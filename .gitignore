@@ -48,3 +48,8 @@ Thumbs.db
 .nx/polygraph
 .nx/self-healing
 .nx/migrate-runs
+
+# local overlays (personal / OpConnect / secrets)
+overlays/local/**
+!overlays/local/.gitkeep
+.temari/
