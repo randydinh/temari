@@ -50,6 +50,8 @@ importers:
         specifier: workspace:*
         version: link:../contracts
 
+  packages/workflow-runtime: {}
+
 packages:
 
   '@babel/code-frame@7.29.7':

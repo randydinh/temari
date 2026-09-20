@@ -11,6 +11,9 @@
     },
     {
       "path": "./libs/host-adapters"
+    },
+    {
+      "path": "./packages/workflow-runtime"
     }
   ],
   "compilerOptions": {}
