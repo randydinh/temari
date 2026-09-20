@@ -1,0 +1,1854 @@
+{
+  "schema": 1,
+  "sourceRevision": "19797453d02f1509d18c42b8d8f6d42e2f2b92e6",
+  "files": [
+    {
+      "path": "LICENSE",
+      "lane": "portable",
+      "sourceSha256": "3d9d76bf9933fba6b57c8f142b9fa21443cb2ca7a449dc4892ff8543be67798c",
+      "artifactSha256": "3d9d76bf9933fba6b57c8f142b9fa21443cb2ca7a449dc4892ff8543be67798c",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "UPSTREAM.md",
+      "lane": "portable",
+      "sourceSha256": "c0c352d96d82a7b85208ac0e3b66942e330c44eef432f104cb50d727f4c8da27",
+      "artifactSha256": "c0c352d96d82a7b85208ac0e3b66942e330c44eef432f104cb50d727f4c8da27",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "adapters/README.md",
+      "lane": "portable",
+      "sourceSha256": "189303ecf9ee61fc310cb61bf1685770bbabc89bafa2e97a75efa0e00863125a",
+      "artifactSha256": "3abdd7e2529a049d3a795361e1c696f8198757ef21e129435132e69ec1045b1e",
+      "executable": false,
+      "transformation": "Exclude historical evidence and require fresh isolated installation proof."
+    },
+    {
+      "path": "adapters/claude-code/HOST.md",
+      "lane": "portable",
+      "sourceSha256": "6941d95ec69aac6369ff587ea800af383d1149219894d5aca3963c6c0b433e57",
+      "artifactSha256": "6941d95ec69aac6369ff587ea800af383d1149219894d5aca3963c6c0b433e57",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "adapters/claude-code/skills/closeout/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "632e820e3e887e58da11b443971d295f87631cd322455e7de98d8d696606d49c",
+      "artifactSha256": "632e820e3e887e58da11b443971d295f87631cd322455e7de98d8d696606d49c",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "adapters/claude-code/skills/poteto-mode/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "d3437cb89fa0dba4404eb1f4bf918fd69142473aa55aef326d8bd14ef270cb51",
+      "artifactSha256": "d3437cb89fa0dba4404eb1f4bf918fd69142473aa55aef326d8bd14ef270cb51",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "adapters/claude-code/skills/temari/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "b7634a911420441076473da8bb071f08980aeee66a166d1bad939e0ce0fb240b",
+      "artifactSha256": "b7634a911420441076473da8bb071f08980aeee66a166d1bad939e0ce0fb240b",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "adapters/claude-code/skills/verify-temari/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "f4d61bd460164b15e6aa067f70dc49e909882195312d412a2322b6c792f015d0",
+      "artifactSha256": "f4d61bd460164b15e6aa067f70dc49e909882195312d412a2322b6c792f015d0",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "adapters/codex/HOST.md",
+      "lane": "portable",
+      "sourceSha256": "979cc1dc01312d0b6127492c4d43ef1e5b1ba5e6446b28b5f0f2039139242da1",
+      "artifactSha256": "979cc1dc01312d0b6127492c4d43ef1e5b1ba5e6446b28b5f0f2039139242da1",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "adapters/codex/plugin.json",
+      "lane": "portable",
+      "sourceSha256": "9205d9ca45bdb074388cb98c40464f3dca11878c45af017c37650b1ee99f5ac1",
+      "artifactSha256": "9205d9ca45bdb074388cb98c40464f3dca11878c45af017c37650b1ee99f5ac1",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "adapters/codex/skills/closeout/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "8294732c4c5c0e7d6f0d72bc52621eb5c2f99c7591648c069bba2de8a351c59a",
+      "artifactSha256": "8294732c4c5c0e7d6f0d72bc52621eb5c2f99c7591648c069bba2de8a351c59a",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "adapters/codex/skills/poteto-mode/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "4a2dbc42cc4a84ef4755a62a01a598ab65c521874012c2c0ff17f4e91eda9b53",
+      "artifactSha256": "4a2dbc42cc4a84ef4755a62a01a598ab65c521874012c2c0ff17f4e91eda9b53",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "adapters/codex/skills/temari/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "a7f8f5abc6496eafa1ac5e84f6ee8602d8e653a4517c45a4346f76dd44bf52de",
+      "artifactSha256": "a7f8f5abc6496eafa1ac5e84f6ee8602d8e653a4517c45a4346f76dd44bf52de",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "adapters/codex/skills/verify-temari/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "95a6a352fd03307691a83c19f37e9399f9ca4cc2394aaab6b483f3f5f2111bee",
+      "artifactSha256": "95a6a352fd03307691a83c19f37e9399f9ca4cc2394aaab6b483f3f5f2111bee",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "adapters/cursor/HOST.md",
+      "lane": "portable",
+      "sourceSha256": "23af0be587b3fccbae1129cefef791a4cfd662a1ae24ac3503126ea38d305491",
+      "artifactSha256": "23af0be587b3fccbae1129cefef791a4cfd662a1ae24ac3503126ea38d305491",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "adapters/generic/HOST.md",
+      "lane": "portable",
+      "sourceSha256": "c9064baa0cf4e5e0b6235b694762b51f2ce7990a10c9426ba6a291b9b61e28cf",
+      "artifactSha256": "c9064baa0cf4e5e0b6235b694762b51f2ce7990a10c9426ba6a291b9b61e28cf",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "adapters/generic/skills/closeout/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "4289bffddbd8358d2c660b788b26233cc921036f9071cb5baa7ba6803219bd80",
+      "artifactSha256": "4289bffddbd8358d2c660b788b26233cc921036f9071cb5baa7ba6803219bd80",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "adapters/generic/skills/poteto-mode/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "373740d35dd3a142afa7b5776944776b2a3bc3b92e832c658cf9d9c39a691afb",
+      "artifactSha256": "f577acc2d0163ed4475ed6a1c674b553ab9b55fa9daee58127ea0eeb8ec22459",
+      "executable": false,
+      "transformation": "Resolve the generic host mapping from the package root so copied public entries remain valid after relocation."
+    },
+    {
+      "path": "adapters/generic/skills/temari/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "9a53b7a734a8f474ded849f7b235784b4795081636088ef4252201da1d1cd42f",
+      "artifactSha256": "fe9b15e1fc11ef6f675f62e7b77724474d15134c6aa3d21700006d9a9a9e8621",
+      "executable": false,
+      "transformation": "Resolve the generic host mapping from the package root so copied public entries remain valid after relocation."
+    },
+    {
+      "path": "adapters/generic/skills/verify-temari/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "784b037859a74f88a5890567c10db63483587dcb39fb6e0c4ff33ad438a67b63",
+      "artifactSha256": "784b037859a74f88a5890567c10db63483587dcb39fb6e0c4ff33ad438a67b63",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "agents/comment-sicko.md",
+      "lane": "portable",
+      "sourceSha256": "c0fd0383008da45fc78cfac17b9007d62c42f87ad1c8d5c2fb658b1fd01f7c82",
+      "artifactSha256": "c0fd0383008da45fc78cfac17b9007d62c42f87ad1c8d5c2fb658b1fd01f7c82",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "agents/dr-eggbot.md",
+      "lane": "portable",
+      "sourceSha256": "ba6256e009a64e8aa446909cfa02fb4203dcecc10406aa8dc60f8f0f1723f13f",
+      "artifactSha256": "ba6256e009a64e8aa446909cfa02fb4203dcecc10406aa8dc60f8f0f1723f13f",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "agents/poteto-agent.md",
+      "lane": "portable",
+      "sourceSha256": "c3850be1b97bc97cec0568ed8b26d04e7693c4e07868137c58fe546d37f288e9",
+      "artifactSha256": "c3850be1b97bc97cec0568ed8b26d04e7693c4e07868137c58fe546d37f288e9",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "docs/guide/01-setup.md",
+      "lane": "portable",
+      "sourceSha256": "c2054ddf17340794410d8a3b250ab932df1f47c967adcd32c5b41a26af63375f",
+      "artifactSha256": "c5ca795594143699d811961716f78cec070b09859da0948dc9c648af0bfce867",
+      "executable": false,
+      "transformation": "Keep directly referenced setup guide without requiring omitted broader guide chapters."
+    },
+    {
+      "path": "docs/guide/02-poteto-mode.md",
+      "lane": "portable",
+      "sourceSha256": "9a3b60248468ade00760354473a7f9d8b23995ab5b7b4c7b03d81000f18b8dc2",
+      "artifactSha256": "e3a7e2b6bf977f4a088f1bb592755d52ae05512c87391ec16107e4958ac0aea3",
+      "executable": false,
+      "transformation": "Keep directly referenced routing guide without omitted illustration or broader guide chapters."
+    },
+    {
+      "path": "integrations/archon/.archon/workflows/temari-live-pilot.yaml",
+      "lane": "archon",
+      "sourceSha256": "8973bd430d0f60374ef7fbc906bd631455f2bacdaeb8601c60b0d98199592850",
+      "artifactSha256": "8973bd430d0f60374ef7fbc906bd631455f2bacdaeb8601c60b0d98199592850",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "integrations/archon/.archon/workflows/temari-pilot.yaml",
+      "lane": "archon",
+      "sourceSha256": "fe2461c0e58e216c7c4bc3480765cb6d44e5609b22485a3f1b1c404a8f0e8761",
+      "artifactSha256": "fe2461c0e58e216c7c4bc3480765cb6d44e5609b22485a3f1b1c404a8f0e8761",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "integrations/archon/README.md",
+      "lane": "archon",
+      "sourceSha256": "e5b67fc9239de7bde650956cf1ea68b6ae5beaba9853b9d5d914d137d01a9767",
+      "artifactSha256": "e5b67fc9239de7bde650956cf1ea68b6ae5beaba9853b9d5d914d137d01a9767",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "integrations/archon/bridge.test.ts",
+      "lane": "archon",
+      "sourceSha256": "43c6c3eca4900d6f7ca6d67160596ab3ec238ddb414a23e63ba0938fee0404f9",
+      "artifactSha256": "43c6c3eca4900d6f7ca6d67160596ab3ec238ddb414a23e63ba0938fee0404f9",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "integrations/archon/bridge.ts",
+      "lane": "archon",
+      "sourceSha256": "13523f2eb5c3de5abbeffcda8d899ce73a7eed34ce708e8ea68b36036cf9d392",
+      "artifactSha256": "13523f2eb5c3de5abbeffcda8d899ce73a7eed34ce708e8ea68b36036cf9d392",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "integrations/archon/fixtures/pilot.ts",
+      "lane": "archon",
+      "sourceSha256": "39344e52631d686bf2b88e2066bf1d431e8742a4baed6b5b66db7962af7d3c0e",
+      "artifactSha256": "39344e52631d686bf2b88e2066bf1d431e8742a4baed6b5b66db7962af7d3c0e",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "integrations/archon/fixtures/stage.ts",
+      "lane": "archon",
+      "sourceSha256": "e2856f9d84028a88041a8f7e2187361094c816b10ef756eb16a099b3c0a719bd",
+      "artifactSha256": "e2856f9d84028a88041a8f7e2187361094c816b10ef756eb16a099b3c0a719bd",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "integrations/archon/lifecycle.test.ts",
+      "lane": "archon",
+      "sourceSha256": "24c183a33c6bcfebab5556d34750f3068f78c17d8fc4d4f0e1d0c6c2ac832ffd",
+      "artifactSha256": "24c183a33c6bcfebab5556d34750f3068f78c17d8fc4d4f0e1d0c6c2ac832ffd",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "integrations/archon/lifecycle.ts",
+      "lane": "archon",
+      "sourceSha256": "35311943e07d118e505d6e3d006284982c157a517564f9f266b2e966c62ecf3e",
+      "artifactSha256": "35311943e07d118e505d6e3d006284982c157a517564f9f266b2e966c62ecf3e",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "integrations/archon/live-codex.ts",
+      "lane": "archon",
+      "sourceSha256": "00fae4ce41b24c2c20cc129aa237b190ced940187e6740d79f8e70ee72a7e133",
+      "artifactSha256": "00fae4ce41b24c2c20cc129aa237b190ced940187e6740d79f8e70ee72a7e133",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "integrations/archon/live-permissions.test.ts",
+      "lane": "archon",
+      "sourceSha256": "0844df99a451a0b384b20b8bb1fa096c0cd49fe454c38658d22c381e06be3979",
+      "artifactSha256": "0844df99a451a0b384b20b8bb1fa096c0cd49fe454c38658d22c381e06be3979",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "integrations/archon/live-permissions.ts",
+      "lane": "archon",
+      "sourceSha256": "37e622550e7353252a5c2985b0b0eac7f0c8ced17d626f7fd790120e78547999",
+      "artifactSha256": "37e622550e7353252a5c2985b0b0eac7f0c8ced17d626f7fd790120e78547999",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "integrations/archon/live-routing.test.ts",
+      "lane": "archon",
+      "sourceSha256": "e53f57ae217abfb51395384b90078e169a90ae7040e7bf348e985ccbb0e1c960",
+      "artifactSha256": "e53f57ae217abfb51395384b90078e169a90ae7040e7bf348e985ccbb0e1c960",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "integrations/archon/live-routing.ts",
+      "lane": "archon",
+      "sourceSha256": "6452f5ab71269437326debdfff9120f45dbfc933f14eb8e7eb41bdfd0a031244",
+      "artifactSha256": "6452f5ab71269437326debdfff9120f45dbfc933f14eb8e7eb41bdfd0a031244",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "integrations/archon/live-tasks.test.ts",
+      "lane": "archon",
+      "sourceSha256": "7eb761b0b7d6fc373e4b44b771de74238f971f1920c41e8e9b9a1823ddb8eb1f",
+      "artifactSha256": "7eb761b0b7d6fc373e4b44b771de74238f971f1920c41e8e9b9a1823ddb8eb1f",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "integrations/archon/live-tasks.ts",
+      "lane": "archon",
+      "sourceSha256": "d76fa10098fffaf8f564b4b3d3e289d66deb03c31a3878a775b5bcc0636db021",
+      "artifactSha256": "d76fa10098fffaf8f564b4b3d3e289d66deb03c31a3878a775b5bcc0636db021",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "integrations/archon/live.test.ts",
+      "lane": "archon",
+      "sourceSha256": "a9aeb3efae54c189de2b5de821f74d8aec6abe09dd4288bacf9ef4552b0b11a8",
+      "artifactSha256": "a9aeb3efae54c189de2b5de821f74d8aec6abe09dd4288bacf9ef4552b0b11a8",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "integrations/archon/live.ts",
+      "lane": "archon",
+      "sourceSha256": "c355605c2069e597f1495fb787aee8754ee0d8142be1851f5fa69fb97bc00ce2",
+      "artifactSha256": "c355605c2069e597f1495fb787aee8754ee0d8142be1851f5fa69fb97bc00ce2",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "integrations/archon/runtime-files.txt",
+      "lane": "archon",
+      "sourceSha256": "0b398acb51b2559546d7a6d75651d17930650261ad0af8ae111c7c5ebd5a962c",
+      "artifactSha256": "0b398acb51b2559546d7a6d75651d17930650261ad0af8ae111c7c5ebd5a962c",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "integrations/archon/smoke.ts",
+      "lane": "archon",
+      "sourceSha256": "1f5ece58fdc786e1266db4cb3db98a68c68754259e5fc661096463a5e0887528",
+      "artifactSha256": "1f5ece58fdc786e1266db4cb3db98a68c68754259e5fc661096463a5e0887528",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "integrations/archon/tsconfig.json",
+      "lane": "archon",
+      "sourceSha256": "542d7e65cbc162a2f23e7de7992c48dfdaf623d10601c7fca1a3c05853e79866",
+      "artifactSha256": "542d7e65cbc162a2f23e7de7992c48dfdaf623d10601c7fca1a3c05853e79866",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "scripts/build-codex-plugin.sh",
+      "lane": "portable",
+      "sourceSha256": "98bb236b15731d521731e1a1f82c5f273d3bcd424459f98663e0719fc27f7e80",
+      "artifactSha256": "7100a4296e37abe00ea9e342ff4f95cbc0a0161cfec2a39c3d37c0067dae2bde",
+      "executable": true,
+      "transformation": "Copy complete portable reference closure and preserve optional Archon absence explicitly."
+    },
+    {
+      "path": "scripts/check-skill-references.sh",
+      "lane": "portable",
+      "sourceSha256": "0797be52ffb984cd7a0e9582fd5e61231a21b1db358a50ce8137d8b56083a21a",
+      "artifactSha256": "6ed8f5cd77ece0116c34b130e31bbec7046122d49d2029556cf7bbcea89251fb",
+      "executable": true,
+      "transformation": "Check the included guide closure and remove arbitrary working-directory fallback."
+    },
+    {
+      "path": "scripts/copy-archon-runtime.sh",
+      "lane": "portable",
+      "sourceSha256": "5ef164dc7e078203ccc8cc176c79030f078221cd1f63978c205145e211851e8e",
+      "artifactSha256": "5ae6334389bdc9d8396fc2d3c81f691f6d8897216c57836c6356f7c0dd55b9a6",
+      "executable": true,
+      "transformation": "Report unavailable optional Archon distribution explicitly."
+    },
+    {
+      "path": "scripts/install-host.sh",
+      "lane": "portable",
+      "sourceSha256": "0d6fc63ef5ccaa721b4f401f2d4b3c74f59ec2e1a2b677a1d09279aa9719f067",
+      "artifactSha256": "ab864c9a6d4ab315ab9d822074a0d0b666e87ef12e7dda3678b9c73b6d08ae92",
+      "executable": true,
+      "transformation": "Copy complete portable reference closure and preserve optional Archon absence explicitly."
+    },
+    {
+      "path": "skills/architect/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "897a59beaa3cab107d98c256206e062cc4a5e9421a45b9d462fbded19291fea5",
+      "artifactSha256": "897a59beaa3cab107d98c256206e062cc4a5e9421a45b9d462fbded19291fea5",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/architect/references/design-red-flags.md",
+      "lane": "portable",
+      "sourceSha256": "905066f9bbac81c573c2b325be47751d2c0f9325e0a0772bd4384e82dafe9336",
+      "artifactSha256": "905066f9bbac81c573c2b325be47751d2c0f9325e0a0772bd4384e82dafe9336",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/architect/references/rationale-template.md",
+      "lane": "portable",
+      "sourceSha256": "0cedfccdc7b47fc881febd5a8293eecbc542c20f8df825639904a8102d2eb5d3",
+      "artifactSha256": "0cedfccdc7b47fc881febd5a8293eecbc542c20f8df825639904a8102d2eb5d3",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/architect/references/runner-prompt.md",
+      "lane": "portable",
+      "sourceSha256": "983bf2820cc14ed8ecab6e448e1033e5cfe6031967d0a9287b48c7fa9c33d925",
+      "artifactSha256": "983bf2820cc14ed8ecab6e448e1033e5cfe6031967d0a9287b48c7fa9c33d925",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/arena/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "8d431f7b1aa19daf6300366fc876c4d1aadac06417ec5502407345ffaf4e90d9",
+      "artifactSha256": "8d431f7b1aa19daf6300366fc876c4d1aadac06417ec5502407345ffaf4e90d9",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/automate-me/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "7534b1269b216b4ae59c98c376371a1d19c72c34330d166a10ad5868b486fc6e",
+      "artifactSha256": "7534b1269b216b4ae59c98c376371a1d19c72c34330d166a10ad5868b486fc6e",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/blast-radius/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "20cb2945f5fe62055166f745107274af5f19428ca033e53a9b8bc69650d3ded1",
+      "artifactSha256": "20cb2945f5fe62055166f745107274af5f19428ca033e53a9b8bc69650d3ded1",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/bro/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "aa329d0ceeeecb6822a7174ad76bb07a7826a3c52ceb6a588dec4138815084bb",
+      "artifactSha256": "aa329d0ceeeecb6822a7174ad76bb07a7826a3c52ceb6a588dec4138815084bb",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/closeout/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "32e3418ddb92c30bfd8c78902ca032071de0b715f03c114459eaabe6b858d740",
+      "artifactSha256": "32e3418ddb92c30bfd8c78902ca032071de0b715f03c114459eaabe6b858d740",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/create-verification-skill/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "6d767adeb6179a28b0a52778c920c2152100830f800fa21c43f39a828530a991",
+      "artifactSha256": "6d767adeb6179a28b0a52778c920c2152100830f800fa21c43f39a828530a991",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/create-verification-skill/references/feature-map-example/README.md",
+      "lane": "portable",
+      "sourceSha256": "cb7bd782cf89968a4ba3d58a5151db837430db92d19a6f52a906973b77b516ba",
+      "artifactSha256": "cb7bd782cf89968a4ba3d58a5151db837430db92d19a6f52a906973b77b516ba",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/create-verification-skill/references/feature-map-example/create-note.md",
+      "lane": "portable",
+      "sourceSha256": "644a44c74f35d38c2feb7cd05a0121fdebbb623e8dc376c185b565a581d1ccf7",
+      "artifactSha256": "644a44c74f35d38c2feb7cd05a0121fdebbb623e8dc376c185b565a581d1ccf7",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/create-verification-skill/references/feature-map-example/search.md",
+      "lane": "portable",
+      "sourceSha256": "6e87b9e7f2791a7776ba1bb83f371cd285c306c67f19d245cc4dd6ca3015c823",
+      "artifactSha256": "6e87b9e7f2791a7776ba1bb83f371cd285c306c67f19d245cc4dd6ca3015c823",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/deslop/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "ffdf565bc1b8d683ea2087ab45628773c4ec1a35ab247691b321fcfa6bce2c1d",
+      "artifactSha256": "ffdf565bc1b8d683ea2087ab45628773c4ec1a35ab247691b321fcfa6bce2c1d",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/figure-it-out/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "e041c64a39f1084a20e60ee99762c4dbd3ec8be56ed33fd68ea867b8bd8bd3e4",
+      "artifactSha256": "e041c64a39f1084a20e60ee99762c4dbd3ec8be56ed33fd68ea867b8bd8bd3e4",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/how/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "06b714dbd830bc829bfb89e33a1c39daf6d72ea412e488ea9d65f5f33b885a0c",
+      "artifactSha256": "06b714dbd830bc829bfb89e33a1c39daf6d72ea412e488ea9d65f5f33b885a0c",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/how/references/explainer-prompt.md",
+      "lane": "portable",
+      "sourceSha256": "ddb89cebefc24e2b54517a331aedfe045b6971e101f45c71b8cef4cccff45bff",
+      "artifactSha256": "ddb89cebefc24e2b54517a331aedfe045b6971e101f45c71b8cef4cccff45bff",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/how/references/explorer-prompt.md",
+      "lane": "portable",
+      "sourceSha256": "1a88e5865d358d9fcd3f5f70699997ed7bddbad92d5d9e16a7f92257a09bc4f9",
+      "artifactSha256": "1a88e5865d358d9fcd3f5f70699997ed7bddbad92d5d9e16a7f92257a09bc4f9",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/interrogate/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "2867910309e81411123ae4edca68ffca5795e66521d3f3bc0876f6213b542fb9",
+      "artifactSha256": "2867910309e81411123ae4edca68ffca5795e66521d3f3bc0876f6213b542fb9",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/interrogate/references/code-quality-review.md",
+      "lane": "portable",
+      "sourceSha256": "623d3d8122d075c303b562783b471a732992e84166b318f85ab6d6c118b13304",
+      "artifactSha256": "623d3d8122d075c303b562783b471a732992e84166b318f85ab6d6c118b13304",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/interrogate/references/lead-judgment.md",
+      "lane": "portable",
+      "sourceSha256": "6e5bdf5670eb34017692e9b6c546f36ac7552e6bb9f3f2f3429164fcc46a9361",
+      "artifactSha256": "6e5bdf5670eb34017692e9b6c546f36ac7552e6bb9f3f2f3429164fcc46a9361",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/interrogate/references/reviewer-prompt.md",
+      "lane": "portable",
+      "sourceSha256": "a397cc61102add709803d917fb23d726920525bf23e7c06dc4ed0b5cbeb00e54",
+      "artifactSha256": "a397cc61102add709803d917fb23d726920525bf23e7c06dc4ed0b5cbeb00e54",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/interrogate/references/rubric.md",
+      "lane": "portable",
+      "sourceSha256": "59e9b7cc4556e735e1b859a7dd1f7637b013a2426a84825ac1c51979942c158a",
+      "artifactSha256": "59e9b7cc4556e735e1b859a7dd1f7637b013a2426a84825ac1c51979942c158a",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/maintain-verification-skill/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "1373c2e2450ce12ff47e29752b4206b0ce205574c7ed47f0dac5bd8d00e164b1",
+      "artifactSha256": "1373c2e2450ce12ff47e29752b4206b0ce205574c7ed47f0dac5bd8d00e164b1",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/make-bot-ui/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "3624c8ef16cf2e48deb2a4049e72c6962a9431c8d6c6af90e7bd7ea0375224ec",
+      "artifactSha256": "3624c8ef16cf2e48deb2a4049e72c6962a9431c8d6c6af90e7bd7ea0375224ec",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/no-comments/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "5c5b0882297d704c3a9720c52b7a793c68b013eaf717989f0945624efdfe2b05",
+      "artifactSha256": "5c5b0882297d704c3a9720c52b7a793c68b013eaf717989f0945624efdfe2b05",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "d6507c6b87d3a3c7c263b711e9152bb513ca1c8b0204aa8da4a1fefe4357f9b3",
+      "artifactSha256": "d6507c6b87d3a3c7c263b711e9152bb513ca1c8b0204aa8da4a1fefe4357f9b3",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbook-contracts/v1/feature.json",
+      "lane": "portable",
+      "sourceSha256": "27afa4044e7e1b0238b2ed6a33f7cff26417d7f905372bd6b5409f4d0462f959",
+      "artifactSha256": "27afa4044e7e1b0238b2ed6a33f7cff26417d7f905372bd6b5409f4d0462f959",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbook-contracts/v1/lightweight-engineering.json",
+      "lane": "portable",
+      "sourceSha256": "94370c4bbbd48666807630abd2866f0727ccf3ab614d23fd4b2d3c3b98d493e7",
+      "artifactSha256": "94370c4bbbd48666807630abd2866f0727ccf3ab614d23fd4b2d3c3b98d493e7",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbook-contracts/v1/profile.schema.json",
+      "lane": "portable",
+      "sourceSha256": "598d1a1a77d3462bf663723ea6278709aeeaaac570132670680ed6c668e918cf",
+      "artifactSha256": "598d1a1a77d3462bf663723ea6278709aeeaaac570132670680ed6c668e918cf",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/authoring-a-skill.md",
+      "lane": "portable",
+      "sourceSha256": "25b79df8989dfdce258c5608f6c3ef41e607ddc6d0d62df2f0a92da88397ae07",
+      "artifactSha256": "25b79df8989dfdce258c5608f6c3ef41e607ddc6d0d62df2f0a92da88397ae07",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/autonomous-run.md",
+      "lane": "portable",
+      "sourceSha256": "15e54ad3ac92565613980772d8708de6e19cc4690bfd4bb3fb8836522407377b",
+      "artifactSha256": "15e54ad3ac92565613980772d8708de6e19cc4690bfd4bb3fb8836522407377b",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/autopilot-full.md",
+      "lane": "portable",
+      "sourceSha256": "7cb915e44dbae30a80bc164366e7ba52bebcb96e184ac12281ec9524cae52582",
+      "artifactSha256": "7cb915e44dbae30a80bc164366e7ba52bebcb96e184ac12281ec9524cae52582",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/autopilot-stack.md",
+      "lane": "portable",
+      "sourceSha256": "3caea8c788b9b53e825bd05d0b3d84b0c41eef65b669a6f1fa0d64cd0e701434",
+      "artifactSha256": "3caea8c788b9b53e825bd05d0b3d84b0c41eef65b669a6f1fa0d64cd0e701434",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/babysit.md",
+      "lane": "portable",
+      "sourceSha256": "51be21872152f97612d37258273269b88212b6696432d25d678cac30f02f4157",
+      "artifactSha256": "51be21872152f97612d37258273269b88212b6696432d25d678cac30f02f4157",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/bug-fix.md",
+      "lane": "portable",
+      "sourceSha256": "e2ca6e217c8414409d3b51c64bb2743afa2256d98f643e104f8c4b52a1951883",
+      "artifactSha256": "e2ca6e217c8414409d3b51c64bb2743afa2256d98f643e104f8c4b52a1951883",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/eval.md",
+      "lane": "portable",
+      "sourceSha256": "b862bfa2fae2399abf047a8e80d3e3dddb64003af96fb1cebb625216131e36bb",
+      "artifactSha256": "b862bfa2fae2399abf047a8e80d3e3dddb64003af96fb1cebb625216131e36bb",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/feature.md",
+      "lane": "portable",
+      "sourceSha256": "6c35ad16414d05056c22b32e84693d1669994334676806540f54adbfea26dca4",
+      "artifactSha256": "6c35ad16414d05056c22b32e84693d1669994334676806540f54adbfea26dca4",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/hillclimb.md",
+      "lane": "portable",
+      "sourceSha256": "4637fb1537288f6c26c69425045f01b725bb6fa8a7b444bf98b6eaa9a1e9fb5f",
+      "artifactSha256": "4637fb1537288f6c26c69425045f01b725bb6fa8a7b444bf98b6eaa9a1e9fb5f",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/investigation.md",
+      "lane": "portable",
+      "sourceSha256": "dc66bcf6af3a074fc7f67aa5e12b93ef571a4fb4d8e17f2f1af5ae5359f42e46",
+      "artifactSha256": "dc66bcf6af3a074fc7f67aa5e12b93ef571a4fb4d8e17f2f1af5ae5359f42e46",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/lightweight-engineering.md",
+      "lane": "portable",
+      "sourceSha256": "320f33d095434c5a58fd2adb2abf6a1fcd458fe3a2af431a227d6f51dde6e492",
+      "artifactSha256": "320f33d095434c5a58fd2adb2abf6a1fcd458fe3a2af431a227d6f51dde6e492",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/multi-phase-plan.md",
+      "lane": "portable",
+      "sourceSha256": "b823e05b64bbef84ae5169717c5fab1d9ab5079625996271e3aa7abcdce7b8ad",
+      "artifactSha256": "b823e05b64bbef84ae5169717c5fab1d9ab5079625996271e3aa7abcdce7b8ad",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/opening-a-pr.md",
+      "lane": "portable",
+      "sourceSha256": "8e44e7b8eb81d5416eae8ed822c8ea4d90d80ac5ff7a3e0ca53a8c3dd5e6d065",
+      "artifactSha256": "8e44e7b8eb81d5416eae8ed822c8ea4d90d80ac5ff7a3e0ca53a8c3dd5e6d065",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/orchestrate.md",
+      "lane": "portable",
+      "sourceSha256": "d42b4375f1bd4ce23da0b575a198571a2117df7eea10c3c9fc6d92ae1053f7be",
+      "artifactSha256": "d42b4375f1bd4ce23da0b575a198571a2117df7eea10c3c9fc6d92ae1053f7be",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/pause-safely.md",
+      "lane": "portable",
+      "sourceSha256": "7d5fc10e144265f1b35f8157926541e738c1de64b6a85b3e61b51cf268c3dffd",
+      "artifactSha256": "7d5fc10e144265f1b35f8157926541e738c1de64b6a85b3e61b51cf268c3dffd",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/perf-issue.md",
+      "lane": "portable",
+      "sourceSha256": "dd81d608d6ab19b3d9c900004fd71e9b2e46b3f1b3c2c88f80ef256268717524",
+      "artifactSha256": "dd81d608d6ab19b3d9c900004fd71e9b2e46b3f1b3c2c88f80ef256268717524",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/prototype.md",
+      "lane": "portable",
+      "sourceSha256": "7aa1f52c691c3d46d5afc527b23f90977fce869ce33573c73c81a4c7f0cde962",
+      "artifactSha256": "7aa1f52c691c3d46d5afc527b23f90977fce869ce33573c73c81a4c7f0cde962",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/refactoring.md",
+      "lane": "portable",
+      "sourceSha256": "53bac1f1fe886600dd1991b5511b7975e6a206168038f9d282d88e45408e93cf",
+      "artifactSha256": "53bac1f1fe886600dd1991b5511b7975e6a206168038f9d282d88e45408e93cf",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/runtime-forensics.md",
+      "lane": "portable",
+      "sourceSha256": "594f02c40c243a346e1f57b688ecf2ed5e882f21b3d24ed2204d1ac6f1c24a8a",
+      "artifactSha256": "594f02c40c243a346e1f57b688ecf2ed5e882f21b3d24ed2204d1ac6f1c24a8a",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/session-pickup.md",
+      "lane": "portable",
+      "sourceSha256": "1604fb463f7c7410d43fa024ca76c1c1824c166a01fd69d61f073d06fdca2a47",
+      "artifactSha256": "1604fb463f7c7410d43fa024ca76c1c1824c166a01fd69d61f073d06fdca2a47",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/shipping.md",
+      "lane": "portable",
+      "sourceSha256": "c301902136e0a9a0a55403c35374f6f5738e501aee66c27458dc197b87557550",
+      "artifactSha256": "c301902136e0a9a0a55403c35374f6f5738e501aee66c27458dc197b87557550",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/trace-forensics.md",
+      "lane": "portable",
+      "sourceSha256": "137ce3984fb96e45971fdff4d3c79fa4ccc647c5b30ae4945783b9fb23f8cec7",
+      "artifactSha256": "137ce3984fb96e45971fdff4d3c79fa4ccc647c5b30ae4945783b9fb23f8cec7",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/visual-parity.md",
+      "lane": "portable",
+      "sourceSha256": "950ca51999a6454c98eee6bcbc3d1bbe501a4e3a5d5439b6f6ddc378991b256c",
+      "artifactSha256": "950ca51999a6454c98eee6bcbc3d1bbe501a4e3a5d5439b6f6ddc378991b256c",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/playbooks/worktree-cleanup.md",
+      "lane": "portable",
+      "sourceSha256": "b29d926ff7df8b811195bb617560e82b2bfd29c0d80bd1c1bb5576945a2c0ad2",
+      "artifactSha256": "b29d926ff7df8b811195bb617560e82b2bfd29c0d80bd1c1bb5576945a2c0ad2",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/references/bugbot-triage.md",
+      "lane": "portable",
+      "sourceSha256": "b2d146c770d8d3593e1ef3d77b668039b8e1f78093ea1a86f1d45d7f99614309",
+      "artifactSha256": "b2d146c770d8d3593e1ef3d77b668039b8e1f78093ea1a86f1d45d7f99614309",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/bootstrap.ts",
+      "lane": "portable",
+      "sourceSha256": "ccd2ed08fd9da9d0d942e5f2491cfc74bb92d8a08fa51755e0da1ac8de287361",
+      "artifactSha256": "ccd2ed08fd9da9d0d942e5f2491cfc74bb92d8a08fa51755e0da1ac8de287361",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/bun.lock",
+      "lane": "portable",
+      "sourceSha256": "667d9cf7222e9aae3fa42a4be383e657784216e9df115da02227fbc5ac7bbe46",
+      "artifactSha256": "667d9cf7222e9aae3fa42a4be383e657784216e9df115da02227fbc5ac7bbe46",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/check-plan.mjs",
+      "lane": "portable",
+      "sourceSha256": "4f5118edf719b481983dc87dfadd5b4b5473d05aad04a7ba65191ff9c73faf1b",
+      "artifactSha256": "4f5118edf719b481983dc87dfadd5b4b5473d05aad04a7ba65191ff9c73faf1b",
+      "executable": true,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/orch/orch.test.ts",
+      "lane": "portable",
+      "sourceSha256": "174b86d21ff51ccd28d1a8c938cb2e0c6fa287b209d4ca6c03932fcb1b53372e",
+      "artifactSha256": "174b86d21ff51ccd28d1a8c938cb2e0c6fa287b209d4ca6c03932fcb1b53372e",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/orch/orch.ts",
+      "lane": "portable",
+      "sourceSha256": "f091687df627a0b75fabd54af58945a9cd6c7039ef0622012ac9ed60cd8ec434",
+      "artifactSha256": "f091687df627a0b75fabd54af58945a9cd6c7039ef0622012ac9ed60cd8ec434",
+      "executable": true,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/orch/store.ts",
+      "lane": "portable",
+      "sourceSha256": "0eae7cf69282e827b1227166f2e32cee3560f2f3e65b3f1f2faf6fb83d3b4c5b",
+      "artifactSha256": "0eae7cf69282e827b1227166f2e32cee3560f2f3e65b3f1f2faf6fb83d3b4c5b",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/package.json",
+      "lane": "portable",
+      "sourceSha256": "2e67aa354fbcf391912b72e9aa8da87e4604e78210d111b8fff270954b35f5df",
+      "artifactSha256": "2e67aa354fbcf391912b72e9aa8da87e4604e78210d111b8fff270954b35f5df",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/watch-pr/cli.test.ts",
+      "lane": "portable",
+      "sourceSha256": "a35592b4c6da96caf8d47987e9cd503fab6c7774ab87d11a43f24b4b5df2a9d1",
+      "artifactSha256": "a35592b4c6da96caf8d47987e9cd503fab6c7774ab87d11a43f24b4b5df2a9d1",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/watch-pr/cli.ts",
+      "lane": "portable",
+      "sourceSha256": "89c08863089181a232be782c4b2ed90a1552f44aeecb0dcb7aac2c623620e680",
+      "artifactSha256": "89c08863089181a232be782c4b2ed90a1552f44aeecb0dcb7aac2c623620e680",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/watch-pr/fakes.test-helper.ts",
+      "lane": "portable",
+      "sourceSha256": "e53e31b7f03068063f53a99a3591b052aaed66e4e2b196b3a364980f60324ab1",
+      "artifactSha256": "e53e31b7f03068063f53a99a3591b052aaed66e4e2b196b3a364980f60324ab1",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/watch-pr/github.test.ts",
+      "lane": "portable",
+      "sourceSha256": "0cbce011050522938523e36bb42a260e92b812dcd2076930fa681672ad316b24",
+      "artifactSha256": "0cbce011050522938523e36bb42a260e92b812dcd2076930fa681672ad316b24",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/watch-pr/github.ts",
+      "lane": "portable",
+      "sourceSha256": "d1bbbafbe8e2c703c84da2029de7f2c4011412512f8cf65a42100f46bcb92c8a",
+      "artifactSha256": "d1bbbafbe8e2c703c84da2029de7f2c4011412512f8cf65a42100f46bcb92c8a",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/watch-pr/policy.test.ts",
+      "lane": "portable",
+      "sourceSha256": "a9fedb25feefd1f57ef6a662f80c99018690170a3a8070773a08eaf694d1d3d9",
+      "artifactSha256": "a9fedb25feefd1f57ef6a662f80c99018690170a3a8070773a08eaf694d1d3d9",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/watch-pr/policy.ts",
+      "lane": "portable",
+      "sourceSha256": "68d240505852cf23c9b2dea463342e9e61243f486b3cc86c735d140f9ee7be49",
+      "artifactSha256": "68d240505852cf23c9b2dea463342e9e61243f486b3cc86c735d140f9ee7be49",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/watch-pr/render.ts",
+      "lane": "portable",
+      "sourceSha256": "2b709e86628d5b8fdb61f860e60ababc342b0626c67576305442cf548283a604",
+      "artifactSha256": "2b709e86628d5b8fdb61f860e60ababc342b0626c67576305442cf548283a604",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/watch-pr/tsconfig.json",
+      "lane": "portable",
+      "sourceSha256": "1ecccc72320b086c63ce3f73c959896fd747363e63553b3b1136296ea4069e45",
+      "artifactSha256": "1ecccc72320b086c63ce3f73c959896fd747363e63553b3b1136296ea4069e45",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/watch-pr/types.compile.ts",
+      "lane": "portable",
+      "sourceSha256": "621af4c9a664fbf699a9737efccdc248abb416df8819c9dc5f824beae2b9b1d6",
+      "artifactSha256": "621af4c9a664fbf699a9737efccdc248abb416df8819c9dc5f824beae2b9b1d6",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/watch-pr/types.ts",
+      "lane": "portable",
+      "sourceSha256": "64ba6221e3bfe61bbb292337d199cdec6309455477280efb060203dba34e0e91",
+      "artifactSha256": "64ba6221e3bfe61bbb292337d199cdec6309455477280efb060203dba34e0e91",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/watch-pr/watch-pr",
+      "lane": "portable",
+      "sourceSha256": "d955603be6cc0e8b8ffcec722f635192b2261410b1f2929abea94480e47eb5d4",
+      "artifactSha256": "d955603be6cc0e8b8ffcec722f635192b2261410b1f2929abea94480e47eb5d4",
+      "executable": true,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/workflow/profiles.ts",
+      "lane": "portable",
+      "sourceSha256": "2f5e3ebd05a2b41259fc90877163135667f17f2cef126c6f141265a38e38ac89",
+      "artifactSha256": "2f5e3ebd05a2b41259fc90877163135667f17f2cef126c6f141265a38e38ac89",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/workflow/receipt.ts",
+      "lane": "portable",
+      "sourceSha256": "cb843ca1463df1852abf6a9e0a6f4a60017bf1e1b723091ead187489d47d1248",
+      "artifactSha256": "cb843ca1463df1852abf6a9e0a6f4a60017bf1e1b723091ead187489d47d1248",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/workflow/store.ts",
+      "lane": "portable",
+      "sourceSha256": "30973aa09acfd21a55d24d325234724e42fdadad414e790ca8e96e25d3712d75",
+      "artifactSha256": "30973aa09acfd21a55d24d325234724e42fdadad414e790ca8e96e25d3712d75",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/workflow/tsconfig.json",
+      "lane": "portable",
+      "sourceSha256": "fdbf1fda38a6481f201e664797592ff84d8e1001eb2a3000605d4c0fb5d6afc6",
+      "artifactSha256": "fdbf1fda38a6481f201e664797592ff84d8e1001eb2a3000605d4c0fb5d6afc6",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/workflow/types.ts",
+      "lane": "portable",
+      "sourceSha256": "dd8d1005d38795cf9bdaf1d650e2348e87ee9c6074905917ac64a3170ea447ac",
+      "artifactSha256": "dd8d1005d38795cf9bdaf1d650e2348e87ee9c6074905917ac64a3170ea447ac",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/workflow/workflow.test.ts",
+      "lane": "portable",
+      "sourceSha256": "f30d47d0b22f33da5d6848c0bad8f8d8a36b1c168fd17e2d8079685a56666339",
+      "artifactSha256": "f30d47d0b22f33da5d6848c0bad8f8d8a36b1c168fd17e2d8079685a56666339",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/workflow/workflow.ts",
+      "lane": "portable",
+      "sourceSha256": "eab20bde0725e7209e8e4c39c0f271a16a69cc71adc876a3be22f6857d6eecf8",
+      "artifactSha256": "eab20bde0725e7209e8e4c39c0f271a16a69cc71adc876a3be22f6857d6eecf8",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/worktree-audit-test.sh",
+      "lane": "portable",
+      "sourceSha256": "fc07e4826492efd1cb6b6ffdae2c198d92b698815e0c7e66a25f959b764cf73f",
+      "artifactSha256": "fc07e4826492efd1cb6b6ffdae2c198d92b698815e0c7e66a25f959b764cf73f",
+      "executable": true,
+      "transformation": null
+    },
+    {
+      "path": "skills/poteto-mode/scripts/worktree-audit.sh",
+      "lane": "portable",
+      "sourceSha256": "cdf172b1e33a66710d32a6d29f86e6aafdb31c925cd76786a3cd4d728f6b6ebd",
+      "artifactSha256": "cdf172b1e33a66710d32a6d29f86e6aafdb31c925cd76786a3cd4d728f6b6ebd",
+      "executable": true,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-attack-the-premise/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "c87bd7536f772f8a403ad8155535ee17a1bbec9a353156693eb3bb1520c87ae3",
+      "artifactSha256": "c87bd7536f772f8a403ad8155535ee17a1bbec9a353156693eb3bb1520c87ae3",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-boundary-discipline/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "62ac2862c2caa22dd14531f51c9c6bb445ceb198ca98a687e25b4d47c1f10a28",
+      "artifactSha256": "62ac2862c2caa22dd14531f51c9c6bb445ceb198ca98a687e25b4d47c1f10a28",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-build-the-lever/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "458b269eab8e95a1573276955312f7d2a13ae8599879a9efc748248f6bc34b56",
+      "artifactSha256": "458b269eab8e95a1573276955312f7d2a13ae8599879a9efc748248f6bc34b56",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-encode-lessons-in-structure/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "77044c83a9ac6df78fc643887ea5f1f11f082adaf14b717c060cdaed03cce863",
+      "artifactSha256": "77044c83a9ac6df78fc643887ea5f1f11f082adaf14b717c060cdaed03cce863",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-exhaust-the-design-space/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "8583310d7297b7823d75494faa57b003564d436807febecdecbd8321abe5cf6e",
+      "artifactSha256": "8583310d7297b7823d75494faa57b003564d436807febecdecbd8321abe5cf6e",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-experience-first/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "58903529d733b1c1a7c9ccf127d45ef3c7d0d9f0b81164a4dc6b80efe6f2912b",
+      "artifactSha256": "58903529d733b1c1a7c9ccf127d45ef3c7d0d9f0b81164a4dc6b80efe6f2912b",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-fix-root-causes/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "ba4cd38da1dcc8fe5432feb64457cba95594736a9b21b2ebf8f8c52aee068707",
+      "artifactSha256": "ba4cd38da1dcc8fe5432feb64457cba95594736a9b21b2ebf8f8c52aee068707",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-foundational-thinking/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "864b827e8199d946ce58beca0f89c4ed4099ed6e426fb698a3aaa45de2a9eea2",
+      "artifactSha256": "864b827e8199d946ce58beca0f89c4ed4099ed6e426fb698a3aaa45de2a9eea2",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-guard-the-context-window/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "9f60e2c79b35f865cb103462f9128c6760b70f603475d1e535e5930f61840f66",
+      "artifactSha256": "9f60e2c79b35f865cb103462f9128c6760b70f603475d1e535e5930f61840f66",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-laziness-protocol/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "9006579e9e3f33955d17569733db688ae65f22577dc3b21803d219a5a8445aff",
+      "artifactSha256": "9006579e9e3f33955d17569733db688ae65f22577dc3b21803d219a5a8445aff",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-make-operations-idempotent/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "540738217c3da7bf513b9886924ad6a2bc77e58be867f5bd2e1831c74bf2ce70",
+      "artifactSha256": "540738217c3da7bf513b9886924ad6a2bc77e58be867f5bd2e1831c74bf2ce70",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-migrate-callers-then-delete-legacy-apis/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "09978915a4a11990cf0a9a02d9c08cc59e0b7a04c5c24b83aa560fbe4146f75b",
+      "artifactSha256": "09978915a4a11990cf0a9a02d9c08cc59e0b7a04c5c24b83aa560fbe4146f75b",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-minimize-reader-load/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "42551c5dc74cd578163c148da552db3ff67d29b78600ef216bfd311fb828fe69",
+      "artifactSha256": "42551c5dc74cd578163c148da552db3ff67d29b78600ef216bfd311fb828fe69",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-model-the-domain/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "bbadbb9a723fac3f76e782ae45665eb94058ec10993e4bae36d4dc6b0e4eac07",
+      "artifactSha256": "bbadbb9a723fac3f76e782ae45665eb94058ec10993e4bae36d4dc6b0e4eac07",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-never-block-on-the-human/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "d82bce9ab9193249d1ec0d514202d89602f0fd3d312174d622c2dd222bae5a2e",
+      "artifactSha256": "d82bce9ab9193249d1ec0d514202d89602f0fd3d312174d622c2dd222bae5a2e",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-outcome-oriented-execution/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "beedcaed75572a6a1662d47f16da203c2bd2c9dbffbbd678d4ba187d67b7e670",
+      "artifactSha256": "beedcaed75572a6a1662d47f16da203c2bd2c9dbffbbd678d4ba187d67b7e670",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-prove-it-works/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "ae13d287984a5864312b6286899d4ee2b60f8272b5e5e8fcc586a7c3ea51020b",
+      "artifactSha256": "ae13d287984a5864312b6286899d4ee2b60f8272b5e5e8fcc586a7c3ea51020b",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-redesign-from-first-principles/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "a1c7fd0a96b40e12a74bceb0e6bb20a9666dd844dcabfb624acb27da23b929fe",
+      "artifactSha256": "a1c7fd0a96b40e12a74bceb0e6bb20a9666dd844dcabfb624acb27da23b929fe",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-separate-before-serializing-shared-state/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "05294b40448e927c5da1c7b6f5c6b9fed3744637e3833d2d948b9154a9dd00bb",
+      "artifactSha256": "05294b40448e927c5da1c7b6f5c6b9fed3744637e3833d2d948b9154a9dd00bb",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-sequence-verifiable-units/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "761390804ee36c32f5338d8db47ec54463d40ff96dbb296dfafabcd5f2593eec",
+      "artifactSha256": "761390804ee36c32f5338d8db47ec54463d40ff96dbb296dfafabcd5f2593eec",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-subtract-before-you-add/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "a983a50e732c1ed315eba7aaf47a61329e31c4794eb1ab9d25d9945265b31e03",
+      "artifactSha256": "a983a50e732c1ed315eba7aaf47a61329e31c4794eb1ab9d25d9945265b31e03",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-test-behavior-not-implementation/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "87e40efe4e486f7ea639d2ed1fc0abe6c93b8fd0e89a81218086909d2470a52e",
+      "artifactSha256": "87e40efe4e486f7ea639d2ed1fc0abe6c93b8fd0e89a81218086909d2470a52e",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/principle-type-system-discipline/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "c83da8031ffb4c86410030d3e261f659598fca2b7d8158fd9dc269d70a3a025e",
+      "artifactSha256": "c83da8031ffb4c86410030d3e261f659598fca2b7d8158fd9dc269d70a3a025e",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/recall/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "d265b0e5b6dc5b89c0407f3387d24462c988e1990a37d5359735137908128c5a",
+      "artifactSha256": "d265b0e5b6dc5b89c0407f3387d24462c988e1990a37d5359735137908128c5a",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/reflect/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "609346ab97ce32c33191e5b7a87f2524ebb897d4f500bc794f55333188540ecc",
+      "artifactSha256": "609346ab97ce32c33191e5b7a87f2524ebb897d4f500bc794f55333188540ecc",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/reflect/references/divergent-reviewer.md",
+      "lane": "portable",
+      "sourceSha256": "7da0334ce282e6d8d7349c0cff14ffbd10a91a756c0b5c3ccc97291f57b8bed6",
+      "artifactSha256": "7da0334ce282e6d8d7349c0cff14ffbd10a91a756c0b5c3ccc97291f57b8bed6",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/reflect/references/judgment-reviewer.md",
+      "lane": "portable",
+      "sourceSha256": "917bb2ad21240a42b440aeb2a17766092e09f70d0982417b2f4caa6d74f27164",
+      "artifactSha256": "917bb2ad21240a42b440aeb2a17766092e09f70d0982417b2f4caa6d74f27164",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/reflect/references/synthesizer.md",
+      "lane": "portable",
+      "sourceSha256": "5e9ff62897b36314339078c8dfe516998eaf79000beb29e459e724d147d62a70",
+      "artifactSha256": "5e9ff62897b36314339078c8dfe516998eaf79000beb29e459e724d147d62a70",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/reflect/references/tooling-reviewer.md",
+      "lane": "portable",
+      "sourceSha256": "8c74ebf7811801d634db7ab609b097d77ea00ab77bb4b258d69bd96e671cfa39",
+      "artifactSha256": "8c74ebf7811801d634db7ab609b097d77ea00ab77bb4b258d69bd96e671cfa39",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/seq-log-review/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "5744b63e945c55be60abf0dc3713a1b29e1f90b3c065b8d1ab299201c4778444",
+      "artifactSha256": "517f633fa37dbe9fa439857b7575a02147cead98f42e5250c17a0061f3016296",
+      "executable": false,
+      "transformation": "Replace required private profile with optional approved project overlay; missing material context returns needs-scope."
+    },
+    {
+      "path": "skills/seq-log-review/references/review-contract.md",
+      "lane": "portable",
+      "sourceSha256": "a4f77ec11fe22dff75c1844f5f4a8acffb6b9cc93c9b852320991d7a1cb7156c",
+      "artifactSha256": "eda3e37864f4f633e81c04d2642009cfa92dc50d9f9ee1c82dc723cfdb4d58ab",
+      "executable": false,
+      "transformation": "Require needs-scope for absent or conflicting material project context without importing private overlay bytes."
+    },
+    {
+      "path": "skills/seq-log-review/references/setup.md",
+      "lane": "portable",
+      "sourceSha256": "05ba4afbb02381c4249c4dac55887ac2152fa999c9d9baf21426524575976e90",
+      "artifactSha256": "05ba4afbb02381c4249c4dac55887ac2152fa999c9d9baf21426524575976e90",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/setup-pstack/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "2399a5670c6408e92a996299c9de9f22736997cb7e835c694309e7c6fc8c39bf",
+      "artifactSha256": "2399a5670c6408e92a996299c9de9f22736997cb7e835c694309e7c6fc8c39bf",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/show-me-your-work/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "831e85ba3f84f38bf338cd03e6af050fea357752e25a825e334c99f59d7f2077",
+      "artifactSha256": "831e85ba3f84f38bf338cd03e6af050fea357752e25a825e334c99f59d7f2077",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/show-me-your-work/references/decision-log-template.tsv",
+      "lane": "portable",
+      "sourceSha256": "6779378006a2f5225e8c06deb84f1d913fb532041ebbb6e50d94600bfe3f4b76",
+      "artifactSha256": "6779378006a2f5225e8c06deb84f1d913fb532041ebbb6e50d94600bfe3f4b76",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/show-me-your-work/scripts/log.sh",
+      "lane": "portable",
+      "sourceSha256": "1601bc18f9aba0af3f5d6375e4f2d5dc6102334d1bca935026c0e3547cdadbbf",
+      "artifactSha256": "1601bc18f9aba0af3f5d6375e4f2d5dc6102334d1bca935026c0e3547cdadbbf",
+      "executable": true,
+      "transformation": null
+    },
+    {
+      "path": "skills/skill-authoring/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "34dc98129f1ecbe33907816ec40bb1bfdf09c7d2ad9fe60de2c08f8b31da6aa1",
+      "artifactSha256": "34dc98129f1ecbe33907816ec40bb1bfdf09c7d2ad9fe60de2c08f8b31da6aa1",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/swarm/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "d578d877c3b8b9de7163f52579c4683337a940acc0fbe4496a498f5d3b27df30",
+      "artifactSha256": "d578d877c3b8b9de7163f52579c4683337a940acc0fbe4496a498f5d3b27df30",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/tdd/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "011cab0ecc04a3632121efb493ae4d60aa282a9b72c66de74dd8ad7e4313e05a",
+      "artifactSha256": "011cab0ecc04a3632121efb493ae4d60aa282a9b72c66de74dd8ad7e4313e05a",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/teach/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "bd286e5a6290673be2cd28aef7af2ec7f1fb138e6bce156ea657368c7e7fc8a4",
+      "artifactSha256": "bd286e5a6290673be2cd28aef7af2ec7f1fb138e6bce156ea657368c7e7fc8a4",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/technical-writing/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "6d6d9e625ae412ee8f36df8deb6fd9203d7c6acca776d5ee3cabbb9126f8b84c",
+      "artifactSha256": "6d6d9e625ae412ee8f36df8deb6fd9203d7c6acca776d5ee3cabbb9126f8b84c",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/temari/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "1f07cef474bc1b11f7583c0d8cafc1c7533521d93c256e37e9ec9dac756a8d8c",
+      "artifactSha256": "1f07cef474bc1b11f7583c0d8cafc1c7533521d93c256e37e9ec9dac756a8d8c",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/temari/references/credentials.md",
+      "lane": "portable",
+      "sourceSha256": "e32477b196fd3b2f8f00f21dacbaec3d17fef82dbc58af59ae69876fbd03d60c",
+      "artifactSha256": "e32477b196fd3b2f8f00f21dacbaec3d17fef82dbc58af59ae69876fbd03d60c",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/temari/references/integration-discovery.md",
+      "lane": "portable",
+      "sourceSha256": "44e32f151e6bcc87ec6449c5dcf892d910ef44aea4ad5355a94f0b1fc35dcad7",
+      "artifactSha256": "e1bd5d268f8b7397fbf4b413c0906404c90b0e33cfc19a5b4da0653939116e14",
+      "executable": false,
+      "transformation": "Link to the included optional Archon guide and report portable runtime absence explicitly."
+    },
+    {
+      "path": "skills/temari/scripts/check-integration-inventory.py",
+      "lane": "portable",
+      "sourceSha256": "1817c5c55aa949334a5fc8feca91d12986c71b3792ffb083caa78d567999a909",
+      "artifactSha256": "1817c5c55aa949334a5fc8feca91d12986c71b3792ffb083caa78d567999a909",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/typescript-best-practices/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "28f9e61710e205f6f3c5476f333483cff0e988f6a5b639e2faad536344b40c5e",
+      "artifactSha256": "28f9e61710e205f6f3c5476f333483cff0e988f6a5b639e2faad536344b40c5e",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/typescript-best-practices/references/patterns.md",
+      "lane": "portable",
+      "sourceSha256": "62e9cd32d2fa066a35d0d1349aac22dce31a48ad7d5eaf142570770cfe707384",
+      "artifactSha256": "62e9cd32d2fa066a35d0d1349aac22dce31a48ad7d5eaf142570770cfe707384",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/unslop/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "c6d2572294d933a428211921069e9a248490e9b466ca59437cb4d9de248600ca",
+      "artifactSha256": "c6d2572294d933a428211921069e9a248490e9b466ca59437cb4d9de248600ca",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/why/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "222b93789754ba6ee901835137184acdca667f7e47c523bcc85aca86675fb249",
+      "artifactSha256": "222b93789754ba6ee901835137184acdca667f7e47c523bcc85aca86675fb249",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/why/references/epistemics.md",
+      "lane": "portable",
+      "sourceSha256": "fcc0f559c072832c869a5ada72434b4849320a637ae63c09e8ee14f7ad787059",
+      "artifactSha256": "fcc0f559c072832c869a5ada72434b4849320a637ae63c09e8ee14f7ad787059",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/why/references/investigator-prompt.md",
+      "lane": "portable",
+      "sourceSha256": "6892956a7ab0b5ee6c4babaf4f793703abe89b350ea7cb9463b4a56eea1c8266",
+      "artifactSha256": "6892956a7ab0b5ee6c4babaf4f793703abe89b350ea7cb9463b4a56eea1c8266",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/why/references/source-playbook.md",
+      "lane": "portable",
+      "sourceSha256": "9ae9dcb9d09111c9facc68510331c5aba4aed9b1b057314ff1fc0e166ad3993a",
+      "artifactSha256": "9ae9dcb9d09111c9facc68510331c5aba4aed9b1b057314ff1fc0e166ad3993a",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/why/references/sources/code-archaeology.md",
+      "lane": "portable",
+      "sourceSha256": "8c14aa382f0de40829b2668d43e3f54814480bb93a486c9282ada4003f6b9dbd",
+      "artifactSha256": "8c14aa382f0de40829b2668d43e3f54814480bb93a486c9282ada4003f6b9dbd",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/why/references/sources/databricks.md",
+      "lane": "portable",
+      "sourceSha256": "236ede7aab6454662a992db088a5393537a5233a4c26719c93188f9e174488f6",
+      "artifactSha256": "236ede7aab6454662a992db088a5393537a5233a4c26719c93188f9e174488f6",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/why/references/sources/datadog.md",
+      "lane": "portable",
+      "sourceSha256": "ebe9c07bac28e47757ee7f16fb93b0c01d427a08c501957d047f395a2f37b7e7",
+      "artifactSha256": "ebe9c07bac28e47757ee7f16fb93b0c01d427a08c501957d047f395a2f37b7e7",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/why/references/sources/incident-postmortem.md",
+      "lane": "portable",
+      "sourceSha256": "a899470f05f86029630a13a2696491cc708ca7b56a6e822a69ff6e954d6ff8cf",
+      "artifactSha256": "a899470f05f86029630a13a2696491cc708ca7b56a6e822a69ff6e954d6ff8cf",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/why/references/sources/linear.md",
+      "lane": "portable",
+      "sourceSha256": "01304e7f1badfcfb78babbb0edcadeb3cc8dd3f713793420cdff24ba190f907c",
+      "artifactSha256": "01304e7f1badfcfb78babbb0edcadeb3cc8dd3f713793420cdff24ba190f907c",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/why/references/sources/notion.md",
+      "lane": "portable",
+      "sourceSha256": "3bcfa695c49dfad4ac036d5d7181c12585f55ac04f1936198d16ab75a2788997",
+      "artifactSha256": "3bcfa695c49dfad4ac036d5d7181c12585f55ac04f1936198d16ab75a2788997",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/why/references/sources/sentry.md",
+      "lane": "portable",
+      "sourceSha256": "6f292bc4fb1548e956f95e1900b9481abf5134254419f1cd9edec95428c82d73",
+      "artifactSha256": "6f292bc4fb1548e956f95e1900b9481abf5134254419f1cd9edec95428c82d73",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/why/references/sources/slack.md",
+      "lane": "portable",
+      "sourceSha256": "58fee61d024b3700b407e7acbed367944720ff05adfddb6954d36c88368f3ba7",
+      "artifactSha256": "58fee61d024b3700b407e7acbed367944720ff05adfddb6954d36c88368f3ba7",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/why/references/synthesizer-prompt.md",
+      "lane": "portable",
+      "sourceSha256": "733a3e9cf897b1aca56aaddeae01a3832e4bfed024c2f602db2d1bf807d7a73b",
+      "artifactSha256": "733a3e9cf897b1aca56aaddeae01a3832e4bfed024c2f602db2d1bf807d7a73b",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/README.md",
+      "lane": "portable",
+      "sourceSha256": "82c28858f24a061ca4b51acd9d34d70ba822273b30642a66313e2f5ab06b0180",
+      "artifactSha256": "82c28858f24a061ca4b51acd9d34d70ba822273b30642a66313e2f5ab06b0180",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "9b5a1cb7d8e3b1628254286e40079b2b6427853b047b06b73e2022a502b189ee",
+      "artifactSha256": "b43a6bbc3c3d299e40ad71f4b77ee1e01d06a17ced4161dc3bde64d3fa782372",
+      "executable": false,
+      "transformation": "Replace excluded repository-only evaluation commands with fresh isolated installation checks; distinguish independent copy equality from unperformed same-tree/symlink comparison."
+    },
+    {
+      "path": "verification/verify-temari/features/README.md",
+      "lane": "portable",
+      "sourceSha256": "f7152dc2047c4e8b2a76181d458c65ded0cf03f0569aa6a519349d5b6cc52302",
+      "artifactSha256": "7572ea176d117142ebcd82ede195a40c214dc82b5c164da8ce9f4a99ce1ad4b8",
+      "executable": false,
+      "transformation": "Declare optional Archon and project-overlay boundaries."
+    },
+    {
+      "path": "verification/verify-temari/features/archon-installation.md",
+      "lane": "portable",
+      "sourceSha256": "f9a844bfb0a0b419df2a9ca5bd8ae9e610a3b922adac4b272fc0fbaed53fa089",
+      "artifactSha256": "d915a0589b120c81bbdf719a2cd27a4ce116ef9996e250a343fa54ae5657d56c",
+      "executable": false,
+      "transformation": "State optional Archon prerequisite and use shipped installation commands."
+    },
+    {
+      "path": "verification/verify-temari/features/archon-live-pilot.md",
+      "lane": "portable",
+      "sourceSha256": "7fa9f23b417d348d2ae75de3a5f55f82252f68e34714730487db033d00bf2353",
+      "artifactSha256": "4883a386bf1a432af0607e7d1c061a2e682557ecddf0e046142843a16525c5a2",
+      "executable": false,
+      "transformation": "Link to the included optional Archon guide; require the Archon distribution before live instructions."
+    },
+    {
+      "path": "verification/verify-temari/features/closeout.md",
+      "lane": "portable",
+      "sourceSha256": "23e8d4155c88d5a10835422e421509eac3f87c9ab3cdb27896c58963a5be340b",
+      "artifactSha256": "23e8d4155c88d5a10835422e421509eac3f87c9ab3cdb27896c58963a5be340b",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/features/credential-profiles.md",
+      "lane": "portable",
+      "sourceSha256": "4653e9700d623bcdaedb17d8da99a609044c80c0502d3d5677b8c632e9408e3b",
+      "artifactSha256": "4653e9700d623bcdaedb17d8da99a609044c80c0502d3d5677b8c632e9408e3b",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/features/decision-log.md",
+      "lane": "portable",
+      "sourceSha256": "ac86f3dbbd749d592d20c0f486e49a6ccb1775514ee2a35c4dcb65f69ea48e52",
+      "artifactSha256": "ac86f3dbbd749d592d20c0f486e49a6ccb1775514ee2a35c4dcb65f69ea48e52",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/features/integration-discovery.md",
+      "lane": "portable",
+      "sourceSha256": "7fd0fac8b4568d17ca6541f91d503446cc1dd54e7cdac8884a58ad31cc8042bc",
+      "artifactSha256": "7fd0fac8b4568d17ca6541f91d503446cc1dd54e7cdac8884a58ad31cc8042bc",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/features/orch-bookkeeping.md",
+      "lane": "portable",
+      "sourceSha256": "c79545d52478c50eae63713e50a037c6fd9c841e43701a3def474a99fd4521b8",
+      "artifactSha256": "c79545d52478c50eae63713e50a037c6fd9c841e43701a3def474a99fd4521b8",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/features/plugin-catalog.md",
+      "lane": "portable",
+      "sourceSha256": "19c4ecd03661d692b4a0b4ed9a715dfa214de756bdebd64770c87d26ccdb74c6",
+      "artifactSha256": "19c4ecd03661d692b4a0b4ed9a715dfa214de756bdebd64770c87d26ccdb74c6",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/features/poteto-mode-playbooks.md",
+      "lane": "portable",
+      "sourceSha256": "3a39b6b5951a3e8445dc68bd61db7ed0c61d9a4fd839b4844e2cc88f353eb3c9",
+      "artifactSha256": "3a39b6b5951a3e8445dc68bd61db7ed0c61d9a4fd839b4844e2cc88f353eb3c9",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/features/routing-chain.md",
+      "lane": "portable",
+      "sourceSha256": "c64d117ed249d968601da6cfe46341b86d7f84cb59b669b0402826089f817478",
+      "artifactSha256": "c32737f82a8f23ccc8531395785f3cc48e3d2875f80d25e121657ea1e1ecbcef",
+      "executable": false,
+      "transformation": "Document independent-reference copy audit, coherent public host projections, safe missing-mapping/changed-script/projection negatives, inherited exclusions, and explicit same-tree/symlink unknown drift."
+    },
+    {
+      "path": "verification/verify-temari/features/seq-log-review.md",
+      "lane": "portable",
+      "sourceSha256": "9f6571f892ea7e7984e44f8c5f5bb13fd6cc2bce0a784a113ad535119e2ec539",
+      "artifactSha256": "b5815ebc79e69da82a2cd84955d6c2d74abdd5185e7b1240000367b92512078a",
+      "executable": false,
+      "transformation": "Verify private profile exclusion and generic missing-context behavior instead of employer-specific contracts."
+    },
+    {
+      "path": "verification/verify-temari/features/watch-pr.md",
+      "lane": "portable",
+      "sourceSha256": "b1af712eaee3b7aad43ba8b3f6c82ccad4e86b9ede0524e3d1601062826b5aec",
+      "artifactSha256": "b1af712eaee3b7aad43ba8b3f6c82ccad4e86b9ede0524e3d1601062826b5aec",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/features/workflow-conformance.md",
+      "lane": "portable",
+      "sourceSha256": "56b213773bc76cbea082a4d744cea03bf5c2a66857d2fb3b9d513e154d64bd81",
+      "artifactSha256": "56b213773bc76cbea082a4d744cea03bf5c2a66857d2fb3b9d513e154d64bd81",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/fixtures/organic-feature/expected/.gitignore",
+      "lane": "portable",
+      "sourceSha256": "52c20766daa7b105521f30471fa859c0633bb822d9814f6963587f1c52a8176d",
+      "artifactSha256": "52c20766daa7b105521f30471fa859c0633bb822d9814f6963587f1c52a8176d",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/fixtures/organic-feature/expected/AGENTS.md",
+      "lane": "portable",
+      "sourceSha256": "017178a853a78453e6fb031e7461b8c4454b97ddcefbe6837c46184349977451",
+      "artifactSha256": "017178a853a78453e6fb031e7461b8c4454b97ddcefbe6837c46184349977451",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/fixtures/organic-feature/expected/json.stdout.txt",
+      "lane": "portable",
+      "sourceSha256": "682c055ddf7d0afe32b7b2646e1635ab3c83f65884a37aecdc8549e7031a3417",
+      "artifactSha256": "682c055ddf7d0afe32b7b2646e1635ab3c83f65884a37aecdc8549e7031a3417",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/fixtures/organic-feature/expected/legacy.stdout.txt",
+      "lane": "portable",
+      "sourceSha256": "27e2e8ee00a09221e834b10dbfdfb2a4a5762cdcf7f518830862e5e7c17013af",
+      "artifactSha256": "27e2e8ee00a09221e834b10dbfdfb2a4a5762cdcf7f518830862e5e7c17013af",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/fixtures/organic-feature/expected/status.mjs",
+      "lane": "portable",
+      "sourceSha256": "5fdcec48b77f9233b8d33118e9fa912b037e8abecf75da73a4e9a6f147e5f95d",
+      "artifactSha256": "5fdcec48b77f9233b8d33118e9fa912b037e8abecf75da73a4e9a6f147e5f95d",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/fixtures/organic-feature/initial/.gitignore",
+      "lane": "portable",
+      "sourceSha256": "52c20766daa7b105521f30471fa859c0633bb822d9814f6963587f1c52a8176d",
+      "artifactSha256": "52c20766daa7b105521f30471fa859c0633bb822d9814f6963587f1c52a8176d",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/fixtures/organic-feature/initial/AGENTS.md",
+      "lane": "portable",
+      "sourceSha256": "017178a853a78453e6fb031e7461b8c4454b97ddcefbe6837c46184349977451",
+      "artifactSha256": "017178a853a78453e6fb031e7461b8c4454b97ddcefbe6837c46184349977451",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/fixtures/organic-feature/initial/status.mjs",
+      "lane": "portable",
+      "sourceSha256": "85a13dcc7e06677c34deed3cac8bcc86e59bf3a9fb89dfa47a9cdd7a759d7b49",
+      "artifactSha256": "85a13dcc7e06677c34deed3cac8bcc86e59bf3a9fb89dfa47a9cdd7a759d7b49",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/fixtures/organic-feature/prompt.txt",
+      "lane": "portable",
+      "sourceSha256": "15f944d489a184b68224dc0068edb574006842b20b0697f904223d774ffba6b9",
+      "artifactSha256": "15f944d489a184b68224dc0068edb574006842b20b0697f904223d774ffba6b9",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/fixtures/organic-lightweight/expected/.gitignore",
+      "lane": "portable",
+      "sourceSha256": "52c20766daa7b105521f30471fa859c0633bb822d9814f6963587f1c52a8176d",
+      "artifactSha256": "52c20766daa7b105521f30471fa859c0633bb822d9814f6963587f1c52a8176d",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/fixtures/organic-lightweight/expected/AGENTS.md",
+      "lane": "portable",
+      "sourceSha256": "017178a853a78453e6fb031e7461b8c4454b97ddcefbe6837c46184349977451",
+      "artifactSha256": "017178a853a78453e6fb031e7461b8c4454b97ddcefbe6837c46184349977451",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/fixtures/organic-lightweight/expected/README.md",
+      "lane": "portable",
+      "sourceSha256": "9086fa267da4fd1699b13ba32a29cc3fe8255e601063146318b753cee72830ca",
+      "artifactSha256": "9086fa267da4fd1699b13ba32a29cc3fe8255e601063146318b753cee72830ca",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/fixtures/organic-lightweight/initial/.gitignore",
+      "lane": "portable",
+      "sourceSha256": "52c20766daa7b105521f30471fa859c0633bb822d9814f6963587f1c52a8176d",
+      "artifactSha256": "52c20766daa7b105521f30471fa859c0633bb822d9814f6963587f1c52a8176d",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/fixtures/organic-lightweight/initial/AGENTS.md",
+      "lane": "portable",
+      "sourceSha256": "017178a853a78453e6fb031e7461b8c4454b97ddcefbe6837c46184349977451",
+      "artifactSha256": "017178a853a78453e6fb031e7461b8c4454b97ddcefbe6837c46184349977451",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/fixtures/organic-lightweight/initial/README.md",
+      "lane": "portable",
+      "sourceSha256": "4777744221a41f00a6c5f281112accc86abb2408c7db5e34502fa81ad54b486b",
+      "artifactSha256": "4777744221a41f00a6c5f281112accc86abb2408c7db5e34502fa81ad54b486b",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/fixtures/organic-lightweight/prompt.txt",
+      "lane": "portable",
+      "sourceSha256": "773ff62d57efb56800d09177b9d8b4a40f13ec1f8e24a48a1ac13974afc43137",
+      "artifactSha256": "773ff62d57efb56800d09177b9d8b4a40f13ec1f8e24a48a1ac13974afc43137",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/scripts/control-temari",
+      "lane": "portable",
+      "sourceSha256": "6a0a6aa58e12ff89ac11f3a38d35d6d4e6ef168e945387440d854860f5cebf24",
+      "artifactSha256": "1ae461154cc30470dd0f4d8d42319ff78f9b0a823291903aa24d15fed129585a",
+      "executable": true,
+      "transformation": "Preserve optional Archon absence; compare the copied runtime directory/root-file closure and coherent host public projections against an independent reference; report unknown drift for same-tree or live-symlink inspection."
+    },
+    {
+      "path": "verification/verify-temari/scripts/control-temari-test.sh",
+      "lane": "portable",
+      "sourceSha256": "6eddd1237d08612a095492e764438c4c1de4346901dd12ef98871bfab42a41c5",
+      "artifactSha256": "6eddd1237d08612a095492e764438c4c1de4346901dd12ef98871bfab42a41c5",
+      "executable": true,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/scripts/journey-evidence-test.py",
+      "lane": "portable",
+      "sourceSha256": "721bc5e5a9ac4ed8fb299273007a141d92d06cc8db42ecd5bbddccc3df4b8083",
+      "artifactSha256": "721bc5e5a9ac4ed8fb299273007a141d92d06cc8db42ecd5bbddccc3df4b8083",
+      "executable": true,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/scripts/journey-evidence.py",
+      "lane": "portable",
+      "sourceSha256": "d76773403d0a3eade069f121263c14652d67beda863ce69a5320154e15e3c5e3",
+      "artifactSha256": "d76773403d0a3eade069f121263c14652d67beda863ce69a5320154e15e3c5e3",
+      "executable": true,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/scripts/test-integration-discovery.py",
+      "lane": "portable",
+      "sourceSha256": "b9118b3fa35e3cc144f115b4bcf0fc7bd0a5766eb9325f1f925c40eea678c936",
+      "artifactSha256": "b9118b3fa35e3cc144f115b4bcf0fc7bd0a5766eb9325f1f925c40eea678c936",
+      "executable": false,
+      "transformation": null
+    }
+  ]
+}

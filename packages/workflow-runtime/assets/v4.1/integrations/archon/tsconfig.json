@@ -1,0 +1,7 @@
+{
+  "extends": "../../skills/poteto-mode/scripts/workflow/tsconfig.json",
+  "compilerOptions": {
+    "typeRoots": ["../../skills/poteto-mode/scripts/node_modules"]
+  },
+  "include": ["*.ts", "fixtures/*.ts"]
+}

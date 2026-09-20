@@ -1,0 +1,34 @@
+name: temari-live-pilot
+description: Opt-in bounded Codex implementation and independent review of the charge cost or Temari routing documentation task.
+inputs:
+  bridge:
+    required: true
+  spec:
+    required: true
+evidence_policy:
+  required: true
+nodes:
+  - id: build
+    timeout: 720000
+    bash: bun "$INPUTS_BRIDGE" capture --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --spec "$INPUTS_SPEC" --stage build
+  - id: shape-final
+    timeout: 720000
+    depends_on: [build]
+    mutates_checkout: false
+    bash: bun "$INPUTS_BRIDGE" capture --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --spec "$INPUTS_SPEC" --stage shape-final
+  - id: verify
+    timeout: 720000
+    depends_on: [shape-final]
+    mutates_checkout: false
+    bash: bun "$INPUTS_BRIDGE" capture --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --spec "$INPUTS_SPEC" --stage verify
+  - id: review
+    timeout: 720000
+    depends_on: [verify]
+    mutates_checkout: false
+    bash: bun "$INPUTS_BRIDGE" capture --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --spec "$INPUTS_SPEC" --stage review
+  - id: finalize
+    timeout: 60000
+    depends_on: [review]
+    always_run: true
+    mutates_checkout: false
+    bash: bun "$INPUTS_BRIDGE" finalize --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --spec "$INPUTS_SPEC"
