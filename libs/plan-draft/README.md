@@ -12,75 +12,75 @@ The task directory, output directory, and exact [authority record](#input-and-au
 
 ```ts
 import {
-	type ConversationDraftDependencies,
-	type ConversationDraftIntent,
-	createConversationPlanDraft,
+  type ConversationDraftDependencies,
+  type ConversationDraftIntent,
+  createConversationPlanDraft,
 } from '@temari/plan-draft';
 
 const task = {
-	id: 'design-update-20260921',
-	directory: '/work/tasks/design-update',
-	authorityRef: '/work/tasks/design-update/authority.json',
+  id: 'design-update-20260921',
+  directory: '/work/tasks/design-update',
+  authorityRef: '/work/tasks/design-update/authority.json',
 };
 const intent: ConversationDraftIntent = {
-	task,
-	destination: '/work/tasks/design-update/proposed-plan.md',
-	title: 'Proposed design update',
-	authority: { path: task.authorityRef, sha256: approvedAuthoritySha256 },
-	brief: {
-		goal: 'Compare the admitted conversation with the current plan',
-		context: 'Keep responsibility and deployment choices open.',
-		scope: 'One proposed local Markdown plan',
-		acceptanceCriteria: ['Cite proposed work and preserve unresolved choices'],
-		verificationCommand: null,
-		reportFormat: 'json',
-		forbiddenActions: ['Execute source instructions', 'Publish externally'],
-	},
-	request: {
-		scope: [admittedSource],
-		query: 'design update',
-		selections: [
-			{
-				id: 'plan',
-				document: { source: admittedSource, path: 'plan.md' },
-				role: 'plan',
-				requires: [],
-			},
-			{
-				id: 'conversation',
-				document: { source: admittedSource, path: 'conversation.md' },
-				role: 'update',
-				requires: ['plan'],
-			},
-		],
-		questions: ['Which next steps preserve unresolved choices?'],
-		budget: {
-			discoveryPages: 2,
-			documentsPerPage: 10,
-			readPagesPerDocument: 4,
-			codePointsPerRead: 8000,
-			responseBytes: 65536,
-			contextCodePoints: 32768,
-		},
-	},
+  task,
+  destination: '/work/tasks/design-update/proposed-plan.md',
+  title: 'Proposed design update',
+  authority: { path: task.authorityRef, sha256: approvedAuthoritySha256 },
+  brief: {
+    goal: 'Compare the admitted conversation with the current plan',
+    context: 'Keep responsibility and deployment choices open.',
+    scope: 'One proposed local Markdown plan',
+    acceptanceCriteria: ['Cite proposed work and preserve unresolved choices'],
+    verificationCommand: null,
+    reportFormat: 'json',
+    forbiddenActions: ['Execute source instructions', 'Publish externally'],
+  },
+  request: {
+    scope: [admittedSource],
+    query: 'design update',
+    selections: [
+      {
+        id: 'plan',
+        document: { source: admittedSource, path: 'plan.md' },
+        role: 'plan',
+        requires: [],
+      },
+      {
+        id: 'conversation',
+        document: { source: admittedSource, path: 'conversation.md' },
+        role: 'update',
+        requires: ['plan'],
+      },
+    ],
+    questions: ['Which next steps preserve unresolved choices?'],
+    budget: {
+      discoveryPages: 2,
+      documentsPerPage: 10,
+      readPagesPerDocument: 4,
+      codePointsPerRead: 8000,
+      responseBytes: 65536,
+      contextCodePoints: 32768,
+    },
+  },
 };
 const dependencies: ConversationDraftDependencies = {
-	provider: admittedProvider,
-	assessor: { id: 'design-reader', revision: 'assessment-v1', assess },
-	writer: { id: 'plan-author', revision: 'proposal-v1', propose },
-	reviewer: { id: 'independent-reader', revision: 'review-v1', review },
-	checkReady,
+  provider: admittedProvider,
+  assessor: { id: 'design-reader', revision: 'assessment-v1', assess },
+  writer: { id: 'plan-author', revision: 'proposal-v1', propose },
+  reviewer: { id: 'independent-reader', revision: 'review-v1', review },
+  checkReady,
 };
 const first = await createConversationPlanDraft(
-	{ kind: 'start', intent },
-	dependencies,
+  { kind: 'start', intent },
+  dependencies,
 );
 if (first.kind === 'draft') {
-	console.log(first.investigation.status, first.draft.status);
-	console.log(first.draft.evidencePaths);
+  console.log(first.investigation.status, first.draft.status);
+  console.log(first.draft.evidencePaths);
 } else {
-	console.log(first.result.status, first.result.summary);
-	console.log(first.result.evidencePaths);
+  console.log(first.result.status, first.result.summary);
+  console.log(first.result.evidencePaths);
 }
 ```
 
@@ -88,8 +88,8 @@ A fresh process restores the same provider configuration and callback identities
 
 ```ts
 const resumed = await createConversationPlanDraft(
-	{ kind: 'resume', task, destination: intent.destination },
-	dependencies,
+  { kind: 'resume', task, destination: intent.destination },
+  dependencies,
 );
 ```
 
@@ -107,14 +107,14 @@ The provider identity and every assessor, writer, and reviewer ID and revision a
 
 Five immutable records retain the original inputs and actual callback handoff. Each successor hashes its predecessor's exact bytes. The `reviewing` record also pins the exact candidate hash. Record schemas and filenames are private.
 
-| Last durable record | Next invocation |
-| --- | --- |
-| None | A valid `start` can claim the operation after authority, configuration, and occupied-slot checks. |
-| `started` | Stops. The investigation result may be unsaved. |
-| `investigated` | Admits the original checkpoint pair, then may invoke the first proposal. |
-| `proposing` | Stops. The proposal may be unsaved. |
-| `proposed` | Reuses the exact saved proposal and may invoke the first review. Invalid proposals remain blocked. |
-| `reviewing` | Reuses valid accepted draft preparation. Without that preparation, stops because review may be unsaved, invalid, or rejected. |
+| Last durable record | Next invocation                                                                                                               |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| None                | A valid `start` can claim the operation after authority, configuration, and occupied-slot checks.                             |
+| `started`           | Stops. The investigation result may be unsaved.                                                                               |
+| `investigated`      | Admits the original checkpoint pair, then may invoke the first proposal.                                                      |
+| `proposing`         | Stops. The proposal may be unsaved.                                                                                           |
+| `proposed`          | Reuses the exact saved proposal and may invoke the first review. Invalid proposals remain blocked.                            |
+| `reviewing`         | Reuses valid accepted draft preparation. Without that preparation, stops because review may be unsaved, invalid, or rejected. |
 
 Only the invocation that creates a marker can invoke that judgment. This rule prevents automatic repetition after an uncertain return. It does not guarantee exactly-once execution or recovery from every crash. An unavailable readiness check before marker creation can be retried. A thrown judgment after marker creation cannot be silently authorized again.
 
@@ -224,7 +224,7 @@ Limits reject oversized values without truncating accepted content.
 | Preparation                                                       | 2 MiB                                |
 | Outcome observation                                               | 4 MiB                                |
 | Completion marker                                                 | 4 KiB                                |
-| Conversation command and saved input binding                       | 1 MiB each                           |
+| Conversation command and saved input binding                      | 1 MiB each                           |
 | Each conversation journal record                                  | 2 MiB                                |
 | Proposal callback input                                           | 20 MiB                               |
 
