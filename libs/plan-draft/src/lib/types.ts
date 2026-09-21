@@ -6,6 +6,7 @@ import type {
   WorkerBrief,
   WorkerResult,
 } from '@temari/contracts';
+import type { DesignUpdateOptions } from '@temari/knowledge';
 
 export interface CitedEntry {
   readonly text: string;
@@ -87,3 +88,51 @@ export interface LocalPlanDraftInput {
     readonly review: (input: DraftReviewInput) => Promise<DraftReview>;
   };
 }
+
+export type ConversationDraftIntent = Pick<
+  LocalPlanDraftInput,
+  'task' | 'brief' | 'request' | 'destination' | 'title' | 'authority'
+>;
+
+export type JudgmentRole = 'assess' | 'propose' | 'review';
+
+export interface ProposalInput {
+  readonly brief: WorkerBrief;
+  readonly request: InvestigationRequest;
+  readonly investigationResult: WorkerResult;
+  readonly checkpoint: InvestigationCheckpoint;
+}
+
+export interface ConversationDraftDependencies {
+  readonly provider: KnowledgeProvider;
+  readonly assessor: DraftIdentity & {
+    readonly assess: DesignUpdateOptions['assess'];
+  };
+  readonly writer: DraftIdentity & {
+    readonly propose: (input: ProposalInput) => Promise<Proposal>;
+  };
+  readonly reviewer: LocalPlanDraftInput['reviewer'];
+  readonly checkReady: (roles: readonly JudgmentRole[]) => Promise<void>;
+}
+
+export type ConversationDraftCommand =
+  | { readonly kind: 'start'; readonly intent: ConversationDraftIntent }
+  | {
+      readonly kind: 'resume';
+      readonly task: InvestigationTask;
+      readonly destination: string;
+    };
+
+export type ConversationDraftOutcome =
+  | {
+      readonly kind: 'draft';
+      readonly investigation: WorkerResult;
+      readonly draft: WorkerResult;
+      readonly checkpointPath: string;
+    }
+  | {
+      readonly kind: 'stopped';
+      readonly result: WorkerResult;
+      readonly investigation: WorkerResult | null;
+      readonly checkpointPath: string | null;
+    };

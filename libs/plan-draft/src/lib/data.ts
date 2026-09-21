@@ -59,10 +59,15 @@ export function uniqueStrings(value: unknown): asserts value is string[] {
 }
 
 export function validateProposal(
-  value: Proposal,
+  input: unknown,
   checkpoint: InvestigationCheckpoint,
-): void {
-  bounded(value, 256 * 1024, 'Proposal');
+): asserts input is Proposal {
+  bounded(input, 256 * 1024, 'Proposal');
+  assert(
+    input !== null && typeof input === 'object',
+    'Proposal object required',
+  );
+  const value = input as Proposal;
   const findings = new Map(
     checkpoint.assessment!.findings.map((f) => [f.id, f]),
   );
@@ -223,17 +228,21 @@ export function requireApproval(review: DraftReview): void {
 const line = (value: string): string =>
   value.replace(/\r?\n/g, ' ').replace(/[\\`*_{}[\]()<>#!|]/g, '\\$&');
 
+export function validateTitle(title: string): void {
+  text(title);
+  assert(
+    title.length <= 300 && !/[\r\n]/.test(title),
+    'Title must be one line, at most 300 characters',
+  );
+}
+
 export function renderDraft(
   title: string,
   proposal: Proposal,
   checkpoint: InvestigationCheckpoint,
   issues: readonly DraftIssue[],
 ): string {
-  text(title);
-  assert(
-    title.length <= 300 && !/[\r\n]/.test(title),
-    'Title must be one line, at most 300 characters',
-  );
+  validateTitle(title);
   const entry = (e: Proposal['planImpact'][number]): string =>
     `${line(e.text)}\n  Findings: ${e.findingIds.map(line).join(', ')}. Evidence: ${e.evidenceIds.map(line).join(', ')}.`;
   const markdown =

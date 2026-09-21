@@ -4,6 +4,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path';
 import {
   minimalPlan,
   type InvestigationCheckpoint,
+  type InvestigationTask,
   type KnowledgeCheck,
   type KnowledgeProvider,
   type WorkerResult,
@@ -11,6 +12,7 @@ import {
 import { loadInvestigation } from '@temari/knowledge';
 import { runPlan } from '@temari/workflow-engine';
 import type {
+  ConversationDraftIntent,
   DraftAuthority,
   DraftIdentity,
   DraftIssue,
@@ -29,6 +31,7 @@ import {
   uniqueStrings,
   validateProposal,
   validateReview,
+  validateTitle,
 } from './data.js';
 import {
   canonicalDirectory,
@@ -57,12 +60,20 @@ type PreparedDraft =
   | { readonly kind: 'prepared'; readonly record: Preparation };
 class DraftStop extends Error {}
 
-async function investigation(
-  subject: Subject,
-  paths?: Set<string>,
-): Promise<InvestigationCheckpoint> {
-  const result = subject.investigationResult;
+export function validateInvestigationResult(
+  value: unknown,
+): asserts value is WorkerResult {
+  assert(
+    value !== null && typeof value === 'object',
+    'Investigation result required',
+  );
+  const result = value as WorkerResult;
   text(result.summary);
+  assert(
+    Array.isArray(result.evidencePaths),
+    'Investigation evidence paths required',
+  );
+  result.evidencePaths.forEach(text);
   assert(
     result.status === 'ISSUES' || result.status === 'BLOCKED',
     'Actual investigation status required',
@@ -71,11 +82,22 @@ async function investigation(
     result.rawLogPath === null && result.evidencePaths.length === 2,
     'Actual two-checkpoint result required',
   );
-  const [partialPath, finalPath] = result.evidencePaths;
   assert(
-    partialPath !== finalPath,
+    result.evidencePaths[0] !== result.evidencePaths[1],
     'Distinct partial and final checkpoints required',
   );
+}
+
+export async function loadDraftInvestigation(
+  subject: Pick<
+    Subject,
+    'task' | 'brief' | 'request' | 'provider' | 'investigationResult'
+  >,
+  paths?: Set<string>,
+): Promise<InvestigationCheckpoint> {
+  const result = subject.investigationResult;
+  validateInvestigationResult(result);
+  const [partialPath, finalPath] = result.evidencePaths;
   const partial = await loadInvestigation(partialPath);
   paths?.add(partialPath);
   const final = await loadInvestigation(finalPath);
@@ -228,7 +250,9 @@ async function investigation(
   return final;
 }
 
-async function authorityFor(subject: Subject): Promise<DraftAuthority> {
+async function authorityFor(
+  subject: Pick<Subject, 'task' | 'destination' | 'authority'>,
+): Promise<DraftAuthority> {
   const { task, destination, authority } = subject;
   text(task.id);
   assert.equal(
@@ -262,6 +286,76 @@ async function authorityFor(subject: Subject): Promise<DraftAuthority> {
     'Authority does not authorize this exact operation/task/destination and task evidence',
   );
   return expected;
+}
+
+export async function admitDraftIntent(
+  subject: ConversationDraftIntent & {
+    readonly writer: DraftIdentity;
+    readonly reviewer: DraftIdentity;
+  },
+): Promise<DraftAuthority> {
+  await canonicalDirectory(subject.task.directory);
+  assert.equal(
+    subject.brief.verificationCommand,
+    null,
+    'This fixed draft action cannot execute a verificationCommand; parent obligations remain with the caller',
+  );
+  uniqueStrings(subject.brief.acceptanceCriteria);
+  assert(
+    subject.brief.acceptanceCriteria.length > 0,
+    'Acceptance criteria required',
+  );
+  text(subject.writer.id);
+  text(subject.writer.revision);
+  text(subject.reviewer.id);
+  text(subject.reviewer.revision);
+  assert(
+    subject.writer.id !== subject.reviewer.id,
+    'Independent reviewer identity required',
+  );
+  validateTitle(subject.title);
+  assert(
+    isAbsolute(subject.destination) &&
+      resolve(subject.destination) === subject.destination &&
+      subject.destination.endsWith('.md'),
+    'Exact absolute Markdown destination required',
+  );
+  await canonicalDirectory(dirname(subject.destination));
+  assert.equal(
+    (await lstat(subject.task.directory)).dev,
+    (await lstat(dirname(subject.destination))).dev,
+    'Task and output parent must share one filesystem',
+  );
+  return authorityFor(subject);
+}
+
+export function draftPaths(task: InvestigationTask, destination: string) {
+  const slot = sha256(
+    canonical({
+      taskId: task.id,
+      taskDirectory: task.directory,
+      destination,
+    }),
+  );
+  return {
+    slot,
+    preparationPath: join(task.directory, `plan-draft-${slot}-prepared.json`),
+    completionPath: join(task.directory, `plan-draft-${slot}-completed.json`),
+  };
+}
+
+export async function requireUnoccupiedDraft(
+  destination: string,
+  completionPath: string,
+): Promise<void> {
+  assert(
+    (await observe(destination)).kind === 'absent',
+    'Existing output without matching preparation cannot be adopted',
+  );
+  assert(
+    (await readRegular(completionPath, 4096)) === null,
+    'Completion exists without preparation',
+  );
 }
 
 async function readPreparation(
@@ -342,7 +436,7 @@ export async function createLocalPlanDraft(
       'Provider identity changed',
     );
     assert.equal(
-      canonical(await investigation(subject)),
+      canonical(await loadDraftInvestigation(subject)),
       canonical(checkpoint),
       'Investigation changed',
     );
@@ -492,53 +586,12 @@ export async function createLocalPlanDraft(
           assert(subject);
           switch (current) {
             case 'investigate': {
-              assert.equal(
-                subject.brief.verificationCommand,
-                null,
-                'This fixed draft action cannot execute a verificationCommand; parent obligations remain with the caller',
-              );
-              uniqueStrings(subject.brief.acceptanceCriteria);
-              assert(
-                subject.brief.acceptanceCriteria.length > 0,
-                'Acceptance criteria required',
-              );
-              text(subject.writer.id);
-              text(subject.writer.revision);
-              text(subject.reviewer.id);
-              text(subject.reviewer.revision);
-              assert(
-                subject.writer.id !== subject.reviewer.id,
-                'Independent reviewer identity required',
-              );
-              assert(
-                isAbsolute(subject.destination) &&
-                  resolve(subject.destination) === subject.destination &&
-                  subject.destination.endsWith('.md'),
-                'Exact absolute Markdown destination required',
-              );
-              await canonicalDirectory(dirname(subject.destination));
-              assert.equal(
-                (await lstat(directory)).dev,
-                (await lstat(dirname(subject.destination))).dev,
-                'Task and output parent must share one filesystem',
-              );
-              authority = await authorityFor(subject);
-              checkpoint = await investigation(subject, paths);
-              slot = sha256(
-                canonical({
-                  taskId: subject.task.id,
-                  taskDirectory: directory,
-                  destination: subject.destination,
-                }),
-              );
-              preparationPath = join(
-                directory,
-                `plan-draft-${slot}-prepared.json`,
-              );
-              completionPath = join(
-                directory,
-                `plan-draft-${slot}-completed.json`,
-              );
+              authority = await admitDraftIntent(subject);
+              checkpoint = await loadDraftInvestigation(subject, paths);
+              ({ slot, preparationPath, completionPath } = draftPaths(
+                subject.task,
+                subject.destination,
+              ));
               break;
             }
             case 'plan': {
@@ -560,14 +613,9 @@ export async function createLocalPlanDraft(
               );
               if (prepared.kind === 'prepared') paths.add(preparationPath);
               else {
-                output = await observe(subject.destination, markdown);
-                assert(
-                  output.kind === 'absent',
-                  'Existing output without matching preparation cannot be adopted',
-                );
-                assert(
-                  (await readRegular(completionPath, 4096)) === null,
-                  'Completion exists without preparation',
+                await requireUnoccupiedDraft(
+                  subject.destination,
+                  completionPath,
                 );
               }
               break;
