@@ -6,6 +6,7 @@ import {
   cp,
   mkdir,
   mkdtemp,
+  lstat,
   readFile,
   readdir,
   realpath,
@@ -556,6 +557,9 @@ test('independent copied-install audit detects changed runtime directories and r
     'docs/guide/01-setup.md',
     'LICENSE',
     'UPSTREAM.md',
+    'verification/verify-temari/scripts/verification-maintenance.mjs',
+    'verification/verify-temari/scripts/verification-maintenance-test.mjs',
+    'verification/verify-temari/features/verification-maintenance.md',
   ];
   for (const path of paths) {
     const installed = join(destination, '.temari-package', path);
@@ -767,3 +771,396 @@ test('CLI rejects unknown options and invalid lanes before writing', () => {
 function resolveWorkspace(): string {
   return join(packageRoot, '../..');
 }
+
+const maintenanceDirectory = 'verification/verify-temari';
+const maintenanceReceipt =
+  '.temari/runs/verification-maintenance/last-success.json';
+const distributionCases = [
+  { lane: 'portable', host: 'generic' },
+  { lane: 'portable', host: 'codex' },
+  { lane: 'portable', host: 'claude-code' },
+  { lane: 'portable', host: 'plugin' },
+  { lane: 'archon', host: 'generic' },
+  { lane: 'archon', host: 'codex' },
+  { lane: 'archon', host: 'claude-code' },
+  { lane: 'archon', host: 'plugin' },
+] as const;
+
+async function maintenanceScratch(t: TestContext): Promise<string> {
+  const retained = process.env.TEMARI_RUNTIME_TEST_EVIDENCE;
+  if (!retained) return scratch(t);
+  await mkdir(retained, { recursive: true });
+  const root = await mkdtemp(join(retained, 'copied-maintenance-'));
+  t.diagnostic(
+    `Synthetic storage and copied CLI evidence retained at ${root}; no maintenance skill execution claimed.`,
+  );
+  return root;
+}
+
+async function capturedCommand(
+  root: string,
+  label: string,
+  command: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  cwd = root,
+  timeout = 15000,
+) {
+  const result = spawnSync(command, args, {
+    cwd,
+    env,
+    timeout,
+    encoding: 'utf8',
+  });
+  await writeFile(
+    join(root, `${label}.json`),
+    JSON.stringify(
+      {
+        command,
+        args,
+        cwd,
+        status: result.status,
+        signal: result.signal,
+        stdout: result.stdout,
+        stderr: result.stderr,
+        error: result.error?.message,
+      },
+      null,
+      2,
+    ),
+  );
+  assert.equal(result.error, undefined, `${label}: ${result.error?.message}`);
+  return result;
+}
+
+test('maintenance payload omissions, byte changes and lost executable modes reject artifacts', async (t) => {
+  const output = await scratch(t);
+  const inventory = await readInventory();
+  const artifact = await packageRuntime('portable', join(output, 'artifact'));
+  for (const path of [
+    `${maintenanceDirectory}/scripts/verification-maintenance.mjs`,
+    `${maintenanceDirectory}/scripts/verification-maintenance-test.mjs`,
+    `${maintenanceDirectory}/features/verification-maintenance.md`,
+  ]) {
+    const target = join(artifact.root, path);
+    const bytes = await readFile(target);
+    const mode = (await lstat(target)).mode;
+    await rm(target);
+    await assert.rejects(
+      checkArtifact(artifact.root, inventory, 'portable'),
+      /missing/,
+    );
+    await writeFile(target, Buffer.concat([bytes, Buffer.from('\nchanged\n')]));
+    await chmod(target, mode);
+    await assert.rejects(
+      checkArtifact(artifact.root, inventory, 'portable'),
+      /Hash mismatch/,
+    );
+    await writeFile(target, bytes);
+    await chmod(target, mode ^ 0o111);
+    await assert.rejects(
+      checkArtifact(artifact.root, inventory, 'portable'),
+      /Executable mode/,
+    );
+    await chmod(target, mode);
+    await checkArtifact(artifact.root, inventory, 'portable');
+  }
+});
+
+test('relocated distribution and host copies guard real effects with explicit owning repositories', async (t) => {
+  const output = await maintenanceScratch(t);
+  const inventory = await readInventory();
+  for (const { lane, host } of distributionCases) {
+    await t.test(`${lane}/${host}`, async () => {
+      const root = join(output, `${lane}-${host}`);
+      await mkdir(root);
+      const artifact = await packageRuntime(lane, join(root, 'artifact'));
+      const initial = join(root, 'initial', 'temari');
+      const installArgs =
+        host === 'plugin'
+          ? [
+              join(artifact.root, 'scripts/build-codex-plugin.sh'),
+              `--output=${initial}`,
+            ]
+          : [
+              join(artifact.root, 'scripts/install-host.sh'),
+              `--host=${host}`,
+              '--mode=copy',
+              `--dest=${initial}`,
+              '--include-verification',
+            ];
+      execFileSync('bash', installArgs, { cwd: root });
+      const moved = join(root, 'relocated');
+      await rename(initial, moved);
+      const bundle = join(
+        moved,
+        host === 'plugin' ? 'package' : '.temari-package',
+      );
+      const selected = inventory.files.filter(
+        (file) => lane === 'archon' || file.lane === 'portable',
+      );
+      await checkPayload(bundle, selected);
+      await rm(artifact.root, { recursive: true });
+      const alias = join(root, 'package-link');
+      await symlink(bundle, alias);
+      const control = join(
+        alias,
+        maintenanceDirectory,
+        'scripts/control-temari',
+      );
+      const owner = join(root, 'owning-repository');
+      execFileSync('git', ['init', '-q', owner]);
+      execFileSync('git', ['init', '-q', bundle]);
+      const env = {
+        ...process.env,
+        TEMARI_MAINTENANCE_REPO: '',
+        TEMARI_VERIFY_RUN_ID: '',
+        TEMARI_HOST_SKILL_ROOT: '',
+        TEMARI_VERIFY_ROOT: join(root, 'scratch'),
+        TEMARI_VERIFY_EVIDENCE: join(root, 'retained'),
+      };
+      const run = (label: string, args: string[]) =>
+        capturedCommand(root, label, 'bash', [control, ...args], env, bundle);
+      assert.equal(
+        (await run('missing-owner', ['maintenance-status'])).status,
+        2,
+      );
+      const status = await run('due-status', [
+        'maintenance-status',
+        '--repo',
+        owner,
+      ]);
+      assert.equal(status.status, 0, status.stderr);
+      assert.equal(JSON.parse(status.stdout).reason, 'missing-receipt');
+      const effect = join(owner, 'effect.tsv');
+      const target = [
+        'log',
+        '--',
+        effect,
+        'verify',
+        'synthetic copied CLI effect',
+        'guard regression',
+        'synthetic',
+        'recorded',
+      ];
+      const drive = ['drive', '--repo', owner, '--', ...target];
+      const denied = await run('due-before-effect', drive);
+      assert.equal(denied.status, 3, denied.stderr);
+      assert.equal(denied.stdout, '');
+      assert.match(denied.stderr, /No maintenance was executed/);
+      await assert.rejects(readFile(effect), { code: 'ENOENT' });
+      const receipt = join(owner, maintenanceReceipt);
+      for (const outcome of ['blocked', 'failed']) {
+        const result = await run(`missing-${outcome}`, [
+          'maintenance-record',
+          '--repo',
+          owner,
+          '--outcome',
+          outcome,
+        ]);
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(JSON.parse(result.stdout).refreshed, false);
+        await assert.rejects(readFile(receipt), { code: 'ENOENT' });
+      }
+      const proof = join(owner, 'synthetic-evidence.md');
+      await writeFile(
+        proof,
+        'Synthetic storage/entrypoint fixture. No maintenance skill was executed.\n',
+      );
+      const completedAt = new Date(Date.now() - 1000).toISOString();
+      const record = [
+        'maintenance-record',
+        '--repo',
+        owner,
+        '--run-id',
+        'synthetic-copy',
+        '--outcome',
+        'clean',
+        '--completed-at',
+        completedAt,
+        '--evidence',
+        proof,
+        '--attest-completed',
+      ];
+      const recorded = await run('clean-record', record);
+      assert.equal(recorded.status, 0, recorded.stderr);
+      assert.equal(
+        JSON.parse(recorded.stdout).operation,
+        'record-caller-attested-result',
+      );
+      const before = await readFile(receipt, 'utf8');
+      const stored = JSON.parse(before);
+      assert.equal(stored.repositoryRoot, await realpath(owner));
+      assert.equal(stored.attestation, 'caller-attested');
+      assert.equal(stored.completedAt, completedAt);
+      assert.equal(stored.evidence.sha256, hash(await readFile(proof, 'utf8')));
+      assert.equal((await run('fresh-effect', drive)).status, 0);
+      const effectBytes = await readFile(effect, 'utf8');
+      assert.match(
+        effectBytes,
+        /^ts\tphase\tdecision\twhy\tevidence\tresult\n/,
+      );
+      assert.match(
+        effectBytes,
+        /\tverify\tsynthetic copied CLI effect\tguard regression\tsynthetic\trecorded\n$/,
+      );
+      const replay = await run('replay', record);
+      assert.equal(replay.status, 0, replay.stderr);
+      assert.equal(JSON.parse(replay.stdout).replay, true);
+      for (const outcome of ['blocked', 'failed']) {
+        const result = await run(`existing-${outcome}`, [
+          'maintenance-record',
+          '--repo',
+          owner,
+          '--outcome',
+          outcome,
+        ]);
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(JSON.parse(result.stdout).refreshed, false);
+        assert.equal(await readFile(receipt, 'utf8'), before);
+      }
+      const cacheStatus = await run('cache-is-not-owner', [
+        'maintenance-status',
+        '--repo',
+        bundle,
+      ]);
+      assert.equal(cacheStatus.status, 0, cacheStatus.stderr);
+      assert.equal(JSON.parse(cacheStatus.stdout).reason, 'missing-receipt');
+      await assert.rejects(readFile(join(bundle, maintenanceReceipt)), {
+        code: 'ENOENT',
+      });
+      await writeFile(proof, 'Changed synthetic evidence.\n');
+      const invalid = await run('changed-evidence-before-effect', drive);
+      assert.equal(invalid.status, 3, invalid.stderr);
+      assert.match(invalid.stderr, /invalid-receipt/);
+      assert.equal(await readFile(effect, 'utf8'), effectBytes);
+      const conflict = await run('conflicting-replay', record);
+      assert.equal(conflict.status, 2, conflict.stderr);
+      assert.match(conflict.stderr, /conflicting replay/);
+      await rm(proof);
+      assert.equal(
+        (await run('missing-evidence-before-effect', drive)).status,
+        3,
+      );
+      assert.equal(await readFile(effect, 'utf8'), effectBytes);
+      assert.equal(await readFile(receipt, 'utf8'), before);
+    });
+  }
+});
+
+test('copied upstream ten-test maintenance suite uses preprovisioned Bun dependencies', async (t) => {
+  const root = await maintenanceScratch(t);
+  const artifact = await packageRuntime('portable', join(root, 'artifact'));
+  const destination = join(root, 'skills');
+  execFileSync(
+    'bash',
+    [
+      join(artifact.root, 'scripts/install-host.sh'),
+      '--host=generic',
+      '--mode=copy',
+      `--dest=${destination}`,
+      '--include-verification',
+    ],
+    { cwd: root },
+  );
+  const bundle = join(destination, '.temari-package');
+  await checkPayload(
+    bundle,
+    (await readInventory()).files.filter((file) => file.lane === 'portable'),
+  );
+  await rm(artifact.root, { recursive: true });
+  const tools = join(bundle, 'skills/poteto-mode/scripts');
+  const temporary = join(root, 'tmp');
+  await mkdir(temporary);
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    TMPDIR: temporary,
+    BUN_INSTALL_CACHE_DIR: join(root, 'bun-cache'),
+    TEMARI_MAINTENANCE_TEST_ROOT: join(root, 'upstream-evidence'),
+    TEMARI_MAINTENANCE_REPO: '',
+    TEMARI_VERIFY_RUN_ID: '',
+    TEMARI_HOST_SKILL_ROOT: '',
+    TEMARI_VERIFY_ROOT: join(root, 'verifier-scratch'),
+    TEMARI_VERIFY_EVIDENCE: join(root, 'verifier-evidence'),
+  };
+  delete env.NODE_TEST_CONTEXT;
+  delete env.FORCE_COLOR;
+  const version = await capturedCommand(
+    root,
+    'bun-version',
+    'bun',
+    ['--version'],
+    env,
+  );
+  assert.equal(
+    version.status,
+    0,
+    'Provide Bun 1.4.2 before running workflow-runtime:test.',
+  );
+  assert.equal(version.stdout.trim(), '1.4.2');
+  const prepared = process.env.TEMARI_RUNTIME_TEST_DEPENDENCIES;
+  if (prepared)
+    await cp(prepared, join(tools, 'node_modules'), { recursive: true });
+  else {
+    const install = await capturedCommand(
+      root,
+      'provision-dependencies',
+      'bun',
+      ['install', '--frozen-lockfile', '--ignore-scripts'],
+      env,
+      tools,
+      120000,
+    );
+    assert.equal(install.status, 0, install.stderr);
+  }
+  const bootstrap = await capturedCommand(
+    root,
+    'prepare-bootstrap',
+    'bun',
+    ['orch/orch.ts', '--help'],
+    env,
+    tools,
+    120000,
+  );
+  assert.equal(bootstrap.status, 0, bootstrap.stderr);
+  assert.match(bootstrap.stdout, /Plain-file orchestrate bookkeeping/);
+  const installKey = createHash('sha256')
+    .update(await readFile(join(tools, 'package.json')))
+    .update('\0')
+    .update(await readFile(join(tools, 'bun.lock')))
+    .digest('hex');
+  assert.equal(
+    (
+      await readFile(
+        join(tools, 'node_modules/.poteto-mode-tools-install-key'),
+        'utf8',
+      )
+    ).trim(),
+    installKey,
+  );
+  const suite = await capturedCommand(
+    root,
+    'upstream-ten-tests',
+    process.execPath,
+    [
+      '--test',
+      '--test-reporter=tap',
+      join(
+        bundle,
+        maintenanceDirectory,
+        'scripts/verification-maintenance-test.mjs',
+      ),
+    ],
+    env,
+    root,
+    120000,
+  );
+  t.diagnostic(suite.stdout);
+  assert.equal(suite.status, 0, suite.stderr + suite.stdout);
+  assert.match(suite.stdout, /# tests 10\b/);
+  assert.match(suite.stdout, /# pass 10\b/);
+  assert.match(suite.stdout, /# skipped 0\b/);
+  await assert.rejects(readFile(join(bundle, maintenanceReceipt)), {
+    code: 'ENOENT',
+  });
+});

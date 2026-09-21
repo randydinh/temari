@@ -26,8 +26,16 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 24
+          node-version: 24.18.0
           cache: 'pnpm'
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
 
       - run: pnpm install --frozen-lockfile
 

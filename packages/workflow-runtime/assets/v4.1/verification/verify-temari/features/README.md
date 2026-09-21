@@ -10,6 +10,8 @@ Temari's primary surface is a plugin package with host-specific discovery. The d
 - Bun is optional on your own `PATH`. `control-temari` resolves it, bootstrapping into `TEMARI_BUN_ROOT` (default `$TMPDIR/temari-bun`) when the host has none, and reports the resolved binary as `bun_bin=`. Run bun through `control-temari bun -- <args>` so a recipe never depends on `~/.bun/bin` existing.
 - Run `verification/verify-temari/scripts/control-temari launch --run-id <run-id>`.
 - Run `control-temari doctor` and require `healthy=yes`, `plugin_name=temari`, and `store_isolated=yes`.
+- Set `TEMARI_MAINTENANCE_REPO` to the owning Git repository root, or pass `--repo <root>` to each maintenance command and guarded drive. Never use the installed package cache as another repository's state.
+- Require a fresh maintenance receipt through `control-temari drive -- <command...>` before ordinary verification. When due, follow [daily maintenance](./verification-maintenance.md) through actual host execution and caller-attested recording.
 - Point evidence at `verification/verify-temari/evidence/<run-id>/` (the helper does this).
 - Never drive an orch store that was not created by this verification run.
 - Never start unbounded `watch-pr` (must pass `--status-only` or `--timeout` greater than 0).
@@ -18,6 +20,8 @@ Temari's primary surface is a plugin package with host-specific discovery. The d
 
 - Start every recipe from a fresh launch unless its preconditions say otherwise.
 - Treat every command as literal. Keep quoted names and flags unchanged.
+- Feature recipes name the underlying controls. For ordinary verification, insert `drive --` before the recipe's target command. For example, `control-temari orch -- init` becomes `control-temari drive -- orch -- init`, and `control-temari capture init -- orch -- init` becomes `control-temari capture init -- drive -- orch -- init`.
+- Use raw controls during the maintenance skill's own live pass, diagnostics, or harness tests. Help, status, doctor, launch, and cleanup stay available when due. Doctor may bootstrap missing dependencies and never records maintenance.
 - Run catalog actions through `control-temari plugin-catalog` and `control-temari playbooks`.
 - Run orchestrate actions through `control-temari orch -- <command>`.
 - Run watcher actions through `control-temari watch-pr -- <flags>`.
@@ -63,3 +67,4 @@ Keep implementation details out of the map. Name only user paths, stable handles
 - [Workflow conformance](./workflow-conformance.md) covers the workflow CLI, bounded journey capture, and sanitized journey replay.
 - [Closeout](./closeout.md) covers the explicit durable task exit, public host stubs, and plugin-native Cursor path.
 - [Credential profiles](./credential-profiles.md) covers Temari's credential-profile guidance and the Omega helper boundary.
+- [Daily verification maintenance](./verification-maintenance.md) covers due/fresh decisions, caller-attested persistence, host continuation, and the guarded verification entry.

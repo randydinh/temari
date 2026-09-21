@@ -39,6 +39,7 @@ ORCH_TS="$TOOLS_DIR/orch/orch.ts"
 WATCH_PR="$TOOLS_DIR/watch-pr/watch-pr"
 WORKFLOW_TS="$TOOLS_DIR/workflow/workflow.ts"
 JOURNEY_EVIDENCE="$SCRIPT_DIR/journey-evidence.py"
+MAINTENANCE="$SCRIPT_DIR/verification-maintenance.mjs"
 LOG_SH="$REPO_ROOT/skills/show-me-your-work/scripts/log.sh"
 PLAYBOOKS_DIR="$REPO_ROOT/skills/poteto-mode/playbooks"
 VERIFY_ROOT="${TEMARI_VERIFY_ROOT:-/tmp/temari-verify}"
@@ -51,7 +52,13 @@ Usage: control-temari <command> [args]
 
 Commands:
   launch [--run-id ID]     Install bun + CLI deps, create an isolated orch store
-  doctor                   Read-only health check (plugin catalog + CLIs + this run)
+  doctor                   Health check (may bootstrap bun/deps; no maintenance receipt)
+  maintenance-status --repo ROOT
+                            Read the daily maintenance decision without writing state
+  maintenance-record --repo ROOT --outcome OUTCOME [result options]
+                            Store an explicitly caller-attested maintenance result
+  drive [--repo ROOT] -- <command...>
+                            Require fresh maintenance before an ordinary verification drive
   current                  Print the active run.env
   orch [--] <args...>      Run orch.ts against this run's --store
   workflow [--] <args...>  Run the workflow conformance CLI
@@ -81,7 +88,30 @@ Environment:
   TEMARI_VERIFY_EVIDENCE   Evidence root (default verification/verify-temari/evidence)
   TEMARI_BUN_ROOT          Bun install root (default $TMPDIR/temari-bun)
   TEMARI_HOST_SKILL_ROOT   Host skill root checked by routing (default: not checked)
+  TEMARI_MAINTENANCE_REPO  Owning Git repository root; required unless --repo is supplied
+
+Successful maintenance-record requires --run-id ID --outcome clean|changed
+  --completed-at UTC --evidence FILE --attest-completed.
+Blocked/failed outcomes never refresh last-success. Recording is caller attestation,
+not proof of skill execution. No automatic maintenance dispatcher is provided.
 EOF
+}
+
+cmd_drive() {
+  local repo="${TEMARI_MAINTENANCE_REPO:-}"
+  if [[ "${1:-}" == "--repo" ]]; then
+    [[ $# -ge 2 ]] || { echo "error: drive --repo requires ROOT" >&2; return 2; }
+    repo="$2"
+    shift 2
+  fi
+  [[ "${1:-}" == "--" ]] || { echo "error: drive [--repo ROOT] -- <command...>" >&2; return 2; }
+  shift
+  case "${1:-}" in
+    orch|workflow|workflow-open|workflow-drive|workflow-snapshot|watch-pr|start-watch-pr|log|bun|routing|plugin-catalog|playbooks|capture|snapshot|journey-capture|journey-score) ;;
+    *) echo "error: drive requires an existing verification command" >&2; return 2 ;;
+  esac
+  node "$MAINTENANCE" guard --repo "$repo" || return $?
+  "$0" "$@"
 }
 
 ensure_bun() {
@@ -852,6 +882,9 @@ main() {
     -h|--help|help) usage ;;
     launch) cmd_launch "$@" ;;
     doctor) cmd_doctor "$@" ;;
+    maintenance-status) node "$MAINTENANCE" status "$@" ;;
+    maintenance-record) node "$MAINTENANCE" record "$@" ;;
+    drive) cmd_drive "$@" ;;
     current) cmd_current "$@" ;;
     orch) cmd_orch "$@" ;;
     workflow) cmd_workflow "$@" ;;

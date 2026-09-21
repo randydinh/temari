@@ -206,6 +206,7 @@ verification/verify-temari/features/plugin-catalog.md
 verification/verify-temari/features/poteto-mode-playbooks.md
 verification/verify-temari/features/routing-chain.md
 verification/verify-temari/features/seq-log-review.md
+verification/verify-temari/features/verification-maintenance.md
 verification/verify-temari/features/watch-pr.md
 verification/verify-temari/features/workflow-conformance.md
 verification/verify-temari/fixtures/organic-feature/expected/.gitignore
@@ -229,3 +230,5 @@ verification/verify-temari/scripts/control-temari-test.sh
 verification/verify-temari/scripts/journey-evidence-test.py
 verification/verify-temari/scripts/journey-evidence.py
 verification/verify-temari/scripts/test-integration-discovery.py
+verification/verify-temari/scripts/verification-maintenance-test.mjs
+verification/verify-temari/scripts/verification-maintenance.mjs
