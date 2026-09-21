@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "sourceRevision": "19797453d02f1509d18c42b8d8f6d42e2f2b92e6",
+  "sourceRevision": "959c8f7be3d7b684207d9e626263d41540d5ecdc",
   "files": [
     {
       "path": "LICENSE",
@@ -1397,10 +1397,10 @@
     {
       "path": "skills/temari/SKILL.md",
       "lane": "portable",
-      "sourceSha256": "1f07cef474bc1b11f7583c0d8cafc1c7533521d93c256e37e9ec9dac756a8d8c",
+      "sourceSha256": "4309ed9237767f9a25cea2ff8da1322ccc19abfd990e65074e86ad6e80a30206",
       "artifactSha256": "1f07cef474bc1b11f7583c0d8cafc1c7533521d93c256e37e9ec9dac756a8d8c",
       "executable": false,
-      "transformation": null
+      "transformation": "Retain the previously accepted semantic skill-selection and invocation policy sentence assigning policy to Temari and translation to the host adapter; source revision removed it. Vendored content is unchanged."
     },
     {
       "path": "skills/temari/references/credentials.md",
@@ -1565,16 +1565,16 @@
     {
       "path": "verification/verify-temari/SKILL.md",
       "lane": "portable",
-      "sourceSha256": "9b5a1cb7d8e3b1628254286e40079b2b6427853b047b06b73e2022a502b189ee",
-      "artifactSha256": "b43a6bbc3c3d299e40ad71f4b77ee1e01d06a17ced4161dc3bde64d3fa782372",
+      "sourceSha256": "c823ac770d9ccf56d703d7e33784c8033b8e30ba91860cca18d70e2a5f63b956",
+      "artifactSha256": "bf58e583b03d74c935d6b323372b1cee74fe01fca21fe3b8d601f93d2c03862c",
       "executable": false,
       "transformation": "Replace excluded repository-only evaluation commands with fresh isolated installation checks; distinguish independent copy equality from unperformed same-tree/symlink comparison."
     },
     {
       "path": "verification/verify-temari/features/README.md",
       "lane": "portable",
-      "sourceSha256": "f7152dc2047c4e8b2a76181d458c65ded0cf03f0569aa6a519349d5b6cc52302",
-      "artifactSha256": "7572ea176d117142ebcd82ede195a40c214dc82b5c164da8ce9f4a99ce1ad4b8",
+      "sourceSha256": "00c916adaccf39ffe8f44925bdbe30b8e50d92b5954aeafd4f143c6ce27dd797",
+      "artifactSha256": "180f781336a7b924ac56229bea04233c2073ebd9d46bccc1d218985d00fefd21",
       "executable": false,
       "transformation": "Declare optional Archon and project-overlay boundaries."
     },
@@ -1665,6 +1665,14 @@
       "artifactSha256": "b5815ebc79e69da82a2cd84955d6c2d74abdd5185e7b1240000367b92512078a",
       "executable": false,
       "transformation": "Verify private profile exclusion and generic missing-context behavior instead of employer-specific contracts."
+    },
+    {
+      "path": "verification/verify-temari/features/verification-maintenance.md",
+      "lane": "portable",
+      "sourceSha256": "b6e6d7b160ed413219fa83b9acfce1b640df689cf522dff878e74f4df00058ee",
+      "artifactSha256": "b6e6d7b160ed413219fa83b9acfce1b640df689cf522dff878e74f4df00058ee",
+      "executable": false,
+      "transformation": null
     },
     {
       "path": "verification/verify-temari/features/watch-pr.md",
@@ -1813,8 +1821,8 @@
     {
       "path": "verification/verify-temari/scripts/control-temari",
       "lane": "portable",
-      "sourceSha256": "6a0a6aa58e12ff89ac11f3a38d35d6d4e6ef168e945387440d854860f5cebf24",
-      "artifactSha256": "1ae461154cc30470dd0f4d8d42319ff78f9b0a823291903aa24d15fed129585a",
+      "sourceSha256": "1bc4fd43bfbb9effe0a44b90c795baf5679f6e652a83268e4d58e753350e8abb",
+      "artifactSha256": "4b9f950e079d20f86d6d601d5c769a01f0d606990d17a445cd8c3658c25f248c",
       "executable": true,
       "transformation": "Preserve optional Archon absence; compare the copied runtime directory/root-file closure and coherent host public projections against an independent reference; report unknown drift for same-tree or live-symlink inspection."
     },
@@ -1848,6 +1856,22 @@
       "sourceSha256": "b9118b3fa35e3cc144f115b4bcf0fc7bd0a5766eb9325f1f925c40eea678c936",
       "artifactSha256": "b9118b3fa35e3cc144f115b4bcf0fc7bd0a5766eb9325f1f925c40eea678c936",
       "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/scripts/verification-maintenance-test.mjs",
+      "lane": "portable",
+      "sourceSha256": "da0039d78b96661a73039fdd54c1737ca4494b674835e7f55489f1a61935c80a",
+      "artifactSha256": "da0039d78b96661a73039fdd54c1737ca4494b674835e7f55489f1a61935c80a",
+      "executable": true,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/scripts/verification-maintenance.mjs",
+      "lane": "portable",
+      "sourceSha256": "6f5b3bb4c4e455e81d8ca0c2bbf310f39f8f0e158083cec4215741364eb4d460",
+      "artifactSha256": "6f5b3bb4c4e455e81d8ca0c2bbf310f39f8f0e158083cec4215741364eb4d460",
+      "executable": true,
       "transformation": null
     }
   ]

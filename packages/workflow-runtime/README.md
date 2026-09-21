@@ -49,6 +49,25 @@ These inherited installation helpers can back up existing destinations. For
 evaluation, always use fresh scratch destinations. Do not point them at your
 active skill root or plugin cache.
 
+## Guard ordinary verification
+
+The raw routing command above is a diagnostic. For ordinary verification, supply
+the owning Git repository root and use the copied guard:
+
+```sh
+bash /absolute/scratch/skills/.temari-package/verification/verify-temari/scripts/control-temari maintenance-status --repo /absolute/owning/repository
+bash /absolute/scratch/skills/.temari-package/verification/verify-temari/scripts/control-temari drive --repo /absolute/owning/repository -- plugin-catalog
+```
+
+Missing or invalid success evidence, or a completion at least 24 hours old,
+blocks the target with exit 3. The package cache and verifier scratch directories
+do not select the owning repository. Follow the copied verifier's
+[maintenance instructions](assets/v4.1/verification/verify-temari/features/verification-maintenance.md)
+to execute the real maintenance pass through the current host, explicitly record
+its caller-attested result, then retry. Failed or blocked outcomes leave success
+unchanged. Evidence hashes validate retained bytes, not semantic coverage. There
+is no automatic host dispatcher or scheduler.
+
 ## Provision command dependencies explicitly
 
 Packaging and inventory checks are offline. Running the copied Pstack commands
@@ -83,11 +102,22 @@ pnpm nx run-many -p workflow-runtime -t test typecheck check --skipNxCache --ski
 pnpm nx run workflow-runtime:check --artifact /absolute/new/portable --lane portable --skipNxCache --skipSync
 ```
 
+Tests require Bun 1.4.2 on `PATH` and Python 3.10 or later. Hosted CI provisions
+these before the Nx test target. The copied upstream ten-test suite provisions
+locked dependencies before its timed subprocesses. For an offline run, set
+`TEMARI_RUNTIME_TEST_DEPENDENCIES` to a prepared dependency directory from the
+bundled Bun lockfile. Set `TEMARI_RUNTIME_TEST_EVIDENCE` to an absolute scratch
+directory outside the workspace to retain copied installations and command logs.
+
 The Node tests exercise inventory rejection, byte and executable-mode integrity,
 portable versus Archon selection, preservation of foreign destinations, output
 overlap through ancestor symlinks, and relocated catalog, routing, copy-install,
-plugin, and reference commands. They do not claim a fresh host conversation or
-native Archon execution. Keep those integration proofs separate.
+plugin, and reference commands. A distribution/host table checks guarded effects,
+explicit owning roots, caller-attested recording, replay and evidence invalidation
+through relocated, symlinked copies. The unchanged upstream suite also exercises
+real guarded orch initialization. Synthetic completion fixtures prove storage and
+CLI behavior only. These checks do not claim a full maintenance pass, a fresh host
+conversation, or native Archon execution. Keep those integration proofs separate.
 
 ## Maintain the imported files
 

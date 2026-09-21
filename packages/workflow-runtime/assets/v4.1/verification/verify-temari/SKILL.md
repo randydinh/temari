@@ -23,7 +23,10 @@ Read `features/README.md` before driving. Drive from the matching feature file.
 flowchart TD
   A[Launch isolated run] --> B[Doctor]
   B -->|unhealthy| A
-  B -->|healthy| C[Drive one mapped feature]
+  B -->|healthy| G[Daily maintenance guard]
+  G -->|fresh| C[Drive one mapped feature]
+  G -->|due| H[Host executes maintenance and records result]
+  H --> G
   C --> D[Capture action plus resulting store or stdout]
   D --> E[Cleanup scratch only]
   E --> F[Confirm evidence still at named path]
@@ -53,7 +56,7 @@ Run this first, and again after any failed drive:
 verification/verify-temari/scripts/control-temari doctor
 ```
 
-Worth driving only when the last line is `healthy=yes`. The check is read-only. It confirms:
+Worth driving only when the last line is `healthy=yes`. Doctor does not execute maintenance or update its receipt. It can bootstrap Bun and CLI dependencies when missing. It confirms:
 
 - the resolved package manifest has `name=temari`, `skills=./skills/`, and, when declared by the host manifest, `agents=./agents/`
 - `skills/poteto-mode/SKILL.md`, `skills/setup-pstack/SKILL.md`, `agents/poteto-agent.md`, `agents/comment-sicko.md` exist. Other `agents/*.md` files (currently `dr-eggbot`) are listed by `plugin-catalog`, not this required-file check.
@@ -66,27 +69,61 @@ Refuse to drive an orch store outside that scratch root. A shared coordinator st
 
 ## Drive
 
-Harness: `control-temari`. Prefer its subcommands over raw bun once a run is active, because it injects `--store` for orch.
+Use `control-temari drive -- <command...>` for ordinary verification. Set the owning repository explicitly before the first drive:
+
+```bash
+export TEMARI_MAINTENANCE_REPO=/absolute/path/to/owning/repository
+verification/verify-temari/scripts/control-temari maintenance-status
+```
+
+The helper validates that this is a Git repository root. An installed package's cache and `TEMARI_VERIFY_ROOT` do not select maintenance state. You can instead pass `--repo <root>` to `maintenance-status`, `maintenance-record`, or `drive` before its `--` separator.
+
+Temari checks this path under the owning repository on every guarded entry:
+
+```text
+.temari/runs/verification-maintenance/last-success.json
+```
+
+A successful receipt is fresh for less than 24 hours. Exactly 24 hours is due, clarifying D-2026-09-19-01's boundary to match the existing pure policy. Missing, malformed, unknown, future, blocked, or evidence-invalid receipts stay due. Status only reports a decision and writes nothing.
+
+When due, `drive` exits 3 before invoking the requested command and selects `maintain-verification-skill`. This is an obligation for the current host coordinator. The CLI does not load or execute the skill. The coordinator reads its host mapping and [`maintain-verification-skill`](../../skills/maintain-verification-skill/SKILL.md), performs the required source wave and live pass, and retains its run notes and evidence. During that pass, use the raw helper subcommands so maintenance does not recursively enter its own guard. If any required coverage cannot finish, report blocked and leave success unchanged.
+
+After an actual completed pass, the coordinator records its observed result:
+
+```bash
+verification/verify-temari/scripts/control-temari maintenance-record \
+  --run-id <completed-run-id> --outcome clean \
+  --completed-at <actual-completion-UTC> --evidence <retained-run-notes> \
+  --attest-completed
+```
+
+Use `changed` only when that skill's corrections and shipping requirements completed. `blocked` and `failed` outcomes never create or refresh success. Clean/changed require a nonempty UTF-8 evidence file and an explicit completion attestation. The stored reference and SHA-256 detect missing or changed evidence; they do not authenticate the coordinator or prove semantic coverage. Reading source, printing an intent, writing JSON, a procedural workflow receipt, or a successful callback is not a completed maintenance pass. No callback executor or automatic host dispatcher is provided.
+
+Record the actual UTC completion time, such as `2026-09-21T09:00:00.000Z`, even when recording later. Future timestamps are refused. Identical replay of the retained run preserves its timestamp and bytes; changed outcome, evidence, or completion time for that run ID is refused. Older or equally dated results cannot replace the known newer completion, even if its evidence has changed or disappeared. Use one trusted coordinator to write receipts. This bounded helper keeps one last-success record, so it recognizes only the current record's run ID, not every historical ID after replacement. Historical reports must keep their original completion time. Keep evidence outside cleanup scratch and do not reuse run IDs.
+
+After recording success, retry the guarded drive. Existing raw controls remain available for maintenance, diagnostics, and harness regression tests. This is cooperative enforcement; calling a raw command directly bypasses the guard. Help, status, doctor, and cleanup never manufacture maintenance freshness.
+
+`drive` preserves the requested command's output and exit status when fresh. The underlying orch command still injects `--store` from the active verifier run.
 
 ```bash
 verification/verify-temari/scripts/control-temari orch -- --help
 verification/verify-temari/scripts/control-temari workflow -- --help
-verification/verify-temari/scripts/control-temari workflow-open <handle> <route> <repo> <coordinator> [capability...]
-verification/verify-temari/scripts/control-temari workflow-drive <handle> <actor> -- <workflow-command>
-verification/verify-temari/scripts/control-temari workflow-snapshot <handle> <label>
-verification/verify-temari/scripts/control-temari journey-capture <stem> <timeout-seconds> <cwd> -- <command>
-verification/verify-temari/scripts/control-temari journey-score <journey-directory> --expected-revision <sha>
-verification/verify-temari/scripts/control-temari orch -- init
-verification/verify-temari/scripts/control-temari orch -- unit add verify-u1 --track verify
-verification/verify-temari/scripts/control-temari orch -- unit get verify-u1
+verification/verify-temari/scripts/control-temari drive -- workflow-open <handle> <route> <repo> <coordinator> [capability...]
+verification/verify-temari/scripts/control-temari drive -- workflow-drive <handle> <actor> -- <workflow-command>
+verification/verify-temari/scripts/control-temari drive -- workflow-snapshot <handle> <label>
+verification/verify-temari/scripts/control-temari drive -- journey-capture <stem> <timeout-seconds> <cwd> -- <command>
+verification/verify-temari/scripts/control-temari drive -- journey-score <journey-directory> --expected-revision <sha>
+verification/verify-temari/scripts/control-temari drive -- orch -- init
+verification/verify-temari/scripts/control-temari drive -- orch -- unit add verify-u1 --track verify
+verification/verify-temari/scripts/control-temari drive -- orch -- unit get verify-u1
 verification/verify-temari/scripts/control-temari orch -- status
-verification/verify-temari/scripts/control-temari plugin-catalog
-verification/verify-temari/scripts/control-temari playbooks
-verification/verify-temari/scripts/control-temari routing --dest ~/.claude/skills
+verification/verify-temari/scripts/control-temari drive -- plugin-catalog
+verification/verify-temari/scripts/control-temari drive -- playbooks
+verification/verify-temari/scripts/control-temari drive -- routing --dest ~/.claude/skills
 verification/verify-temari/scripts/control-temari watch-pr -- --help
-verification/verify-temari/scripts/control-temari watch-pr -- --status-only --pretty --owner <owner> --repo <repo> --pr <n>
-verification/verify-temari/scripts/control-temari bun -- skills/poteto-mode/scripts/watch-pr/watch-pr --unknown
-verification/verify-temari/scripts/control-temari log -- "$EVIDENCE/decisions.tsv" verify "chose isolated store" "scratch must not share coordinator state" "$EVIDENCE/01-doctor.stdout.txt" "row appended"
+verification/verify-temari/scripts/control-temari drive -- watch-pr -- --status-only --pretty --owner <owner> --repo <repo> --pr <n>
+verification/verify-temari/scripts/control-temari drive -- bun -- skills/poteto-mode/scripts/watch-pr/watch-pr --unknown
+verification/verify-temari/scripts/control-temari drive -- log -- "$EVIDENCE/decisions.tsv" verify "chose isolated store" "scratch must not share coordinator state" "$EVIDENCE/01-doctor.stdout.txt" "row appended"
 ```
 
 Stable handles (use these, not coordinates or tab order):
@@ -125,7 +162,7 @@ Absolute form: `$REPO_ROOT/verification/verify-temari/evidence/<run-id>/`. Overr
 Capture:
 
 ```bash
-verification/verify-temari/scripts/control-temari capture 02-orch-init -- orch -- init
+verification/verify-temari/scripts/control-temari capture 02-orch-init -- drive -- orch -- init
 verification/verify-temari/scripts/control-temari snapshot 03-after-unit-add
 ```
 
@@ -158,7 +195,10 @@ All helpers live in `verification/verify-temari/scripts/` and must be executable
 | Invoke | What it does |
 |---|---|
 | `control-temari launch --run-id <id>` | bun + deps, isolated store, evidence dir, `run.env` |
-| `control-temari doctor` | read-only health line `healthy=yes\|no` |
+| `control-temari doctor` | health line `healthy=yes\|no`; may bootstrap dependencies, never records maintenance |
+| `control-temari maintenance-status [--repo <root>]` | read-only due/fresh decision |
+| `control-temari maintenance-record [--repo <root>] --outcome <outcome> [result options]` | explicitly caller-attested completion storage; see Drive |
+| `control-temari drive [--repo <root>] -- <command...>` | checks maintenance before ordinary verification; exits 3 when due |
 | `control-temari current` | dump `run.env` |
 | `control-temari orch -- <args>` | `bun orch.ts --store $STORE <args>` |
 | `control-temari workflow -- <args>` | `bun workflow.ts <args>` |
@@ -178,6 +218,7 @@ All helpers live in `verification/verify-temari/scripts/` and must be executable
 | `control-temari journey-score <dir> [args]` | validate a sanitized revision-bound journey manifest |
 | `control-temari cleanup` | drop scratch + recorded PIDs; keep evidence |
 | `control-temari-test.sh` | smoke-tests launch/doctor/help/cleanup of the helper itself |
+| `node --test verification/verify-temari/scripts/verification-maintenance-test.mjs` | synthetic storage/replay fixtures and actual guarded CLI subprocess regression; not full maintenance coverage |
 
 Isolation: each run-id has its own store. Two orch drives may run side by side with different `--run-id` values. `watch-pr` is not isolated on GitHub; do not double-drive the same PR with a poller. The plugin catalog is read-only and safe to inspect concurrently.
 
@@ -198,3 +239,4 @@ Start here:
 - [`features/workflow-conformance.md`](features/workflow-conformance.md)
 - [`features/closeout.md`](features/closeout.md)
 - [`features/credential-profiles.md`](features/credential-profiles.md)
+- [`features/verification-maintenance.md`](features/verification-maintenance.md)
