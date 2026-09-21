@@ -1,0 +1,28 @@
+{
+  "name": "temari",
+  "version": "0.15.2+codex.1",
+  "description": "Temari's provider-neutral conversation layer with packaged P-stack engineering workflows.",
+  "author": {
+    "name": "Randy Dinh"
+  },
+  "homepage": "https://github.com/randydinh/temari",
+  "repository": "https://github.com/randydinh/temari",
+  "license": "MIT",
+  "keywords": [
+    "temari",
+    "pstack",
+    "engineering"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Temari",
+    "shortDescription": "Route engineering work through packaged P-stack workflows.",
+    "longDescription": "Temari is a conversational engineering entry point. It classifies every engineering request through the P-stack skills packaged with this plugin.",
+    "developerName": "Randy Dinh",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": [
+      "Temari, help me work through this engineering request."
+    ]
+  }
+}

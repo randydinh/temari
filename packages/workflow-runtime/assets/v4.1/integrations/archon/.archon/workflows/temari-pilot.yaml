@@ -1,0 +1,29 @@
+name: temari-pilot
+description: Deterministic Temari capture and recovery pilot. No AI dispatch.
+inputs:
+  bridge:
+    required: true
+  spec:
+    required: true
+evidence_policy:
+  required: true
+nodes:
+  - id: build
+    bash: bun "$INPUTS_BRIDGE" capture --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --spec "$INPUTS_SPEC" --stage build
+  - id: shape-final
+    depends_on: [build]
+    mutates_checkout: false
+    bash: bun "$INPUTS_BRIDGE" capture --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --spec "$INPUTS_SPEC" --stage shape-final
+  - id: verify
+    depends_on: [shape-final]
+    mutates_checkout: false
+    bash: bun "$INPUTS_BRIDGE" capture --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --spec "$INPUTS_SPEC" --stage verify
+  - id: review
+    depends_on: [verify]
+    mutates_checkout: false
+    bash: bun "$INPUTS_BRIDGE" capture --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --spec "$INPUTS_SPEC" --stage review
+  - id: finalize
+    depends_on: [review]
+    always_run: true
+    mutates_checkout: false
+    bash: bun "$INPUTS_BRIDGE" finalize --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --spec "$INPUTS_SPEC"
