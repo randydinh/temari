@@ -1,0 +1,884 @@
+#!/usr/bin/env bash
+# control-temari: launch, doctor, drive, capture, and clean up Temari verification runs.
+# This helper works from a repository checkout or copied package bundle and
+# never kills by process name;
+# it only signals PIDs recorded for the current run.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Resolve the package from its own checkout or from a copied bundle. This keeps
+# verification usable when the host installs `.temari-package` outside Git.
+resolve_temari_root() {
+  local candidate="$SKILL_DIR"
+  while [[ "$candidate" != "/" ]]; do
+    if [[ -f "$candidate/.cursor-plugin/plugin.json" || \
+          -f "$candidate/.codex-plugin/plugin.json" || \
+          -f "$candidate/adapters/codex/plugin.json" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+    candidate="$(dirname "$candidate")"
+  done
+  echo "error: could not resolve Temari package root from $SKILL_DIR" >&2
+  return 1
+}
+
+REPO_ROOT="$(resolve_temari_root)"
+if [[ -f "$REPO_ROOT/.cursor-plugin/plugin.json" ]]; then
+  PLUGIN_JSON="$REPO_ROOT/.cursor-plugin/plugin.json"
+elif [[ -f "$REPO_ROOT/.codex-plugin/plugin.json" ]]; then
+  PLUGIN_JSON="$REPO_ROOT/.codex-plugin/plugin.json"
+else
+  PLUGIN_JSON="$REPO_ROOT/adapters/codex/plugin.json"
+fi
+export REPO_ROOT PLUGIN_JSON
+TOOLS_DIR="$REPO_ROOT/skills/poteto-mode/scripts"
+ORCH_TS="$TOOLS_DIR/orch/orch.ts"
+WATCH_PR="$TOOLS_DIR/watch-pr/watch-pr"
+WORKFLOW_TS="$TOOLS_DIR/workflow/workflow.ts"
+JOURNEY_EVIDENCE="$SCRIPT_DIR/journey-evidence.py"
+LOG_SH="$REPO_ROOT/skills/show-me-your-work/scripts/log.sh"
+PLAYBOOKS_DIR="$REPO_ROOT/skills/poteto-mode/playbooks"
+VERIFY_ROOT="${TEMARI_VERIFY_ROOT:-/tmp/temari-verify}"
+DEFAULT_EVIDENCE_ROOT="$SKILL_DIR/evidence"
+BUN_ROOT="${TEMARI_BUN_ROOT:-${TMPDIR:-/tmp}/temari-bun}"
+
+usage() {
+  cat <<'EOF'
+Usage: control-temari <command> [args]
+
+Commands:
+  launch [--run-id ID]     Install bun + CLI deps, create an isolated orch store
+  doctor                   Read-only health check (plugin catalog + CLIs + this run)
+  current                  Print the active run.env
+  orch [--] <args...>      Run orch.ts against this run's --store
+  workflow [--] <args...>  Run the workflow conformance CLI
+  workflow-open HANDLE ROUTE REPO COORDINATOR [CAPABILITY...]
+                            Start a named workflow below the active verifier run
+  workflow-drive HANDLE ACTOR -- <args...>
+                            Drive a named workflow without repeating its path
+  workflow-snapshot HANDLE LABEL
+                            Copy a named workflow tree into retained evidence
+  watch-pr [--] <args...>  Run watch-pr (require --status-only or --timeout > 0)
+  start-watch-pr [--] ...  Same, backgrounded; PID recorded for cleanup
+  log [--] <args...>       Run show-me-your-work scripts/log.sh
+  bun [--] [args...]       Run the resolved bun from the package root; no args prints its path
+  routing [--dest ROOT]    Check the temari -> poteto-mode chain and host install drift
+  plugin-catalog           Print the plugin identity from this checkout
+  playbooks                List poteto-mode playbook files and SKILL.md coverage
+  capture <stem> -- <cmd>  Run a helper command; save cmd/stdout/stderr/exit under evidence
+  snapshot <label>         Copy orch store files into evidence/<run-id>/<label>/
+  journey-capture STEM TIMEOUT CWD -- <cmd...>
+                            Run one bounded command and retain its raw capture
+  journey-score DIR [args] Validate a sanitized journey manifest and product proof
+  cleanup                  Remove this run's scratch dir and recorded PIDs; keep evidence
+
+Environment:
+  TEMARI_VERIFY_RUN_ID     Active run id (set by launch)
+  TEMARI_VERIFY_ROOT       Scratch root (default /tmp/temari-verify)
+  TEMARI_VERIFY_EVIDENCE   Evidence root (default verification/verify-temari/evidence)
+  TEMARI_BUN_ROOT          Bun install root (default $TMPDIR/temari-bun)
+  TEMARI_HOST_SKILL_ROOT   Host skill root checked by routing (default: not checked)
+EOF
+}
+
+ensure_bun() {
+  if command -v bun >/dev/null 2>&1; then
+    return 0
+  fi
+  if [[ -x "$BUN_ROOT/bin/bun" ]]; then
+    export PATH="$BUN_ROOT/bin:$PATH"
+    return 0
+  fi
+  if ! mkdir -p "$BUN_ROOT"; then
+    echo "error: cannot create Bun install root $BUN_ROOT" >&2
+    echo "set TEMARI_BUN_ROOT to a writable directory or install Bun on PATH" >&2
+    return 1
+  fi
+  if ! curl -fsSL https://bun.sh/install | BUN_INSTALL="$BUN_ROOT" bash; then
+    echo "error: Bun bootstrap failed for $BUN_ROOT" >&2
+    return 1
+  fi
+  export PATH="$BUN_ROOT/bin:$PATH"
+  if ! command -v bun >/dev/null 2>&1; then
+    echo "error: Bun was not found under $BUN_ROOT/bin after bootstrap" >&2
+    return 1
+  fi
+}
+
+ensure_tools() {
+  ensure_bun
+  bun "$ORCH_TS" --help >/dev/null
+  bun "$WATCH_PR" --help >/dev/null
+  bun "$WORKFLOW_TS" --help >/dev/null
+}
+
+run_dir_for() {
+  local id="$1"
+  printf '%s/%s\n' "$VERIFY_ROOT" "$id"
+}
+
+resolve_run_id() {
+  if [[ -n "${TEMARI_VERIFY_RUN_ID:-}" ]]; then
+    printf '%s\n' "$TEMARI_VERIFY_RUN_ID"
+    return 0
+  fi
+  if [[ -f "$VERIFY_ROOT/current" ]]; then
+    cat "$VERIFY_ROOT/current"
+    return 0
+  fi
+  echo "error: no active run; run control-temari launch first" >&2
+  return 1
+}
+
+load_run() {
+  local id
+  id="$(resolve_run_id)"
+  RUN_DIR="$(run_dir_for "$id")"
+  RUN_ENV="$RUN_DIR/run.env"
+  if [[ ! -f "$RUN_ENV" ]]; then
+    echo "error: missing $RUN_ENV" >&2
+    return 1
+  fi
+  # shellcheck disable=SC1090
+  set -a
+  # shellcheck disable=SC1091
+  source "$RUN_ENV"
+  set +a
+  export TEMARI_VERIFY_RUN_ID="$RUN_ID"
+}
+
+strip_double_dash() {
+  if [[ "${1:-}" == "--" ]]; then
+    shift
+  fi
+  printf '%s\0' "$@"
+}
+
+has_flag() {
+  local needle="$1"
+  shift
+  local arg
+  for arg in "$@"; do
+    if [[ "$arg" == "$needle" || "$arg" == "$needle"=* ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+watch_pr_is_bounded() {
+  local arg timeout=""
+  if has_flag "--status-only" "$@"; then
+    return 0
+  fi
+  if has_flag "--help" "$@" || has_flag "-h" "$@"; then
+    return 0
+  fi
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --timeout)
+        timeout="${2:-}"
+        shift 2 || true
+        ;;
+      --timeout=*)
+        timeout="${1#--timeout=}"
+        shift
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+  if [[ -n "$timeout" && "$timeout" != "0" ]]; then
+    return 0
+  fi
+  return 1
+}
+
+cmd_launch() {
+  local run_id=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --run-id)
+        run_id="${2:-}"
+        shift 2
+        ;;
+      --run-id=*)
+        run_id="${1#--run-id=}"
+        shift
+        ;;
+      *)
+        echo "error: unknown launch argument: $1" >&2
+        return 2
+        ;;
+    esac
+  done
+  if [[ -z "$run_id" ]]; then
+    run_id="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+  fi
+  ensure_bun
+  local run_dir store evidence_root evidence_dir version bun_ver bun_bin
+  run_dir="$(run_dir_for "$run_id")"
+  store="$run_dir/store"
+  evidence_root="${TEMARI_VERIFY_EVIDENCE:-$DEFAULT_EVIDENCE_ROOT}"
+  evidence_dir="$evidence_root/$run_id"
+  mkdir -p "$store" "$evidence_dir" "$VERIFY_ROOT"
+  ensure_tools
+  version="$(node -e 'const p=require(process.argv[1]); process.stdout.write(p.version)' "$PLUGIN_JSON")"
+  bun_ver="$(bun --version)"
+  bun_bin="$(command -v bun)"
+  cat >"$run_dir/run.env" <<EOF
+RUN_ID=$run_id
+REPO_ROOT=$REPO_ROOT
+RUN_DIR=$run_dir
+STORE=$store
+EVIDENCE=$evidence_dir
+PLUGIN_VERSION=$version
+BUN_VERSION=$bun_ver
+BUN_BIN=$bun_bin
+CREATED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+EOF
+  : >"$run_dir/pids"
+  printf '%s\n' "$run_id" >"$VERIFY_ROOT/current"
+  export TEMARI_VERIFY_RUN_ID="$run_id"
+  cat <<EOF
+run_id=$run_id
+store=$store
+evidence=$evidence_dir
+plugin_version=$version
+bun=$bun_ver
+bun_bin=$bun_bin
+ready: run control-temari doctor next
+EOF
+}
+
+cmd_doctor() {
+  ensure_bun
+  local healthy=yes
+  local plugin_name plugin_version skills_dir agents_dir orch_help watch_help
+  plugin_name="$(node -e 'const p=require(process.argv[1]); process.stdout.write(p.name)' "$PLUGIN_JSON")"
+  plugin_version="$(node -e 'const p=require(process.argv[1]); process.stdout.write(p.version)' "$PLUGIN_JSON")"
+  skills_dir="$(node -e 'const p=require(process.argv[1]); process.stdout.write(p.skills)' "$PLUGIN_JSON")"
+  agents_dir="$(node -e 'const p=require(process.argv[1]); process.stdout.write(p.agents || "(not declared)")' "$PLUGIN_JSON")"
+  orch_help="$(bun "$ORCH_TS" --help 2>&1 || true)"
+  watch_help="$(bun "$WATCH_PR" --help 2>&1 || true)"
+
+  echo "plugin_name=$plugin_name"
+  echo "plugin_version=$plugin_version"
+  echo "plugin_skills=$skills_dir"
+  echo "plugin_agents=$agents_dir"
+  echo "bun=$(bun --version)"
+  echo "bun_bin=$(command -v bun)"
+  echo "orch_bin=$ORCH_TS"
+  echo "watch_pr_bin=$WATCH_PR"
+
+  [[ "$plugin_name" == "temari" ]] || { echo "check_plugin_name=fail"; healthy=no; }
+  [[ "$skills_dir" == "./skills/" ]] || { echo "check_skills_ptr=fail"; healthy=no; }
+  if [[ "$agents_dir" != "(not declared)" ]]; then
+    [[ "$agents_dir" == "./agents/" ]] || { echo "check_agents_ptr=fail"; healthy=no; }
+  fi
+  [[ -f "$REPO_ROOT/skills/poteto-mode/SKILL.md" ]] || { echo "check_poteto_mode=fail"; healthy=no; }
+  [[ -f "$REPO_ROOT/skills/setup-pstack/SKILL.md" ]] || { echo "check_setup_pstack=fail"; healthy=no; }
+  [[ -f "$REPO_ROOT/agents/poteto-agent.md" ]] || { echo "check_poteto_agent=fail"; healthy=no; }
+  [[ -f "$REPO_ROOT/agents/comment-sicko.md" ]] || { echo "check_comment_sicko=fail"; healthy=no; }
+  [[ -f "$JOURNEY_EVIDENCE" ]] || { echo "check_journey_evidence=fail"; healthy=no; }
+  if [[ "$orch_help" == *"Plain-file orchestrate bookkeeping"* ]]; then
+    echo "orch_help=yes"
+  else
+    echo "orch_help=no"
+    healthy=no
+  fi
+  if [[ "$watch_help" == *"Watch one pull request"* ]]; then
+    echo "watch_pr_help=yes"
+  else
+    echo "watch_pr_help=no"
+    healthy=no
+  fi
+
+  if [[ -n "${TEMARI_VERIFY_RUN_ID:-}" || -f "$VERIFY_ROOT/current" ]]; then
+    load_run
+    echo "run_id=$RUN_ID"
+    echo "store=$STORE"
+    echo "evidence=$EVIDENCE"
+    case "$STORE" in
+      "$VERIFY_ROOT"/*)
+        echo "store_isolated=yes"
+        ;;
+      *)
+        echo "store_isolated=no"
+        echo "error: refuse to drive a store outside $VERIFY_ROOT" >&2
+        healthy=no
+        ;;
+    esac
+    if [[ -f "$STORE/units.tsv" ]]; then
+      local header
+      header="$(head -n 1 "$STORE/units.tsv")"
+      echo "units_header=$header"
+      [[ "$header" == $'id\ttrack\tstate\tbranch\tpr\tsha\tbrief' ]] || {
+        echo "check_units_header=fail"
+        healthy=no
+      }
+    else
+      echo "units_header=(not initialized)"
+    fi
+  else
+    echo "run_id=(none)"
+  fi
+
+  echo "healthy=$healthy"
+  [[ "$healthy" == yes ]]
+}
+
+cmd_current() {
+  load_run
+  cat "$RUN_ENV"
+}
+
+cmd_orch() {
+  load_run
+  ensure_bun
+  if [[ "${1:-}" == "--" ]]; then
+    shift
+  fi
+  local args=("$@")
+  if ! has_flag "--store" "${args[@]+"${args[@]}"}"; then
+    bun "$ORCH_TS" --store "$STORE" "${args[@]+"${args[@]}"}"
+  else
+    bun "$ORCH_TS" "${args[@]+"${args[@]}"}"
+  fi
+}
+
+cmd_workflow() {
+  ensure_bun
+  if [[ "${1:-}" == "--" ]]; then
+    shift
+  fi
+  bun "$WORKFLOW_TS" "$@"
+}
+
+validate_handle() {
+  local handle="$1"
+  if [[ ! "$handle" =~ ^[a-z][a-z0-9-]*$ ]]; then
+    echo "error: workflow handle must match [a-z][a-z0-9-]*" >&2
+    return 2
+  fi
+}
+
+workflow_dir() {
+  local handle="$1"
+  validate_handle "$handle"
+  printf '%s/workflows/%s\n' "$RUN_DIR" "$handle"
+}
+
+cmd_workflow_open() {
+  local handle="${1:-}" route="${2:-}" repo="${3:-}" coordinator="${4:-}"
+  if [[ -z "$handle" || -z "$route" || -z "$repo" || -z "$coordinator" ]]; then
+    echo "error: workflow-open requires HANDLE ROUTE REPO COORDINATOR [CAPABILITY...]" >&2
+    return 2
+  fi
+  shift 4
+  load_run
+  ensure_bun
+  local profile run_dir capability
+  case "$route" in
+    lightweight-engineering) profile="$REPO_ROOT/skills/poteto-mode/playbook-contracts/v1/lightweight-engineering.json" ;;
+    feature) profile="$REPO_ROOT/skills/poteto-mode/playbook-contracts/v1/feature.json" ;;
+    *) echo "error: route must be lightweight-engineering or feature" >&2; return 2 ;;
+  esac
+  run_dir="$(workflow_dir "$handle")"
+  local args=(--run "$run_dir" --actor "$coordinator" start --profile "$profile" --repo "$repo" --coordinator "$coordinator")
+  for capability in "$@"; do
+    args+=(--capability "$capability")
+  done
+  bun "$WORKFLOW_TS" "${args[@]}"
+}
+
+cmd_workflow_drive() {
+  local handle="${1:-}" actor="${2:-}"
+  if [[ -z "$handle" || -z "$actor" ]]; then
+    echo "error: workflow-drive requires HANDLE ACTOR -- <args...>" >&2
+    return 2
+  fi
+  shift 2
+  if [[ "${1:-}" == "--" ]]; then shift; fi
+  if [[ $# -eq 0 ]]; then
+    echo "error: workflow-drive requires a workflow command" >&2
+    return 2
+  fi
+  load_run
+  ensure_bun
+  local run_dir
+  run_dir="$(workflow_dir "$handle")"
+  [[ -f "$run_dir/run.json" ]] || { echo "error: unknown workflow handle $handle" >&2; return 1; }
+  bun "$WORKFLOW_TS" --run "$run_dir" --actor "$actor" "$@"
+}
+
+cmd_workflow_snapshot() {
+  local handle="${1:-}" label="${2:-}"
+  if [[ -z "$handle" || -z "$label" || ! "$label" =~ ^[a-z][a-z0-9-]*$ ]]; then
+    echo "error: workflow-snapshot requires valid HANDLE and LABEL values" >&2
+    return 2
+  fi
+  load_run
+  local run_dir dest
+  run_dir="$(workflow_dir "$handle")"
+  [[ -f "$run_dir/run.json" ]] || { echo "error: unknown workflow handle $handle" >&2; return 1; }
+  dest="$EVIDENCE/workflows/$handle/$label"
+  mkdir -p "$(dirname "$dest")"
+  [[ ! -e "$dest" ]] || { echo "error: snapshot already exists at $dest" >&2; return 1; }
+  cp -a "$run_dir" "$dest"
+  echo "workflow_snapshot=$dest"
+}
+
+cmd_journey_capture() {
+  local stem="${1:-}" timeout="${2:-}" cwd="${3:-}"
+  if [[ -z "$stem" || ! "$stem" =~ ^[a-z][a-z0-9-]*$ || -z "$timeout" || -z "$cwd" ]]; then
+    echo "error: journey-capture requires STEM TIMEOUT CWD -- <cmd...>" >&2
+    return 2
+  fi
+  shift 3
+  load_run
+  python3 -B "$JOURNEY_EVIDENCE" capture --output "$EVIDENCE/journeys/$stem/raw" --timeout "$timeout" --cwd "$cwd" "$@"
+}
+
+cmd_journey_score() {
+  local journey="${1:-}"
+  if [[ -z "$journey" ]]; then
+    echo "error: journey-score requires DIR" >&2
+    return 2
+  fi
+  shift
+  local -a allowed=()
+  while (( $# )); do
+    case "$1" in
+      --json)
+        allowed+=("$1")
+        shift
+        ;;
+      --expected-revision)
+        [[ $# -ge 2 && -n "$2" ]] || { echo "error: --expected-revision requires a value" >&2; return 2; }
+        allowed+=("$1" "$2")
+        shift 2
+        ;;
+      --expected-revision=*)
+        allowed+=("$1")
+        shift
+        ;;
+      *)
+        echo "error: unsupported journey-score option $1" >&2
+        return 2
+        ;;
+    esac
+  done
+  python3 -B "$JOURNEY_EVIDENCE" score "$journey" "${allowed[@]}" --candidate-root "$REPO_ROOT"
+}
+
+cmd_watch_pr() {
+  ensure_bun
+  if [[ "${1:-}" == "--" ]]; then
+    shift
+  fi
+  if ! watch_pr_is_bounded "$@"; then
+    echo "error: refuse unbounded watch-pr; pass --status-only or --timeout <seconds> greater than 0" >&2
+    return 2
+  fi
+  bun "$WATCH_PR" "$@"
+}
+
+cmd_start_watch_pr() {
+  load_run
+  ensure_bun
+  if [[ "${1:-}" == "--" ]]; then
+    shift
+  fi
+  if ! watch_pr_is_bounded "$@"; then
+    echo "error: refuse unbounded watch-pr; pass --status-only or --timeout <seconds> greater than 0" >&2
+    return 2
+  fi
+  bun "$WATCH_PR" "$@" &
+  local pid=$!
+  printf '%s\n' "$pid" >>"$RUN_DIR/pids"
+  echo "pid=$pid"
+}
+
+cmd_log() {
+  if [[ "${1:-}" == "--" ]]; then
+    shift
+  fi
+  "$LOG_SH" "$@"
+}
+
+cmd_bun() {
+  ensure_bun
+  if [[ "${1:-}" == "--" ]]; then
+    shift
+  fi
+  if [[ $# -eq 0 ]]; then
+    command -v bun
+    return 0
+  fi
+  (cd "$REPO_ROOT" && bun "$@")
+}
+
+cmd_routing() {
+  local dest="${TEMARI_HOST_SKILL_ROOT:-}"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --dest)
+        dest="${2:-}"
+        shift 2
+        ;;
+      --dest=*)
+        dest="${1#--dest=}"
+        shift
+        ;;
+      *)
+        echo "error: unknown routing argument: $1" >&2
+        return 2
+        ;;
+    esac
+  done
+
+  local ok=yes
+  local temari_skill="$REPO_ROOT/skills/temari/SKILL.md"
+  local poteto_skill="$REPO_ROOT/skills/poteto-mode/SKILL.md"
+  local lightweight="$REPO_ROOT/skills/poteto-mode/playbooks/lightweight-engineering.md"
+
+  # Adapter layout and install-host.sh modes belong to scripts/check-host-adapters.sh.
+  # This check owns the contract text and a live host skill root.
+  echo "package_root=$REPO_ROOT"
+
+  # The routing contract: Temari hands every engineering request to poteto-mode,
+  # and poteto-mode owns the lightweight-versus-full decision.
+  if grep -q 'every software engineering request' "$temari_skill" &&
+    grep -q 'poteto-mode' "$temari_skill"; then
+    echo "temari_delegates=yes"
+  else
+    echo "temari_delegates=no"
+    ok=no
+  fi
+  if grep -q 'route classification' "$poteto_skill"; then
+    echo "poteto_classifies=yes"
+  else
+    echo "poteto_classifies=no"
+    ok=no
+  fi
+  if [[ -f "$lightweight" ]]; then
+    echo "lightweight_playbook=yes"
+  else
+    echo "lightweight_playbook=no"
+    ok=no
+  fi
+
+  if [[ -n "$dest" ]]; then
+    routing_check_install "$dest" || ok=no
+  else
+    echo "install_root=(not checked)"
+  fi
+
+  echo "routing_ok=$ok"
+  [[ "$ok" == yes ]]
+}
+
+routing_check_install() {
+  local dest="$1"
+  echo "install_root=$dest"
+  local pointer="$dest/pstack-root"
+  if [[ ! -f "$pointer" ]]; then
+    echo "install_pointer=missing"
+    return 1
+  fi
+  local target installed mode
+  target="$(cat "$pointer")"
+  if [[ "$target" == /* ]]; then
+    installed="$target"
+    mode=symlink
+  else
+    installed="$dest/$target"
+    mode=copy
+  fi
+  echo "install_mode=$mode"
+  if [[ ! -d "$installed" ]]; then
+    echo "install_pointer_resolves=no"
+    return 1
+  fi
+  echo "install_package=$installed"
+
+  local entry
+  for entry in temari poteto-mode; do
+    if [[ ! -e "$dest/$entry/SKILL.md" ]]; then
+      echo "check_install_entry_$entry=fail"
+      return 1
+    fi
+  done
+
+  if [[ "$(cd "$installed" && pwd -P)" == "$(cd "$REPO_ROOT" && pwd -P)" ]]; then
+    echo "install_comparison=not-performed (same tree; no independent reference)"
+    echo "install_drift=unknown"
+    return 0
+  fi
+
+  # A symlink install cannot go stale on its own: it serves whatever its target
+  # checkout holds. Report what that is instead of diffing it against this tree,
+  # which would flag an ordinary revision difference as drift.
+  if [[ "$mode" == symlink ]]; then
+    local head
+    head="$(git -C "$installed" log --oneline -1 2>/dev/null || echo "(not a git checkout)")"
+    echo "install_tracks=$head"
+    echo "install_comparison=not-performed (live symlink; no copy comparison)"
+    echo "install_drift=unknown"
+    return 0
+  fi
+
+  echo "install_comparison=independent-reference"
+  local drift=0 path differences
+  local directories=(skills verification adapters agents scripts docs)
+  for path in "${directories[@]}"; do
+    if [[ "$path" == verification ]]; then
+      differences="$(diff -rq -x evidence "$installed/$path" "$REPO_ROOT/$path" 2>&1 | grep -c . || true)"
+    else
+      differences="$(diff -rq "$installed/$path" "$REPO_ROOT/$path" 2>&1 | grep -c . || true)"
+    fi
+    drift=$((drift + differences))
+  done
+  for path in LICENSE UPSTREAM.md; do
+    if ! cmp -s "$installed/$path" "$REPO_ROOT/$path"; then
+      drift=$((drift + 1))
+    fi
+  done
+  local host matched_host="" host_matches=0
+  for host in codex claude-code generic; do
+    if cmp -s "$dest/pstack-HOST.md" "$REPO_ROOT/adapters/$host/HOST.md"; then
+      matched_host="$host"
+      host_matches=$((host_matches + 1))
+    fi
+  done
+  if [[ "$host_matches" -ne 1 ]]; then
+    drift=$((drift + 1))
+  else
+    local entries=(temari poteto-mode closeout)
+    if [[ -e "$dest/verify-temari" || -L "$dest/verify-temari" ]]; then
+      entries+=(verify-temari)
+    fi
+    for entry in "${entries[@]}"; do
+      differences="$(diff -rq "$dest/$entry" "$REPO_ROOT/adapters/$matched_host/skills/$entry" 2>&1 | grep -c . || true)"
+      drift=$((drift + differences))
+    done
+  fi
+  local archon_drift=0
+  local archon_manifest="$REPO_ROOT/integrations/archon/runtime-files.txt"
+  local installed_archon="$installed/integrations/archon"
+  if [[ ! -f "$archon_manifest" && ! -e "$installed_archon" ]]; then
+    echo "archon=unavailable (portable distribution; drift check skipped)"
+  elif [[ ! -f "$archon_manifest" || ! -f "$installed_archon/runtime-files.txt" ]] || ! cmp -s "$archon_manifest" "$installed_archon/runtime-files.txt"; then
+    archon_drift=1
+  else
+    local relative
+    while IFS= read -r relative || [[ -n "$relative" ]]; do
+      if [[ ! -f "$installed_archon/$relative" ]] || ! cmp -s "$REPO_ROOT/integrations/archon/$relative" "$installed_archon/$relative"; then
+        archon_drift=$((archon_drift + 1))
+      fi
+    done < "$archon_manifest"
+    local expected_archon_count actual_archon_count
+    expected_archon_count=$(( $(wc -l < "$archon_manifest") + 1 ))
+    actual_archon_count="$(find "$installed_archon" -type f | wc -l | tr -d ' ')"
+    if [[ "$actual_archon_count" -ne "$expected_archon_count" ]]; then
+      archon_drift=$((archon_drift + 1))
+    fi
+  fi
+  drift=$((drift + archon_drift))
+  if [[ "$drift" -eq 0 ]]; then
+    echo "install_drift=none"
+    return 0
+  fi
+  echo "install_drift=$drift files"
+  echo "install_drift_fix=scripts/install-host.sh --mode=symlink reinstalls without a second copy"
+  return 1
+}
+
+cmd_plugin_catalog() {
+  node <<'NODE'
+const fs = require("fs");
+const path = require("path");
+const repo = process.env.REPO_ROOT;
+const plugin = JSON.parse(fs.readFileSync(process.env.PLUGIN_JSON, "utf8"));
+const skillsDir = path.join(repo, "skills");
+const skillNames = fs.readdirSync(skillsDir).filter((name) =>
+  fs.existsSync(path.join(skillsDir, name, "SKILL.md"))
+).sort();
+const agents = fs.readdirSync(path.join(repo, "agents"))
+  .filter((name) => name.endsWith(".md"))
+  .map((name) => name.replace(/\.md$/, ""))
+  .sort();
+const playbooks = fs.readdirSync(path.join(repo, "skills/poteto-mode/playbooks"))
+  .filter((name) => name.endsWith(".md"))
+  .map((name) => name.replace(/\.md$/, ""))
+  .sort();
+process.stdout.write([
+  `name=${plugin.name}`,
+  `displayName=${plugin.displayName || plugin.name}`,
+  `version=${plugin.version}`,
+  `skills_ptr=${plugin.skills}`,
+  `agents_ptr=${plugin.agents || "(not declared)"}`,
+  `skill_count=${skillNames.length}`,
+  `skills=${skillNames.join(",")}`,
+  `agent_count=${agents.length}`,
+  `agents=${agents.join(",")}`,
+  `playbook_count=${playbooks.length}`,
+  `playbooks=${playbooks.join(",")}`,
+].join("\n") + "\n");
+NODE
+}
+
+cmd_playbooks() {
+  local listed linked missing
+  listed="$(ls -1 "$PLAYBOOKS_DIR"/*.md | xargs -n1 basename | sed 's/\.md$//' | sort)"
+  linked="$(
+    python3 - <<PY
+from pathlib import Path
+text = Path("$REPO_ROOT/skills/poteto-mode/SKILL.md").read_text()
+import re
+print("\n".join(sorted(set(re.findall(r"playbooks/([a-z0-9-]+)\\.md", text)))))
+PY
+  )"
+  echo "playbook_files:"
+  printf '%s\n' "$listed" | sed 's/^/  /'
+  echo "linked_from_poteto_mode:"
+  printf '%s\n' "$linked" | sed 's/^/  /'
+  missing="$(comm -23 <(printf '%s\n' "$listed") <(printf '%s\n' "$linked"))"
+  extra="$(comm -13 <(printf '%s\n' "$listed") <(printf '%s\n' "$linked"))"
+  if [[ -n "$missing" ]]; then
+    echo "unlinked_files:"
+    printf '%s\n' "$missing" | sed 's/^/  /'
+  fi
+  if [[ -n "$extra" ]]; then
+    echo "links_without_file:"
+    printf '%s\n' "$extra" | sed 's/^/  /'
+  fi
+  if [[ -z "$missing" && -z "$extra" ]]; then
+    echo "coverage=exact"
+  else
+    echo "coverage=drift"
+    return 1
+  fi
+}
+
+cmd_capture() {
+  local stem="${1:-}"
+  if [[ -z "$stem" ]]; then
+    echo "error: capture requires a stem" >&2
+    return 2
+  fi
+  shift
+  if [[ "${1:-}" == "--" ]]; then
+    shift
+  fi
+  load_run
+  mkdir -p "$EVIDENCE"
+  local cmd_file="$EVIDENCE/${stem}.cmd.txt"
+  local stdout_file="$EVIDENCE/${stem}.stdout.txt"
+  local stderr_file="$EVIDENCE/${stem}.stderr.txt"
+  local exit_file="$EVIDENCE/${stem}.exit.txt"
+  printf '%s\n' "control-temari $*" >"$cmd_file"
+  set +e
+  "$0" "$@" >"$stdout_file" 2>"$stderr_file"
+  local ec=$?
+  set -e
+  printf '%s\n' "$ec" >"$exit_file"
+  echo "captured=$EVIDENCE/${stem}.{cmd,stdout,stderr,exit}.txt exit=$ec"
+  return "$ec"
+}
+
+cmd_snapshot() {
+  local label="${1:-}"
+  if [[ -z "$label" ]]; then
+    echo "error: snapshot requires a label" >&2
+    return 2
+  fi
+  load_run
+  local dest="$EVIDENCE/$label"
+  mkdir -p "$dest"
+  local f
+  for f in units.tsv ledger.tsv status.md preferences.md gates.md frontier.json; do
+    if [[ -e "$STORE/$f" ]]; then
+      cp "$STORE/$f" "$dest/$f"
+    fi
+  done
+  if [[ -d "$STORE/inbox" ]]; then
+    mkdir -p "$dest/inbox"
+    cp -a "$STORE/inbox/." "$dest/inbox/" 2>/dev/null || true
+  fi
+  echo "snapshot=$dest"
+}
+
+cmd_cleanup() {
+  if [[ -z "${TEMARI_VERIFY_RUN_ID:-}" && ! -f "$VERIFY_ROOT/current" ]]; then
+    echo "cleanup=nothing (no active run)"
+    return 0
+  fi
+  load_run
+  local pid
+  if [[ -f "$RUN_DIR/pids" ]]; then
+    while read -r pid; do
+      [[ -z "$pid" ]] && continue
+      if kill -0 "$pid" 2>/dev/null; then
+        kill "$pid" 2>/dev/null || true
+        wait "$pid" 2>/dev/null || true
+      fi
+    done <"$RUN_DIR/pids"
+  fi
+  local evidence="$EVIDENCE"
+  rm -rf "$RUN_DIR"
+  if [[ -f "$VERIFY_ROOT/current" ]] && [[ "$(cat "$VERIFY_ROOT/current")" == "$RUN_ID" ]]; then
+    rm -f "$VERIFY_ROOT/current"
+  fi
+  unset TEMARI_VERIFY_RUN_ID
+  echo "cleanup=removed $RUN_DIR"
+  echo "evidence_kept=$evidence"
+}
+
+main() {
+  export REPO_ROOT
+  local cmd="${1:-}"
+  if [[ -z "$cmd" ]]; then
+    usage
+    return 2
+  fi
+  shift || true
+  case "$cmd" in
+    -h|--help|help) usage ;;
+    launch) cmd_launch "$@" ;;
+    doctor) cmd_doctor "$@" ;;
+    current) cmd_current "$@" ;;
+    orch) cmd_orch "$@" ;;
+    workflow) cmd_workflow "$@" ;;
+    workflow-open) cmd_workflow_open "$@" ;;
+    workflow-drive) cmd_workflow_drive "$@" ;;
+    workflow-snapshot) cmd_workflow_snapshot "$@" ;;
+    watch-pr) cmd_watch_pr "$@" ;;
+    start-watch-pr) cmd_start_watch_pr "$@" ;;
+    log) cmd_log "$@" ;;
+    bun) cmd_bun "$@" ;;
+    routing) cmd_routing "$@" ;;
+    plugin-catalog)
+      export REPO_ROOT
+      cmd_plugin_catalog "$@"
+      ;;
+    playbooks) cmd_playbooks "$@" ;;
+    capture) cmd_capture "$@" ;;
+    snapshot) cmd_snapshot "$@" ;;
+    journey-capture) cmd_journey_capture "$@" ;;
+    journey-score) cmd_journey_score "$@" ;;
+    cleanup) cmd_cleanup "$@" ;;
+    *)
+      echo "error: unknown command: $cmd" >&2
+      usage >&2
+      return 2
+      ;;
+  esac
+}
+
+main "$@"

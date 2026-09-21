@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "id": "lightweight-engineering-v1",
+  "route": "lightweight-engineering",
+  "playbook": {
+    "path": "../../playbooks/lightweight-engineering.md",
+    "sha256": "320f33d095434c5a58fd2adb2abf6a1fcd458fe3a2af431a227d6f51dde6e492"
+  },
+  "hostCapabilities": [],
+  "stages": [
+    {
+      "id": "intake",
+      "assignment": { "owner": "coordinator", "distinctFrom": [] },
+      "requirements": [
+        {
+          "id": "lightweight.intake.inspect",
+          "sourceStep": "1",
+          "description": "Inspect the exact target, repository instructions, and nearby context.",
+          "allowedEvidenceKinds": ["command", "document"],
+          "skip": { "allowed": false }
+        }
+      ]
+    },
+    {
+      "id": "route",
+      "assignment": { "owner": "coordinator", "distinctFrom": [] },
+      "requirements": [
+        {
+          "id": "lightweight.route.qualifies",
+          "sourceStep": "route conditions",
+          "description": "Confirm every lightweight route condition applies.",
+          "allowedEvidenceKinds": ["document", "review"],
+          "skip": { "allowed": false }
+        }
+      ]
+    },
+    {
+      "id": "build",
+      "assignment": { "owner": "coordinator", "distinctFrom": [] },
+      "requirements": [
+        {
+          "id": "lightweight.build.smallest-complete-change",
+          "sourceStep": "2",
+          "description": "Make the smallest complete serial change.",
+          "allowedEvidenceKinds": ["diff"],
+          "skip": { "allowed": false }
+        }
+      ]
+    },
+    {
+      "id": "verify",
+      "assignment": { "owner": "coordinator", "distinctFrom": [] },
+      "requirements": [
+        {
+          "id": "lightweight.verify.direct-check",
+          "sourceStep": "3",
+          "description": "Run the narrowest direct check and inspect the final diff.",
+          "allowedEvidenceKinds": ["command", "runtime", "diff"],
+          "skip": { "allowed": false }
+        }
+      ]
+    }
+  ],
+  "boundaries": {
+    "final": { "requirements": ["lightweight.intake.inspect", "lightweight.route.qualifies", "lightweight.build.smallest-complete-change", "lightweight.verify.direct-check"], "resolvedGates": [] },
+    "commit": { "requirements": ["lightweight.intake.inspect", "lightweight.route.qualifies", "lightweight.build.smallest-complete-change", "lightweight.verify.direct-check"], "resolvedGates": [] },
+    "review": { "requirements": ["lightweight.intake.inspect", "lightweight.route.qualifies", "lightweight.build.smallest-complete-change", "lightweight.verify.direct-check"], "resolvedGates": [] },
+    "publish": { "requirements": ["lightweight.intake.inspect", "lightweight.route.qualifies", "lightweight.build.smallest-complete-change", "lightweight.verify.direct-check"], "resolvedGates": ["operator-approval"] }
+  }
+}

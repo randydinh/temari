@@ -1,0 +1,1 @@
+Add a `--json` flag to this command. Existing text output must remain byte-identical. The JSON output must parse to `{"status":"ready"}`.
