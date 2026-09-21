@@ -8,13 +8,54 @@ import {
   inputFor,
 } from '../../../knowledge/src/support/fixtures.js';
 import {
+  createCommandJudgments,
   createConversationPlanDraft,
   createLocalPlanDraft,
   type DraftReviewInput,
 } from '../index.js';
 import { conversationFor } from '../support/conversation-fixtures.js';
+import {
+  commandConfiguration,
+  commandEvents,
+} from '../support/command-fixtures.js';
 import { approve, draftFor } from '../support/fixtures.js';
 import { sha256 } from './data.js';
+
+test('ACTUAL Registrar and real child processes with synthetic judgments publish exact reviewed bytes', async () => {
+  const prepared = await actualFixture();
+  const provider = await createLocalRegistrar(prepared.config);
+  const { intent } = await conversationFor(
+    inputFor(prepared.source, join(prepared.base, 'task')),
+    provider,
+  );
+  const judgments = createCommandJudgments(
+    await commandConfiguration(intent.task.directory),
+  );
+  const outcome = await createConversationPlanDraft(
+    { kind: 'start', intent },
+    { provider, ...judgments },
+  );
+  assert(outcome.kind === 'draft');
+  assert.equal(outcome.investigation.status, 'ISSUES');
+  assert.equal(outcome.draft.status, 'PASS', outcome.draft.summary);
+  const events = await commandEvents(intent.task.directory);
+  assert.deepEqual(
+    events.map((e) => e.request.role),
+    ['assess', 'propose', 'review'],
+  );
+  const review = events[2].request.untrusted;
+  assert.equal(review.checkpoint.provider.instance, provider.identity.instance);
+  assert.match(JSON.stringify(review.checkpoint.evidence), /execute evil/);
+  assert.equal(
+    events[0].request.trusted.brief.context,
+    'Trusted coordinator instructions.',
+  );
+  const output = await readFile(intent.destination, 'utf8');
+  assert.equal(output, review.candidate.markdown);
+  assert.equal(sha256(output), review.candidate.sha256);
+  assert.match(output, /Keep D1 open/);
+  assert.match(output, /What is still unknown/);
+});
 
 test('ACTUAL Registrar → investigation → exact reviewed draft → unchanged retry → source drift refusal', async () => {
   const prepared = await actualFixture();
