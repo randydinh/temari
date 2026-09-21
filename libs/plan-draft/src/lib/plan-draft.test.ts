@@ -633,6 +633,145 @@ test('fresh processes reconcile crash after link before receipt with the pinned 
   );
 });
 
+test('fresh processes refuse invalidated completion without repeating the draft effect', async (t) => {
+  const cases = [
+    {
+      change: 'deleted completed output',
+      stage: 'build',
+      reason: /Completed output is missing; automatic recreation is refused/,
+    },
+    {
+      change: 'changed writer revision',
+      stage: 'plan',
+      reason: /Preparation is pinned to different inputs/,
+    },
+    {
+      change: 'changed source content',
+      stage: 'build',
+      reason: /before publication evidence .*: changed: Test map observation/,
+    },
+  ] as const;
+  for (const { change, stage, reason } of cases)
+    await t.test(change, async () => {
+      const { input, contents } = await fixture();
+      const manifest = join(input.task.directory, 'refusal-input.json');
+      const child = fileURLToPath(
+        new URL('../support/recovery-child.ts', import.meta.url),
+      );
+      const invoke = async (mode: 'publish' | 'recover') => {
+        const { stdout } = await promisify(execFile)(
+          process.execPath,
+          [
+            '--import',
+            '@swc-node/register/esm-register',
+            child,
+            mode,
+            manifest,
+          ],
+          { timeout: 20_000 },
+        );
+        return JSON.parse(stdout) as WorkerResult & {
+          processId: number;
+          reviewCalls: number;
+        };
+      };
+      await writeFile(
+        manifest,
+        JSON.stringify({ input, contents: [...contents] }),
+        { flag: 'wx' },
+      );
+      const first = await invoke('publish');
+      assert.equal(first.status, 'PASS', first.summary);
+      assert.equal(first.reviewCalls, 1);
+      assert.notEqual(first.processId, process.pid);
+      const bytes = await readFile(input.destination);
+      assert.match(bytes.toString('utf8'), /^Proposed implementation plan\./m);
+      const inode = (await lstat(input.destination)).ino;
+      const firstObservation = await receipt(first);
+      assert.equal(firstObservation.kind, 'completed');
+      assert.equal(firstObservation.output.kind, 'matching');
+      const records = (await files(input)).filter(
+        (path) =>
+          path.endsWith('-prepared.json') || path.endsWith('-completed.json'),
+      );
+      assert.equal(
+        records.filter((path) => path.endsWith('-prepared.json')).length,
+        1,
+      );
+      assert.equal(
+        records.filter((path) => path.endsWith('-completed.json')).length,
+        1,
+      );
+      const retained = await Promise.all(
+        first.evidencePaths.map(async (path) => ({
+          path,
+          bytes: await readFile(path),
+        })),
+      );
+
+      if (change === 'deleted completed output')
+        await unlink(input.destination);
+      const retryInput =
+        change === 'changed writer revision'
+          ? { ...input, writer: { ...input.writer, revision: 'proposal-v2' } }
+          : input;
+      if (change === 'changed source content')
+        contents.set(
+          'plan.txt',
+          'Changed required plan after recorded completion.',
+        );
+      await writeFile(
+        manifest,
+        JSON.stringify({ input: retryInput, contents: [...contents] }),
+      );
+
+      const retry = await invoke('recover');
+      assert.notEqual(retry.processId, process.pid);
+      assert.notEqual(retry.processId, first.processId);
+      assert.equal(retry.status, 'BLOCKED', retry.summary);
+      assert.match(retry.summary, reason);
+      assert.equal(retry.reviewCalls, 0);
+      const observation = await receipt(retry);
+      assert.equal(observation.kind, 'blocked');
+      assert.equal(observation.stage, stage);
+      assert.equal(
+        observation.output.kind,
+        change === 'deleted completed output' ? 'absent' : 'matching',
+      );
+      if (change === 'deleted completed output') {
+        await assert.rejects(readFile(input.destination), { code: 'ENOENT' });
+        assert.equal(retry.evidencePaths.includes(input.destination), false);
+      } else {
+        assert.deepEqual(await readFile(input.destination), bytes);
+        assert.equal((await lstat(input.destination)).ino, inode);
+        assert.equal(retry.evidencePaths.includes(input.destination), true);
+      }
+      if (change === 'changed source content') {
+        assert.equal(observation.checks.at(-1).phase, 'before');
+        assert.equal(observation.checks.at(-1).check.state, 'changed');
+      }
+      assert.deepEqual(
+        (await files(input)).filter(
+          (path) =>
+            path.endsWith('-prepared.json') || path.endsWith('-completed.json'),
+        ),
+        records,
+      );
+      assert.deepEqual(
+        (await files(input)).filter((path) => path.endsWith('.md')),
+        change === 'deleted completed output' ? [] : ['draft.md'],
+      );
+      for (const artifact of retained) {
+        if (
+          change === 'deleted completed output' &&
+          artifact.path === input.destination
+        )
+          continue;
+        assert.deepEqual(await readFile(artifact.path), artifact.bytes);
+      }
+    });
+});
+
 test('cooperating concurrent calls converge to one preparation and one output', async () => {
   const { input } = await fixture();
   const results = await Promise.all([
