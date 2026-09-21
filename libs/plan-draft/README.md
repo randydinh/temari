@@ -2,7 +2,7 @@
 
 `@temari/plan-draft` creates one authorized, independently reviewed Markdown draft. `createConversationPlanDraft(command, dependencies)` connects investigation and proposal callbacks to the existing `createLocalPlanDraft(input)` operation. The [domain types](src/lib/types.ts) describe both contracts.
 
-The application supplies the provider and judgment functions. This package configures no model service and chooses no additional action. The local draft operation uses `runPlan` in the fixed order `investigate`, `plan`, `review`, `build`, `verify`, `deliver`.
+The application supplies the provider and judgment functions. It can use raw callbacks or [`createCommandJudgments` with explicitly selected local commands](command-judgments.md). The package chooses no model service or additional action. The local draft operation uses `runPlan` in the fixed order `investigate`, `plan`, `review`, `build`, `verify`, `deliver`.
 
 ## Start and resume a conversation draft
 
@@ -228,11 +228,11 @@ Limits reject oversized values without truncating accepted content.
 | Each conversation journal record                                  | 2 MiB                                |
 | Proposal callback input                                           | 20 MiB                               |
 
-Existing knowledge retrieval and checkpoint limits are unchanged. Each local draft invocation performs at most one review and two full evidence revalidation passes, with no internal retry loop. A new conversation invocation also performs knowledge investigation. Callback and provider latency remain the caller's responsibility.
+Existing knowledge retrieval and checkpoint limits are unchanged. Each local draft invocation performs at most one review and two full evidence revalidation passes, with no internal retry loop. A new conversation invocation also performs knowledge investigation. Raw callback and provider latency remain the caller's responsibility. The command factory bounds each child exchange; readiness and artifact hashing are outside that deadline.
 
 ## Module ownership
 
-`conversation-draft.ts` owns the start/resume journal and callback handoff. `plan-draft.ts` owns shared admission and the existing publication engine. `data.ts` owns citation validation, review validation, and rendering. `files.ts` owns bounded regular reads and exclusive synced publication. The public barrel exports the two operations and domain types, not admission or persistence helpers.
+`conversation-draft.ts` owns the start/resume journal and callback handoff. `plan-draft.ts` owns shared admission and the existing publication engine. `command-judgments.ts` owns command configuration, identities, readiness, and process execution. Its private `judgment-policy.ts` owns role instructions, descriptive shapes, input projections, and structural parsers. `data.ts` owns citation validation, review validation, and rendering. `files.ts` owns bounded regular reads and exclusive synced publication. The public barrel exports the operations, command factory, configuration types, and domain types, not protocol, admission, or persistence helpers.
 
 ## Verification targets
 

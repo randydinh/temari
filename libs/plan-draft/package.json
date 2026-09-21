@@ -19,7 +19,14 @@
       "test": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "node --import @swc-node/register/esm-register --test libs/plan-draft/src/lib/plan-draft.test.ts libs/plan-draft/src/lib/conversation-draft.test.ts libs/plan-draft/src/lib/conversation-recovery.test.ts",
+          "command": "node --import @swc-node/register/esm-register --test libs/plan-draft/src/lib/plan-draft.test.ts libs/plan-draft/src/lib/conversation-draft.test.ts libs/plan-draft/src/lib/conversation-recovery.test.ts libs/plan-draft/src/lib/command-judgments.test.ts",
+          "cwd": "{workspaceRoot}"
+        }
+      },
+      "test-command-judgments": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test libs/plan-draft/src/lib/command-judgments.test.ts",
           "cwd": "{workspaceRoot}"
         }
       },
