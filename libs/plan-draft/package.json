@@ -19,7 +19,7 @@
       "test": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "node --import @swc-node/register/esm-register --test libs/plan-draft/src/lib/plan-draft.test.ts libs/plan-draft/src/lib/conversation-draft.test.ts libs/plan-draft/src/lib/conversation-recovery.test.ts libs/plan-draft/src/lib/command-judgments.test.ts",
+          "command": "node --import @swc-node/register/esm-register --test libs/plan-draft/src/lib/plan-draft.test.ts libs/plan-draft/src/lib/conversation-draft.test.ts libs/plan-draft/src/lib/conversation-recovery.test.ts libs/plan-draft/src/lib/command-judgments.test.ts libs/plan-draft/src/pilot.test.ts",
           "cwd": "{workspaceRoot}"
         }
       },
@@ -34,7 +34,15 @@
         "executor": "nx:run-commands",
         "cache": false,
         "options": {
-          "command": "node --import @swc-node/register/esm-register --test libs/plan-draft/src/lib/registrar.integration.test.ts",
+          "command": "node --import @swc-node/register/esm-register --test libs/plan-draft/src/lib/registrar.integration.test.ts libs/plan-draft/src/pilot.integration.test.ts",
+          "cwd": "{workspaceRoot}"
+        }
+      },
+      "pilot": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --import @swc-node/register/esm-register libs/plan-draft/src/pilot.ts",
           "cwd": "{workspaceRoot}"
         }
       }
