@@ -55,6 +55,14 @@ simulate subagents, model diversity, or forge operations.
 
 ## Portability
 
+### Local conversation drafts
+
+`@temari/plan-draft` owns the bounded conversation-to-draft caller because it already owns the authorized local file effect. `createConversationPlanDraft` connects an admitted source provider and supplied assessment, proposal, and review functions. It preserves knowledge and draft results separately. General language classification, host model dispatch, and authority creation remain outside this operation.
+
+The caller stores five immutable task-local records and reuses the draft engine's checkpoint admission and preparation. A resume replays the original result and proposal. An invocation marker without a saved outcome stops instead of authorizing another judgment. Keeping this recovery protocol inside one start/resume operation avoids separate public preparation and publication APIs or a new orchestration package. The [plan-draft contract](../libs/plan-draft/README.md) describes usage, authority, recovery boundaries, and the trusted local process profile.
+
+### Provider boundaries
+
 - Core packages describe intent, not a provider API.
 - Adapters are swappable. Inherit the host model by default.
 - Serial execution is first-class, not a consolation prize.

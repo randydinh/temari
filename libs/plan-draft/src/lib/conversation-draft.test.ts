@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { lstat, readFile, readdir, writeFile } from 'node:fs/promises';
+import { lstat, readFile, readdir, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 import {
@@ -333,4 +333,295 @@ test('unrelated discovery gap remains knowledge BLOCKED while the exact draft ca
   const output = await readFile(intent.destination, 'utf8');
   assert.match(output, /unselected.txt/);
   assert.match(output, /Review D1 wording/);
+});
+
+test('every provider and judgment identity/revision is pinned, as is repeated-start context', async (t) => {
+  const changes = [
+    ...(['instance', 'implementation', 'configuration'] as const).map(
+      (field) => ({
+        name: `provider ${field}`,
+        change: (
+          deps: ConversationDraftDependencies,
+        ): ConversationDraftDependencies => ({
+          ...deps,
+          provider: {
+            ...deps.provider,
+            identity: { ...deps.provider.identity, [field]: 'changed' },
+          },
+        }),
+      }),
+    ),
+    ...(['assessor', 'writer', 'reviewer'] as const).flatMap((role) =>
+      (['id', 'revision'] as const).map((field) => ({
+        name: `${role} ${field}`,
+        change: (
+          deps: ConversationDraftDependencies,
+        ): ConversationDraftDependencies => ({
+          ...deps,
+          [role]: { ...deps[role], [field]: 'changed' },
+        }),
+      })),
+    ),
+  ];
+  for (const { name, change } of changes) {
+    await t.test(name, async () => {
+      const { intent, deps } = await conversationFixture();
+      const first = await createConversationPlanDraft(
+        { kind: 'start', intent },
+        deps,
+      );
+      assert(first.kind === 'draft' && first.draft.status === 'PASS');
+      const bytes = await readFile(intent.destination, 'utf8');
+      blocked(
+        await createConversationPlanDraft(
+          {
+            kind: 'resume',
+            task: intent.task,
+            destination: intent.destination,
+          },
+          change(noJudgments(deps)),
+        ),
+        /Saved binding or dependency identity\/revision changed/,
+      );
+      assert.equal(await readFile(intent.destination, 'utf8'), bytes);
+    });
+  }
+  const { intent, deps } = await conversationFixture();
+  const first = await createConversationPlanDraft(
+    { kind: 'start', intent },
+    deps,
+  );
+  assert(first.kind === 'draft' && first.draft.status === 'PASS');
+  const bytes = await readFile(intent.destination, 'utf8');
+  blocked(
+    await createConversationPlanDraft(
+      {
+        kind: 'start',
+        intent: {
+          ...intent,
+          brief: { ...intent.brief, context: 'Different trusted context' },
+        },
+      },
+      noJudgments(deps),
+    ),
+    /Start inputs differ/,
+  );
+  assert.equal(await readFile(intent.destination, 'utf8'), bytes);
+});
+
+test('missing authority or missing judgment function blocks before any provider data access', async (t) => {
+  for (const absent of [
+    'authority',
+    'assessor',
+    'writer',
+    'reviewer',
+  ] as const) {
+    await t.test(absent, async () => {
+      const { intent, deps } = await conversationFixture();
+      if (absent === 'authority') await unlink(intent.authority.path);
+      const broken = noJudgments(deps);
+      if (absent === 'assessor')
+        Object.assign(broken.assessor, { assess: undefined });
+      if (absent === 'writer')
+        Object.assign(broken.writer, { propose: undefined });
+      if (absent === 'reviewer')
+        Object.assign(broken.reviewer, { review: undefined });
+      const outcome = await createConversationPlanDraft(
+        { kind: 'start', intent },
+        {
+          ...broken,
+          provider: {
+            ...deps.provider,
+            discover: async () => {
+              throw new Error('FORBIDDEN provider');
+            },
+          },
+        },
+      );
+      blocked(
+        outcome,
+        absent === 'authority' ? /ENOENT/ : /Configured assessment/,
+      );
+      assert.deepEqual(
+        await readdir(intent.task.directory),
+        absent === 'authority' ? [] : ['authority.json'],
+      );
+    });
+  }
+});
+
+test('assessment failure and omitted required context preserve actual BLOCKED knowledge without proposal', async (t) => {
+  for (const defect of ['throws', 'malformed', 'context'] as const) {
+    await t.test(defect, async () => {
+      const { intent, deps } = await conversationFixture();
+      const outcome = await createConversationPlanDraft(
+        {
+          kind: 'start',
+          intent:
+            defect === 'context'
+              ? {
+                  ...intent,
+                  request: {
+                    ...intent.request,
+                    budget: {
+                      ...intent.request.budget,
+                      contextCodePoints: 256,
+                    },
+                  },
+                }
+              : intent,
+        },
+        {
+          ...deps,
+          assessor: {
+            ...deps.assessor,
+            assess: async (input) => {
+              if (defect === 'throws')
+                throw new Error('Assessment service failed');
+              const assessment = await deps.assessor.assess(input);
+              return { ...assessment, findings: [] };
+            },
+          },
+          writer: noJudgments(deps).writer,
+        },
+      );
+      assert(outcome.kind === 'stopped');
+      assert.equal(outcome.investigation?.status, 'BLOCKED');
+      blocked(
+        outcome,
+        /Missing assessment|Assessment failed|Required investigation gap|Unaccounted final investigation gaps/,
+      );
+      assert.equal(await lstat(intent.destination).catch(() => null), null);
+      assert(
+        (await readdir(intent.task.directory)).some((name) =>
+          name.endsWith('-investigated.json'),
+        ),
+      );
+      assert(
+        !(await readdir(intent.task.directory)).some((name) =>
+          name.endsWith('-proposing.json'),
+        ),
+      );
+    });
+  }
+});
+
+test('all judgment inputs are frozen and attempted mutation cannot alter the trusted binding or output', async () => {
+  const { intent, deps } = await conversationFixture();
+  const original = JSON.stringify(intent);
+  let reviewed = '';
+  const outcome = await createConversationPlanDraft(
+    { kind: 'start', intent },
+    {
+      ...deps,
+      assessor: {
+        ...deps.assessor,
+        assess: async (input) => {
+          assert.throws(
+            () =>
+              Object.assign(input.brief, { context: 'Forged trusted context' }),
+            TypeError,
+          );
+          assert.throws(
+            () =>
+              Object.assign(input.checkpoint.evidence[0], {
+                excerpt: 'Forged source',
+              }),
+            TypeError,
+          );
+          return deps.assessor.assess(input);
+        },
+      },
+      writer: {
+        ...deps.writer,
+        propose: async (input) => {
+          assert.throws(
+            () =>
+              Object.assign(input.brief, { context: 'Forged trusted context' }),
+            TypeError,
+          );
+          assert.throws(
+            () => Object.assign(input.checkpoint.task, { directory: '/wrong' }),
+            TypeError,
+          );
+          return deps.writer.propose(input);
+        },
+      },
+      reviewer: {
+        ...deps.reviewer,
+        review: async (input) => {
+          reviewed = input.candidate.markdown;
+          assert.throws(
+            () => Object.assign(input.candidate, { markdown: 'Forged output' }),
+            TypeError,
+          );
+          assert.throws(
+            () => Object.assign(input.authority, { destination: '/wrong.md' }),
+            TypeError,
+          );
+          return deps.reviewer.review(input);
+        },
+      },
+    },
+  );
+  assert(outcome.kind === 'draft');
+  assert.equal(outcome.draft.status, 'PASS', outcome.draft.summary);
+  assert.equal(await readFile(intent.destination, 'utf8'), reviewed);
+  assert.equal(JSON.stringify(intent), original);
+  const started = (await readdir(intent.task.directory)).find((name) =>
+    name.endsWith('-started.json'),
+  )!;
+  const saved = JSON.parse(
+    await readFile(join(intent.task.directory, started), 'utf8'),
+  );
+  assert.equal(
+    saved.binding.brief.context,
+    'Trusted coordinator instructions.',
+  );
+  assert.equal(saved.binding.destination, intent.destination);
+});
+
+test('concurrent starts claim each judgment once and converge to one reviewed output', async () => {
+  const { intent, deps } = await conversationFixture();
+  const calls: string[] = [];
+  let reviewed = '';
+  const concurrent = {
+    ...deps,
+    assessor: {
+      ...deps.assessor,
+      assess: async (input: Parameters<typeof deps.assessor.assess>[0]) => {
+        calls.push('assess');
+        return deps.assessor.assess(input);
+      },
+    },
+    writer: {
+      ...deps.writer,
+      propose: async (input: Parameters<typeof deps.writer.propose>[0]) => {
+        calls.push('propose');
+        return deps.writer.propose(input);
+      },
+    },
+    reviewer: {
+      ...deps.reviewer,
+      review: async (input: Parameters<typeof deps.reviewer.review>[0]) => {
+        calls.push('review');
+        reviewed = input.candidate.markdown;
+        return deps.reviewer.review(input);
+      },
+    },
+  };
+  const results = await Promise.all(
+    [1, 2, 3].map(() =>
+      createConversationPlanDraft({ kind: 'start', intent }, concurrent),
+    ),
+  );
+  assert(results.some((r) => r.kind === 'draft' && r.draft.status === 'PASS'));
+  assert.equal(await readFile(intent.destination, 'utf8'), reviewed);
+  assert.deepEqual(calls, ['assess', 'propose', 'review']);
+  const replay = await createConversationPlanDraft(
+    { kind: 'resume', task: intent.task, destination: intent.destination },
+    noJudgments(deps),
+  );
+  assert(replay.kind === 'draft' && replay.draft.status === 'PASS');
+  assert.equal(await readFile(intent.destination, 'utf8'), reviewed);
 });

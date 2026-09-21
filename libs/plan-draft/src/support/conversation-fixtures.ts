@@ -59,7 +59,13 @@ export async function conversationFor(
       budget: { ...base.request.budget, documentsPerPage: 10 },
     },
   };
-  const deps: ConversationDraftDependencies = {
+  return { intent, deps: conversationDependencies(provider) };
+}
+
+export function conversationDependencies(
+  provider: KnowledgeProvider,
+): ConversationDraftDependencies {
+  return {
     provider,
     assessor: {
       id: 'fixture-assessor',
@@ -78,7 +84,6 @@ export async function conversationFor(
     },
     checkReady: async () => {},
   };
-  return { intent, deps };
 }
 
 export async function conversationFixture() {
