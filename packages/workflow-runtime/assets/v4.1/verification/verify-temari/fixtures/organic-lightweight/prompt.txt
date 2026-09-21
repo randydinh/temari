@@ -1,0 +1,1 @@
+Fix the misspelling "dependancies" in this README and check the diff.

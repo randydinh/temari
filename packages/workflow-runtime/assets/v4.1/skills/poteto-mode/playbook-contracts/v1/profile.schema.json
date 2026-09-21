@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://temari.dev/schemas/playbook-profile-v1.json",
+  "title": "Temari playbook conformance profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "id", "route", "playbook", "hostCapabilities", "stages", "boundaries"],
+  "properties": {
+    "version": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "route": { "enum": ["lightweight-engineering", "feature"] },
+    "playbook": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "hostCapabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "assignment", "requirements"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "assignment": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["owner", "distinctFrom"],
+            "properties": {
+              "owner": { "enum": ["coordinator", "non-coordinator"] },
+              "distinctFrom": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }
+              }
+            }
+          },
+          "requirements": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "sourceStep", "description", "allowedEvidenceKinds", "skip"],
+              "properties": {
+                "id": { "type": "string", "pattern": "^[a-z][a-z0-9.-]*$" },
+                "sourceStep": { "type": "string", "minLength": 1 },
+                "description": { "type": "string", "minLength": 1 },
+                "allowedEvidenceKinds": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": { "enum": ["command", "diff", "document", "runtime", "review"] }
+                },
+                "requiredCapabilities": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }
+                },
+                "skip": {
+                  "oneOf": [
+                    { "type": "object", "additionalProperties": false, "required": ["allowed"], "properties": { "allowed": { "const": false } } },
+                    { "type": "object", "additionalProperties": false, "required": ["allowed", "whenCapabilityMissing"], "properties": { "allowed": { "const": true }, "whenCapabilityMissing": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "boundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["final", "commit", "review", "publish"],
+      "properties": {
+        "final": { "$ref": "#/$defs/boundary" },
+        "commit": { "$ref": "#/$defs/boundary" },
+        "review": { "$ref": "#/$defs/boundary" },
+        "publish": { "$ref": "#/$defs/boundary" }
+      }
+    }
+  },
+  "$defs": {
+    "boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requirements", "resolvedGates"],
+      "properties": {
+        "requirements": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "resolvedGates": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }
+      }
+    }
+  }
+}
