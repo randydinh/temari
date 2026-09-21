@@ -19,7 +19,7 @@
       "test": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "node --import @swc-node/register/esm-register --test libs/plan-draft/src/lib/plan-draft.test.ts",
+          "command": "node --import @swc-node/register/esm-register --test libs/plan-draft/src/lib/plan-draft.test.ts libs/plan-draft/src/lib/conversation-draft.test.ts libs/plan-draft/src/lib/conversation-recovery.test.ts",
           "cwd": "{workspaceRoot}"
         }
       },
