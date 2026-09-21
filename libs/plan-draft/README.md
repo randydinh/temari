@@ -4,6 +4,9 @@
 
 The application supplies the provider and judgment functions. It can use raw callbacks or [`createCommandJudgments` with explicitly selected local commands](command-judgments.md). The package chooses no model service or additional action. The local draft operation uses `runPlan` in the fixed order `investigate`, `plan`, `review`, `build`, `verify`, `deliver`.
 
+Maintainers with prepared Registrar state and approved command configuration can
+[run one local pilot](pilot.md) through the opt-in `plan-draft:pilot` target.
+
 ## Start and resume a conversation draft
 
 The following wiring assumes an admitted `KnowledgeSource`, a configured provider, and application implementations of `assess`, `propose`, `review`, and `checkReady`. The first three callbacks supply judgment. `checkReady` checks configuration. No default approval or model implementation is supplied.
@@ -235,6 +238,12 @@ Existing knowledge retrieval and checkpoint limits are unchanged. Each local dra
 `conversation-draft.ts` owns the start/resume journal and callback handoff. `plan-draft.ts` owns shared admission and the existing publication engine. `command-judgments.ts` owns command configuration, identities, readiness, and process execution. Its private `judgment-policy.ts` owns role instructions, descriptive shapes, input projections, and structural parsers. `data.ts` owns citation validation, review validation, and rendering. `files.ts` owns bounded regular reads and exclusive synced publication. The public barrel exports the operations, command factory, configuration types, and domain types, not protocol, admission, or persistence helpers.
 
 ## Verification targets
+
+The [pilot CLI checks](src/pilot.test.ts) run within `plan-draft:test`.
+The [actual Registrar CLI cases](src/pilot.integration.test.ts) run within
+`plan-draft:integration`. They cover exact reviewed bytes, recovery after a crash
+with unavailable judgment commands, retained blocked output, and no replay after
+uncertain review. Their judgments are synthetic.
 
 Portable boundary and recovery tests run with `pnpm nx run plan-draft:test`. The integration target uses the actual Registrar CLI with isolated temporary source copies and state. Its fixture reviews are synthetic, separate from any real-document semantic demonstration.
 
