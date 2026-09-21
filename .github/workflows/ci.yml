@@ -33,3 +33,4 @@ jobs:
 
       - run: pnpm exec nx format:check --base="remotes/origin/main"
       - run: pnpm exec nx run-many -t typecheck --output-style=static
+      - run: pnpm exec nx run knowledge:test --output-style=static
