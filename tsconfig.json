@@ -11,6 +11,9 @@
     },
     {
       "path": "./libs/host-adapters"
+    },
+    {
+      "path": "./libs/knowledge"
     }
   ],
   "compilerOptions": {}

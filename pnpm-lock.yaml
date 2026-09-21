@@ -44,6 +44,16 @@ importers:
         specifier: workspace:*
         version: link:../contracts
 
+  libs/knowledge:
+    dependencies:
+      '@temari/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
+      '@temari/workflow-engine':
+        specifier: workspace:*
+        version: link:../workflow-engine
+
   libs/workflow-engine:
     dependencies:
       '@temari/contracts':
