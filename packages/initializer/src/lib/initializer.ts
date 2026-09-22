@@ -27,6 +27,7 @@ import {
   platformKey,
   type PlatformInfo,
 } from './platform.js';
+import { commandInvocation } from './command.js';
 
 const DEFAULT_MANIFEST_PATH = fileURLToPath(
   new URL('../../dependency-manifest.json', import.meta.url),
@@ -385,26 +386,6 @@ function workspacePath(
     throw new Error(`${label} must remain inside the workspace.`);
   }
   return candidate;
-}
-
-function quoteWindows(value: string): string {
-  return `"${value.replaceAll('"', '\\"')}"`;
-}
-
-function commandInvocation(
-  file: string,
-  args: readonly string[],
-  platform: NodeJS.Platform,
-  environment: NodeJS.ProcessEnv,
-): { readonly file: string; readonly args: readonly string[] } {
-  if (platform !== 'win32' || !/\.(?:cmd|bat)$/i.test(file)) {
-    return { file, args };
-  }
-  const commandLine = [file, ...args].map(quoteWindows).join(' ');
-  return {
-    file: environment.ComSpec ?? 'cmd.exe',
-    args: ['/d', '/s', '/c', commandLine],
-  };
 }
 
 export function createCommandRunner(

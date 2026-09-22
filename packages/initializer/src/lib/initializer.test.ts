@@ -21,6 +21,7 @@ import {
   type DependencyManifest,
 } from './initializer.js';
 import { platformInfo } from './platform.js';
+import { commandInvocation } from './command.js';
 import type { ManagedArchonRuntime } from '@temari/archon-harness';
 
 const manifest: DependencyManifest = {
@@ -120,6 +121,26 @@ test('finds executables through a platform-specific PATH', async () => {
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('quotes Windows command wrappers for cmd.exe /s /c', () => {
+  assert.deepEqual(
+    commandInvocation(
+      'C:\\Program Files\\pnpm\\pnpm.CMD',
+      ['--version'],
+      'win32',
+      { ComSpec: 'C:\\Windows\\System32\\cmd.exe' },
+    ),
+    {
+      file: 'C:\\Windows\\System32\\cmd.exe',
+      args: [
+        '/d',
+        '/s',
+        '/c',
+        '""C:\\Program Files\\pnpm\\pnpm.CMD" "--version""',
+      ],
+    },
+  );
 });
 
 test('doctor reports required lockfiles and allows unsupported optional tools', async () => {
