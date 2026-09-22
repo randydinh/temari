@@ -139,6 +139,7 @@ test('quotes Windows command wrappers for cmd.exe /s /c', () => {
         '/c',
         '""C:\\Program Files\\pnpm\\pnpm.CMD" "--version""',
       ],
+      windowsVerbatimArguments: true,
     },
   );
 });

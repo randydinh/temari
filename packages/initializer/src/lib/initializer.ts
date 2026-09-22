@@ -401,6 +401,7 @@ export function createCommandRunner(
           env: environment,
           shell: false,
           windowsHide: true,
+          windowsVerbatimArguments: invocation.windowsVerbatimArguments,
         });
         let stdout = '';
         let stderr = '';
@@ -446,8 +447,11 @@ function toolReason(
     return `not supported on ${platform.key}`;
   }
   if (!path) return 'executable not found on PATH';
-  if (!commandResult || commandResult.exitCode !== 0)
-    return 'version check failed';
+  if (!commandResult || commandResult.exitCode !== 0) {
+    return commandResult
+      ? `version check failed (exit code ${commandResult.exitCode})`
+      : 'version check failed (process could not start)';
+  }
   if (!version || major === null) return 'version could not be parsed';
   if (
     requirement.minimumMajor !== undefined &&

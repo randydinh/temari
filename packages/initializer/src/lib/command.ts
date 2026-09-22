@@ -1,6 +1,7 @@
 export interface CommandInvocation {
   readonly file: string;
   readonly args: readonly string[];
+  readonly windowsVerbatimArguments?: boolean;
 }
 
 function quoteWindows(value: string): string {
@@ -21,5 +22,6 @@ export function commandInvocation(
   return {
     file: environment.ComSpec ?? 'cmd.exe',
     args: ['/d', '/s', '/c', `"${commandLine}"`],
+    windowsVerbatimArguments: true,
   };
 }
