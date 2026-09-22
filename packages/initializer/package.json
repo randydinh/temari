@@ -1,0 +1,39 @@
+{
+  "name": "@temari/initializer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "nx": {
+    "name": "initializer",
+    "tags": [
+      "scope:platform",
+      "type:tooling"
+    ],
+    "targets": {
+      "test": {
+        "command": "node --import @swc-node/register/esm-register packages/initializer/src/lib/initializer.test.ts",
+        "cache": true
+      },
+      "init": {
+        "command": "node --import @swc-node/register/esm-register packages/initializer/src/cli.ts init",
+        "cache": false
+      },
+      "doctor": {
+        "command": "node --import @swc-node/register/esm-register packages/initializer/src/cli.ts doctor",
+        "cache": false
+      }
+    }
+  },
+  "dependencies": {
+    "@temari/archon-harness": "workspace:*"
+  }
+}

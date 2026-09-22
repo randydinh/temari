@@ -13,7 +13,22 @@
       "path": "./libs/host-adapters"
     },
     {
+      "path": "./libs/temari-core"
+    },
+    {
       "path": "./packages/workflow-runtime"
+    },
+    {
+      "path": "./libs/knowledge"
+    },
+    {
+      "path": "./libs/runtime"
+    },
+    {
+      "path": "./packages/initializer"
+    },
+    {
+      "path": "./libs/archon-harness"
     }
   ],
   "compilerOptions": {}

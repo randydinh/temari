@@ -2,7 +2,14 @@
   "name": "@temari/workspace",
   "version": "0.0.0",
   "license": "MIT",
-  "scripts": {},
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22.0.0 <27"
+  },
+  "scripts": {
+    "temari:init": "node --import @swc-node/register/esm-register packages/initializer/src/cli.ts init",
+    "temari:doctor": "node --import @swc-node/register/esm-register packages/initializer/src/cli.ts doctor"
+  },
   "private": true,
   "dependencies": {},
   "devDependencies": {

@@ -26,7 +26,10 @@ pnpm nx run workflow-runtime:package --lane archon --output /absolute/new/archon
 The portable lane omits the Archon runtime. Its discovery and installation checks
 report that absence. The Archon lane includes the same portable files plus the
 runtime allowlist, including hidden native workflows. Neither lane invokes a
-model, changes model defaults, or downloads an Archon executable.
+model, changes model defaults, or downloads an Archon executable. The Nx
+initializer manages the native executable separately through
+`@temari/archon-harness`; this v4.1 bundle remains a historical migration
+payload.
 
 ## Try a copy without changing an active installation
 

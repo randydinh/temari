@@ -19,7 +19,16 @@
     "tags": [
       "scope:host",
       "type:adapter"
-    ]
+    ],
+    "targets": {
+      "test": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test libs/host-adapters/src/lib/host-adapters.test.ts",
+          "cwd": "{workspaceRoot}"
+        }
+      }
+    }
   },
   "dependencies": {
     "@temari/contracts": "workspace:*"
