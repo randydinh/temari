@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import {
   mkdir,
+  lstat,
   open,
   readFile,
   realpath,
@@ -495,14 +496,23 @@ export class FileWorkflowRunStore implements WorkflowRunStore {
   ): Promise<T> {
     const path = this.lockPath(runId);
     let acquired = false;
-    for (let attempt = 0; attempt < 40; attempt += 1) {
+    for (let attempt = 0; attempt < 100; attempt += 1) {
       try {
         await mkdir(path, { mode: 0o700 });
         acquired = true;
         break;
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-        await new Promise((resolve) => setTimeout(resolve, 5));
+        const code = (error as NodeJS.ErrnoException).code;
+        let lockExists = code === 'EEXIST';
+        if (code === 'EPERM') {
+          try {
+            lockExists = (await lstat(path)).isDirectory();
+          } catch {
+            lockExists = false;
+          }
+        }
+        if (!lockExists) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 10));
       }
     }
     assert(acquired, `Could not acquire run lock for ${runId}.`);
