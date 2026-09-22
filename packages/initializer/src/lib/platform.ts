@@ -1,5 +1,5 @@
 import { homedir } from 'node:os';
-import { delimiter, join, win32 } from 'node:path';
+import { delimiter, posix, win32 } from 'node:path';
 
 export interface PlatformInfo {
   readonly platform: NodeJS.Platform;
@@ -29,7 +29,7 @@ export function platformInfo(inputs: PlatformInputs = {}): PlatformInfo {
   const arch = inputs.arch ?? process.arch;
   const homeDirectory = inputs.homeDirectory ?? homedir();
   const environment = inputs.environment ?? process.env;
-  const joinPath = platform === 'win32' ? win32.join : join;
+  const joinPath = platform === 'win32' ? win32.join : posix.join;
 
   if (platform === 'win32') {
     const localAppData =

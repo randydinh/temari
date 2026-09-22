@@ -9,14 +9,10 @@ import {
   realpath,
   unlink,
 } from 'node:fs/promises';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 
 export type EvidenceKind =
-  | 'stdout'
-  | 'stderr'
-  | 'worker-result'
-  | 'verification'
-  | 'other';
+  'stdout' | 'stderr' | 'worker-result' | 'verification' | 'other';
 
 export interface EvidenceReference {
   readonly schema: 1;
@@ -50,7 +46,10 @@ function assertRunId(runId: string): void {
 }
 
 function assertRevision(revision: string): void {
-  assert(revision.length > 0 && revision.length <= 512, 'Revision is required.');
+  assert(
+    revision.length > 0 && revision.length <= 512,
+    'Revision is required.',
+  );
 }
 
 function bytesOf(content: string | Uint8Array): Uint8Array {
@@ -69,7 +68,7 @@ export class FileEvidenceStore implements EvidenceStore {
   private constructor(private readonly root: string) {}
 
   static async create(root: string): Promise<FileEvidenceStore> {
-    assert(root.startsWith('/'), 'Evidence store root must be absolute.');
+    assert(isAbsolute(root), 'Evidence store root must be absolute.');
     await mkdir(root, { recursive: true, mode: 0o700 });
     return new FileEvidenceStore(await realpath(root));
   }
@@ -78,10 +77,16 @@ export class FileEvidenceStore implements EvidenceStore {
     assertRunId(request.runId);
     assertRevision(request.revision);
     const content = bytesOf(request.content);
-    assert(content.byteLength <= MAX_EVIDENCE_BYTES, 'Evidence exceeds 16 MiB.');
+    assert(
+      content.byteLength <= MAX_EVIDENCE_BYTES,
+      'Evidence exceeds 16 MiB.',
+    );
     const sha256 = hash(content);
     const path = join(this.root, `${sha256}.artifact`);
-    const temporary = join(this.root, `.${sha256}.${process.pid}.${Date.now()}.tmp`);
+    const temporary = join(
+      this.root,
+      `.${sha256}.${process.pid}.${Date.now()}.tmp`,
+    );
     const file = await open(temporary, 'wx', 0o600);
     try {
       try {
@@ -95,7 +100,11 @@ export class FileEvidenceStore implements EvidenceStore {
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
         const existing = await readFile(path);
-        assert.equal(hash(existing), sha256, 'Evidence artifact collision or mutation.');
+        assert.equal(
+          hash(existing),
+          sha256,
+          'Evidence artifact collision or mutation.',
+        );
       }
     } finally {
       await unlink(temporary).catch(() => undefined);
@@ -117,12 +126,23 @@ export class FileEvidenceStore implements EvidenceStore {
     assertRevision(reference.revision);
     assertHash(reference.sha256);
     const path = join(this.root, `${reference.sha256}.artifact`);
-    assert.equal(reference.path, path, 'Evidence path is outside its configured store.');
+    assert.equal(
+      reference.path,
+      path,
+      'Evidence path is outside its configured store.',
+    );
     const stat = await lstat(path);
-    assert(stat.isFile() && !stat.isSymbolicLink(), 'Evidence must be a regular file.');
+    assert(
+      stat.isFile() && !stat.isSymbolicLink(),
+      'Evidence must be a regular file.',
+    );
     assert(stat.size <= MAX_EVIDENCE_BYTES, 'Evidence exceeds 16 MiB.');
     const content = await readFile(path);
-    assert.equal(content.byteLength, reference.bytes, 'Evidence byte count changed.');
+    assert.equal(
+      content.byteLength,
+      reference.bytes,
+      'Evidence byte count changed.',
+    );
     assert.equal(hash(content), reference.sha256, 'Evidence hash changed.');
     return content;
   }

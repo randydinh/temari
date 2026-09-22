@@ -9,15 +9,10 @@ import {
   rmdir,
   unlink,
 } from 'node:fs/promises';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 
 export type MechanicalRunStatus =
-  | 'QUEUED'
-  | 'RUNNING'
-  | 'SUCCEEDED'
-  | 'FAILED'
-  | 'BLOCKED'
-  | 'CANCELLED';
+  'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'BLOCKED' | 'CANCELLED';
 
 export interface RunLease {
   readonly owner: string;
@@ -42,10 +37,7 @@ export type RunEventPayload = Readonly<
 >;
 
 export type RunEventType =
-  | 'run-created'
-  | 'run-claimed'
-  | 'run-event'
-  | 'run-status-changed';
+  'run-created' | 'run-claimed' | 'run-event' | 'run-status-changed';
 
 export interface RunEvent {
   readonly schema: 1;
@@ -131,7 +123,10 @@ function assertText(value: string, label: string): void {
 }
 
 function assertLeaseMs(leaseMs: number): void {
-  assert(Number.isInteger(leaseMs) && leaseMs > 0, 'Lease duration must be positive.');
+  assert(
+    Number.isInteger(leaseMs) && leaseMs > 0,
+    'Lease duration must be positive.',
+  );
 }
 
 function message(error: unknown): string {
@@ -139,7 +134,12 @@ function message(error: unknown): string {
 }
 
 function isTerminal(status: MechanicalRunStatus): boolean {
-  return status === 'SUCCEEDED' || status === 'FAILED' || status === 'BLOCKED' || status === 'CANCELLED';
+  return (
+    status === 'SUCCEEDED' ||
+    status === 'FAILED' ||
+    status === 'BLOCKED' ||
+    status === 'CANCELLED'
+  );
 }
 
 function parseRecord(value: unknown): MechanicalRunRecord {
@@ -150,11 +150,25 @@ function parseRecord(value: unknown): MechanicalRunRecord {
   assertRunId(record.runId);
   assert(typeof record.revision === 'string' && record.revision.length > 0);
   assert(typeof record.status === 'string', 'Run record status is missing.');
-  assert(['QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED', 'BLOCKED', 'CANCELLED'].includes(record.status));
+  assert(
+    [
+      'QUEUED',
+      'RUNNING',
+      'SUCCEEDED',
+      'FAILED',
+      'BLOCKED',
+      'CANCELLED',
+    ].includes(record.status),
+  );
   const attempt = record.attempt as number | undefined;
   assert(Number.isInteger(attempt) && (attempt as number) >= 0);
-  assert(typeof record.createdAt === 'string' && typeof record.updatedAt === 'string');
-  assert(record.lease === null || (record.lease && typeof record.lease === 'object'));
+  assert(
+    typeof record.createdAt === 'string' &&
+      typeof record.updatedAt === 'string',
+  );
+  assert(
+    record.lease === null || (record.lease && typeof record.lease === 'object'),
+  );
   return { ...record, attempt } as MechanicalRunRecord;
 }
 
@@ -168,7 +182,9 @@ function parseEvent(value: unknown): RunEvent {
   assertRunId(event.runId);
   assert(typeof event.revision === 'string' && event.revision.length > 0);
   assert(typeof event.type === 'string');
-  assert(typeof event.idempotencyKey === 'string' && event.idempotencyKey.length > 0);
+  assert(
+    typeof event.idempotencyKey === 'string' && event.idempotencyKey.length > 0,
+  );
   assert(typeof event.actor === 'string' && event.actor.length > 0);
   assert(typeof event.at === 'string');
   assert(event.payload && typeof event.payload === 'object');
@@ -179,7 +195,7 @@ export class FileWorkflowRunStore implements WorkflowRunStore {
   private constructor(private readonly root: string) {}
 
   static async create(root: string): Promise<FileWorkflowRunStore> {
-    assert(root.startsWith('/'), 'Run store root must be absolute.');
+    assert(isAbsolute(root), 'Run store root must be absolute.');
     await mkdir(root, { recursive: true, mode: 0o700 });
     return new FileWorkflowRunStore(await realpath(root));
   }
@@ -191,7 +207,11 @@ export class FileWorkflowRunStore implements WorkflowRunStore {
     return this.withLock(request.runId, async () => {
       const existing = await this.readRecord(request.runId);
       if (existing) {
-        assert.equal(existing.revision, request.revision, 'Run ID is bound to another revision.');
+        assert.equal(
+          existing.revision,
+          request.revision,
+          'Run ID is bound to another revision.',
+        );
         return existing;
       }
       const at = (request.now ?? new Date()).toISOString();
@@ -258,7 +278,10 @@ export class FileWorkflowRunStore implements WorkflowRunStore {
         actor: request.owner,
         type: 'run-claimed',
         idempotencyKey: `claim:${request.runId}:${request.owner}:${next.attempt}`,
-        payload: { attempt: next.attempt, expiresAt: next.lease?.expiresAt ?? null },
+        payload: {
+          attempt: next.attempt,
+          expiresAt: next.lease?.expiresAt ?? null,
+        },
         now,
       });
       return { claimed: true, record: next };
@@ -279,29 +302,54 @@ export class FileWorkflowRunStore implements WorkflowRunStore {
     });
   }
 
-  async transition(request: TransitionRunRequest): Promise<MechanicalRunRecord> {
+  async transition(
+    request: TransitionRunRequest,
+  ): Promise<MechanicalRunRecord> {
     assertRunId(request.runId);
     assertText(request.owner, 'Owner');
     assertText(request.leaseToken, 'Lease token');
     assertText(request.idempotencyKey, 'Idempotency key');
     return this.withLock(request.runId, async () => {
       const record = await this.requireRecord(request.runId);
-      const existing = (await this.readEvents(request.runId, record.revision)).find(
-        (event) => event.idempotencyKey === request.idempotencyKey,
-      );
+      const existing = (
+        await this.readEvents(request.runId, record.revision)
+      ).find((event) => event.idempotencyKey === request.idempotencyKey);
       if (existing) {
-        assert.equal(existing.payload.to, request.status, 'Idempotency key target changed.');
+        assert.equal(
+          existing.payload.to,
+          request.status,
+          'Idempotency key target changed.',
+        );
         for (const [key, value] of Object.entries(request.payload ?? {})) {
-          assert.equal(existing.payload[key], value, 'Idempotency key payload changed.');
+          assert.equal(
+            existing.payload[key],
+            value,
+            'Idempotency key payload changed.',
+          );
         }
         return record;
       }
       const now = request.now ?? new Date();
-      assert.equal(record.status, 'RUNNING', 'Only a running lease can transition a run.');
+      assert.equal(
+        record.status,
+        'RUNNING',
+        'Only a running lease can transition a run.',
+      );
       assert(record.lease, 'Run lease is missing.');
-      assert.equal(record.lease.owner, request.owner, 'Run lease owner mismatch.');
-      assert.equal(record.lease.token, request.leaseToken, 'Run lease token mismatch.');
-      assert(Date.parse(record.lease.expiresAt) > now.getTime(), 'Run lease has expired.');
+      assert.equal(
+        record.lease.owner,
+        request.owner,
+        'Run lease owner mismatch.',
+      );
+      assert.equal(
+        record.lease.token,
+        request.leaseToken,
+        'Run lease token mismatch.',
+      );
+      assert(
+        Date.parse(record.lease.expiresAt) > now.getTime(),
+        'Run lease has expired.',
+      );
       const next: MechanicalRunRecord = {
         ...record,
         status: request.status,
@@ -315,7 +363,11 @@ export class FileWorkflowRunStore implements WorkflowRunStore {
         actor: request.owner,
         type: 'run-status-changed',
         idempotencyKey: request.idempotencyKey,
-        payload: { from: record.status, to: request.status, ...(request.payload ?? {}) },
+        payload: {
+          from: record.status,
+          to: request.status,
+          ...(request.payload ?? {}),
+        },
         now,
       });
       return next;
@@ -342,7 +394,9 @@ export class FileWorkflowRunStore implements WorkflowRunStore {
 
   private async readRecord(runId: string): Promise<MechanicalRunRecord | null> {
     try {
-      return parseRecord(JSON.parse(await readFile(this.statePath(runId), 'utf8')));
+      return parseRecord(
+        JSON.parse(await readFile(this.statePath(runId), 'utf8')),
+      );
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
       throw error;
@@ -372,7 +426,10 @@ export class FileWorkflowRunStore implements WorkflowRunStore {
     }
   }
 
-  private async readEvents(runId: string, revision: string): Promise<readonly RunEvent[]> {
+  private async readEvents(
+    runId: string,
+    revision: string,
+  ): Promise<readonly RunEvent[]> {
     let body: string;
     try {
       body = await readFile(this.eventPath(runId), 'utf8');
@@ -387,16 +444,28 @@ export class FileWorkflowRunStore implements WorkflowRunStore {
     events.forEach((event, index) => {
       assert.equal(event.runId, runId);
       assert.equal(event.revision, revision);
-      assert.equal(event.sequence, index + 1, 'Run event sequence is not contiguous.');
+      assert.equal(
+        event.sequence,
+        index + 1,
+        'Run event sequence is not contiguous.',
+      );
     });
     return events;
   }
 
-  private async appendEventLocked(input: AppendRunEventRequest & { readonly revision: string }): Promise<RunEvent> {
+  private async appendEventLocked(
+    input: AppendRunEventRequest & { readonly revision: string },
+  ): Promise<RunEvent> {
     const events = await this.readEvents(input.runId, input.revision);
-    const existing = events.find((event) => event.idempotencyKey === input.idempotencyKey);
+    const existing = events.find(
+      (event) => event.idempotencyKey === input.idempotencyKey,
+    );
     if (existing) {
-      assert.equal(canonical(existing.payload), canonical(input.payload ?? {}), 'Idempotency key payload changed.');
+      assert.equal(
+        canonical(existing.payload),
+        canonical(input.payload ?? {}),
+        'Idempotency key payload changed.',
+      );
       return existing;
     }
     const event: RunEvent = {
@@ -420,7 +489,10 @@ export class FileWorkflowRunStore implements WorkflowRunStore {
     return event;
   }
 
-  private async withLock<T>(runId: string, operation: () => Promise<T>): Promise<T> {
+  private async withLock<T>(
+    runId: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
     const path = this.lockPath(runId);
     let acquired = false;
     for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -437,7 +509,9 @@ export class FileWorkflowRunStore implements WorkflowRunStore {
     try {
       return await operation();
     } catch (error) {
-      throw new Error(`Run store operation failed: ${message(error)}`, { cause: error });
+      throw new Error(`Run store operation failed: ${message(error)}`, {
+        cause: error,
+      });
     } finally {
       await rmdir(path).catch(() => undefined);
     }

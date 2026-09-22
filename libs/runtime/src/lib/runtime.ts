@@ -8,20 +8,14 @@ import {
   realpath,
   unlink,
 } from 'node:fs/promises';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 
-import type {
-  WorkflowReceipt,
-  WorkflowReceiptStatus,
-} from '@temari/contracts';
+import type { WorkflowReceipt, WorkflowReceiptStatus } from '@temari/contracts';
 import {
   runPlanWithReceipt,
   type ReceiptRunRequest,
 } from '@temari/workflow-engine';
-import type {
-  MechanicalRunStatus,
-  WorkflowRunStore,
-} from './run-store.js';
+import type { MechanicalRunStatus, WorkflowRunStore } from './run-store.js';
 
 export interface WorkflowReceiptStore {
   save(receipt: WorkflowReceipt): Promise<string>;
@@ -73,14 +67,23 @@ function storedBody(receipt: WorkflowReceipt): string {
 }
 
 function parseStored(value: unknown): WorkflowReceipt {
-  assert(value && typeof value === 'object', 'Stored receipt must be an object.');
+  assert(
+    value && typeof value === 'object',
+    'Stored receipt must be an object.',
+  );
   const stored = value as Partial<StoredReceipt>;
   assert(stored.schema === 1, 'Unsupported stored receipt schema.');
   assert(typeof stored.sha256 === 'string', 'Stored receipt hash is missing.');
-  assert(stored.receipt && typeof stored.receipt === 'object', 'Stored receipt body is missing.');
+  assert(
+    stored.receipt && typeof stored.receipt === 'object',
+    'Stored receipt body is missing.',
+  );
   assert.equal(stored.sha256, digest(receiptBody(stored.receipt)));
   assert.equal(stored.receipt.schema, 1);
-  assert(typeof stored.receipt.runId === 'string', 'Stored receipt run ID is missing.');
+  assert(
+    typeof stored.receipt.runId === 'string',
+    'Stored receipt run ID is missing.',
+  );
   return stored.receipt;
 }
 
@@ -88,7 +91,7 @@ export class FileWorkflowReceiptStore implements WorkflowReceiptStore {
   private constructor(private readonly root: string) {}
 
   static async create(root: string): Promise<FileWorkflowReceiptStore> {
-    assert(root.startsWith('/'), 'Receipt store root must be absolute.');
+    assert(isAbsolute(root), 'Receipt store root must be absolute.');
     await mkdir(root, { recursive: true, mode: 0o700 });
     const canonicalRoot = await realpath(root);
     return new FileWorkflowReceiptStore(canonicalRoot);
@@ -112,7 +115,11 @@ export class FileWorkflowReceiptStore implements WorkflowReceiptStore {
         await link(temporary, path);
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-        assert.equal(await readFile(path, 'utf8'), body, 'Receipt collision or mutation.');
+        assert.equal(
+          await readFile(path, 'utf8'),
+          body,
+          'Receipt collision or mutation.',
+        );
       }
     } finally {
       await unlink(temporary).catch(() => undefined);
@@ -148,8 +155,7 @@ export async function executeAndPersist(
   return receipt;
 }
 
-export interface ExecuteScheduledAndPersistRequest
-  extends ExecuteAndPersistRequest {
+export interface ExecuteScheduledAndPersistRequest extends ExecuteAndPersistRequest {
   readonly runStore: WorkflowRunStore;
   readonly owner: string;
   readonly leaseMs: number;
@@ -215,7 +221,10 @@ export async function executeScheduledAndPersist(
       leaseToken,
       status: mechanicalStatus(receipt.status),
       idempotencyKey: `complete:${request.runId}:${attempt}`,
-      payload: { receipt: `${request.runId}.receipt.json`, receiptStatus: receipt.status },
+      payload: {
+        receipt: `${request.runId}.receipt.json`,
+        receiptStatus: receipt.status,
+      },
       now: now(),
     });
     return { claimed: true, record, receipt };
