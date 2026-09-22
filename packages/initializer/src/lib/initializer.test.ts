@@ -8,7 +8,7 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 import test from 'node:test';
 
 import {
@@ -219,7 +219,7 @@ test('init runs locked installs and writes a receipt without shell-specific comm
     assert.equal(result.doctor.ok, false);
     assert.deepEqual(installCalls, [
       {
-        cacheDirectory: join(root, 'Library', 'Caches', 'Temari'),
+        cacheDirectory: posix.join(root, 'Library', 'Caches', 'Temari'),
         platform: 'darwin',
         arch: 'arm64',
       },
