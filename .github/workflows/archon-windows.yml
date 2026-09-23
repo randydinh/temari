@@ -71,7 +71,7 @@ jobs:
 
           $versionText = (& $archon version 2>&1 | Out-String)
           if ($LASTEXITCODE -ne 0) { throw "Archon version check failed: $versionText" }
-          if ($versionText -notmatch '(?m)^Archon CLI v0\.10\.1$' -or $versionText -notmatch '(?m)^  Git commit: 9820785c$') { throw "Unexpected Archon build: $versionText" }
+          if ($versionText -notmatch '(?m)^Archon CLI v0\.10\.1(?:\s|$)' -or $versionText -notmatch 'Git\s+commit:\s*9820785c') { throw "Unexpected Archon build: $versionText" }
 
           $workspace = Join-Path $env:RUNNER_TEMP 'Temari Archon café workspace'
           New-Item -ItemType Directory -Force -Path $workspace | Out-Null
