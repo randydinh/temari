@@ -36,6 +36,12 @@ importers:
         specifier: ~6.0.3
         version: 6.0.3
 
+  libs/archon-harness:
+    dependencies:
+      '@temari/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+
   libs/contracts: {}
 
   libs/host-adapters:
@@ -66,11 +72,32 @@ importers:
         specifier: workspace:*
         version: link:../workflow-engine
 
+  libs/runtime:
+    dependencies:
+      '@temari/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@temari/workflow-engine':
+        specifier: workspace:*
+        version: link:../workflow-engine
+
+  libs/temari-core:
+    dependencies:
+      '@temari/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+
   libs/workflow-engine:
     dependencies:
       '@temari/contracts':
         specifier: workspace:*
         version: link:../contracts
+
+  packages/initializer:
+    dependencies:
+      '@temari/archon-harness':
+        specifier: workspace:*
+        version: link:../../libs/archon-harness
 
   packages/workflow-runtime: {}
 

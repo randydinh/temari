@@ -1,0 +1,104 @@
+name: Archon Windows harness
+
+on:
+  push:
+    branches:
+      - 'codex/**'
+    paths:
+      - '.github/workflows/archon-windows.yml'
+      - 'libs/archon-harness/**'
+      - 'libs/contracts/**'
+      - 'libs/runtime/**'
+      - 'packages/initializer/**'
+      - 'packages/workflow-runtime/assets/v4.1/integrations/archon/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig*.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test harness, initializer, runtime, and contracts
+        run: pnpm exec nx run-many -t typecheck test -p archon-harness,initializer,runtime,workflow-engine,contracts --parallel=1 --skip-nx-cache
+
+      - name: Initialize Temari and install pinned Archon
+        run: |
+          pnpm temari:init
+          pnpm temari:doctor
+          pnpm temari:init
+
+      - name: Execute a model-free Archon workflow on Windows
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archon = Join-Path $env:LOCALAPPDATA 'Temari\cache\components\archon\0.10.1\win32-x64\archon-windows-x64.exe'
+          $gitRoot = Join-Path $env:ProgramFiles 'Git'
+          $bash = Join-Path $gitRoot 'bin\bash.exe'
+          $falseExe = Join-Path $gitRoot 'usr\bin\false.exe'
+          if (-not (Test-Path -LiteralPath $archon -PathType Leaf)) { throw "Managed Archon binary not found: $archon" }
+          if (-not (Test-Path -LiteralPath $bash -PathType Leaf)) { throw "Git Bash not found: $bash" }
+          if (-not (Test-Path -LiteralPath $falseExe -PathType Leaf)) { throw "Git false utility not found: $falseExe" }
+          $env:ARCHON_BASH_PATH = $bash
+          $env:CLAUDE_BIN_PATH = $falseExe
+          $env:ARCHON_HOME = Join-Path $env:RUNNER_TEMP 'archon-home'
+          $env:DO_NOT_TRACK = '1'
+          $env:LOG_LEVEL = 'error'
+          New-Item -ItemType Directory -Force -Path $env:ARCHON_HOME | Out-Null
+
+          $versionText = (& $archon version 2>&1 | Out-String)
+          if ($LASTEXITCODE -ne 0) { throw "Archon version check failed: $versionText" }
+          if ($versionText -notmatch '(?m)^Archon CLI v0\.10\.1(?:\s|$)' -or $versionText -notmatch 'Git\s+commit:\s*9820785c') { throw "Unexpected Archon build: $versionText" }
+
+          $workspace = Join-Path $env:RUNNER_TEMP 'Temari Archon café workspace'
+          New-Item -ItemType Directory -Force -Path $workspace | Out-Null
+          $workflowDir = Join-Path $workspace '.archon\workflows'
+          New-Item -ItemType Directory -Force -Path $workflowDir | Out-Null
+          Copy-Item -LiteralPath 'libs/archon-harness/temari-windows-smoke.yaml' -Destination (Join-Path $workflowDir 'temari-windows-smoke.yaml')
+          git -C $workspace init -b main
+          if ($LASTEXITCODE -ne 0) { throw 'Could not initialize the disposable workflow repository.' }
+          git -C $workspace config user.name 'Temari Windows smoke'
+          git -C $workspace config user.email 'temari-windows-smoke@example.invalid'
+          git -C $workspace add .
+          git -C $workspace commit -m 'Prepare Archon Windows smoke'
+          if ($LASTEXITCODE -ne 0) { throw 'Could not commit the disposable workflow fixture.' }
+
+          & $archon validate workflows temari-windows-smoke --cwd $workspace
+          if ($LASTEXITCODE -ne 0) { throw 'Archon workflow validation failed on Windows.' }
+          $launchText = (& $archon workflow run temari-windows-smoke --cwd $workspace --workflow-source $workspace --no-worktree --detach --json 2>&1 | Out-String)
+          if ($LASTEXITCODE -ne 0) { throw "Archon workflow launch failed: $launchText" }
+          $launch = $launchText | ConvertFrom-Json
+          if (-not $launch.runId) { throw "Archon launch did not return a native run ID: $launchText" }
+          & $archon workflow wait $launch.runId --timeout 90 --json
+          if ($LASTEXITCODE -ne 0) { throw "Archon native workflow did not finish successfully: $($launch.runId)" }
+          $statusText = (& $archon workflow get $launch.runId --json 2>&1 | Out-String)
+          if ($LASTEXITCODE -ne 0) { throw "Could not read Archon workflow status: $statusText" }
+          $status = $statusText | ConvertFrom-Json
+          if ($status.id -ne $launch.runId -or $status.status -ne 'completed') { throw "Unexpected Archon workflow result: $statusText" }
+          $marker = Join-Path $workspace 'archon-windows-smoke.txt'
+          if (-not (Test-Path -LiteralPath $marker -PathType Leaf)) { throw 'The native Archon Bash node did not write its marker.' }
+          if ((Get-Content -Raw $marker).Trim() -ne 'win32') { throw 'The Archon smoke ran on an unexpected platform.' }
+          "Archon $($versionText.Trim()) ran $($launch.runId) on $($workspace)." | Out-File -Append $env:GITHUB_STEP_SUMMARY

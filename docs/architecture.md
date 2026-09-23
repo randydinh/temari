@@ -10,14 +10,21 @@ canonical behavior there.
 
 ## Layers
 
-| Layer                           | Package                   | Owns                                                                                            |
-| ------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------- |
-| Conversation and classification | future `libs/temari-core` | Understand the request, preserve constraints, construct an `ExecutionPlan`, explain the result. |
-| Contracts                       | `@temari/contracts`       | `ExecutionPlan`, host capabilities, worker briefs and results.                                  |
-| Workflow engine                 | `@temari/workflow-engine` | One stage sequence: investigate → plan → build → review → verify → deliver.                     |
-| Host adapters                   | `@temari/host-adapters`   | Capability reports and host-specific tools. Never fake a missing API.                           |
-| Mechanical runtime              | not yet extracted         | Persist runs, dispatch, leases, retries. No semantic decisions.                                 |
-| Overlays                        | install-time only         | Personal skills, OpConnect resources, credentials. Not this git tree.                           |
+| Layer                           | Package                   | Owns                                                                                                                                                         |
+| ------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Conversation and classification | `@temari/temari-core`     | Understand the request, preserve constraints, construct an `ExecutionPlan`, choose skill-dispatch intent, and apply provider-neutral verification policy.    |
+| Contracts                       | `@temari/contracts`       | `ExecutionPlan`, host capabilities, worker briefs and results.                                                                                               |
+| Workflow engine                 | `@temari/workflow-engine` | One stage sequence: investigate → plan → build → review → verify → deliver.                                                                                  |
+| Host adapters                   | `@temari/host-adapters`   | Capability reports and host-specific tools. Never fake a missing API.                                                                                        |
+| Execution harnesses             | `@temari/archon-harness`  | Replaceable run-level start/status/resume port; Archon is a managed implementation, not a host capability or semantic coordinator.                           |
+| Mechanical runtime              | `@temari/runtime`         | Atomic/idempotent receipt persistence and execution wrapper; durable dispatch, leases, retries, and reconciliation remain incomplete. No semantic decisions. |
+| Overlays                        | install-time only         | Personal skills, OpConnect resources, credentials. Not this git tree.                                                                                        |
+
+Knowledge providers are a separate boundary. Content Registrar may be a
+provider implementation, but its source registry, extractors, indexes,
+credentials, and freshness lifecycle do not belong in the workflow engine.
+The Nx project graph remains a code/build graph; it is not a document
+knowledge graph.
 
 Public entries remain `temari`, `poteto-mode`, and `closeout` once packaging exists.
 
@@ -35,12 +42,31 @@ The same engine runs every change. Risk and ceremony live on the plan:
 
 A one-line local edit and a risky feature produce the same receipt type.
 
+The first executable slice reconciles semantic `PlanObligations` into this
+single `ExecutionPlan` shape. Serial local work is the default. Stronger
+obligations derive their host requirements (`subagents` for required
+delegation or independent review, `forge` for pull-request delivery) instead
+of asking callers to maintain a second risk or host matrix. The slice proves
+stage order and honest capability failure; durable dispatch, leases, retries,
+watchers, reconciliation, and provider-specific execution remain deferred. The
+runtime package now persists the engine's revision-bound receipt shape without
+owning semantic decisions. A separate run-level harness port now binds native
+run IDs to a Temari run and plan digest; canonical Archon receipt parity is
+still a promotion gate.
+
+The coordinator slice also exposes a pure daily verification-maintenance
+decision. It can return a typed intent for `maintain-verification-skill` when
+the last successful receipt is missing or older than 24 hours. It does not
+read files, schedule work, or invoke a host; persistence and execution remain
+caller responsibilities.
+
 ## Responsibility split
 
 ```text
 Temari coordinator  →  meaning, research, plan, design, replan, decisions
 Runtime services    →  persist, dispatch, lease, retry, reconcile, status
 Host adapter        →  tools, models, permissions, credentials, forge
+Execution harness   →  native scheduling, status, and resume
 ```
 
 A dispatcher is deterministic. It is not an LLM “scheduler agent.”
@@ -53,18 +79,18 @@ only source of truth.
 If a required capability is missing, Temari degrades or stops. It does not
 simulate subagents, model diversity, or forge operations.
 
+Host and harness selection are independent. A host can inject its own harness;
+otherwise an explicitly configured harness is selected, then the managed
+Archon implementation. Archon scheduling never proves that its host provides
+subagents, credentials, model diversity, or forge operations. The current
+six-stage receipt engine remains authoritative until the Archon adapter can
+produce equivalent stage-bound receipts.
+
 ## Portability
 
-### Local conversation drafts
-
-`@temari/plan-draft` owns the bounded conversation-to-draft caller because it already owns the authorized local file effect. `createConversationPlanDraft` connects an admitted source provider and supplied assessment, proposal, and review functions. It preserves knowledge and draft results separately. General language classification, host model dispatch, and authority creation remain outside this operation.
-
-The caller stores five immutable task-local records and reuses the draft engine's checkpoint admission and preparation. A resume replays the original result and proposal. An invocation marker without a saved outcome stops instead of authorizing another judgment. Keeping this recovery protocol inside one start/resume operation avoids separate public preparation and publication APIs or a new orchestration package. The [plan-draft contract](../libs/plan-draft/README.md) describes usage, authority, recovery boundaries, and the trusted local process profile.
-
-### Provider boundaries
-
 - Core packages describe intent, not a provider API.
-- Adapters are swappable. Inherit the host model by default.
+- Host adapters and execution harnesses are independently swappable. Inherit
+  the host model by default.
 - Serial execution is first-class, not a consolation prize.
 - Multi-agent work is a capability, not a requirement.
 - Personal and employer material stay in overlays. Coworkers get the

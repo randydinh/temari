@@ -19,7 +19,16 @@
     "tags": [
       "scope:core",
       "type:engine"
-    ]
+    ],
+    "targets": {
+      "test": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test libs/workflow-engine/src/lib/workflow-engine.test.ts",
+          "cwd": "{workspaceRoot}"
+        }
+      }
+    }
   },
   "dependencies": {
     "@temari/contracts": "workspace:*"

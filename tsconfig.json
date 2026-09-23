@@ -13,7 +13,19 @@
       "path": "./libs/host-adapters"
     },
     {
+      "path": "./libs/temari-core"
+    },
+    {
       "path": "./libs/knowledge"
+    },
+    {
+      "path": "./libs/runtime"
+    },
+    {
+      "path": "./packages/initializer"
+    },
+    {
+      "path": "./libs/archon-harness"
     },
     {
       "path": "./libs/plan-draft"

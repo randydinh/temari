@@ -42,7 +42,7 @@
         "executor": "nx:run-commands",
         "cache": false,
         "options": {
-          "command": "node --import @swc-node/register/esm-register libs/plan-draft/src/pilot.ts",
+          "command": "node --no-warnings --import @swc-node/register/esm-register libs/plan-draft/src/pilot.ts",
           "cwd": "{workspaceRoot}"
         }
       }

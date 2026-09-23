@@ -14,10 +14,18 @@ import type {
 const workspace = fileURLToPath(new URL('../../../../', import.meta.url));
 const entry = 'libs/plan-draft/src/pilot.ts';
 
+function childEnvironment(): NodeJS.ProcessEnv {
+  const environment = { ...process.env };
+  delete environment.FORCE_COLOR;
+  environment.NO_COLOR = '1';
+  return environment;
+}
+
 export function runPilot(args: string[], imports: string[] = []) {
   const result = spawnSync(
     process.execPath,
     [
+      '--no-warnings',
       ...imports.flatMap((path) => ['--import', path]),
       '--import',
       '@swc-node/register/esm-register',
@@ -29,7 +37,7 @@ export function runPilot(args: string[], imports: string[] = []) {
       encoding: 'utf8',
       timeout: 120_000,
       maxBuffer: 4 * 1024 * 1024,
-      env: { ...process.env, FORCE_COLOR: undefined, NO_COLOR: '1' },
+      env: childEnvironment(),
     },
   );
   assert.ifError(result.error);
@@ -47,7 +55,7 @@ export function runPilotNx(args: string[]) {
       timeout: 120_000,
       maxBuffer: 4 * 1024 * 1024,
       env: {
-        ...process.env,
+        ...childEnvironment(),
         NX_DAEMON: 'false',
         NX_ISOLATE_PLUGINS: 'false',
         NX_NO_CLOUD: 'true',

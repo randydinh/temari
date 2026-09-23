@@ -1,0 +1,5 @@
+name: temari-windows-smoke
+description: Model-free smoke of the native Archon Windows workflow runner.
+nodes:
+  - id: write-platform-marker
+    bash: node -e 'require("node:fs").writeFileSync("archon-windows-smoke.txt", process.platform)'

@@ -19,7 +19,16 @@
     "tags": [
       "scope:core",
       "type:contracts"
-    ]
+    ],
+    "targets": {
+      "test": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test libs/contracts/src/lib/worker.test.ts",
+          "cwd": "{workspaceRoot}"
+        }
+      }
+    }
   },
   "dependencies": {}
 }

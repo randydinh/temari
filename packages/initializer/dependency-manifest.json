@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "version": "0.1.0",
+  "tools": {
+    "node": {
+      "command": "node",
+      "required": true,
+      "minimumMajor": 22
+    },
+    "pnpm": {
+      "command": "pnpm",
+      "required": true,
+      "minimumMajor": 9
+    },
+    "bun": {
+      "command": "bun",
+      "required": true,
+      "minimumMajor": 1
+    },
+    "git": {
+      "command": "git",
+      "required": true
+    }
+  },
+  "installations": [
+    {
+      "id": "workspace",
+      "manager": "pnpm",
+      "workingDirectory": ".",
+      "lockfile": "pnpm-lock.yaml",
+      "args": ["install", "--frozen-lockfile"],
+      "required": true
+    },
+    {
+      "id": "poteto-runtime",
+      "manager": "bun",
+      "workingDirectory": ".",
+      "sourceDirectory": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/scripts",
+      "lockfile": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/scripts/bun.lock",
+      "args": ["install", "--frozen-lockfile", "--ignore-scripts"],
+      "cache": true,
+      "required": true
+    }
+  ]
+}
