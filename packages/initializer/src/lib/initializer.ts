@@ -439,6 +439,7 @@ function toolReason(
   version: string | null,
   major: number | null,
   commandResult: CommandResult | null,
+  commandError: FileLikeError | null,
 ): string {
   if (
     requirement.supportedPlatforms &&
@@ -448,8 +449,11 @@ function toolReason(
   }
   if (!path) return 'executable not found on PATH';
   if (!commandResult || commandResult.exitCode !== 0) {
-    return commandResult
-      ? `version check failed (exit code ${commandResult.exitCode})`
+    if (commandResult) {
+      return `version check failed (exit code ${commandResult.exitCode})`;
+    }
+    return commandError?.code
+      ? `version check failed (process could not start: ${commandError.code})`
       : 'version check failed (process could not start)';
   }
   if (!version || major === null) return 'version could not be parsed';
@@ -509,10 +513,12 @@ export async function inspectTools(
     }
 
     let commandResult: CommandResult | null = null;
+    let commandError: FileLikeError | null = null;
     try {
       commandResult = await runner.run(path, ['--version'], process.cwd());
-    } catch {
+    } catch (error) {
       commandResult = null;
+      commandError = error as FileLikeError;
     }
     const parsed = parseVersion(
       `${commandResult?.stdout ?? ''}\n${commandResult?.stderr ?? ''}`,
@@ -524,6 +530,7 @@ export async function inspectTools(
       parsed?.version ?? null,
       parsed?.major ?? null,
       commandResult,
+      commandError,
     );
     checks.push({
       name,

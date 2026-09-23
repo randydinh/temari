@@ -144,6 +144,27 @@ test('quotes Windows command wrappers for cmd.exe /s /c', () => {
   );
 });
 
+test('resolves Windows shell variables without relying on environment casing', () => {
+  assert.deepEqual(
+    commandInvocation(
+      'C:\\Program Files\\pnpm\\pnpm.CMD',
+      ['--version'],
+      'win32',
+      { COMSPEC: 'C:\\Windows\\System32\\cmd.exe' },
+    ),
+    {
+      file: 'C:\\Windows\\System32\\cmd.exe',
+      args: [
+        '/d',
+        '/s',
+        '/c',
+        '""C:\\Program Files\\pnpm\\pnpm.CMD" "--version""',
+      ],
+      windowsVerbatimArguments: true,
+    },
+  );
+});
+
 test('doctor reports required lockfiles and allows unsupported optional tools', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-initializer-'));
   try {

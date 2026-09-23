@@ -1,3 +1,5 @@
+import { win32 } from 'node:path';
+
 export interface CommandInvocation {
   readonly file: string;
   readonly args: readonly string[];
@@ -6,6 +8,24 @@ export interface CommandInvocation {
 
 function quoteWindows(value: string): string {
   return `"${value.replaceAll('"', '\\"')}"`;
+}
+
+function environmentValue(
+  environment: NodeJS.ProcessEnv,
+  name: string,
+): string | undefined {
+  const key = Object.keys(environment).find(
+    (candidate) => candidate.toLowerCase() === name.toLowerCase(),
+  );
+  return key ? environment[key] : undefined;
+}
+
+function windowsShell(environment: NodeJS.ProcessEnv): string {
+  const comspec = environmentValue(environment, 'ComSpec');
+  if (comspec) return comspec;
+  const systemRoot = environmentValue(environment, 'SystemRoot');
+  if (systemRoot) return win32.join(systemRoot, 'System32', 'cmd.exe');
+  return 'cmd.exe';
 }
 
 /** Build cmd.exe's /s /c form while preserving the wrapper and argument quotes. */
@@ -20,7 +40,7 @@ export function commandInvocation(
   }
   const commandLine = [file, ...args].map(quoteWindows).join(' ');
   return {
-    file: environment.ComSpec ?? 'cmd.exe',
+    file: windowsShell(environment),
     args: ['/d', '/s', '/c', `"${commandLine}"`],
     windowsVerbatimArguments: true,
   };
