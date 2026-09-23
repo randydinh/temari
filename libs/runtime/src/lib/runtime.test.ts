@@ -32,7 +32,10 @@ test('persists and reloads a revision-bound receipt idempotently', async () => {
     const path = await store.save(receipt);
     assert.equal(path, join(canonicalRoot, 'run-1.receipt.json'));
     assert.deepEqual(await store.load('run-1'), receipt);
-    assert.equal((await readFile(path, 'utf8')).includes(receipt.revision), true);
+    assert.equal(
+      (await readFile(path, 'utf8')).includes(receipt.revision),
+      true,
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -53,9 +56,10 @@ test('persists blocked capability gaps instead of losing the reason', async () =
     });
 
     assert.equal(receipt.status, 'BLOCKED');
-    assert.deepEqual((await store.load('run-2'))?.failure?.missingCapabilities, [
-      'forge',
-    ]);
+    assert.deepEqual(
+      (await store.load('run-2'))?.failure?.missingCapabilities,
+      ['forge'],
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -87,7 +91,9 @@ test('rejects a different receipt for an existing run ID', async () => {
 test('executes a revision through the run lease and closes with a receipt status', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-runtime-'));
   try {
-    const receiptStore = await FileWorkflowReceiptStore.create(join(root, 'receipts'));
+    const receiptStore = await FileWorkflowReceiptStore.create(
+      join(root, 'receipts'),
+    );
     const runStore = await FileWorkflowRunStore.create(join(root, 'runs'));
     const result = await executeScheduledAndPersist({
       runId: 'scheduled-1',
@@ -114,7 +120,9 @@ test('executes a revision through the run lease and closes with a receipt status
 test('does not start a duplicate while a lease is active', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-runtime-'));
   try {
-    const receiptStore = await FileWorkflowReceiptStore.create(join(root, 'receipts'));
+    const receiptStore = await FileWorkflowReceiptStore.create(
+      join(root, 'receipts'),
+    );
     const runStore = await FileWorkflowRunStore.create(join(root, 'runs'));
     await runStore.create({
       runId: 'scheduled-2',
@@ -167,7 +175,10 @@ test('stores immutable content-addressed evidence and verifies it on reload', as
     });
 
     assert.equal(reference.sha256, replay.sha256);
-    assert.deepEqual(await store.load(reference), Buffer.from('verification output\n'));
+    assert.deepEqual(
+      await store.load(reference),
+      Buffer.from('verification output\n'),
+    );
     await assert.rejects(
       store.load({ ...reference, sha256: '0'.repeat(64) }),
       /Evidence hash changed|Evidence path is outside|ENOENT/,

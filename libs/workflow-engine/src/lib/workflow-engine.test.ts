@@ -84,7 +84,10 @@ test('returns a revision-bound receipt for a completed serial run', async () => 
   assert.equal(receipt.runId, 'run-1');
   assert.equal(receipt.revision, 'revision-1');
   assert.equal(receipt.stages.length, 6);
-  assert.equal(receipt.stages[0]?.evidencePaths[0], 'evidence/investigate.json');
+  assert.equal(
+    receipt.stages[0]?.evidencePaths[0],
+    'evidence/investigate.json',
+  );
   assert.equal(receipt.failure, null);
 });
 

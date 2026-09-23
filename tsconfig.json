@@ -16,9 +16,6 @@
       "path": "./libs/temari-core"
     },
     {
-      "path": "./packages/workflow-runtime"
-    },
-    {
       "path": "./libs/knowledge"
     },
     {
@@ -29,6 +26,12 @@
     },
     {
       "path": "./libs/archon-harness"
+    },
+    {
+      "path": "./libs/plan-draft"
+    },
+    {
+      "path": "./packages/workflow-runtime"
     }
   ],
   "compilerOptions": {}

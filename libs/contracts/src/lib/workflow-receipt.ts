@@ -4,8 +4,7 @@ import type { ExecutionPlan, WorkflowStageId } from './execution-plan.js';
 export type WorkflowReceiptStatus = 'PASS' | 'ISSUES' | 'BLOCKED' | 'DROPPED';
 
 export type WorkflowReceiptFailureKind =
-  | 'capability-gap'
-  | 'stage-handler-error';
+  'capability-gap' | 'stage-handler-error';
 
 export interface WorkflowReceiptFailure {
   readonly kind: WorkflowReceiptFailureKind;

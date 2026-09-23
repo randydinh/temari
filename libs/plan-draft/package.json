@@ -1,0 +1,56 @@
+{
+  "name": "@temari/plan-draft",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "nx": {
+    "name": "plan-draft",
+    "targets": {
+      "test": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test libs/plan-draft/src/lib/plan-draft.test.ts libs/plan-draft/src/lib/conversation-draft.test.ts libs/plan-draft/src/lib/conversation-recovery.test.ts libs/plan-draft/src/lib/command-judgments.test.ts libs/plan-draft/src/pilot.test.ts",
+          "cwd": "{workspaceRoot}"
+        }
+      },
+      "test-command-judgments": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test libs/plan-draft/src/lib/command-judgments.test.ts",
+          "cwd": "{workspaceRoot}"
+        }
+      },
+      "integration": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test libs/plan-draft/src/lib/registrar.integration.test.ts libs/plan-draft/src/pilot.integration.test.ts",
+          "cwd": "{workspaceRoot}"
+        }
+      },
+      "pilot": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --no-warnings --import @swc-node/register/esm-register libs/plan-draft/src/pilot.ts",
+          "cwd": "{workspaceRoot}"
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "@temari/contracts": "workspace:*",
+    "@temari/knowledge": "workspace:*",
+    "@temari/workflow-engine": "workspace:*"
+  }
+}

@@ -16,20 +16,34 @@
   "nx": {
     "name": "knowledge",
     "targets": {
-      "test": { "executor": "nx:run-commands", "options": {
-        "command": "node --import @swc-node/register/esm-register --test libs/knowledge/src/lib/knowledge.test.ts",
-        "cwd": "{workspaceRoot}"
-      } },
-      "integration": { "executor": "nx:run-commands", "cache": false, "options": {
-        "command": "node --import @swc-node/register/esm-register --test libs/knowledge/src/lib/registrar.integration.test.ts",
-        "cwd": "{workspaceRoot}"
-      } },
-      "demo": { "executor": "nx:run-commands", "options": {
-        "command": "node --import @swc-node/register/esm-register libs/knowledge/src/demo.ts",
-        "cwd": "{workspaceRoot}"
-      } }
+      "test": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test libs/knowledge/src/lib/knowledge.test.ts",
+          "cwd": "{workspaceRoot}"
+        }
+      },
+      "integration": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test libs/knowledge/src/lib/registrar.integration.test.ts",
+          "cwd": "{workspaceRoot}"
+        }
+      },
+      "demo": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "node --import @swc-node/register/esm-register libs/knowledge/src/demo.ts",
+          "cwd": "{workspaceRoot}"
+        }
+      }
     }
   },
-  "dependencies": { "@temari/contracts": "workspace:*" },
-  "devDependencies": { "@temari/workflow-engine": "workspace:*" }
+  "dependencies": {
+    "@temari/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@temari/workflow-engine": "workspace:*"
+  }
 }

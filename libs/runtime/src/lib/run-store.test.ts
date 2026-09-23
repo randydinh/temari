@@ -146,7 +146,12 @@ test('replaying an idempotency key returns the original event', async () => {
 
     assert.deepEqual(replay, first);
     assert.equal((await store.events('run-event-1')).length, 2);
-    assert.equal((await readFile(join(root, 'run-event-1.events.jsonl'), 'utf8')).split('\n').filter(Boolean).length, 2);
+    assert.equal(
+      (await readFile(join(root, 'run-event-1.events.jsonl'), 'utf8'))
+        .split('\n')
+        .filter(Boolean).length,
+      2,
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }

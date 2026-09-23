@@ -413,31 +413,31 @@ sequenceDiagram
 
 The current records distinguish incomplete behavior from behavior that exists only in a bounded or source-specific path.
 
-| Area | Current state | Nx expectation |
-| --- | --- | --- |
-| Conversation classification | Evidenced in v4.1 workflows, absent in the current Nx libraries | Add `temari-core` with compatibility fixtures |
-| Versioned routes and profile events | Evidenced in v4.1, no Nx compatibility reader | Map explicitly or record an incompatibility boundary |
-| Evidence, gates, and receipts | Rich v4.1 behavior, current Nx worker results are only paths and status | Add revision, producer, requirement, and freshness references |
-| Durable runtime | Resume, leases, retries, remote cancellation, and post-host execution remain incomplete or bounded in older lineages | Defer until an unattended journey requires them, then add ports first |
-| Host control | Live worker control, host closure, evaluator identity, and cancellation remain bounded | Prove each host adapter instead of copying capability claims |
-| Public packaging | v4.1 has public entries, current Nx has private libraries only | Add isolated install and drift checks |
-| QA domain route | v4.1 QA contract is documented and tested in its own route, Nx has no QA route | Add one reviewed domain route over the same engine |
-| Provider and knowledge features | Registrar, Graphify, Archon, dashboards, model switching, and calibration are optional or incomplete | Keep external until a contract and journey justify promotion |
-| Cutover | Package installation, clean host journeys, compatibility mapping, stable CI evidence, and rollback are unexecuted for Nx | Treat all as release gates |
-| Open reference tasks | Chase sandbox payment fixture, API-suite publication, and duplicate-settings coverage have unresolved follow-ups | Keep them as reference and closeout records, not as Nx dependencies |
+| Area                                | Current state                                                                                                            | Nx expectation                                                        |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| Conversation classification         | Evidenced in v4.1 workflows, absent in the current Nx libraries                                                          | Add `temari-core` with compatibility fixtures                         |
+| Versioned routes and profile events | Evidenced in v4.1, no Nx compatibility reader                                                                            | Map explicitly or record an incompatibility boundary                  |
+| Evidence, gates, and receipts       | Rich v4.1 behavior, current Nx worker results are only paths and status                                                  | Add revision, producer, requirement, and freshness references         |
+| Durable runtime                     | Resume, leases, retries, remote cancellation, and post-host execution remain incomplete or bounded in older lineages     | Defer until an unattended journey requires them, then add ports first |
+| Host control                        | Live worker control, host closure, evaluator identity, and cancellation remain bounded                                   | Prove each host adapter instead of copying capability claims          |
+| Public packaging                    | v4.1 has public entries, current Nx has private libraries only                                                           | Add isolated install and drift checks                                 |
+| QA domain route                     | v4.1 QA contract is documented and tested in its own route, Nx has no QA route                                           | Add one reviewed domain route over the same engine                    |
+| Provider and knowledge features     | Registrar, Graphify, Archon, dashboards, model switching, and calibration are optional or incomplete                     | Keep external until a contract and journey justify promotion          |
+| Cutover                             | Package installation, clean host journeys, compatibility mapping, stable CI evidence, and rollback are unexecuted for Nx | Treat all as release gates                                            |
+| Open reference tasks                | Chase sandbox payment fixture, API-suite publication, and duplicate-settings coverage have unresolved follow-ups         | Keep them as reference and closeout records, not as Nx dependencies   |
 
 ### Source folder disposition
 
 The complete assessment is recorded in [the project boundary audit](../.audit/project-boundary-assessment-2026-09-19.tsv).
 
-| Disposition | Examples | Plan |
-| --- | --- | --- |
-| Canonical Nx | `temari-next` | Add only verified contracts, core behavior, engine behavior, fixtures, and package sources |
-| External managed | `plugins`, `knowledge-agent`, `content-registrar*`, `information-knowledge-extractor`, `agent-privacy`, `codex`, `product-foundry`, `sports-analyst` | Keep separate and connect through reviewed manifests or adapter ports |
-| OpConnect external | `core-api-suite*`, `qa-review-*`, `qa-skills-library`, `AgentIndex`, and OpConnect application trees | Keep in the owning work account and never import customer data or credentials |
-| Historical reference | v1 through v4, `temari-design`, and transfer snapshots | Extract evidence selectively and preserve source provenance |
-| Archive candidate | `second-brain`, `temari-adapter-e2e`, duplicate registrar worktrees, duplicate sports symlink, transfer worktree | Confirm ownership, preserve unique records, then handle in a separate cleanup task |
-| Cache or archive data | `.pnpm-store`, `.content-registrar-sources`, unrelated guides | Keep outside product scope and manage independently |
+| Disposition           | Examples                                                                                                                                             | Plan                                                                                       |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Canonical Nx          | `temari-next`                                                                                                                                        | Add only verified contracts, core behavior, engine behavior, fixtures, and package sources |
+| External managed      | `plugins`, `knowledge-agent`, `content-registrar*`, `information-knowledge-extractor`, `agent-privacy`, `codex`, `product-foundry`, `sports-analyst` | Keep separate and connect through reviewed manifests or adapter ports                      |
+| OpConnect external    | `core-api-suite*`, `qa-review-*`, `qa-skills-library`, `AgentIndex`, and OpConnect application trees                                                 | Keep in the owning work account and never import customer data or credentials              |
+| Historical reference  | v1 through v4, `temari-design`, and transfer snapshots                                                                                               | Extract evidence selectively and preserve source provenance                                |
+| Archive candidate     | `second-brain`, `temari-adapter-e2e`, duplicate registrar worktrees, duplicate sports symlink, transfer worktree                                     | Confirm ownership, preserve unique records, then handle in a separate cleanup task         |
+| Cache or archive data | `.pnpm-store`, `.content-registrar-sources`, unrelated guides                                                                                        | Keep outside product scope and manage independently                                        |
 
 ### Ambiguities with redesign impact
 

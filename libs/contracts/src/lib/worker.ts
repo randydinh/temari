@@ -39,7 +39,8 @@ function nonEmpty(value: string, field: string, issues: string[]): void {
 
 function evidencePath(value: string, field: string, issues: string[]): void {
   nonEmpty(value, field, issues);
-  if (value.includes('\0')) issues.push(`${field} must not contain a NUL byte.`);
+  if (value.includes('\0'))
+    issues.push(`${field} must not contain a NUL byte.`);
 }
 
 /** Return shape and completeness issues without deciding whether work passed. */
@@ -79,7 +80,8 @@ export function validateWorkerResult(result: WorkerResult): readonly string[] {
   result.evidencePaths.forEach((value, index) => {
     evidencePath(value, `evidencePaths[${index}]`, issues);
   });
-  if (result.rawLogPath !== null) evidencePath(result.rawLogPath, 'rawLogPath', issues);
+  if (result.rawLogPath !== null)
+    evidencePath(result.rawLogPath, 'rawLogPath', issues);
   if (result.evidencePaths.length === 0 && result.rawLogPath === null) {
     issues.push('a worker result must retain evidencePaths or rawLogPath.');
   }
@@ -88,10 +90,12 @@ export function validateWorkerResult(result: WorkerResult): readonly string[] {
 
 export function assertWorkerBrief(brief: WorkerBrief): void {
   const issues = validateWorkerBrief(brief);
-  if (issues.length > 0) throw new Error(`Invalid WorkerBrief: ${issues.join(' ')}`);
+  if (issues.length > 0)
+    throw new Error(`Invalid WorkerBrief: ${issues.join(' ')}`);
 }
 
 export function assertWorkerResult(result: WorkerResult): void {
   const issues = validateWorkerResult(result);
-  if (issues.length > 0) throw new Error(`Invalid WorkerResult: ${issues.join(' ')}`);
+  if (issues.length > 0)
+    throw new Error(`Invalid WorkerResult: ${issues.join(' ')}`);
 }
