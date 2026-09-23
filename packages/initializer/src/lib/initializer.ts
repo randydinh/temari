@@ -179,6 +179,7 @@ export interface InitializationResult {
 
 interface FileLikeError extends Error {
   readonly code?: string;
+  readonly path?: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -452,8 +453,14 @@ function toolReason(
     if (commandResult) {
       return `version check failed (exit code ${commandResult.exitCode})`;
     }
-    return commandError?.code
-      ? `version check failed (process could not start: ${commandError.code})`
+    if (commandError?.code) {
+      const detail = [commandError.code, commandError.path]
+        .filter((value): value is string => Boolean(value))
+        .join(' ');
+      return `version check failed (process could not start: ${detail})`;
+    }
+    return commandError
+      ? `version check failed (process could not start: ${commandError.message})`
       : 'version check failed (process could not start)';
   }
   if (!version || major === null) return 'version could not be parsed';
