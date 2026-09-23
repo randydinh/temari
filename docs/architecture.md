@@ -10,15 +10,15 @@ canonical behavior there.
 
 ## Layers
 
-| Layer                           | Package                   | Owns                                                                                                                                                         |
-| ------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Conversation and classification | `@temari/temari-core`     | Understand the request, preserve constraints, construct an `ExecutionPlan`, choose skill-dispatch intent, and apply provider-neutral verification policy.    |
-| Contracts                       | `@temari/contracts`       | `ExecutionPlan`, host capabilities, worker briefs and results.                                                                                               |
-| Workflow engine                 | `@temari/workflow-engine` | One stage sequence: investigate → plan → build → review → verify → deliver.                                                                                  |
-| Host adapters                   | `@temari/host-adapters`   | Capability reports and host-specific tools. Never fake a missing API.                                                                                        |
-| Execution harnesses             | `@temari/archon-harness`  | Replaceable run-level start/status/resume port; Archon is a managed implementation, not a host capability or semantic coordinator.                           |
-| Mechanical runtime              | `@temari/runtime`         | Atomic/idempotent receipt persistence and execution wrapper; durable dispatch, leases, retries, and reconciliation remain incomplete. No semantic decisions. |
-| Overlays                        | install-time only         | Personal skills, OpConnect resources, credentials. Not this git tree.                                                                                        |
+| Layer                           | Package                   | Owns                                                                                                                                                                                                          |
+| ------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Conversation and classification | `@temari/temari-core`     | Understand the request, preserve constraints, construct an `ExecutionPlan`, choose skill-dispatch intent, and apply provider-neutral verification policy.                                                     |
+| Contracts                       | `@temari/contracts`       | `ExecutionPlan`, host capabilities, worker briefs and results.                                                                                                                                                |
+| Workflow engine                 | `@temari/workflow-engine` | One stage sequence: investigate → plan → build → review → verify → deliver.                                                                                                                                   |
+| Host adapters                   | `@temari/host-adapters`   | Capability reports and host-specific tools. Never fake a missing API.                                                                                                                                         |
+| Execution harnesses             | `@temari/archon-harness`  | Replaceable run-level start/status/resume port; Archon is a managed implementation, not a host capability or semantic coordinator.                                                                            |
+| Mechanical runtime              | `@temari/runtime`         | Atomic/idempotent receipt and child-task persistence, dependency-aware claims, leases, and fencing; executor integration, retries, cancellation, and reconciliation remain incomplete. No semantic decisions. |
+| Overlays                        | install-time only         | Personal skills, OpConnect resources, credentials. Not this git tree.                                                                                                                                         |
 
 Knowledge providers are a separate boundary. Content Registrar may be a
 provider implementation, but its source registry, extractors, indexes,
@@ -46,14 +46,16 @@ The first executable slice reconciles semantic `PlanObligations` into this
 single `ExecutionPlan` shape. Serial local work is the default, and an
 explicit bounded `parallelism.maxConcurrency` policy enables independent
 worker fan-out when the host proves the `parallelism` capability. The engine
-joins worker results in declaration order and preserves sibling failures; it
-does not yet persist child tasks or recover them after interruption. Stronger
-obligations derive their host requirements (`subagents` for required
+joins worker results in declaration order and preserves sibling failures. The
+runtime now persists a local child-task graph with dependency-aware claims,
+per-child leases, fencing epochs, and idempotent completion, but the executor
+does not yet recover parallel work through that store after interruption.
+Stronger obligations derive their host requirements (`subagents` for required
 delegation or independent review, `parallelism` for bounded fan-out, `forge`
 for pull-request delivery) instead of asking callers to maintain a second risk
-or host matrix. Durable child dispatch, leases, retries, watchers,
+or host matrix. Durable child dispatch integration, retries, watchers,
 reconciliation, and provider-specific execution remain deferred. The runtime
-package now persists the engine's revision-bound receipt shape without owning
+package persists the engine's revision-bound receipt shape without owning
 semantic decisions. A separate run-level harness port now binds native run IDs
 to a Temari run and plan digest; canonical Archon receipt parity is still a
 promotion gate.

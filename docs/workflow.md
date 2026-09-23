@@ -32,8 +32,10 @@ obligations are reconciled into one `ExecutionPlan`, then the engine runs the
 declared stages serially by default or performs bounded fan-out for explicitly
 independent worker assignments. It stops before execution when required
 capabilities are missing. A generic host is therefore a valid serial fallback,
-not a pretend subagent provider. The current fan-out is in-memory; durable
-child-task recovery and automatic failover remain roadmap work.
+not a pretend subagent provider. The current fan-out remains in-memory; the
+runtime now provides a local durable child-task store with dependency-aware
+claims and fencing, while executor integration, child recovery, and automatic
+failover remain roadmap work.
 
 Temari owns the semantic decision to classify a request and dispatch a skill.
 The host adapter only translates that typed intent into host-native tools.

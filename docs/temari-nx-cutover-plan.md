@@ -185,11 +185,14 @@ making it durable or allowing workers to mutate shared semantic state.
 
 **Current evidence.** The contracts already define worker briefs and typed
 worker results, and host capability reports already distinguish
-`parallelism`. The workflow engine now provides `runParallelWorkers`: it
-validates assignments, refuses a missing capability before starting work,
-limits fan-out to the declared maximum, continues collecting sibling results,
-and joins them in declaration order. Its receipt records the peak concurrency
-and the first actionable failure. This is an in-memory primitive only.
+`parallelism`. The workflow engine provides `runParallelWorkers`: it validates
+assignments, refuses a missing capability before starting work, limits fan-out
+to the declared maximum, continues collecting sibling results, and joins them
+in declaration order. `FileChildTaskStore` now provides a local durable slice
+for parent-bound child records, dependency-aware claims, leases, fencing
+epochs, result persistence, idempotent completion, and ready-frontier
+reconstruction. The executor does not yet use that store for restartable
+parallel dispatch.
 
 **Files.**
 
@@ -198,18 +201,21 @@ and the first actionable failure. This is an in-memory primitive only.
 - [x] Add a typed `WorkerAssignment` boundary.
 - [x] Add bounded fan-out and stable join behavior to `libs/workflow-engine`.
 - [x] Add capability-gap, concurrency-bound, ordering, and failure-join tests.
-- [ ] Add durable child-task records, ownership, leases, retries, cancellation,
-      and recovery before claiming unattended parallel execution.
+- [x] Add local durable child-task records, ownership, leases, fencing epochs,
+      dependency-aware claims, result persistence, and idempotent completion.
+- [ ] Integrate child-task persistence with the executor and add explicit
+      retry, cancellation, crash-reconciliation, and unattended recovery.
 
 **Build next.**
 
-- [ ] Give each child task a stable ID, parent run ID, revision, dependency
-      set, attempt, owner, lease, status, and idempotency key.
-- [ ] Persist child results and evidence separately from coordinator state;
-      only the coordinator may publish the joined semantic result.
+- [x] Give each child task a stable ID, parent run ID, revision, dependency
+      set, attempt, owner, lease, status, fencing epoch, and idempotent
+      completion key.
+- [ ] Persist child results and evidence manifests separately from coordinator
+      state; only the coordinator may publish the joined semantic result.
 - [ ] Define join policy for `PASS`, `ISSUES`, `BLOCKED`, and `DROPPED`, plus
       required-task failure and optional-task degradation.
-- [ ] Add fencing epochs so an expired worker cannot publish after takeover.
+- [x] Add fencing epochs so an expired worker cannot publish after takeover.
 - [ ] Prove interruption, retry, duplicate delivery, partial completion, and
       manual takeover with shared control and artifact stores.
 
