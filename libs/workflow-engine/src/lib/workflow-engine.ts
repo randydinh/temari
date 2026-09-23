@@ -4,6 +4,10 @@ import {
   type ExecutionPlan,
   type HostCapability,
   type HostCapabilityReport,
+  assertWorkerBrief,
+  assertWorkerResult,
+  type WorkerAssignment,
+  type WorkerResult,
   type WorkflowReceipt,
   type WorkflowReceiptStatus,
   type WorkflowStageReceipt,
@@ -31,6 +35,48 @@ export type StageReceiptHandler = (
   stage: WorkflowStageId,
   plan: ExecutionPlan,
 ) => Promise<StageReceiptResult> | StageReceiptResult;
+
+export interface ParallelWorkerOutcome {
+  readonly assignment: WorkerAssignment;
+  readonly result: WorkerResult | null;
+  readonly error: string | null;
+}
+
+export type ParallelWorkerFailureKind =
+  'plan-gap' | 'capability-gap' | 'worker-error' | 'worker-status';
+
+export interface ParallelWorkerFailure {
+  readonly kind: ParallelWorkerFailureKind;
+  readonly message: string;
+  readonly workerId: string | null;
+  readonly missingCapabilities: readonly HostCapability[];
+}
+
+export interface ParallelWorkerReceipt {
+  readonly schema: 1;
+  readonly runId: string;
+  readonly revision: string;
+  readonly startedAt: string;
+  readonly completedAt: string;
+  readonly status: WorkflowReceiptStatus;
+  readonly maxConcurrency: number;
+  readonly peakConcurrency: number;
+  readonly outcomes: readonly ParallelWorkerOutcome[];
+  readonly failure: ParallelWorkerFailure | null;
+}
+
+export interface ParallelWorkerRunRequest {
+  readonly runId: string;
+  readonly revision: string;
+  readonly plan: ExecutionPlan;
+  readonly capabilities: HostCapabilityReport;
+  readonly assignments: readonly WorkerAssignment[];
+  readonly handler: (
+    assignment: WorkerAssignment,
+  ) => Promise<WorkerResult> | WorkerResult;
+  readonly maxConcurrency?: number;
+  readonly now?: () => Date;
+}
 
 export interface ReceiptRunRequest {
   readonly runId: string;
@@ -202,5 +248,207 @@ export async function runPlanWithReceipt(
     status: 'PASS',
     stages,
     failure: null,
+  };
+}
+
+function workerError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isWorkerId(value: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value);
+}
+
+function validateParallelAssignments(
+  assignments: readonly WorkerAssignment[],
+): void {
+  if (assignments.length === 0) {
+    throw new Error(
+      'Parallel worker execution requires at least one assignment.',
+    );
+  }
+
+  const ids = new Set<string>();
+  assignments.forEach((assignment, index) => {
+    if (!isWorkerId(assignment.id)) {
+      throw new Error(`Worker assignment ${index} has an invalid ID.`);
+    }
+    if (ids.has(assignment.id)) {
+      throw new Error(`Worker assignment ID is duplicated: ${assignment.id}.`);
+    }
+    ids.add(assignment.id);
+    assertWorkerBrief(assignment.brief);
+  });
+}
+
+function aggregateWorkerStatus(
+  outcomes: readonly ParallelWorkerOutcome[],
+): WorkflowReceiptStatus {
+  if (outcomes.some((outcome) => outcome.error !== null)) return 'BLOCKED';
+  if (outcomes.some((outcome) => outcome.result?.status === 'BLOCKED')) {
+    return 'BLOCKED';
+  }
+  if (outcomes.some((outcome) => outcome.result?.status === 'ISSUES')) {
+    return 'ISSUES';
+  }
+  if (outcomes.some((outcome) => outcome.result?.status === 'DROPPED')) {
+    return 'DROPPED';
+  }
+  return 'PASS';
+}
+
+function firstWorkerFailure(
+  outcomes: readonly ParallelWorkerOutcome[],
+): ParallelWorkerFailure | null {
+  const errored = outcomes.find((outcome) => outcome.error !== null);
+  if (errored) {
+    return {
+      kind: 'worker-error',
+      message: errored.error ?? 'Worker failed without an error message.',
+      workerId: errored.assignment.id,
+      missingCapabilities: [],
+    };
+  }
+
+  const nonPass = outcomes.find(
+    (outcome) => outcome.result && outcome.result.status !== 'PASS',
+  );
+  if (!nonPass?.result) return null;
+  return {
+    kind: 'worker-status',
+    message: nonPass.result.summary,
+    workerId: nonPass.assignment.id,
+    missingCapabilities: [],
+  };
+}
+
+/**
+ * Execute independent worker assignments with a bounded fan-out and a stable
+ * join. This is intentionally an in-memory execution primitive; durable child
+ * task ownership, leases, retries, and recovery remain runtime work.
+ */
+export async function runParallelWorkers(
+  request: ParallelWorkerRunRequest,
+): Promise<ParallelWorkerReceipt> {
+  const now = request.now ?? (() => new Date());
+  const started = now();
+  const declaredConcurrency = request.plan.parallelism?.maxConcurrency;
+  const maxConcurrency = request.maxConcurrency ?? declaredConcurrency;
+
+  if (declaredConcurrency === undefined) {
+    const completed = now();
+    return {
+      schema: 1,
+      runId: request.runId,
+      revision: request.revision,
+      startedAt: started.toISOString(),
+      completedAt: completed.toISOString(),
+      status: 'BLOCKED',
+      maxConcurrency: 0,
+      peakConcurrency: 0,
+      outcomes: [],
+      failure: {
+        kind: 'plan-gap',
+        message: 'Execution plan does not declare a parallelism policy.',
+        workerId: null,
+        missingCapabilities: [],
+      },
+    };
+  }
+
+  if (
+    maxConcurrency === undefined ||
+    !Number.isInteger(maxConcurrency) ||
+    maxConcurrency < 1 ||
+    maxConcurrency > declaredConcurrency
+  ) {
+    throw new Error(
+      'Parallel worker maxConcurrency must be a positive integer no greater than the plan limit.',
+    );
+  }
+
+  const missing = missingCapabilities(
+    request.plan.requiredCapabilities,
+    request.capabilities.available,
+  );
+  if (
+    declaredConcurrency > 1 &&
+    !request.capabilities.available.includes('parallelism')
+  ) {
+    if (!missing.includes('parallelism')) missing.push('parallelism');
+  }
+  if (missing.length > 0) {
+    const completed = now();
+    return {
+      schema: 1,
+      runId: request.runId,
+      revision: request.revision,
+      startedAt: started.toISOString(),
+      completedAt: completed.toISOString(),
+      status: 'BLOCKED',
+      maxConcurrency,
+      peakConcurrency: 0,
+      outcomes: [],
+      failure: {
+        kind: 'capability-gap',
+        message: `Host is missing required capabilities: ${missing.join(', ')}`,
+        workerId: null,
+        missingCapabilities: missing,
+      },
+    };
+  }
+
+  validateParallelAssignments(request.assignments);
+  const outcomes = new Array<ParallelWorkerOutcome>(request.assignments.length);
+  let next = 0;
+  let active = 0;
+  let peak = 0;
+
+  async function drain(): Promise<void> {
+    while (true) {
+      const index = next;
+      next += 1;
+      const assignment = request.assignments[index];
+      if (!assignment) return;
+      active += 1;
+      peak = Math.max(peak, active);
+      try {
+        const result = await request.handler(assignment);
+        assertWorkerResult(result);
+        outcomes[index] = { assignment, result, error: null };
+      } catch (error) {
+        outcomes[index] = {
+          assignment,
+          result: null,
+          error: workerError(error),
+        };
+      } finally {
+        active -= 1;
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from(
+      { length: Math.min(maxConcurrency, request.assignments.length) },
+      () => drain(),
+    ),
+  );
+
+  const completed = now();
+  const stableOutcomes = outcomes.filter(
+    (outcome): outcome is ParallelWorkerOutcome => outcome !== undefined,
+  );
+  return {
+    schema: 1,
+    runId: request.runId,
+    revision: request.revision,
+    startedAt: started.toISOString(),
+    completedAt: completed.toISOString(),
+    status: aggregateWorkerStatus(stableOutcomes),
+    maxConcurrency,
+    peakConcurrency: peak,
+    outcomes: stableOutcomes,
+    failure: firstWorkerFailure(stableOutcomes),
   };
 }

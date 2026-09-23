@@ -33,6 +33,11 @@ export interface PlanObligations {
   readonly evidence?: EvidencePolicy;
   readonly delivery?: DeliveryPolicy;
   readonly requiredCapabilities?: readonly HostCapability[];
+  readonly parallelism?: ParallelismPolicy;
+}
+
+export interface ParallelismPolicy {
+  readonly maxConcurrency: number;
 }
 
 /**
@@ -48,6 +53,7 @@ export interface ExecutionPlan {
   readonly evidence: EvidencePolicy;
   readonly delivery: DeliveryPolicy;
   readonly requiredCapabilities: readonly HostCapability[];
+  readonly parallelism?: ParallelismPolicy;
 }
 
 export const DEFAULT_STAGES: readonly WorkflowStageId[] = WORKFLOW_STAGES;
@@ -56,7 +62,11 @@ function capabilitiesFor(
   obligations: Required<
     Pick<
       PlanObligations,
-      'delegation' | 'review' | 'delivery' | 'requiredCapabilities'
+      | 'delegation'
+      | 'review'
+      | 'delivery'
+      | 'requiredCapabilities'
+      | 'parallelism'
     >
   >,
 ): readonly HostCapability[] {
@@ -71,8 +81,24 @@ function capabilitiesFor(
   if (obligations.delivery === 'pull-request') {
     required.add('forge');
   }
+  if (obligations.parallelism.maxConcurrency > 1) {
+    required.add('parallelism');
+  }
 
   return HOST_CAPABILITIES.filter((capability) => required.has(capability));
+}
+
+function normalizeParallelism(
+  parallelism: ParallelismPolicy | undefined,
+): ParallelismPolicy | undefined {
+  if (!parallelism) return undefined;
+  if (
+    !Number.isInteger(parallelism.maxConcurrency) ||
+    parallelism.maxConcurrency < 1
+  ) {
+    throw new Error('parallelism.maxConcurrency must be a positive integer.');
+  }
+  return { maxConcurrency: parallelism.maxConcurrency };
 }
 
 /** Convert semantic obligations into the single workflow-engine plan shape. */
@@ -81,8 +107,9 @@ export function reconcilePlan(obligations: PlanObligations): ExecutionPlan {
   const review = obligations.review ?? 'self';
   const evidence = obligations.evidence ?? 'minimal';
   const delivery = obligations.delivery ?? 'local';
+  const parallelism = normalizeParallelism(obligations.parallelism);
 
-  return {
+  const plan: ExecutionPlan = {
     version: 1,
     workType: obligations.workType,
     stages: DEFAULT_STAGES,
@@ -95,8 +122,11 @@ export function reconcilePlan(obligations: PlanObligations): ExecutionPlan {
       review,
       delivery,
       requiredCapabilities: obligations.requiredCapabilities ?? [],
+      parallelism: parallelism ?? { maxConcurrency: 1 },
     }),
   };
+
+  return parallelism ? { ...plan, parallelism } : plan;
 }
 
 export function minimalPlan(workType: WorkType = 'bug'): ExecutionPlan {
@@ -110,5 +140,19 @@ export function expandedPlan(workType: WorkType = 'feature'): ExecutionPlan {
     review: 'independent',
     evidence: 'revision-bound',
     delivery: 'pull-request',
+  });
+}
+
+export function parallelPlan(
+  workType: WorkType = 'feature',
+  maxConcurrency = 2,
+): ExecutionPlan {
+  return reconcilePlan({
+    workType,
+    delegation: 'required',
+    review: 'independent',
+    evidence: 'revision-bound',
+    delivery: 'pull-request',
+    parallelism: { maxConcurrency },
   });
 }

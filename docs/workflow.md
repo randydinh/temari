@@ -21,16 +21,19 @@ flowchart TD
   Exec -->|none| Local[Coordinator tools]
   Exec -->|optional or required| Disp[Deterministic dispatcher]
   Disp --> W[Workers]
+  W --> Fan[Bounded fan-out and stable join]
+  Fan --> Store
   Local --> Store[(Run store)]
-  W --> Store
   Store --> E
 ```
 
 The current vertical slice makes the plan boundary executable: semantic
-obligations are reconciled into one `ExecutionPlan`, then the serial engine
-runs the declared stages or stops before execution when required capabilities
-are missing. A generic host is therefore a valid serial fallback, not a
-pretend subagent provider.
+obligations are reconciled into one `ExecutionPlan`, then the engine runs the
+declared stages serially by default or performs bounded fan-out for explicitly
+independent worker assignments. It stops before execution when required
+capabilities are missing. A generic host is therefore a valid serial fallback,
+not a pretend subagent provider. The current fan-out is in-memory; durable
+child-task recovery and automatic failover remain roadmap work.
 
 Temari owns the semantic decision to classify a request and dispatch a skill.
 The host adapter only translates that typed intent into host-native tools.
