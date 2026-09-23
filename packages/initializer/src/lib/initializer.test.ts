@@ -109,6 +109,7 @@ test('parses common tool version output', () => {
 test('finds executables through a platform-specific PATH', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-initializer-'));
   try {
+    await writeFile(join(root, 'pnpm'), 'extensionless shim');
     const executable = join(root, 'pnpm.cmd');
     await writeFile(executable, '');
     assert.equal(

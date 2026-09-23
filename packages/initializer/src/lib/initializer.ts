@@ -332,8 +332,8 @@ function executableNames(
     .split(';')
     .filter((extension) => extension.length > 0);
   return [
-    command,
     ...extensions.map((extension) => `${command}${extension.toLowerCase()}`),
+    command,
   ];
 }
 
