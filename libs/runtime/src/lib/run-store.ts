@@ -504,11 +504,12 @@ export class FileWorkflowRunStore implements WorkflowRunStore {
       } catch (error) {
         const code = (error as NodeJS.ErrnoException).code;
         let lockExists = code === 'EEXIST';
-        if (code === 'EPERM') {
+        if (code === 'EPERM' || code === 'EACCES') {
+          lockExists = true;
           try {
             lockExists = (await lstat(path)).isDirectory();
           } catch {
-            lockExists = false;
+            lockExists = true;
           }
         }
         if (!lockExists) throw error;
