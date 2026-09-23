@@ -1,11 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { expandedPlan, minimalPlan, reconcilePlan } from '@temari/contracts';
+import {
+  expandedPlan,
+  minimalPlan,
+  parallelPlan,
+  reconcilePlan,
+  type WorkerAssignment,
+} from '@temari/contracts';
 
 import {
   CapabilityError,
   runPlan,
+  runParallelWorkers,
   runPlanWithReceipt,
 } from './workflow-engine.js';
 
@@ -29,6 +36,17 @@ test('derives capabilities from stronger obligations', () => {
   });
 
   assert.deepEqual(plan.requiredCapabilities, ['subagents', 'forge']);
+});
+
+test('derives parallelism as an explicit plan capability', () => {
+  const plan = parallelPlan('feature', 3);
+
+  assert.deepEqual(plan.parallelism, { maxConcurrency: 3 });
+  assert.deepEqual(plan.requiredCapabilities, [
+    'subagents',
+    'parallelism',
+    'forge',
+  ]);
 });
 
 test('runs the same declared stage sequence serially', async () => {
@@ -154,6 +172,95 @@ test('converts handler failures into a blocked receipt', async () => {
   assert.equal(receipt.stages.at(-1)?.status, 'BLOCKED');
 });
 
+test('fans out independent workers within the declared concurrency bound', async () => {
+  const active: string[] = [];
+  let peak = 0;
+  const assignments = workerAssignments(4);
+  const receipt = await runParallelWorkers({
+    runId: 'parallel-1',
+    revision: 'revision-parallel-1',
+    plan: parallelPlan('feature', 2),
+    capabilities: parallelCapabilities(),
+    assignments,
+    handler: async (assignment) => {
+      active.push(assignment.id);
+      peak = Math.max(peak, active.length);
+      await new Promise((resolve) => setTimeout(resolve, 2));
+      active.splice(active.indexOf(assignment.id), 1);
+      return {
+        status: 'PASS',
+        summary: `${assignment.id} complete`,
+        evidencePaths: [`evidence/${assignment.id}.json`],
+        rawLogPath: null,
+      };
+    },
+    now: sequenceClock(),
+  });
+
+  assert.equal(receipt.status, 'PASS');
+  assert.equal(receipt.peakConcurrency, 2);
+  assert.equal(peak, 2);
+  assert.deepEqual(
+    receipt.outcomes.map((outcome) => outcome.assignment.id),
+    ['worker-1', 'worker-2', 'worker-3', 'worker-4'],
+  );
+});
+
+test('blocks parallel workers before execution when the host lacks parallelism', async () => {
+  let invoked = false;
+  const receipt = await runParallelWorkers({
+    runId: 'parallel-2',
+    revision: 'revision-parallel-2',
+    plan: parallelPlan('feature', 2),
+    capabilities: serialCapabilities(),
+    assignments: workerAssignments(2),
+    handler: () => {
+      invoked = true;
+      return {
+        status: 'PASS',
+        summary: 'unexpected',
+        evidencePaths: ['evidence/unexpected.json'],
+        rawLogPath: null,
+      };
+    },
+    now: sequenceClock(),
+  });
+
+  assert.equal(receipt.status, 'BLOCKED');
+  assert.equal(invoked, false);
+  assert.deepEqual(receipt.failure?.missingCapabilities, [
+    'subagents',
+    'parallelism',
+    'forge',
+  ]);
+});
+
+test('joins worker issues and preserves handler failures as outcomes', async () => {
+  const receipt = await runParallelWorkers({
+    runId: 'parallel-3',
+    revision: 'revision-parallel-3',
+    plan: parallelPlan('feature', 2),
+    capabilities: parallelCapabilities(),
+    assignments: workerAssignments(3),
+    handler: (assignment) => {
+      if (assignment.id === 'worker-2') throw new Error('worker interrupted');
+      return {
+        status: assignment.id === 'worker-3' ? 'ISSUES' : 'PASS',
+        summary: assignment.id === 'worker-3' ? 'needs review' : 'complete',
+        evidencePaths: [`evidence/${assignment.id}.json`],
+        rawLogPath: null,
+      } as const;
+    },
+    now: sequenceClock(),
+  });
+
+  assert.equal(receipt.status, 'BLOCKED');
+  assert.equal(receipt.failure?.kind, 'worker-error');
+  assert.equal(receipt.failure?.workerId, 'worker-2');
+  assert.equal(receipt.outcomes[1]?.error, 'worker interrupted');
+  assert.equal(receipt.outcomes[2]?.result?.status, 'ISSUES');
+});
+
 function sequenceClock(): () => Date {
   let count = 0;
   const start = new Date('2026-09-22T12:00:00.000Z').getTime();
@@ -174,4 +281,36 @@ function serialCapabilities() {
     ] as const,
     notes: {},
   };
+}
+
+function parallelCapabilities() {
+  return {
+    host: 'cursor',
+    available: [
+      'subagents',
+      'parallelism',
+      'model_diversity',
+      'worktree_isolation',
+      'durable_delivery',
+      'forge',
+    ] as const,
+    missing: [] as const,
+    notes: {},
+  };
+}
+
+function workerAssignments(count: number): WorkerAssignment[] {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `worker-${index + 1}`,
+    role: 'investigator' as const,
+    brief: {
+      goal: `Inspect work item ${index + 1}`,
+      context: 'The coordinator supplied bounded context.',
+      scope: `Work item ${index + 1} only`,
+      acceptanceCriteria: ['Return retained evidence.'],
+      verificationCommand: null,
+      reportFormat: 'json' as const,
+      forbiddenActions: ['Do not modify shared state.'],
+    },
+  }));
 }

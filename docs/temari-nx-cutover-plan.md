@@ -3,14 +3,18 @@
 This plan turns `temari-next` into the canonical Temari control plane.
 It keeps one workflow engine, treats host capabilities as explicit, and keeps
 personal, provider, and OpConnect material outside the shared repository.
-It is an outline for agreement before implementation, not a waterfall schedule.
-The current candidate is a typed foundation and the cutover gate remains on hold.
+It is the living roadmap for implementation, not a waterfall schedule. The
+current candidate is a typed foundation with a bounded in-memory parallel
+worker slice; the cutover gate remains on hold until the durable and packaging
+gates below have evidence.
 
 ## How to read this
 
 One box is one unit of work. Every box names the evidence that checks it. A nested box is a sub-step of the box above it. Check a box only when its evidence exists, a file, a log line, a screenshot, a test run, or a SHA. The body is a how-to. The appendices explain and record.
 
-The program runs `pstack/skills/poteto-mode/playbooks/autopilot-stack.md`. This task stops at plan approval. The owner starts execution only after an explicit go, and the operator reviews any interaction-changing work before merge.
+The program runs `pstack/skills/poteto-mode/playbooks/autopilot-stack.md`. The
+owner starts execution only after an explicit go, and the operator reviews any
+interaction-changing work before merge.
 
 Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -32,7 +36,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 ### Spawn owners
 
 - [ ] Assign one owner to each work package. The packages are `WP1`, `WP2`, `WP3`, and `WP4`.
-- [ ] Start `WP1` first. Start `WP2` after `WP1` merges. Start `WP3` after `WP2` merges. Start `WP4` after `WP3` merges.
+- [ ] Start `WP1` first. Start `WP2` after `WP1` merges. Start `WP2P` after `WP2` merges. Start `WP3` after `WP2P` merges. Start `WP4` after `WP3` merges.
 - [ ] Keep file boundaries. Contract work stays in `libs/contracts` and migration records. Core workflow work stays in its own libraries and fixtures. Packaging work stays in public package paths and overlay documentation. Cutover work stays in verification, install, and rollback records.
 - [ ] Do not delete legacy repositories, worktrees, symlinks, or external folders as part of a work package. Deletion requires a separate owner check and a durable archive record.
 
@@ -174,9 +178,66 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 - [ ] The journey report distinguishes procedural workflow proof from product correctness.
 - [ ] The owner merges `WP2` after the operator review.
 
+## Add bounded parallel worker execution (WP2P)
+
+**Depends on.** `WP2`. This work package makes parallelism executable without
+making it durable or allowing workers to mutate shared semantic state.
+
+**Current evidence.** The contracts already define worker briefs and typed
+worker results, and host capability reports already distinguish
+`parallelism`. The workflow engine now provides `runParallelWorkers`: it
+validates assignments, refuses a missing capability before starting work,
+limits fan-out to the declared maximum, continues collecting sibling results,
+and joins them in declaration order. Its receipt records the peak concurrency
+and the first actionable failure. This is an in-memory primitive only.
+
+**Files.**
+
+- [x] Extend `PlanObligations` and `ExecutionPlan` with an explicit bounded
+      `parallelism.maxConcurrency` policy.
+- [x] Add a typed `WorkerAssignment` boundary.
+- [x] Add bounded fan-out and stable join behavior to `libs/workflow-engine`.
+- [x] Add capability-gap, concurrency-bound, ordering, and failure-join tests.
+- [ ] Add durable child-task records, ownership, leases, retries, cancellation,
+      and recovery before claiming unattended parallel execution.
+
+**Build next.**
+
+- [ ] Give each child task a stable ID, parent run ID, revision, dependency
+      set, attempt, owner, lease, status, and idempotency key.
+- [ ] Persist child results and evidence separately from coordinator state;
+      only the coordinator may publish the joined semantic result.
+- [ ] Define join policy for `PASS`, `ISSUES`, `BLOCKED`, and `DROPPED`, plus
+      required-task failure and optional-task degradation.
+- [ ] Add fencing epochs so an expired worker cannot publish after takeover.
+- [ ] Prove interruption, retry, duplicate delivery, partial completion, and
+      manual takeover with shared control and artifact stores.
+
+**You see.**
+
+- [ ] Two independent assignments overlap when the host proves parallelism.
+- [ ] A serial host blocks required parallel work before any child starts.
+- [ ] A failed child does not erase sibling evidence or cause duplicate work on
+      replay.
+- [ ] A coordinator restart can reconstruct the child frontier and join state.
+
+**Verify.**
+
+- [ ] Unit tests cover fan-out bounds, stable joins, malformed results, worker
+      errors, capability gaps, replay, and child-task fencing.
+- [ ] Live proof runs two independent tasks with separate workspaces and
+      retained evidence, then interrupts and resumes one child.
+- [ ] Perf proof records peak concurrency and confirms no shared-state race or
+      unbounded process creation.
+
+**Ordering.** `WP2P` precedes `WP3` because public packaging must expose the
+same bounded execution contract that the cutover journey verifies. Durable
+parallel execution precedes automatic failover; automatic failover remains
+out of scope until fencing, idempotency, and reconciliation are proven.
+
 ## Package public surfaces and external overlays (WP3)
 
-**Depends on.** `WP2`. This work package exposes the public entries and makes the external folder boundary usable without importing private material.
+**Depends on.** `WP2P`. This work package exposes the public entries and makes the external folder boundary usable without importing private material.
 
 **Files.**
 

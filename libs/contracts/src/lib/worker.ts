@@ -19,6 +19,12 @@ export interface WorkerBrief {
   readonly forbiddenActions: readonly string[];
 }
 
+export interface WorkerAssignment {
+  readonly id: string;
+  readonly role: WorkerRole;
+  readonly brief: WorkerBrief;
+}
+
 export interface WorkerResult {
   readonly status: WorkerResultStatus;
   readonly summary: string;

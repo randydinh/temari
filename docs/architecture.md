@@ -43,16 +43,20 @@ The same engine runs every change. Risk and ceremony live on the plan:
 A one-line local edit and a risky feature produce the same receipt type.
 
 The first executable slice reconciles semantic `PlanObligations` into this
-single `ExecutionPlan` shape. Serial local work is the default. Stronger
+single `ExecutionPlan` shape. Serial local work is the default, and an
+explicit bounded `parallelism.maxConcurrency` policy enables independent
+worker fan-out when the host proves the `parallelism` capability. The engine
+joins worker results in declaration order and preserves sibling failures; it
+does not yet persist child tasks or recover them after interruption. Stronger
 obligations derive their host requirements (`subagents` for required
-delegation or independent review, `forge` for pull-request delivery) instead
-of asking callers to maintain a second risk or host matrix. The slice proves
-stage order and honest capability failure; durable dispatch, leases, retries,
-watchers, reconciliation, and provider-specific execution remain deferred. The
-runtime package now persists the engine's revision-bound receipt shape without
-owning semantic decisions. A separate run-level harness port now binds native
-run IDs to a Temari run and plan digest; canonical Archon receipt parity is
-still a promotion gate.
+delegation or independent review, `parallelism` for bounded fan-out, `forge`
+for pull-request delivery) instead of asking callers to maintain a second risk
+or host matrix. Durable child dispatch, leases, retries, watchers,
+reconciliation, and provider-specific execution remain deferred. The runtime
+package now persists the engine's revision-bound receipt shape without owning
+semantic decisions. A separate run-level harness port now binds native run IDs
+to a Temari run and plan digest; canonical Archon receipt parity is still a
+promotion gate.
 
 The coordinator slice also exposes a pure daily verification-maintenance
 decision. It can return a typed intent for `maintain-verification-skill` when

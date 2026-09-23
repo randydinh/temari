@@ -6,10 +6,10 @@ the evidence required to call work complete.
 
 The diagrams distinguish the current Nx slice from planned runtime behavior.
 The distinction matters. The repository currently proves a typed plan boundary,
-capability gating, a serial stage runner, bounded knowledge investigation, and
-a managed Archon-harness port. It does not yet claim a complete unattended
-scheduler, universally proven host capabilities, or canonical Archon receipt
-parity.
+capability gating, a serial stage runner, bounded independent worker fan-out,
+bounded knowledge investigation, and a managed Archon-harness port. It does
+not yet claim a complete unattended scheduler, durable child-task recovery,
+universally proven host capabilities, or canonical Archon receipt parity.
 
 ## The ownership model
 
@@ -83,6 +83,7 @@ The plan always contains the fixed stages. Policy fields carry the variation.
 - `requiredCapabilities` is the explicit capability set needed by the plan.
 
 Required delegation or independent review adds the `subagents` capability.
+Bounded fan-out above one worker adds the `parallelism` capability.
 Pull-request delivery adds the `forge` capability. These are derived plan
 requirements rather than hidden scheduler behavior.
 
@@ -217,12 +218,15 @@ The planned runtime boundary owns:
 - The relationship between worker evidence and the active stage.
 
 The current Nx `workflow-engine` implements the serial stage sequence,
-capability checks, and an in-memory revision-bound `WorkflowReceipt`. The
+capability checks, an in-memory revision-bound `WorkflowReceipt`, and a
+bounded independent-worker fan-out with a stable join receipt. The
 `@temari/runtime` package consumes that receipt shape and now provides atomic
 receipt persistence, immutable content-addressed evidence, basic run leases,
 append-only route events, idempotent transitions, and a scheduled execution
-wrapper. It does not yet provide the full durable runtime. The dispatcher
-should be deterministic. It is not an LLM scheduler agent.
+wrapper. It does not yet provide the full durable runtime: child-task
+checkpoints, per-child leases, fencing, retries, cancellation, and
+reconciliation remain incomplete. The dispatcher should be deterministic. It
+is not an LLM scheduler agent.
 
 ### Scheduling path
 
