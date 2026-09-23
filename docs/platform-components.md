@@ -454,6 +454,8 @@ The design still leaves these decisions or gates open:
 
 - Where durable runtime ownership lives when persistence, leases, retries, and
   cancellation become necessary.
+- How cross-machine manual takeover will be operated and what would be required
+  to promote the [automatic failover draft](decisions/2026-09-23-failover-design.md).
 - How live host capability claims are proven rather than declared.
 - Whether Archon becomes a host capability, dispatcher, or separate executor.
 - How public `temari`, `poteto-mode`, and `closeout` entries install and drift
