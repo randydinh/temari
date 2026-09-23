@@ -222,11 +222,12 @@ capability checks, an in-memory revision-bound `WorkflowReceipt`, and a
 bounded independent-worker fan-out with a stable join receipt. The
 `@temari/runtime` package consumes that receipt shape and now provides atomic
 receipt persistence, immutable content-addressed evidence, basic run leases,
-append-only route events, idempotent transitions, and a scheduled execution
-wrapper. It does not yet provide the full durable runtime: child-task
-checkpoints, per-child leases, fencing, retries, cancellation, and
-reconciliation remain incomplete. The dispatcher should be deterministic. It
-is not an LLM scheduler agent.
+append-only route events, idempotent transitions, a scheduled execution
+wrapper, and a local `FileChildTaskStore` with dependency-aware claims,
+per-child leases, fencing epochs, result persistence, and idempotent
+completion. It does not yet provide full executor-backed child checkpoints,
+retry/cancellation policy, workspace manifests, or crash reconciliation. The
+dispatcher should be deterministic. It is not an LLM scheduler agent.
 
 ### Scheduling path
 

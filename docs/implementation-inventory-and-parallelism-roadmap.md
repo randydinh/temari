@@ -1,6 +1,6 @@
 # Temari implementation inventory and parallelism roadmap
 
-Status: merged baseline `95d62d9`; this document records what is actually in
+Status: merged baseline `20428d3`; this document records what is actually in
 the canonical Nx repository and separates it from planned behavior.
 
 ## Lossless implementation inventory
@@ -52,11 +52,16 @@ the canonical Nx repository and separates it from planned behavior.
 - `FileWorkflowRunStore` persists queued/running/terminal state, append-only
   route events, owner leases, expiry-based re-claim, idempotent transitions,
   and per-run filesystem locking.
+- `FileChildTaskStore` persists revision-bound child-task records, dependency
+  edges, attempts, per-child leases, fencing epochs, append-only task events,
+  worker results, and idempotent terminal completion. Claims are dependency
+  aware, and `listReady` reconstructs a stable ready frontier from disk.
 - `executeScheduledAndPersist` composes run creation, claim, dispatch event,
   serial engine execution, receipt persistence, and terminal status transition.
 - This is a mechanical foundation, not yet a complete durable scheduler: it
-  does not persist child tasks, stage checkpoints, cancellation, notifications,
-  retries with policy, reconciliation, or shared-store fencing.
+  does not yet integrate child tasks with the parallel executor, persist stage
+  checkpoints or workspace manifests, apply retry/cancellation policy, send
+  notifications, reconcile crashes, or provide shared-store fencing.
 
 ### Archon and cross-platform delivery
 
@@ -107,10 +112,13 @@ workflow engine. The executor validates briefs and results, never starts work
 when the capability is missing, bounds active workers, collects sibling
 outcomes, and returns a stable declaration-order join.
 
-It deliberately does not claim durable parallel execution. The runtime still
-needs child-task state, dependency/frontier reconstruction, per-child leases,
-fencing, retries, cancellation, artifact/workspace isolation, and a semantic
-join owned by the coordinator.
+It deliberately does not claim complete durable parallel execution. The
+runtime now has a local file-backed child-task slice with dependency-aware
+claims, per-child leases, fencing epochs, result persistence, idempotent
+completion, and ready-frontier reconstruction. It still needs executor
+integration, stage checkpoints, retry/cancellation policy, artifact/workspace
+manifests, failure reconciliation, and a semantic join owned by the
+coordinator.
 
 ## Completion roadmap
 
@@ -118,10 +126,12 @@ join owned by the coordinator.
    primitive deterministic, capability-gated, bounded, evidence-bearing, and
    serializable at the API boundary. Verify concurrency bounds and stable
    joins.
-2. **Durable child-task runtime.** Add parent/child task records, dependency
-   edges, attempts, leases, fencing epochs, idempotency keys, status events,
-   cancellation, and retry policy to the mechanical runtime. Do not let child
-   workers mutate shared semantic state.
+2. **Durable child-task runtime — local slice implemented.** The mechanical
+   runtime now has parent-bound child-task records, dependency edges, attempts,
+   per-child leases, fencing epochs, idempotent completion, status events, and
+   ready-frontier reconstruction in `FileChildTaskStore`. The remaining work
+   is executor integration plus explicit cancellation and retry policy. Do
+   not let child workers mutate shared semantic state.
 3. **Recovery and join proof.** Persist child evidence and workspace manifests;
    rebuild the ready frontier after process/host failure; retry only incomplete
    attempts; join all required results with explicit optional degradation;
