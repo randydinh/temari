@@ -10,15 +10,15 @@ canonical behavior there.
 
 ## Layers
 
-| Layer                           | Package                   | Owns                                                                                                                                                                                                                                             |
-| ------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Conversation and classification | `@temari/temari-core`     | Understand the request, preserve constraints, construct an `ExecutionPlan`, choose skill-dispatch intent, and apply provider-neutral verification policy.                                                                                        |
-| Contracts                       | `@temari/contracts`       | `ExecutionPlan`, host capabilities, worker briefs and results.                                                                                                                                                                                   |
-| Workflow engine                 | `@temari/workflow-engine` | One stage sequence: investigate → plan → build → review → verify → deliver.                                                                                                                                                                      |
-| Host adapters                   | `@temari/host-adapters`   | Capability reports and host-specific tools. Never fake a missing API.                                                                                                                                                                            |
-| Execution harnesses             | `@temari/archon-harness`  | Replaceable run-level start/status/resume port; Archon is a managed implementation, not a host capability or semantic coordinator.                                                                                                               |
-| Mechanical runtime              | `@temari/runtime`         | Atomic/idempotent receipt and child-task persistence, dependency-aware claims, leases, fencing, bounded executor integration, mechanical retries, cancellation gating, reconciliation, and optional parent lease renewal. No semantic decisions. |
-| Overlays                        | install-time only         | Personal skills, OpConnect resources, credentials. Not this git tree.                                                                                                                                                                            |
+| Layer                           | Package                   | Owns                                                                                                                                                                                                                                                      |
+| ------------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Conversation and classification | `@temari/temari-core`     | Understand the request, preserve constraints, construct an `ExecutionPlan`, choose skill-dispatch intent, and apply provider-neutral verification policy.                                                                                                 |
+| Contracts                       | `@temari/contracts`       | `ExecutionPlan`, host capabilities, worker briefs and results.                                                                                                                                                                                            |
+| Workflow engine                 | `@temari/workflow-engine` | One stage sequence: investigate → plan → build → review → verify → deliver.                                                                                                                                                                               |
+| Host adapters                   | `@temari/host-adapters`   | Capability reports and host-specific tools. Never fake a missing API.                                                                                                                                                                                     |
+| Execution harnesses             | `@temari/archon-harness`  | Replaceable run-level start/status/resume port; Archon is a managed implementation, not a host capability or semantic coordinator.                                                                                                                        |
+| Mechanical runtime              | `@temari/runtime`         | Atomic/idempotent receipt and child-task persistence, dependency-aware claims, leases, fencing, bounded executor integration, mechanical retries, cancellation requests/gating, reconciliation, and optional parent lease renewal. No semantic decisions. |
+| Overlays                        | install-time only         | Personal skills, OpConnect resources, credentials. Not this git tree.                                                                                                                                                                                     |
 
 Knowledge providers are a separate boundary. Content Registrar may be a
 provider implementation, but its source registry, extractors, indexes,
@@ -56,6 +56,9 @@ retain a portable execution-evidence envelope for the child group, assignment
 set, declared bound, and observed peak.
 Scheduled execution can opt into an append-only parent lease-renewal heartbeat;
 an expired or fenced renewal fails closed rather than authorizing completion.
+The run store records active cancellation requests separately from terminal
+status; the scheduled wrapper can honor one at its completion boundary without
+claiming to terminate an in-flight handler.
 Stronger obligations derive their host requirements (`subagents` for required
 delegation or independent review, `parallelism` for bounded fan-out, `forge`
 for pull-request delivery) instead of asking callers to maintain a second risk

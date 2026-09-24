@@ -239,6 +239,9 @@ child group, assignment set, declared bound, and observed peak concurrency;
 replay refuses a receipt whose execution evidence does not match the task
 identity. Scheduled execution can opt into an append-only parent lease-renewal
 heartbeat; renewal failure prevents the run from being marked complete. The
+run store also records active cancellation requests and can honor them at the
+completion boundary without claiming to kill an in-flight handler. Complete
+cancellation policy and external notifications remain policy work. The
 dispatcher should be deterministic. It is not an LLM scheduler agent.
 
 ### Scheduling path

@@ -165,6 +165,55 @@ test('renews the parent lease while a scheduled revision is still executing', as
   }
 });
 
+test('honors a durable active-run cancellation request at completion', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-runtime-'));
+  try {
+    const receiptStore = await FileWorkflowReceiptStore.create(
+      join(root, 'receipts'),
+    );
+    const runStore = await FileWorkflowRunStore.create(join(root, 'runs'));
+    let requested = false;
+    const result = await executeScheduledAndPersist({
+      runId: 'scheduled-cancel-1',
+      revision: 'revision-scheduled-cancel-1',
+      plan: minimalPlan('feature'),
+      capabilities: serialCapabilities(),
+      store: receiptStore,
+      runStore,
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      cancellation: { onRequested: 'cancel-before-completion' },
+      handler: async () => {
+        if (!requested) {
+          requested = true;
+          await runStore.cancel({
+            runId: 'scheduled-cancel-1',
+            actor: 'coordinator',
+            idempotencyKey: 'cancel:scheduled-cancel-1',
+          });
+        }
+        return { status: 'PASS' as const, summary: 'handler completed' };
+      },
+    });
+
+    assert.equal(result.claimed, true);
+    assert.equal(result.receipt?.status, 'PASS');
+    assert.equal(result.record.status, 'CANCELLED');
+    assert.deepEqual(
+      (await runStore.events('scheduled-cancel-1')).map((event) => event.type),
+      [
+        'run-created',
+        'run-claimed',
+        'run-event',
+        'run-cancellation-requested',
+        'run-status-changed',
+      ],
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('does not start a duplicate while a lease is active', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-runtime-'));
   try {
