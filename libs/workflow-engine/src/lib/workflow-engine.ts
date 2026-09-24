@@ -29,6 +29,7 @@ export interface StageReceiptResult {
   readonly summary: string;
   readonly evidencePaths?: readonly string[];
   readonly rawLogPath?: string | null;
+  readonly workspaceManifestId?: string | null;
 }
 
 export type StageReceiptHandler = (
@@ -170,6 +171,7 @@ function stageReceipt(
     summary: result.summary,
     evidencePaths: [...(result.evidencePaths ?? [])],
     rawLogPath: result.rawLogPath ?? null,
+    workspaceManifestId: result.workspaceManifestId ?? null,
   };
 }
 

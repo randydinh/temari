@@ -84,9 +84,10 @@ the canonical Nx repository and separates it from planned behavior.
   final receipt publication can therefore resume without replaying completed
   stages.
 - This is a mechanical foundation, not yet a complete durable scheduler: it
-  does not yet wire workspace manifests into serial stage receipts, apply
-  retry/cancellation policy, send notifications, renew parent leases, or
-  provide shared-store fencing.
+  does not yet apply retry/cancellation policy, send notifications, renew
+  parent leases, or provide shared-store fencing. Serial and restartable child
+  execution now bind completed work to local workspace manifests when callers
+  provide explicit workspace bindings; shared artifact recovery remains open.
 
 ### Archon and cross-platform delivery
 
@@ -170,10 +171,11 @@ automatic failover.
    proofs, lock-safe reconciliation, crash-boundary tests, no-rerun recovery,
    receipt replay refusal, and PASS-stage checkpoint/resume are now implemented
    for child tasks, the parent run store, and the serial stage engine. A local
-   workspace manifest capture/verification boundary is also implemented;
-   executor-integrated child evidence publication, serial-stage manifests,
-   retry/cancellation policy, run-level concurrency evidence, artifact recovery,
-   shared storage, and cross-machine failover remain explicit follow-on gates.
+   workspace manifest capture/verification boundary is also implemented for
+   restartable child completion and serial PASS-stage checkpoint resume;
+   retry/cancellation policy, run-level concurrency evidence, provider
+   evidence publication, artifact recovery, shared storage, and cross-machine
+   failover remain explicit follow-on gates.
 4. **Temporal/shared-service proof.** Move the local Stage 1 proof to a shared
    Temporal service and artifact store. Prove builder/coordinator replacement,
    approval recovery, required-concurrency failure, serial fallback only when

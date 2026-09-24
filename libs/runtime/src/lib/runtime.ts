@@ -11,13 +11,19 @@ import {
 } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 
-import type { WorkflowReceipt, WorkflowReceiptStatus } from '@temari/contracts';
+import type {
+  WorkflowReceipt,
+  WorkflowReceiptStatus,
+  WorkflowStageId,
+} from '@temari/contracts';
 import {
   runPlanWithReceipt,
   type WorkflowCheckpoint,
   type ReceiptRunRequest,
+  type StageReceiptResult,
 } from '@temari/workflow-engine';
 import type { MechanicalRunStatus, WorkflowRunStore } from './run-store.js';
+import type { WorkspaceManifestStore } from './workspace-manifest.js';
 
 export interface WorkflowReceiptStore {
   save(receipt: WorkflowReceipt): Promise<string>;
@@ -289,18 +295,108 @@ export class FileWorkflowReceiptStore implements WorkflowReceiptStore {
 export interface ExecuteAndPersistRequest extends ReceiptRunRequest {
   readonly store: WorkflowReceiptStore;
   readonly checkpointStore?: WorkflowCheckpointStore;
+  readonly workspaceManifestStore?: WorkspaceManifestStore;
+  readonly workspaceForStage?: (
+    stage: WorkflowStageId,
+  ) => StageWorkspaceBinding | null | undefined;
+}
+
+/**
+ * Workspace bound to a serial stage. For checkpoint resume, callers should
+ * bind a stable stage workspace; a later stage changing the same root causes
+ * the earlier checkpoint manifest to fail closed.
+ */
+export interface StageWorkspaceBinding {
+  readonly workspaceId: string;
+  readonly root: string;
+}
+
+function workspaceManifestId(stage: WorkflowStageId): string {
+  return stage;
+}
+
+async function persistStageWorkspaceManifest(
+  request: ExecuteAndPersistRequest,
+  stage: WorkflowStageId,
+  now: () => Date,
+): Promise<string | null> {
+  const store = request.workspaceManifestStore;
+  if (!store) return null;
+  const binding = request.workspaceForStage?.(stage);
+  assert(
+    binding,
+    'Workspace manifest storage requires a workspace binding for every stage.',
+  );
+  const manifest = await store.capture({
+    runId: request.runId,
+    revision: request.revision,
+    subjectId: workspaceManifestId(stage),
+    workspaceId: binding.workspaceId,
+    workspaceRoot: binding.root,
+    now: now(),
+  });
+  await store.save(manifest);
+  return workspaceManifestId(stage);
+}
+
+async function verifyCheckpointWorkspaceManifests(
+  request: ExecuteAndPersistRequest,
+  checkpoint: WorkflowCheckpoint | null,
+): Promise<void> {
+  const store = request.workspaceManifestStore;
+  if (!store || !checkpoint) return;
+  await Promise.all(
+    checkpoint.stages.map(async (stage) => {
+      const id = stage.workspaceManifestId;
+      assert(
+        id === workspaceManifestId(stage.stage),
+        `Checkpoint stage ${stage.stage} is missing its workspace manifest ID.`,
+      );
+      const binding = request.workspaceForStage?.(stage.stage);
+      assert(
+        binding,
+        `Checkpoint stage ${stage.stage} has no workspace binding.`,
+      );
+      const manifest = await store.load(request.runId, id);
+      assert(
+        manifest,
+        `Checkpoint stage ${stage.stage} is missing its workspace manifest.`,
+      );
+      assert.equal(manifest.revision, request.revision);
+      assert.equal(manifest.workspaceId, binding.workspaceId);
+      await store.verify(manifest, binding.root);
+    }),
+  );
 }
 
 export async function executeAndPersist(
   request: ExecuteAndPersistRequest,
 ): Promise<WorkflowReceipt> {
+  if (request.workspaceManifestStore) {
+    assert(
+      request.workspaceForStage,
+      'Workspace manifest storage requires workspaceForStage.',
+    );
+  }
   const checkpoint =
     (await request.checkpointStore?.load(request.runId)) ??
     request.checkpoint ??
     null;
+  await verifyCheckpointWorkspaceManifests(request, checkpoint);
   const receipt = await runPlanWithReceipt({
     ...request,
     checkpoint,
+    handler: async (stage, plan): Promise<StageReceiptResult> => {
+      const result = await request.handler(stage, plan);
+      const manifestId = await persistStageWorkspaceManifest(
+        request,
+        stage,
+        request.now ?? (() => new Date()),
+      );
+      return manifestId
+        ? { ...result, workspaceManifestId: manifestId }
+        : result;
+    },
     onStageCheckpoint: async (nextCheckpoint) => {
       await request.checkpointStore?.save(nextCheckpoint);
       await request.onStageCheckpoint?.(nextCheckpoint);

@@ -256,6 +256,105 @@ test('resumes from durable stage checkpoints after final receipt publication fai
   }
 });
 
+test('publishes serial stage manifests and verifies them before checkpoint resume', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-runtime-'));
+  try {
+    const checkpointStore = await FileWorkflowCheckpointStore.create(
+      join(root, 'checkpoints'),
+    );
+    const receiptStore = await FileWorkflowReceiptStore.create(
+      join(root, 'receipts'),
+    );
+    const manifestStore = await FileWorkspaceManifestStore.create(
+      join(root, 'manifests'),
+    );
+    const plan = minimalPlan('feature');
+    const stageRoots = new Map<WorkflowStageId, string>();
+    for (const stage of plan.stages) {
+      const stageRoot = join(root, 'workspaces', stage);
+      await mkdir(stageRoot, { recursive: true });
+      stageRoots.set(stage, stageRoot);
+    }
+    let failPublication = true;
+    let handlerCalls = 0;
+    const request = {
+      runId: 'serial-workspace-1',
+      revision: 'revision-serial-workspace-1',
+      plan,
+      capabilities: serialCapabilities(),
+      checkpointStore,
+      workspaceManifestStore: manifestStore,
+      workspaceForStage: (stage: WorkflowStageId) => ({
+        workspaceId: `workspace-${stage}`,
+        root: stageRoots.get(stage) as string,
+      }),
+      now: sequenceClock(),
+      handler: async (stage: WorkflowStageId) => {
+        handlerCalls += 1;
+        await writeFile(
+          join(stageRoots.get(stage) as string, 'result.txt'),
+          `${stage}\n`,
+        );
+        return { status: 'PASS' as const, summary: `${stage} complete` };
+      },
+    };
+
+    await assert.rejects(
+      executeAndPersist({
+        ...request,
+        store: {
+          save: async () => {
+            if (failPublication) {
+              failPublication = false;
+              throw new Error('receipt publication interrupted');
+            }
+            return 'unused';
+          },
+          load: async () => null,
+        },
+      }),
+      /receipt publication interrupted/,
+    );
+    assert.equal(handlerCalls, plan.stages.length);
+    assert.equal(
+      (await manifestStore.load(request.runId, 'investigate'))?.workspaceId,
+      'workspace-investigate',
+    );
+    assert.equal(
+      (await checkpointStore.load(request.runId))?.stages.at(-1)
+        ?.workspaceManifestId,
+      'deliver',
+    );
+
+    await writeFile(
+      join(stageRoots.get('investigate') as string, 'result.txt'),
+      'changed\n',
+    );
+    await assert.rejects(
+      executeAndPersist({ ...request, store: receiptStore }),
+      /Workspace manifest changed|Workspace file changed/,
+    );
+    assert.equal(handlerCalls, plan.stages.length);
+
+    await writeFile(
+      join(stageRoots.get('investigate') as string, 'result.txt'),
+      'investigate\n',
+    );
+    const receipt = await executeAndPersist({
+      ...request,
+      store: receiptStore,
+    });
+    assert.equal(receipt.status, 'PASS');
+    assert.equal(handlerCalls, plan.stages.length);
+    assert.deepEqual(
+      receipt.stages.map((stage) => stage.workspaceManifestId),
+      plan.stages,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('captures, persists, reloads, and verifies a portable workspace manifest', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-runtime-'));
   try {
