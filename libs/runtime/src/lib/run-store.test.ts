@@ -91,6 +91,48 @@ test('expires a lease before another worker can resume the same revision', async
   }
 });
 
+test('renews an active lease with an append-only witness and idempotent replay', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-run-store-'));
+  try {
+    const store = await FileWorkflowRunStore.create(root);
+    await store.create({
+      runId: 'run-renew-1',
+      revision: 'revision-renew-1',
+      actor: 'coordinator',
+      now: at('2026-09-24T12:00:00.000Z'),
+    });
+    const claimed = await store.claim({
+      runId: 'run-renew-1',
+      owner: 'worker-a',
+      leaseMs: 1_000,
+      now: at('2026-09-24T12:00:01.000Z'),
+    });
+    assert(claimed.record.lease);
+    const renewal = {
+      runId: 'run-renew-1',
+      owner: 'worker-a',
+      leaseToken: claimed.record.lease.token,
+      leaseMs: 30_000,
+      idempotencyKey: 'renew:run-renew-1:1:1',
+      now: at('2026-09-24T12:00:01.500Z'),
+    } as const;
+    const renewed = await store.renew(renewal);
+    const replay = await store.renew({
+      ...renewal,
+      now: at('2026-09-24T12:00:01.900Z'),
+    });
+
+    assert.equal(renewed.lease?.expiresAt, '2026-09-24T12:00:31.500Z');
+    assert.deepEqual(replay, renewed);
+    assert.deepEqual(
+      (await store.events('run-renew-1')).map((event) => event.type),
+      ['run-created', 'run-claimed', 'run-lease-renewed'],
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('serializes concurrent claims so one owner receives the lease', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-run-store-'));
   try {
