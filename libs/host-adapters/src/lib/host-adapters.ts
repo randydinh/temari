@@ -15,11 +15,21 @@ function report(
   notes: HostCapabilityReport['notes'] = {},
 ): HostCapabilityReport {
   const have = new Set(available);
+  const provenance = Object.fromEntries(
+    available.map((capability) => [
+      capability,
+      {
+        status: 'unproven' as const,
+        source: `${host} adapter declaration`,
+      },
+    ]),
+  ) as HostCapabilityReport['provenance'];
   return {
     host,
     available,
     missing: HOST_CAPABILITIES.filter((capability) => !have.has(capability)),
     notes,
+    provenance,
   };
 }
 
