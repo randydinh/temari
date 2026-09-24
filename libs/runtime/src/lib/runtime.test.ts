@@ -4,9 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { minimalPlan } from '@temari/contracts';
+import { minimalPlan, type WorkflowStageId } from '@temari/contracts';
 
 import {
+  FileWorkflowCheckpointStore,
   FileWorkflowReceiptStore,
   executeAndPersist,
   executeScheduledAndPersist,
@@ -182,6 +183,65 @@ test('stores immutable content-addressed evidence and verifies it on reload', as
     await assert.rejects(
       store.load({ ...reference, sha256: '0'.repeat(64) }),
       /Evidence hash changed|Evidence path is outside|ENOENT/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('resumes from durable stage checkpoints after final receipt publication fails', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-runtime-'));
+  try {
+    const checkpointStore = await FileWorkflowCheckpointStore.create(
+      join(root, 'checkpoints'),
+    );
+    const receiptStore = await FileWorkflowReceiptStore.create(
+      join(root, 'receipts'),
+    );
+    let failPublication = true;
+    let handlerCalls = 0;
+    const request = {
+      runId: 'checkpoint-runtime-1',
+      revision: 'revision-checkpoint-runtime-1',
+      plan: minimalPlan('feature'),
+      capabilities: serialCapabilities(),
+      checkpointStore,
+      now: sequenceClock(),
+      handler: (stage: WorkflowStageId) => {
+        handlerCalls += 1;
+        return { status: 'PASS' as const, summary: `${stage} complete` };
+      },
+    };
+
+    await assert.rejects(
+      executeAndPersist({
+        ...request,
+        store: {
+          save: async () => {
+            if (failPublication) {
+              failPublication = false;
+              throw new Error('receipt publication interrupted');
+            }
+            return 'unused';
+          },
+          load: async () => null,
+        },
+      }),
+      /receipt publication interrupted/,
+    );
+    assert.equal((await checkpointStore.load(request.runId))?.stages.length, 6);
+    assert.equal(handlerCalls, 6);
+
+    const receipt = await executeAndPersist({
+      ...request,
+      store: receiptStore,
+    });
+
+    assert.equal(receipt.status, 'PASS');
+    assert.equal(handlerCalls, 6, 'completed stages must not be replayed');
+    assert.deepEqual(
+      (await receiptStore.load(request.runId))?.stages,
+      receipt.stages,
     );
   } finally {
     await rm(root, { recursive: true, force: true });

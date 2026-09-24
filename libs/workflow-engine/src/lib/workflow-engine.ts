@@ -36,6 +36,21 @@ export type StageReceiptHandler = (
   plan: ExecutionPlan,
 ) => Promise<StageReceiptResult> | StageReceiptResult;
 
+/**
+ * Durable prefix state for a workflow that has not yet published its final
+ * receipt. Only PASS stages belong in a checkpoint; a non-pass stage must be
+ * retried rather than treated as completed.
+ */
+export interface WorkflowCheckpoint {
+  readonly schema: 1;
+  readonly runId: string;
+  readonly revision: string;
+  readonly plan: ExecutionPlan;
+  readonly capabilities: HostCapabilityReport;
+  readonly startedAt: string;
+  readonly stages: readonly WorkflowStageReceipt[];
+}
+
 export interface ParallelWorkerOutcome {
   readonly assignment: WorkerAssignment;
   readonly result: WorkerResult | null;
@@ -95,6 +110,10 @@ export interface ReceiptRunRequest {
   readonly capabilities: HostCapabilityReport;
   readonly handler: StageReceiptHandler;
   readonly now?: () => Date;
+  readonly checkpoint?: WorkflowCheckpoint | null;
+  readonly onStageCheckpoint?: (
+    checkpoint: WorkflowCheckpoint,
+  ) => Promise<void> | void;
 }
 
 export class CapabilityError extends Error {
@@ -154,19 +173,75 @@ function stageReceipt(
   };
 }
 
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => canonical(item)).join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'undefined';
+}
+
+function assertCheckpoint(
+  request: ReceiptRunRequest,
+  declaredStages: readonly WorkflowStageId[],
+): readonly WorkflowStageReceipt[] {
+  const checkpoint = request.checkpoint;
+  if (!checkpoint) return [];
+  if (checkpoint.schema !== 1)
+    throw new Error('Unsupported workflow checkpoint schema.');
+  if (checkpoint.runId !== request.runId) {
+    throw new Error('Workflow checkpoint run ID does not match the request.');
+  }
+  if (checkpoint.revision !== request.revision) {
+    throw new Error('Workflow checkpoint revision does not match the request.');
+  }
+  if (canonical(checkpoint.plan) !== canonical(request.plan)) {
+    throw new Error('Workflow checkpoint plan does not match the request.');
+  }
+  if (canonical(checkpoint.capabilities) !== canonical(request.capabilities)) {
+    throw new Error(
+      'Workflow checkpoint capabilities do not match the request.',
+    );
+  }
+  if (!Number.isFinite(Date.parse(checkpoint.startedAt))) {
+    throw new Error('Workflow checkpoint start time is invalid.');
+  }
+  if (checkpoint.stages.length > declaredStages.length) {
+    throw new Error('Workflow checkpoint contains too many stages.');
+  }
+  checkpoint.stages.forEach((stage, index) => {
+    if (stage.stage !== declaredStages[index]) {
+      throw new Error('Workflow checkpoint stages are not a declared prefix.');
+    }
+    if (stage.status !== 'PASS') {
+      throw new Error('Workflow checkpoints may contain only PASS stages.');
+    }
+  });
+  return [...checkpoint.stages];
+}
+
 /**
  * Run one plan while returning a revision-bound in-memory receipt.
  *
- * This adds evidence shape without adding persistence or a second lifecycle.
- * Capability gaps are represented as BLOCKED receipts so callers can retain
- * the reason instead of losing it to an exception.
+ * This adds evidence shape and an optional durable checkpoint hook without
+ * adding a second lifecycle. Capability gaps are represented as BLOCKED
+ * receipts so callers can retain the reason instead of losing it to an
+ * exception.
  */
 export async function runPlanWithReceipt(
   request: ReceiptRunRequest,
 ): Promise<WorkflowReceipt> {
   const now = request.now ?? (() => new Date());
-  const started = now();
-  const stages: WorkflowStageReceipt[] = [];
+  const declaredStages =
+    request.plan.stages.length > 0 ? request.plan.stages : DEFAULT_STAGES;
+  const checkpointStages = assertCheckpoint(request, declaredStages);
+  const startedAt = request.checkpoint?.startedAt ?? now().toISOString();
+  const stages: WorkflowStageReceipt[] = [...checkpointStages];
   const missing = missingCapabilities(
     request.plan.requiredCapabilities,
     request.capabilities.available,
@@ -180,7 +255,7 @@ export async function runPlanWithReceipt(
       revision: request.revision,
       plan: request.plan,
       capabilities: request.capabilities,
-      startedAt: started.toISOString(),
+      startedAt,
       completedAt: completed.toISOString(),
       status: 'BLOCKED',
       stages,
@@ -193,31 +268,11 @@ export async function runPlanWithReceipt(
     };
   }
 
-  const declaredStages =
-    request.plan.stages.length > 0 ? request.plan.stages : DEFAULT_STAGES;
-
-  for (const stage of declaredStages) {
+  for (const stage of declaredStages.slice(checkpointStages.length)) {
     const stageStarted = now();
+    let result: StageReceiptResult;
     try {
-      const result = await request.handler(stage, request.plan);
-      const stageCompleted = now();
-      stages.push(stageReceipt(stage, stageStarted, stageCompleted, result));
-
-      if (result.status !== 'PASS') {
-        const completed = now();
-        return {
-          schema: 1,
-          runId: request.runId,
-          revision: request.revision,
-          plan: request.plan,
-          capabilities: request.capabilities,
-          startedAt: started.toISOString(),
-          completedAt: completed.toISOString(),
-          status: result.status,
-          stages,
-          failure: null,
-        };
-      }
+      result = await request.handler(stage, request.plan);
     } catch (error) {
       const completed = now();
       stages.push(
@@ -232,7 +287,7 @@ export async function runPlanWithReceipt(
         revision: request.revision,
         plan: request.plan,
         capabilities: request.capabilities,
-        startedAt: started.toISOString(),
+        startedAt,
         completedAt: completed.toISOString(),
         status: 'BLOCKED',
         stages,
@@ -244,6 +299,36 @@ export async function runPlanWithReceipt(
         },
       };
     }
+
+    const stageCompleted = now();
+    const receipt = stageReceipt(stage, stageStarted, stageCompleted, result);
+    stages.push(receipt);
+
+    if (result.status !== 'PASS') {
+      const completed = now();
+      return {
+        schema: 1,
+        runId: request.runId,
+        revision: request.revision,
+        plan: request.plan,
+        capabilities: request.capabilities,
+        startedAt,
+        completedAt: completed.toISOString(),
+        status: result.status,
+        stages,
+        failure: null,
+      };
+    }
+
+    await request.onStageCheckpoint?.({
+      schema: 1,
+      runId: request.runId,
+      revision: request.revision,
+      plan: request.plan,
+      capabilities: request.capabilities,
+      startedAt,
+      stages: [...stages],
+    });
   }
 
   const completed = now();
@@ -253,7 +338,7 @@ export async function runPlanWithReceipt(
     revision: request.revision,
     plan: request.plan,
     capabilities: request.capabilities,
-    startedAt: started.toISOString(),
+    startedAt,
     completedAt: completed.toISOString(),
     status: 'PASS',
     stages,
