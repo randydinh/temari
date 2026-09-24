@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
+import {
+  mkdtemp,
+  mkdir,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -14,6 +21,7 @@ import {
 } from './runtime.js';
 import { FileWorkflowRunStore } from './run-store.js';
 import { FileEvidenceStore } from './evidence-store.js';
+import { FileWorkspaceManifestStore } from './workspace-manifest.js';
 
 test('persists and reloads a revision-bound receipt idempotently', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-runtime-'));
@@ -242,6 +250,76 @@ test('resumes from durable stage checkpoints after final receipt publication fai
     assert.deepEqual(
       (await receiptStore.load(request.runId))?.stages,
       receipt.stages,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('captures, persists, reloads, and verifies a portable workspace manifest', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-runtime-'));
+  try {
+    const workspaceRoot = join(root, 'workspace');
+    await mkdir(join(workspaceRoot, 'nested'), { recursive: true });
+    await writeFile(join(workspaceRoot, 'README.md'), 'workspace\n');
+    await writeFile(join(workspaceRoot, 'nested', 'result.txt'), 'result\n');
+    const store = await FileWorkspaceManifestStore.create(
+      join(root, 'manifests'),
+    );
+    const manifest = await store.capture({
+      runId: 'manifest-1',
+      revision: 'revision-manifest-1',
+      subjectId: 'worker-1',
+      workspaceId: 'workspace-a',
+      workspaceRoot,
+      now: new Date('2026-09-24T12:00:00.000Z'),
+    });
+
+    assert.deepEqual(
+      manifest.entries.map((entry) => entry.path),
+      ['README.md', 'nested/result.txt'],
+    );
+    const path = await store.save(manifest);
+    assert.equal(
+      path,
+      join(
+        await realpath(join(root, 'manifests')),
+        'manifest-1.worker-1.workspace.json',
+      ),
+    );
+    assert.deepEqual(await store.load('manifest-1', 'worker-1'), manifest);
+    await store.verify(manifest, workspaceRoot);
+
+    await writeFile(join(workspaceRoot, 'README.md'), 'changed\n');
+    await assert.rejects(
+      store.verify(manifest, workspaceRoot),
+      /Workspace manifest changed|Workspace file changed/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('refuses a conflicting workspace manifest for the same run subject', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-runtime-'));
+  try {
+    const workspaceRoot = join(root, 'workspace');
+    await mkdir(workspaceRoot, { recursive: true });
+    await writeFile(join(workspaceRoot, 'result.txt'), 'one\n');
+    const store = await FileWorkspaceManifestStore.create(
+      join(root, 'manifests'),
+    );
+    const manifest = await store.capture({
+      runId: 'manifest-2',
+      revision: 'revision-manifest-2',
+      subjectId: 'worker-2',
+      workspaceId: 'workspace-b',
+      workspaceRoot,
+    });
+    await store.save(manifest);
+    await assert.rejects(
+      store.save({ ...manifest, workspaceId: 'different-workspace' }),
+      /collision or mutation/,
     );
   } finally {
     await rm(root, { recursive: true, force: true });
