@@ -133,6 +133,79 @@ test('renews an active lease with an append-only witness and idempotent replay',
   }
 });
 
+test('cancels queued runs and durably requests cancellation for active runs', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-run-store-'));
+  try {
+    const store = await FileWorkflowRunStore.create(root);
+    await store.create({
+      runId: 'run-cancel-queued',
+      revision: 'revision-cancel-queued',
+      actor: 'coordinator',
+      now: at('2026-09-24T12:00:00.000Z'),
+    });
+    const queued = await store.cancel({
+      runId: 'run-cancel-queued',
+      actor: 'coordinator',
+      idempotencyKey: 'cancel:queued',
+      now: at('2026-09-24T12:00:01.000Z'),
+    });
+    assert.equal(queued.status, 'CANCELLED');
+    assert.equal(
+      (
+        await store.claim({
+          runId: 'run-cancel-queued',
+          owner: 'worker-a',
+          leaseMs: 30_000,
+          now: at('2026-09-24T12:00:02.000Z'),
+        })
+      ).claimed,
+      false,
+    );
+
+    await store.create({
+      runId: 'run-cancel-active',
+      revision: 'revision-cancel-active',
+      actor: 'coordinator',
+      now: at('2026-09-24T12:00:00.000Z'),
+    });
+    const claimed = await store.claim({
+      runId: 'run-cancel-active',
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      now: at('2026-09-24T12:00:01.000Z'),
+    });
+    const requested = await store.cancel({
+      runId: 'run-cancel-active',
+      actor: 'coordinator',
+      idempotencyKey: 'cancel:active',
+      now: at('2026-09-24T12:00:02.000Z'),
+    });
+    assert.equal(requested.status, 'RUNNING');
+    assert.equal(await store.cancellationRequested('run-cancel-active'), true);
+    assert(claimed.record.lease);
+    const cancelled = await store.transition({
+      runId: 'run-cancel-active',
+      owner: 'worker-a',
+      leaseToken: claimed.record.lease.token,
+      status: 'CANCELLED',
+      idempotencyKey: 'complete:cancelled',
+      now: at('2026-09-24T12:00:03.000Z'),
+    });
+    assert.equal(cancelled.status, 'CANCELLED');
+    assert.deepEqual(
+      (await store.events('run-cancel-active')).map((event) => event.type),
+      [
+        'run-created',
+        'run-claimed',
+        'run-cancellation-requested',
+        'run-status-changed',
+      ],
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('serializes concurrent claims so one owner receives the lease', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-run-store-'));
   try {

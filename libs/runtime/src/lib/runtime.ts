@@ -414,6 +414,10 @@ export interface ExecuteScheduledAndPersistRequest extends ExecuteAndPersistRequ
   readonly leaseRenewal?: {
     readonly intervalMs: number;
   };
+  /** Honor a durable parent cancellation request at the completion boundary. */
+  readonly cancellation?: {
+    readonly onRequested: 'cancel-before-completion';
+  };
 }
 
 export interface ScheduledExecutionResult {
@@ -513,15 +517,21 @@ export async function executeScheduledAndPersist(
     if (renewalInFlight) await renewalInFlight;
     if (renewalTimer) clearInterval(renewalTimer);
     if (renewalError) throw renewalError;
+    const cancellationRequested =
+      request.cancellation?.onRequested === 'cancel-before-completion' &&
+      (await request.runStore.cancellationRequested(request.runId));
     const record = await request.runStore.transition({
       runId: request.runId,
       owner: request.owner,
       leaseToken,
-      status: mechanicalStatus(receipt.status),
+      status: cancellationRequested
+        ? 'CANCELLED'
+        : mechanicalStatus(receipt.status),
       idempotencyKey: `complete:${request.runId}:${attempt}`,
       payload: {
         receipt: `${request.runId}.receipt.json`,
         receiptStatus: receipt.status,
+        cancellationRequested,
       },
       now: now(),
     });
@@ -530,13 +540,16 @@ export async function executeScheduledAndPersist(
     if (renewalTimer) clearInterval(renewalTimer);
     if (renewalInFlight) await renewalInFlight;
     try {
+      const cancellationRequested =
+        request.cancellation?.onRequested === 'cancel-before-completion' &&
+        (await request.runStore.cancellationRequested(request.runId));
       await request.runStore.transition({
         runId: request.runId,
         owner: request.owner,
         leaseToken,
-        status: 'FAILED',
+        status: cancellationRequested ? 'CANCELLED' : 'FAILED',
         idempotencyKey: `failed:${request.runId}:${attempt}`,
-        payload: { error: errorMessage(error) },
+        payload: { error: errorMessage(error), cancellationRequested },
         now: now(),
       });
     } catch (transitionError) {

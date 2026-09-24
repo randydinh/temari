@@ -41,6 +41,7 @@ export type RunEventType =
   | 'run-created'
   | 'run-claimed'
   | 'run-lease-renewed'
+  | 'run-cancellation-requested'
   | 'run-event'
   | 'run-status-changed';
 
@@ -84,6 +85,13 @@ export interface RenewRunLeaseRequest {
   readonly now?: Date;
 }
 
+export interface CancelRunRequest {
+  readonly runId: string;
+  readonly actor: string;
+  readonly idempotencyKey: string;
+  readonly now?: Date;
+}
+
 export interface AppendRunEventRequest {
   readonly runId: string;
   readonly actor: string;
@@ -109,6 +117,8 @@ export interface WorkflowRunStore {
   reconcile(runId: string): Promise<MechanicalRunRecord | null>;
   claim(request: ClaimRunRequest): Promise<ClaimRunResult>;
   renew(request: RenewRunLeaseRequest): Promise<MechanicalRunRecord>;
+  cancel(request: CancelRunRequest): Promise<MechanicalRunRecord>;
+  cancellationRequested(runId: string): Promise<boolean>;
   appendEvent(request: AppendRunEventRequest): Promise<RunEvent>;
   transition(request: TransitionRunRequest): Promise<MechanicalRunRecord>;
   events(runId: string): Promise<readonly RunEvent[]>;
@@ -222,6 +232,7 @@ function parseEvent(value: unknown): RunEvent {
     event.type === 'run-created' ||
       event.type === 'run-claimed' ||
       event.type === 'run-lease-renewed' ||
+      event.type === 'run-cancellation-requested' ||
       event.type === 'run-event' ||
       event.type === 'run-status-changed',
   );
@@ -298,6 +309,7 @@ function assertRunHistory(
   let lastClaim: RunEvent | null = null;
   let lastLease: RunEvent | null = null;
   let lastStatusChange: RunEvent | null = null;
+  let cancellationRequested = false;
   for (const event of events.slice(1)) {
     if (event.type === 'run-claimed') {
       attempt += 1;
@@ -315,6 +327,13 @@ function assertRunHistory(
       assert(typeof event.payload.expiresAt === 'string');
       assert(Number.isFinite(Date.parse(event.payload.expiresAt)));
       lastLease = event;
+      continue;
+    }
+    if (event.type === 'run-cancellation-requested') {
+      assert.equal(status, 'RUNNING');
+      assert(!cancellationRequested, 'Run cancellation was requested twice.');
+      assert.equal(event.payload.requested, true);
+      cancellationRequested = true;
       continue;
     }
     if (event.type === 'run-status-changed') {
@@ -605,6 +624,102 @@ export class FileWorkflowRunStore implements WorkflowRunStore {
         nextEvents: [...events, event],
       });
       return next;
+    });
+  }
+
+  async cancel(request: CancelRunRequest): Promise<MechanicalRunRecord> {
+    assertRunId(request.runId);
+    assertText(request.actor, 'Actor');
+    assertText(request.idempotencyKey, 'Idempotency key');
+    return this.withLock(request.runId, async () => {
+      await this.reconcileLocked(request.runId);
+      const record = await this.requireRecord(request.runId);
+      if (isTerminal(record.status)) return record;
+      const events = await this.readEvents(request.runId, record.revision);
+      const existing = events.find(
+        (event) => event.idempotencyKey === request.idempotencyKey,
+      );
+      if (existing) {
+        assert(
+          existing.type === 'run-cancellation-requested' ||
+            (existing.type === 'run-status-changed' &&
+              existing.payload.reason === 'cancellation-requested'),
+          'Idempotency key was used for another run event.',
+        );
+        return record;
+      }
+      if (events.some((event) => event.type === 'run-cancellation-requested')) {
+        return record;
+      }
+      const now = request.now ?? new Date();
+      assertDate(now);
+      if (record.status === 'QUEUED') {
+        const next: MechanicalRunRecord = {
+          ...record,
+          status: 'CANCELLED',
+          updatedAt: now.toISOString(),
+          lease: null,
+        };
+        const event = this.createEvent({
+          sequence: events.length + 1,
+          runId: request.runId,
+          revision: record.revision,
+          actor: request.actor,
+          type: 'run-status-changed',
+          idempotencyKey: request.idempotencyKey,
+          payload: {
+            from: record.status,
+            to: 'CANCELLED',
+            reason: 'cancellation-requested',
+          },
+          now,
+        });
+        await this.commitTransitionLocked({
+          runId: request.runId,
+          baseState: record,
+          baseEvents: events,
+          nextState: next,
+          nextEvents: [...events, event],
+        });
+        return next;
+      }
+
+      assert.equal(record.status, 'RUNNING');
+      assert(record.lease, 'Running run lease is missing.');
+      const event = this.createEvent({
+        sequence: events.length + 1,
+        runId: request.runId,
+        revision: record.revision,
+        actor: request.actor,
+        type: 'run-cancellation-requested',
+        idempotencyKey: request.idempotencyKey,
+        payload: { requested: true },
+        now,
+      });
+      await this.commitTransitionLocked({
+        runId: request.runId,
+        baseState: record,
+        baseEvents: events,
+        nextState: record,
+        nextEvents: [...events, event],
+      });
+      return record;
+    });
+  }
+
+  async cancellationRequested(runId: string): Promise<boolean> {
+    assertRunId(runId);
+    return this.withLock(runId, async () => {
+      await this.reconcileLocked(runId);
+      const record = await this.requireRecord(runId);
+      if (record.status === 'CANCELLED') return true;
+      const events = await this.readEvents(runId, record.revision);
+      return events.some(
+        (event) =>
+          event.type === 'run-cancellation-requested' ||
+          (event.type === 'run-status-changed' &&
+            event.payload.reason === 'cancellation-requested'),
+      );
     });
   }
 
