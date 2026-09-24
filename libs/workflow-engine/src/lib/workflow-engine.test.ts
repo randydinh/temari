@@ -275,6 +275,13 @@ test('fans out independent workers within the declared concurrency bound', async
   assert.equal(receipt.status, 'PASS');
   assert.equal(receipt.peakConcurrency, 2);
   assert.equal(peak, 2);
+  assert.deepEqual(receipt.executionEvidence, {
+    schema: 1,
+    groupId: null,
+    assignmentIds: assignments.map((assignment) => assignment.id),
+    maxConcurrency: 2,
+    peakConcurrency: 2,
+  });
   assert.deepEqual(
     receipt.outcomes.map((outcome) => outcome.assignment.id),
     ['worker-1', 'worker-2', 'worker-3', 'worker-4'],

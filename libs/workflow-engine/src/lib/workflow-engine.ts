@@ -77,8 +77,18 @@ export interface ParallelWorkerReceipt {
   readonly status: WorkflowReceiptStatus;
   readonly maxConcurrency: number;
   readonly peakConcurrency: number;
+  /** Optional portable evidence describing the execution measured above. */
+  readonly executionEvidence?: ParallelExecutionEvidence;
   readonly outcomes: readonly ParallelWorkerOutcome[];
   readonly failure: ParallelWorkerFailure | null;
+}
+
+export interface ParallelExecutionEvidence {
+  readonly schema: 1;
+  readonly groupId: string | null;
+  readonly assignmentIds: readonly string[];
+  readonly maxConcurrency: number;
+  readonly peakConcurrency: number;
 }
 
 export interface ParallelWorkerRunRequest {
@@ -172,6 +182,20 @@ function stageReceipt(
     evidencePaths: [...(result.evidencePaths ?? [])],
     rawLogPath: result.rawLogPath ?? null,
     workspaceManifestId: result.workspaceManifestId ?? null,
+  };
+}
+
+function executionEvidence(
+  assignments: readonly WorkerAssignment[],
+  maxConcurrency: number,
+  peakConcurrency: number,
+): ParallelExecutionEvidence {
+  return {
+    schema: 1,
+    groupId: null,
+    assignmentIds: assignments.map((assignment) => assignment.id),
+    maxConcurrency,
+    peakConcurrency,
   };
 }
 
@@ -501,6 +525,7 @@ export async function runParallelWorkers(
       status: 'BLOCKED',
       maxConcurrency: 0,
       peakConcurrency: 0,
+      executionEvidence: executionEvidence(request.assignments, 0, 0),
       outcomes: [],
       failure: {
         kind: 'plan-gap',
@@ -543,6 +568,11 @@ export async function runParallelWorkers(
       status: 'BLOCKED',
       maxConcurrency,
       peakConcurrency: 0,
+      executionEvidence: executionEvidence(
+        request.assignments,
+        maxConcurrency,
+        0,
+      ),
       outcomes: [],
       failure: {
         kind: 'capability-gap',
@@ -604,6 +634,11 @@ export async function runParallelWorkers(
     status: joined.status,
     maxConcurrency,
     peakConcurrency: peak,
+    executionEvidence: executionEvidence(
+      request.assignments,
+      maxConcurrency,
+      peak,
+    ),
     outcomes: joined.outcomes,
     failure: joined.failure,
   };

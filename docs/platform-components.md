@@ -234,7 +234,10 @@ yet provide provider-specific log capture, cancellation policy, or shared-store
 reconciliation. A provider-neutral callback can publish worker evidence through
 the immutable content-addressed store; child replay verifies those portable
 references before reuse. An explicit bounded mechanical retry policy is
-available for child handlers. The
+available for child handlers. Completed parallel receipts also retain the
+child group, assignment set, declared bound, and observed peak concurrency;
+replay refuses a receipt whose execution evidence does not match the task
+identity. The
 dispatcher should be deterministic. It is not an LLM scheduler agent.
 
 ### Scheduling path

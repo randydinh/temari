@@ -177,6 +177,31 @@ function assertMaxAttempts(value: number): void {
   );
 }
 
+function assertParallelExecutionEvidence(receipt: ParallelWorkerReceipt): void {
+  const evidence = receipt.executionEvidence;
+  if (evidence === undefined) return;
+  assert.equal(evidence.schema, 1);
+  assert(evidence.groupId === null || typeof evidence.groupId === 'string');
+  if (evidence.groupId !== null)
+    assertText(evidence.groupId, 'Evidence group ID');
+  assert(Array.isArray(evidence.assignmentIds));
+  const assignmentIds = new Set<string>();
+  for (const assignmentId of evidence.assignmentIds) {
+    assertText(assignmentId, 'Evidence assignment ID');
+    assert(
+      !assignmentIds.has(assignmentId),
+      'Evidence assignment IDs are duplicated.',
+    );
+    assignmentIds.add(assignmentId);
+  }
+  assert(Number.isInteger(evidence.maxConcurrency));
+  assert(evidence.maxConcurrency >= 0);
+  assert(Number.isInteger(evidence.peakConcurrency));
+  assert(evidence.peakConcurrency >= 0);
+  assert.equal(evidence.maxConcurrency, receipt.maxConcurrency);
+  assert.equal(evidence.peakConcurrency, receipt.peakConcurrency);
+}
+
 function receiptBody(receipt: ParallelWorkerReceipt): string {
   return canonical(receipt);
 }
@@ -211,6 +236,7 @@ function parseStored(value: unknown): ParallelWorkerReceiptRecord {
   assert.equal(stored.receipt.schema, 1);
   assert(typeof stored.receipt.runId === 'string');
   assert(typeof stored.receipt.revision === 'string');
+  assertParallelExecutionEvidence(stored.receipt);
   return {
     receipt: stored.receipt,
     binding: {
@@ -233,6 +259,7 @@ export class FileParallelWorkerReceiptStore implements ParallelWorkerReceiptStor
     receipt: ParallelWorkerReceipt,
     binding: ParallelWorkerReceiptBinding,
   ): Promise<string> {
+    assertParallelExecutionEvidence(receipt);
     assertRunId(receipt.runId);
     assertText(receipt.revision, 'Receipt revision');
     const path = join(this.root, `${receipt.runId}.parallel.receipt.json`);
@@ -310,6 +337,33 @@ function taskIdentity(
         `pwt-${digest({ groupId, index, assignmentId: assignment.id }).slice(0, 48)}`,
     ),
   };
+}
+
+function assertReplayExecutionEvidence(
+  receipt: ParallelWorkerReceipt,
+  identity: TaskIdentity,
+  assignments: readonly WorkerAssignment[],
+): void {
+  const evidence = receipt.executionEvidence;
+  assert(
+    evidence,
+    'Parallel receipt is missing execution evidence; refusing stale replay.',
+  );
+  assert.deepEqual(
+    evidence.assignmentIds,
+    assignments.map((assignment) => assignment.id),
+    'Parallel receipt execution assignment evidence changed; refusing stale replay.',
+  );
+  const expectedGroupId =
+    receipt.failure?.kind === 'plan-gap' ||
+    receipt.failure?.kind === 'capability-gap'
+      ? null
+      : identity.groupId;
+  assert.equal(
+    evidence.groupId,
+    expectedGroupId,
+    'Parallel receipt execution group evidence changed; refusing stale replay.',
+  );
 }
 
 function cancellationTaskIds(
@@ -401,6 +455,7 @@ function blockedReceipt(
   request: ExecuteRestartableParallelWorkersRequest,
   failure: ParallelWorkerFailure,
   maxConcurrency: number,
+  assignmentIds: readonly string[],
   now: () => Date,
 ): ParallelWorkerReceipt {
   const startedAt = now().toISOString();
@@ -413,6 +468,13 @@ function blockedReceipt(
     status: 'BLOCKED',
     maxConcurrency,
     peakConcurrency: 0,
+    executionEvidence: {
+      schema: 1,
+      groupId: null,
+      assignmentIds: [...assignmentIds],
+      maxConcurrency,
+      peakConcurrency: 0,
+    },
     outcomes: [],
     failure,
   };
@@ -752,6 +814,11 @@ export async function executeRestartableParallelWorkers(
       },
       'Parallel receipt binding changed; refusing stale replay.',
     );
+    assertReplayExecutionEvidence(
+      replay.receipt,
+      identity,
+      request.assignments,
+    );
     if (
       replay.receipt.failure?.kind === 'plan-gap' ||
       replay.receipt.failure?.kind === 'capability-gap'
@@ -797,7 +864,13 @@ export async function executeRestartableParallelWorkers(
 
   const failure = capabilityFailure(request.plan, request.capabilities);
   if (failure) {
-    const receipt = blockedReceipt(request, failure, maxConcurrency, now);
+    const receipt = blockedReceipt(
+      request,
+      failure,
+      maxConcurrency,
+      request.assignments.map((assignment) => assignment.id),
+      now,
+    );
     const binding = {
       groupId: identity.groupId,
       fingerprint: identity.fingerprint,
@@ -937,6 +1010,13 @@ export async function executeRestartableParallelWorkers(
       status: joined.status,
       maxConcurrency,
       peakConcurrency,
+      executionEvidence: {
+        schema: 1,
+        groupId: identity.groupId,
+        assignmentIds: request.assignments.map((assignment) => assignment.id),
+        maxConcurrency,
+        peakConcurrency,
+      },
       outcomes: joined.outcomes,
       failure: joined.failure,
     };
