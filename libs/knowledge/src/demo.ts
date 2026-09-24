@@ -2,9 +2,7 @@ import assert from 'node:assert/strict';
 import { lstat, readFile, realpath, writeFile } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { runPlan } from '@temari/workflow-engine';
 import {
-  minimalPlan,
   type InvestigationRequest,
   type InvestigationTask,
   type KnowledgeAssessment,
@@ -25,7 +23,7 @@ const help = `Knowledge demo (explicit local files; no model or semantic approva
   pnpm nx run knowledge:demo -- collect --input /absolute/input.json [--resume /absolute/knowledge-HASH.json] [--assessment /absolute/assessment.json]
 
 prepare copies only manifest snapshots into a new mkdtemp source/state, registers/refreshes those copies, and prints config/source/input paths.
-collect uses input {config, task, brief, request} and runs investigateDesignUpdate from the existing runPlan investigation callback.
+collect uses input {config, task, brief, request} and runs the explicit investigation operation.
 Without --assessment it saves a BLOCKED checkpoint for a reader; --assessment supplies a KnowledgeAssessment JSON grounded in returned context evidence IDs.
 For an existing prepared state, write input.json directly; no setup/refresh occurs during collect.
 The callback API also supports inline assessment: investigateDesignUpdate({brief, task, request, provider, resumeFrom?, assess}).
@@ -169,28 +167,19 @@ async function main(): Promise<void> {
     request: InvestigationRequest;
   };
   const provider = await createLocalRegistrar(input.config);
-  let result: WorkerResult | undefined;
-  await runPlan(
-    { ...minimalPlan('investigation'), stages: ['investigate'] },
-    [],
-    async () => {
-      result = await investigateDesignUpdate({
-        ...input,
-        provider,
-        resumeFrom: args.get('--resume'),
-        assess: async () => {
-          const path = args.get('--assessment');
-          if (!path)
-            throw new Error(
-              'Reader assessment pending; use the saved context evidence and resume with --assessment',
-            );
-          return JSON.parse(
-            await readFile(path, 'utf8'),
-          ) as KnowledgeAssessment;
-        },
-      });
+  const result: WorkerResult = await investigateDesignUpdate({
+    ...input,
+    provider,
+    resumeFrom: args.get('--resume'),
+    assess: async () => {
+      const path = args.get('--assessment');
+      if (!path)
+        throw new Error(
+          'Reader assessment pending; use the saved context evidence and resume with --assessment',
+        );
+      return JSON.parse(await readFile(path, 'utf8')) as KnowledgeAssessment;
     },
-  );
+  });
   process.stdout.write(
     JSON.stringify({ provider: provider.identity, result }, null, 2) + '\n',
   );
