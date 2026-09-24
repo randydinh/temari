@@ -52,6 +52,7 @@ export interface V41ProfileRecord {
 
 export interface V41ProfileIdentity {
   readonly sourceRevision: string;
+  /** SHA-256 of the profile JSON with canonical LF line endings. */
   readonly profileSha256: string;
 }
 
@@ -84,6 +85,8 @@ export interface V41PlanBoundary {
   readonly reason: string | null;
 }
 
+export type V41RouteReplayStatus = 'supported' | 'blocked' | 'incompatible';
+
 export interface V41RouteEvent {
   readonly version: 1;
   readonly kind: 'route';
@@ -97,6 +100,32 @@ export interface V41RouteEvent {
   readonly assignments: Readonly<Record<string, string>>;
   readonly fromProfileId: string | null;
   readonly invalidatedRequirementIds: readonly string[];
+}
+
+export interface V41RouteReplayInput {
+  readonly parsed: V41ParsedProfile;
+  readonly event: V41RouteEvent;
+}
+
+export interface V41RouteReplayState {
+  readonly routeVersion: 1;
+  readonly profileVersion: 1;
+  readonly profilePath: string;
+  readonly profileId: string;
+  readonly profileSha256: string;
+  readonly capabilities: readonly string[];
+  readonly assignments: Readonly<Record<string, string>>;
+  readonly fromProfileId: string | null;
+  readonly invalidatedRequirementIds: readonly string[];
+}
+
+export interface V41RouteReplay {
+  readonly status: V41RouteReplayStatus;
+  readonly source: V41ProfileIdentity;
+  readonly profileId: string;
+  readonly route: V41Route;
+  readonly state: V41RouteReplayState | null;
+  readonly reason: string | null;
 }
 
 export type V41ParseResult<T> =
@@ -161,6 +190,10 @@ function sha256(value: string): string {
 }
 
 function canonicalPlaybookText(value: string): string {
+  return value.replace(/\r\n?/g, '\n');
+}
+
+function canonicalProfileText(value: string): string {
   return value.replace(/\r\n?/g, '\n');
 }
 
@@ -502,7 +535,7 @@ export function parseV41Profile(
       SOURCE_REVISION,
     );
     const profileText = text(input.profileText, 'profileText');
-    const profileSha256 = sha256(profileText);
+    const profileSha256 = sha256(canonicalProfileText(profileText));
     if (input.expectedProfileSha256 !== undefined) {
       const expectedProfileSha256 = text(
         input.expectedProfileSha256,
@@ -549,6 +582,109 @@ function sameSet(left: readonly string[], right: readonly string[]): boolean {
   return (
     left.length === right.length && left.every((value) => right.includes(value))
   );
+}
+
+function routeReplayResult(
+  input: V41RouteReplayInput,
+  status: V41RouteReplayStatus,
+  reason: string | null,
+  state: V41RouteReplayState | null,
+): V41RouteReplay {
+  return {
+    status,
+    source: input.parsed.identity,
+    profileId: input.parsed.profile.id,
+    route: input.parsed.profile.route,
+    state,
+    reason,
+  };
+}
+
+/**
+ * Validate the v4.1 route event before projecting it into Nx run state.
+ *
+ * The event's local profile path and historical invalidation list are data,
+ * not instructions for the successor checkout. Replay is supported only
+ * when the version, profile identity, declared capabilities, and complete
+ * stage assignment set are unambiguous. No assignment or invalidation is
+ * regenerated at this boundary.
+ */
+export function assessV41RouteReplay(
+  input: V41RouteReplayInput,
+): V41RouteReplay {
+  const { parsed, event } = input;
+  const profile = parsed.profile;
+
+  if (event.version !== 1 || event.kind !== 'route') {
+    return routeReplayResult(
+      input,
+      'incompatible',
+      'Route event version or kind is not supported.',
+      null,
+    );
+  }
+
+  if (profile.version !== 1) {
+    return routeReplayResult(
+      input,
+      'incompatible',
+      'Profile version is not supported by the v4.1 replay boundary.',
+      null,
+    );
+  }
+
+  if (event.profileId !== profile.id) {
+    return routeReplayResult(
+      input,
+      'blocked',
+      'Route event profileId does not match the parsed profile.',
+      null,
+    );
+  }
+
+  if (event.profileSha256 !== parsed.identity.profileSha256) {
+    return routeReplayResult(
+      input,
+      'blocked',
+      'Route event profileSha256 does not match the parsed profile identity.',
+      null,
+    );
+  }
+
+  const undeclaredCapability = event.capabilities.find(
+    (capability) => !profile.hostCapabilities.includes(capability),
+  );
+  if (undeclaredCapability !== undefined) {
+    return routeReplayResult(
+      input,
+      'blocked',
+      `Route event claims a capability not declared by the profile: ${undeclaredCapability}.`,
+      null,
+    );
+  }
+
+  const sourceStageIds = profile.stages.map((stage) => stage.id);
+  const assignedStageIds = Object.keys(event.assignments);
+  if (!sameSet(sourceStageIds, assignedStageIds)) {
+    return routeReplayResult(
+      input,
+      'blocked',
+      'Route event assignments do not cover exactly the parsed profile stages.',
+      null,
+    );
+  }
+
+  return routeReplayResult(input, 'supported', null, {
+    routeVersion: event.version,
+    profileVersion: profile.version,
+    profilePath: event.profilePath,
+    profileId: event.profileId,
+    profileSha256: event.profileSha256,
+    capabilities: [...event.capabilities],
+    assignments: { ...event.assignments },
+    fromProfileId: event.fromProfileId,
+    invalidatedRequirementIds: [...event.invalidatedRequirementIds],
+  });
 }
 
 function boundaryResult(
