@@ -21,6 +21,8 @@ export interface WorkflowStageReceipt {
   readonly summary: string;
   readonly evidencePaths: readonly string[];
   readonly rawLogPath: string | null;
+  /** Portable ID for the immutable workspace manifest captured at completion. */
+  readonly workspaceManifestId?: string | null;
 }
 
 /**

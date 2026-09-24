@@ -227,9 +227,11 @@ wrapper, and a local `FileChildTaskStore` with dependency-aware claims,
 per-child leases, fencing epochs, result persistence, and idempotent
 completion. It now provides durable PASS-stage checkpoints, bounded workspace
 manifest capture/verification, child manifest publication during restartable
-parallel execution, and local recovery of parent and child state/event
-boundaries. It does not yet provide executor-integrated worker evidence
-publication, retry/cancellation policy, or shared-store reconciliation. The
+parallel execution, and serial-stage manifest publication and verification
+before checkpoint resume. Callers must provide explicit bindings for the
+workspace associated with each child or stage; this local boundary does not
+yet provide executor-integrated provider evidence publication,
+retry/cancellation policy, or shared-store reconciliation. The
 dispatcher should be deterministic. It is not an LLM scheduler agent.
 
 ### Scheduling path
@@ -269,9 +271,10 @@ concurrent actors from serializing shared mutable state into an ambiguous
 receipt.
 
 The receipt remains an in-memory semantic boundary in the engine. Persistence,
-content-addressed evidence, leases, idempotency, and route events are runtime
-concerns. Cancellation, durable notifications, executor-integrated workspace
-manifests, and shared store reconciliation remain open runtime work.
+content-addressed evidence, leases, idempotency, route events, and local
+workspace-manifest verification are runtime concerns. Cancellation, durable
+notifications, provider evidence capture, and shared store reconciliation
+remain open runtime work.
 
 ## 5. Execution harnesses and Archon
 
