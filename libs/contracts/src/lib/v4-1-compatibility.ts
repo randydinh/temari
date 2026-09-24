@@ -110,6 +110,7 @@ export interface V41RouteReplayInput {
 export interface V41RouteReplayState {
   readonly routeVersion: 1;
   readonly profileVersion: 1;
+  readonly sourceRevision: string;
   readonly profilePath: string;
   readonly profileId: string;
   readonly profileSha256: string;
@@ -677,6 +678,7 @@ export function assessV41RouteReplay(
   return routeReplayResult(input, 'supported', null, {
     routeVersion: event.version,
     profileVersion: profile.version,
+    sourceRevision: parsed.identity.sourceRevision,
     profilePath: event.profilePath,
     profileId: event.profileId,
     profileSha256: event.profileSha256,

@@ -167,6 +167,7 @@ test('replays a valid route while preserving assignments and historical invalida
   assert.deepEqual(replay.state, {
     routeVersion: 1,
     profileVersion: 1,
+    sourceRevision: '959c8f7be3d7b684207d9e626263d41540d5ecdc',
     profilePath: '/old/checkout/profile.json',
     profileId: 'feature-v1',
     profileSha256:

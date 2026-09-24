@@ -6,3 +6,4 @@ export * from './lib/evidence-store.js';
 export * from './lib/workspace-manifest.js';
 export * from './lib/harness-selector.js';
 export * from './lib/harness-runtime.js';
+export * from './lib/v4-1-route-replay.js';
