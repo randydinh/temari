@@ -154,6 +154,80 @@ test('stops at a non-pass stage and preserves its evidence', async () => {
   assert.equal(receipt.stages.at(-1)?.evidencePaths[0], 'evidence/verify.txt');
 });
 
+test('resumes after a verified pass-stage checkpoint without replaying its prefix', async () => {
+  const plan = minimalPlan('feature');
+  const checkpoints: import('./workflow-engine.js').WorkflowCheckpoint[] = [];
+  const firstCalls: string[] = [];
+  const first = await runPlanWithReceipt({
+    runId: 'checkpoint-1',
+    revision: 'revision-checkpoint-1',
+    plan,
+    capabilities: serialCapabilities(),
+    now: sequenceClock(),
+    handler: (stage) => {
+      firstCalls.push(stage);
+      if (stage === 'build') throw new Error('builder interrupted');
+      return { status: 'PASS', summary: `${stage} complete` };
+    },
+    onStageCheckpoint: (checkpoint) => {
+      checkpoints.push(checkpoint);
+    },
+  });
+
+  assert.equal(first.status, 'BLOCKED');
+  assert.deepEqual(firstCalls, ['investigate', 'plan', 'build']);
+  assert.deepEqual(
+    checkpoints.at(-1)?.stages.map((stage) => stage.stage),
+    ['investigate', 'plan'],
+  );
+
+  const resumedCalls: string[] = [];
+  const resumed = await runPlanWithReceipt({
+    runId: 'checkpoint-1',
+    revision: 'revision-checkpoint-1',
+    plan,
+    capabilities: serialCapabilities(),
+    checkpoint: checkpoints.at(-1),
+    now: sequenceClock(),
+    handler: (stage) => {
+      resumedCalls.push(stage);
+      return { status: 'PASS', summary: `${stage} complete` };
+    },
+  });
+
+  assert.equal(resumed.status, 'PASS');
+  assert.deepEqual(resumedCalls, ['build', 'review', 'verify', 'deliver']);
+  assert.deepEqual(
+    resumed.stages.map((stage) => stage.stage),
+    ['investigate', 'plan', 'build', 'review', 'verify', 'deliver'],
+  );
+});
+
+test('rejects a checkpoint bound to a different plan', async () => {
+  const plan = minimalPlan('feature');
+  const checkpoint: import('./workflow-engine.js').WorkflowCheckpoint = {
+    schema: 1,
+    runId: 'checkpoint-2',
+    revision: 'revision-checkpoint-2',
+    plan,
+    capabilities: serialCapabilities(),
+    startedAt: '2026-09-22T12:00:00.000Z',
+    stages: [],
+  };
+
+  await assert.rejects(
+    runPlanWithReceipt({
+      runId: checkpoint.runId,
+      revision: checkpoint.revision,
+      plan: minimalPlan('bug'),
+      capabilities: serialCapabilities(),
+      checkpoint,
+      handler: () => ({ status: 'PASS', summary: 'must not run' }),
+    }),
+    /checkpoint plan does not match/i,
+  );
+});
+
 test('converts handler failures into a blocked receipt', async () => {
   const receipt = await runPlanWithReceipt({
     runId: 'run-4',

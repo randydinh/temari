@@ -6,6 +6,7 @@ import {
   open,
   readFile,
   realpath,
+  rename,
   unlink,
 } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
@@ -13,6 +14,7 @@ import { isAbsolute, join } from 'node:path';
 import type { WorkflowReceipt, WorkflowReceiptStatus } from '@temari/contracts';
 import {
   runPlanWithReceipt,
+  type WorkflowCheckpoint,
   type ReceiptRunRequest,
 } from '@temari/workflow-engine';
 import type { MechanicalRunStatus, WorkflowRunStore } from './run-store.js';
@@ -26,6 +28,12 @@ interface StoredReceipt {
   readonly schema: 1;
   readonly sha256: string;
   readonly receipt: WorkflowReceipt;
+}
+
+interface StoredCheckpoint {
+  readonly schema: 1;
+  readonly sha256: string;
+  readonly checkpoint: WorkflowCheckpoint;
 }
 
 function canonical(value: unknown): string {
@@ -66,6 +74,20 @@ function storedBody(receipt: WorkflowReceipt): string {
   return canonical(stored);
 }
 
+function checkpointBody(checkpoint: WorkflowCheckpoint): string {
+  return canonical(checkpoint);
+}
+
+function storedCheckpointBody(checkpoint: WorkflowCheckpoint): string {
+  const body = checkpointBody(checkpoint);
+  const stored: StoredCheckpoint = {
+    schema: 1,
+    sha256: digest(body),
+    checkpoint,
+  };
+  return canonical(stored);
+}
+
 function parseStored(value: unknown): WorkflowReceipt {
   assert(
     value && typeof value === 'object',
@@ -85,6 +107,127 @@ function parseStored(value: unknown): WorkflowReceipt {
     'Stored receipt run ID is missing.',
   );
   return stored.receipt;
+}
+
+function parseStoredCheckpoint(value: unknown): WorkflowCheckpoint {
+  assert(
+    value && typeof value === 'object',
+    'Stored workflow checkpoint must be an object.',
+  );
+  const stored = value as Partial<StoredCheckpoint>;
+  assert(stored.schema === 1, 'Unsupported stored checkpoint schema.');
+  assert(
+    typeof stored.sha256 === 'string',
+    'Stored checkpoint hash is missing.',
+  );
+  assert(
+    stored.checkpoint && typeof stored.checkpoint === 'object',
+    'Stored checkpoint body is missing.',
+  );
+  assert.equal(stored.sha256, digest(checkpointBody(stored.checkpoint)));
+  const checkpoint = stored.checkpoint;
+  assert.equal(checkpoint.schema, 1);
+  assertRunId(checkpoint.runId);
+  assert(
+    typeof checkpoint.revision === 'string' && checkpoint.revision.length > 0,
+    'Checkpoint revision is required.',
+  );
+  assert(Number.isFinite(Date.parse(checkpoint.startedAt)));
+  assert(Array.isArray(checkpoint.stages));
+  let previousStage: string | null = null;
+  for (const stage of checkpoint.stages) {
+    assert(stage && typeof stage === 'object');
+    assert(typeof stage.stage === 'string');
+    assert.equal(stage.status, 'PASS');
+    assert(
+      previousStage === null || previousStage !== stage.stage,
+      'Checkpoint stages must not repeat.',
+    );
+    previousStage = stage.stage;
+  }
+  return checkpoint;
+}
+
+export interface WorkflowCheckpointStore {
+  save(checkpoint: WorkflowCheckpoint): Promise<string>;
+  load(runId: string): Promise<WorkflowCheckpoint | null>;
+}
+
+export class FileWorkflowCheckpointStore implements WorkflowCheckpointStore {
+  private constructor(private readonly root: string) {}
+
+  static async create(root: string): Promise<FileWorkflowCheckpointStore> {
+    assert(isAbsolute(root), 'Checkpoint store root must be absolute.');
+    await mkdir(root, { recursive: true, mode: 0o700 });
+    return new FileWorkflowCheckpointStore(await realpath(root));
+  }
+
+  async save(checkpoint: WorkflowCheckpoint): Promise<string> {
+    assertRunId(checkpoint.runId);
+    assert(checkpoint.revision.length > 0, 'Checkpoint revision is required.');
+    const path = join(this.root, `${checkpoint.runId}.checkpoint.json`);
+    const existing = await this.load(checkpoint.runId);
+    if (existing) {
+      assert.equal(existing.revision, checkpoint.revision);
+      assert.equal(existing.startedAt, checkpoint.startedAt);
+      assert.equal(
+        checkpointBody(existing),
+        checkpointBody({
+          ...checkpoint,
+          stages: existing.stages,
+        }),
+        'Checkpoint identity changed.',
+      );
+      assert(
+        existing.stages.length <= checkpoint.stages.length,
+        'Checkpoint history cannot move backwards.',
+      );
+      assert.deepEqual(
+        existing.stages,
+        checkpoint.stages.slice(0, existing.stages.length),
+        'Checkpoint history is not an append-only prefix.',
+      );
+    }
+
+    const body = storedCheckpointBody(checkpoint);
+    const temporary = join(
+      this.root,
+      `.${checkpoint.runId}.${randomUUID()}.tmp`,
+    );
+    const file = await open(temporary, 'wx', 0o600);
+    try {
+      try {
+        await file.writeFile(body);
+        await file.sync();
+      } finally {
+        await file.close();
+      }
+      await rename(temporary, path);
+    } finally {
+      await unlink(temporary).catch(() => undefined);
+    }
+    return path;
+  }
+
+  async load(runId: string): Promise<WorkflowCheckpoint | null> {
+    assertRunId(runId);
+    try {
+      const checkpoint = parseStoredCheckpoint(
+        JSON.parse(
+          await readFile(join(this.root, `${runId}.checkpoint.json`), 'utf8'),
+        ),
+      );
+      assert.equal(
+        checkpoint.runId,
+        runId,
+        'Checkpoint filename and body disagree.',
+      );
+      return checkpoint;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      throw error;
+    }
+  }
 }
 
 export class FileWorkflowReceiptStore implements WorkflowReceiptStore {
@@ -145,12 +288,24 @@ export class FileWorkflowReceiptStore implements WorkflowReceiptStore {
 
 export interface ExecuteAndPersistRequest extends ReceiptRunRequest {
   readonly store: WorkflowReceiptStore;
+  readonly checkpointStore?: WorkflowCheckpointStore;
 }
 
 export async function executeAndPersist(
   request: ExecuteAndPersistRequest,
 ): Promise<WorkflowReceipt> {
-  const receipt = await runPlanWithReceipt(request);
+  const checkpoint =
+    (await request.checkpointStore?.load(request.runId)) ??
+    request.checkpoint ??
+    null;
+  const receipt = await runPlanWithReceipt({
+    ...request,
+    checkpoint,
+    onStageCheckpoint: async (nextCheckpoint) => {
+      await request.checkpointStore?.save(nextCheckpoint);
+      await request.onStageCheckpoint?.(nextCheckpoint);
+    },
+  });
   await request.store.save(receipt);
   return receipt;
 }
