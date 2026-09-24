@@ -207,6 +207,46 @@ test('stops mechanical retries at the declared attempt bound', async () => {
   }
 });
 
+test('durably cancels queued assignments and keeps the join incomplete', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
+  try {
+    const childStore = await FileChildTaskStore.create(join(root, 'children'));
+    const receiptStore = await FileParallelWorkerReceiptStore.create(
+      join(root, 'receipts'),
+    );
+    let calls = 0;
+    const execution = await executeRestartableParallelWorkers({
+      runId: 'parallel-runtime-cancel-1',
+      revision: 'revision-parallel-runtime-cancel-1',
+      plan: parallelPlan('feature', 1),
+      capabilities: parallelCapabilities(),
+      assignments: workerAssignments(2),
+      childStore,
+      receiptStore,
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      cancellation: { assignmentIds: ['worker-2'] },
+      now: fixedClock(),
+      handler: () => {
+        calls += 1;
+        return result('first assignment complete');
+      },
+    });
+
+    assert.equal(execution.state, 'BLOCKED');
+    assert.equal(execution.receipt, null);
+    assert.equal(calls, 1);
+    assert.deepEqual(
+      execution.pending.map((item) => item.reason),
+      ['cancellation-gated'],
+    );
+    assert.equal(execution.tasks[1]?.status, 'CANCELLED');
+    assert.equal(await receiptStore.load('parallel-runtime-cancel-1'), null);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('publishes and verifies a workspace manifest for every completed child', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
   try {

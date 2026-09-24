@@ -146,10 +146,11 @@ after every expected child is terminal and valid. Crash-boundary tests prove
 that a repaired terminal child is not rerun and that stale receipts are not
 replayed when expected state is missing. This remains a local child-task proof:
 it deliberately does not claim parent-run lease renewal, automatic failover,
-shared control or artifact storage, cancellation policy, workspace manifests
-integrated with serial stage completion, or cross-machine execution. A bounded
-local mechanical retry policy is implemented for explicitly configured child
-attempts; it does not imply automatic failover or semantic retry decisions.
+shared control or artifact storage, cancellation policy, or cross-machine
+execution. Local
+mechanical retry and cancellation gating are implemented for explicitly
+configured child attempts/assignments; they do not imply automatic failover,
+semantic retry decisions, or a complete cancellation policy.
 
 The parent control plane now has the corresponding local recovery boundary.
 Create, claim, route-event append, transition, load, and event observation all
