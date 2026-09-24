@@ -77,7 +77,8 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 - [x] Map each carried behavior to source revision, target package, external boundary, omitted behavior, verification, and rollback in `docs/migrations/v4.1-to-nx-matrix.md`.
 - [ ] Define the compatibility boundary between v4.1 profile and route records and the Nx `ExecutionPlan` version.
 - [ ] Make the workflow stage sequence canonical instead of caller-controlled. Preserve explicit optional, required, and blocked capability outcomes.
-- [ ] Add capability provenance so a declared adapter does not satisfy a strict gate without a proof source.
+- [ ] Apply capability provenance to the strict workflow execution gate after a host journey supplies proof.
+- [x] Add capability provenance to host reports and a strict migration helper; keep legacy execution gates unchanged until live proof exists.
 
 **You see.**
 

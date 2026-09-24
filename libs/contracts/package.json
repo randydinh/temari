@@ -24,7 +24,7 @@
       "test": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "node --import @swc-node/register/esm-register --test libs/contracts/src/lib/worker.test.ts libs/contracts/src/lib/v4-1-compatibility.test.ts",
+          "command": "node --import @swc-node/register/esm-register --test libs/contracts/src/lib/worker.test.ts libs/contracts/src/lib/capabilities.test.ts libs/contracts/src/lib/v4-1-compatibility.test.ts",
           "cwd": "{workspaceRoot}"
         }
       }
