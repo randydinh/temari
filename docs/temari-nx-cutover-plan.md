@@ -75,7 +75,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 **Build.**
 
 - [x] Map each carried behavior to source revision, target package, external boundary, omitted behavior, verification, and rollback in `docs/migrations/v4.1-to-nx-matrix.md`.
-- [ ] Define the compatibility boundary between v4.1 profile and route records and the Nx `ExecutionPlan` version.
+- [x] Define the compatibility boundary between the verified v4.1 feature profile and Nx `ExecutionPlan` version 1. Preserve source stages, verify canonical playbook text, and block unresolved publish gates.
 - [ ] Make the workflow stage sequence canonical instead of caller-controlled. Preserve explicit optional, required, and blocked capability outcomes.
 - [ ] Apply capability provenance to the strict workflow execution gate after a host journey supplies proof.
 - [x] Add capability provenance to host reports and a strict migration helper; keep legacy execution gates unchanged until live proof exists.
@@ -391,7 +391,7 @@ artifacts. They are not migration inputs or runtime dependencies.
 
 The architecture comparison tested two candidates. Candidate A keeps the Nx repository as a core-first control plane and manages hosts, providers, plugins, and OpConnect as external overlays. Candidate B promotes runtime, QA, host implementations, and providers to first-class Nx projects. Candidate A is selected for the first increments. Candidate B remains a gated expansion after an unattended journey and a second real consumer earn the shared runtime cost.
 
-Unproven items remain the public package install, host journeys, capability provenance, v4.1 compatibility mapping, durable runtime semantics, rollback, and external folder management.
+Unproven items remain the public package install, host journeys, the remaining v4.1 lightweight and route-replay mappings, durable runtime semantics, rollback, and external folder management.
 
 ## Appendix B. Architecture and folder structure
 
