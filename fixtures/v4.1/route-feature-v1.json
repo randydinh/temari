@@ -6,7 +6,7 @@
   "actor": "coordinator",
   "profilePath": "/old/checkout/profile.json",
   "profileId": "feature-v1",
-  "profileSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "profileSha256": "12f4e650dd15d1d5dd9ee7bd4c2af39c0e872155714e76f1f1e024beb516b0a3",
   "capabilities": ["subagents", "forge"],
   "assignments": {
     "shape": "coordinator",

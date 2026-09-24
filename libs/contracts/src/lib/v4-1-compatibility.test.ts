@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import {
+  assessV41RouteReplay,
   assessV41PlanBoundary,
   parseV41Profile,
   parseV41RouteEvent,
@@ -122,7 +123,10 @@ test('parses a route event without treating its local path as portable identity'
   assert.equal(result.status, 'valid');
   if (result.status !== 'valid') return;
   assert.equal(result.value.profilePath, '/old/checkout/profile.json');
-  assert.equal(result.value.profileSha256, 'a'.repeat(64));
+  assert.equal(
+    result.value.profileSha256,
+    '12f4e650dd15d1d5dd9ee7bd4c2af39c0e872155714e76f1f1e024beb516b0a3',
+  );
   assert.deepEqual(result.value.assignments, {
     shape: 'coordinator',
     build: 'builder',
@@ -130,6 +134,111 @@ test('parses a route event without treating its local path as portable identity'
     review: 'reviewer',
     delivery: 'coordinator',
   });
+});
+
+test('replays a valid route while preserving assignments and historical invalidations', async () => {
+  const event = parseV41RouteEvent(
+    JSON.parse(await fixture('route-feature-v1.json')),
+  );
+  assert.equal(event.status, 'valid');
+  if (event.status !== 'valid') return;
+
+  const replay = assessV41RouteReplay({
+    parsed: await parsedFeatureProfile(),
+    event: event.value,
+  });
+
+  assert.equal(replay.status, 'supported');
+  assert.deepEqual(replay.state, {
+    routeVersion: 1,
+    profileVersion: 1,
+    profilePath: '/old/checkout/profile.json',
+    profileId: 'feature-v1',
+    profileSha256:
+      '12f4e650dd15d1d5dd9ee7bd4c2af39c0e872155714e76f1f1e024beb516b0a3',
+    capabilities: ['subagents', 'forge'],
+    assignments: {
+      shape: 'coordinator',
+      build: 'builder',
+      verify: 'coordinator',
+      review: 'reviewer',
+      delivery: 'coordinator',
+    },
+    fromProfileId: null,
+    invalidatedRequirementIds: [],
+  });
+});
+
+test('refuses route replay when profile identity or stage coverage is ambiguous', async () => {
+  const event = parseV41RouteEvent(
+    JSON.parse(await fixture('route-feature-v1.json')),
+  );
+  assert.equal(event.status, 'valid');
+  if (event.status !== 'valid') return;
+  const parsed = await parsedFeatureProfile();
+
+  const mismatchedIdentity = assessV41RouteReplay({
+    parsed,
+    event: { ...event.value, profileId: 'other-profile' },
+  });
+  assert.equal(mismatchedIdentity.status, 'blocked');
+  assert.equal(mismatchedIdentity.state, null);
+  assert.equal(
+    mismatchedIdentity.reason,
+    'Route event profileId does not match the parsed profile.',
+  );
+
+  const incompleteAssignments = assessV41RouteReplay({
+    parsed,
+    event: {
+      ...event.value,
+      assignments: Object.fromEntries(
+        Object.entries(event.value.assignments).filter(
+          ([stageId]) => stageId !== 'delivery',
+        ),
+      ),
+    },
+  });
+  assert.equal(incompleteAssignments.status, 'blocked');
+  assert.equal(incompleteAssignments.state, null);
+});
+
+test('rejects a route event that claims a capability outside the profile', async () => {
+  const event = parseV41RouteEvent(
+    JSON.parse(await fixture('route-feature-v1.json')),
+  );
+  assert.equal(event.status, 'valid');
+  if (event.status !== 'valid') return;
+
+  const replay = assessV41RouteReplay({
+    parsed: await parsedFeatureProfile(),
+    event: {
+      ...event.value,
+      capabilities: [...event.value.capabilities, 'parallelism'],
+    },
+  });
+
+  assert.equal(replay.status, 'blocked');
+  assert.equal(
+    replay.reason,
+    'Route event claims a capability not declared by the profile: parallelism.',
+  );
+});
+
+test('marks a future route event version incompatible before replay', async () => {
+  const event = parseV41RouteEvent(
+    JSON.parse(await fixture('route-feature-v1.json')),
+  );
+  assert.equal(event.status, 'valid');
+  if (event.status !== 'valid') return;
+
+  const replay = assessV41RouteReplay({
+    parsed: await parsedFeatureProfile(),
+    event: { ...event.value, version: 2 } as never,
+  });
+
+  assert.equal(replay.status, 'incompatible');
+  assert.equal(replay.state, null);
 });
 
 test('rejects a route event with an unsupported version or invalid assignment', async () => {
