@@ -84,8 +84,8 @@ the canonical Nx repository and separates it from planned behavior.
   final receipt publication can therefore resume without replaying completed
   stages.
 - This is a mechanical foundation, not yet a complete durable scheduler: it
-  does not yet apply retry/cancellation policy, send notifications, renew
-  parent leases, or provide shared-store fencing. Serial and restartable child
+  does not yet apply cancellation policy, send notifications, renew parent
+  leases, or provide shared-store fencing. Serial and restartable child
   execution now bind completed work to local workspace manifests when callers
   provide explicit workspace bindings; shared artifact recovery remains open.
 
@@ -146,8 +146,10 @@ after every expected child is terminal and valid. Crash-boundary tests prove
 that a repaired terminal child is not rerun and that stale receipts are not
 replayed when expected state is missing. This remains a local child-task proof:
 it deliberately does not claim parent-run lease renewal, automatic failover,
-shared control or artifact storage, retry/cancellation policy, workspace
-manifests integrated with serial stage completion, or cross-machine execution.
+shared control or artifact storage, cancellation policy, workspace manifests
+integrated with serial stage completion, or cross-machine execution. A bounded
+local mechanical retry policy is implemented for explicitly configured child
+attempts; it does not imply automatic failover or semantic retry decisions.
 
 The parent control plane now has the corresponding local recovery boundary.
 Create, claim, route-event append, transition, load, and event observation all
@@ -173,9 +175,9 @@ automatic failover.
    for child tasks, the parent run store, and the serial stage engine. A local
    workspace manifest capture/verification boundary is also implemented for
    restartable child completion and serial PASS-stage checkpoint resume;
-   retry/cancellation policy, run-level concurrency evidence, provider
-   evidence publication, artifact recovery, shared storage, and cross-machine
-   failover remain explicit follow-on gates.
+   bounded local retry is implemented; cancellation policy, run-level
+   concurrency evidence, provider evidence publication, artifact recovery,
+   shared storage, and cross-machine failover remain explicit follow-on gates.
 4. **Temporal/shared-service proof.** Move the local Stage 1 proof to a shared
    Temporal service and artifact store. Prove builder/coordinator replacement,
    approval recovery, required-concurrency failure, serial fallback only when

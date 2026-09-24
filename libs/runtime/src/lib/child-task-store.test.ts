@@ -156,6 +156,91 @@ test('persists FAILED child outcomes without synthetic worker evidence', async (
   }
 });
 
+test('requeues mechanical failures with an append-only retry event', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-child-task-store-'));
+  try {
+    const store = await FileChildTaskStore.create(root);
+    await store.create({
+      taskId: 'child-retry-1',
+      runId: 'run-retry-1',
+      revision: 'revision-retry-1',
+      dependsOn: [],
+      actor: 'coordinator',
+      now: at('2026-09-24T12:00:00.000Z'),
+    });
+    const claimed = await store.claim({
+      taskId: 'child-retry-1',
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      now: at('2026-09-24T12:00:01.000Z'),
+    });
+    assert(claimed.record.lease);
+    const failed = await store.complete({
+      taskId: 'child-retry-1',
+      owner: 'worker-a',
+      leaseToken: claimed.record.lease.token,
+      fencingEpoch: claimed.record.lease.fencingEpoch,
+      status: 'FAILED',
+      idempotencyKey: 'complete:child-retry-1:1',
+      error: 'first attempt failed',
+      now: at('2026-09-24T12:00:02.000Z'),
+    });
+
+    const queued = await store.retry({
+      taskId: 'child-retry-1',
+      actor: 'coordinator',
+      idempotencyKey: 'retry:child-retry-1:1',
+      now: at('2026-09-24T12:00:03.000Z'),
+    });
+    assert.equal(failed.status, 'FAILED');
+    assert.equal(queued.status, 'QUEUED');
+    assert.equal(queued.attempt, 1);
+    assert.equal(queued.result, null);
+    assert.equal(queued.error, null);
+    assert.deepEqual(
+      await store.retry({
+        taskId: 'child-retry-1',
+        actor: 'coordinator',
+        idempotencyKey: 'retry:child-retry-1:1',
+        now: at('2026-09-24T12:00:04.000Z'),
+      }),
+      queued,
+    );
+
+    const secondClaim = await store.claim({
+      taskId: 'child-retry-1',
+      owner: 'worker-b',
+      leaseMs: 30_000,
+      now: at('2026-09-24T12:00:05.000Z'),
+    });
+    assert(secondClaim.record.lease);
+    const succeeded = await store.complete({
+      taskId: 'child-retry-1',
+      owner: 'worker-b',
+      leaseToken: secondClaim.record.lease.token,
+      fencingEpoch: secondClaim.record.lease.fencingEpoch,
+      status: 'SUCCEEDED',
+      idempotencyKey: 'complete:child-retry-1:2',
+      result: result('PASS', 'second attempt passed'),
+      now: at('2026-09-24T12:00:06.000Z'),
+    });
+    assert.equal(succeeded.status, 'SUCCEEDED');
+    assert.deepEqual(
+      (await store.events('child-retry-1')).map((event) => event.type),
+      [
+        'task-created',
+        'task-claimed',
+        'task-completed',
+        'task-retried',
+        'task-claimed',
+        'task-completed',
+      ],
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('preserves semantic BLOCKED as a normal worker result', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-child-task-store-'));
   try {

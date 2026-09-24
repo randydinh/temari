@@ -91,6 +91,10 @@ export interface ExecuteRestartableParallelWorkersRequest {
   readonly workspaceForAssignment?: (
     assignment: WorkerAssignment,
   ) => WorkspaceBinding | null | undefined;
+  readonly retryPolicy?: {
+    /** Total mechanical handler attempts allowed for one child, including the first. */
+    readonly maxAttempts: number;
+  };
   readonly maxConcurrency?: number;
   readonly handler: (
     assignment: WorkerAssignment,
@@ -146,6 +150,13 @@ function assertLeaseMs(value: number): void {
   assert(
     Number.isInteger(value) && value > 0,
     'Lease duration must be positive.',
+  );
+}
+
+function assertMaxAttempts(value: number): void {
+  assert(
+    Number.isInteger(value) && value > 0,
+    'Retry policy maxAttempts must be a positive integer.',
   );
 }
 
@@ -604,6 +615,8 @@ export async function executeRestartableParallelWorkers(
   assertText(request.revision, 'Revision');
   assertText(request.owner, 'Owner');
   assertLeaseMs(request.leaseMs);
+  const maxAttempts = request.retryPolicy?.maxAttempts ?? 1;
+  assertMaxAttempts(maxAttempts);
   if (request.workspaceManifestStore) {
     assert(
       request.workspaceForAssignment,
@@ -706,90 +719,115 @@ export async function executeRestartableParallelWorkers(
   );
   const expectedTasks = await reconcileExpectedTasks(request, identity);
   await verifyExpectedWorkspaces(request, expectedTasks, assignmentByTaskId);
-  const reservation = await request.childStore.claimGroup({
-    groupId: identity.groupId,
-    runId: request.runId,
-    revision: request.revision,
-    taskIds: identity.taskIds,
-    maxConcurrency,
-    owner: request.owner,
-    leaseMs: request.leaseMs,
-    now: now(),
-  });
-  const claimed = reservation.claimed.map((record) => {
-    const assignment = assignmentByTaskId.get(record.taskId);
-    assert(assignment);
-    return { assignment, record };
-  });
+  let peakConcurrency = 0;
+  while (true) {
+    const reservation = await request.childStore.claimGroup({
+      groupId: identity.groupId,
+      runId: request.runId,
+      revision: request.revision,
+      taskIds: identity.taskIds,
+      maxConcurrency,
+      owner: request.owner,
+      leaseMs: request.leaseMs,
+      now: now(),
+    });
+    const claimed = reservation.claimed.map((record) => {
+      const assignment = assignmentByTaskId.get(record.taskId);
+      assert(assignment);
+      return { assignment, record };
+    });
+    peakConcurrency = Math.max(peakConcurrency, claimed.length);
 
-  const leaseLost = new Set<string>();
-  await Promise.all(
-    claimed.map(async (task) => {
-      if (await executeClaimed(request, task, now)) {
-        leaseLost.add(task.record.taskId);
+    const leaseLost = new Set<string>();
+    await Promise.all(
+      claimed.map(async (task) => {
+        if (await executeClaimed(request, task, now)) {
+          leaseLost.add(task.record.taskId);
+        }
+      }),
+    );
+
+    const finalTasks: ChildTaskRecord[] = [];
+    const pending: RestartableParallelPendingTask[] = [];
+    const outcomes = [];
+    for (const taskId of identity.taskIds) {
+      const assignment = assignmentByTaskId.get(taskId);
+      assert(assignment);
+      const record = await request.childStore.reconcile(taskId);
+      if (!record) {
+        pending.push({
+          taskId,
+          assignmentId: assignment.id,
+          reason: 'missing',
+        });
+        continue;
       }
-    }),
-  );
+      await verifyWorkspaceManifest(request, assignment, record);
+      finalTasks.push(record);
+      const pendingTask = pendingForRecord(
+        record,
+        assignment.id,
+        leaseLost.has(taskId),
+      );
+      if (pendingTask) pending.push(pendingTask);
+      if (pendingTask) continue;
+      outcomes.push(outcomeForRecord(assignment, record));
+    }
 
-  const finalTasks: ChildTaskRecord[] = [];
-  const pending: RestartableParallelPendingTask[] = [];
-  const outcomes = [];
-  for (const taskId of identity.taskIds) {
-    const assignment = assignmentByTaskId.get(taskId);
-    assert(assignment);
-    const record = await request.childStore.reconcile(taskId);
-    if (!record) {
-      pending.push({ taskId, assignmentId: assignment.id, reason: 'missing' });
+    if (pending.length > 0) {
+      const state = pending.some((item) => item.reason === 'cancellation-gated')
+        ? 'BLOCKED'
+        : 'RUNNING';
+      return {
+        state,
+        group,
+        tasks: finalTasks,
+        pending,
+        receipt: null,
+      };
+    }
+
+    const retryable = finalTasks.filter(
+      (record) => record.status === 'FAILED' && record.attempt < maxAttempts,
+    );
+    if (retryable.length > 0) {
+      await Promise.all(
+        retryable.map((record) =>
+          request.childStore.retry({
+            taskId: record.taskId,
+            actor: request.owner,
+            idempotencyKey: `retry:${record.taskId}:${record.attempt}`,
+            now: now(),
+          }),
+        ),
+      );
       continue;
     }
-    await verifyWorkspaceManifest(request, assignment, record);
-    finalTasks.push(record);
-    const pendingTask = pendingForRecord(
-      record,
-      assignment.id,
-      leaseLost.has(taskId),
-    );
-    if (pendingTask) pending.push(pendingTask);
-    if (pendingTask) continue;
-    outcomes.push(outcomeForRecord(assignment, record));
-  }
 
-  if (pending.length > 0) {
-    const state = pending.some((item) => item.reason === 'cancellation-gated')
-      ? 'BLOCKED'
-      : 'RUNNING';
+    const joined = joinParallelWorkers(request.assignments, outcomes);
+    const receipt: ParallelWorkerReceipt = {
+      schema: 1,
+      runId: request.runId,
+      revision: request.revision,
+      startedAt: now().toISOString(),
+      completedAt: now().toISOString(),
+      status: joined.status,
+      maxConcurrency,
+      peakConcurrency,
+      outcomes: joined.outcomes,
+      failure: joined.failure,
+    };
+    const binding = {
+      groupId: identity.groupId,
+      fingerprint: identity.fingerprint,
+    };
+    const persisted = await persistReceipt(request, receipt, binding);
     return {
-      state,
+      state: 'COMPLETE',
       group,
       tasks: finalTasks,
-      pending,
-      receipt: null,
+      pending: [],
+      receipt: persisted,
     };
   }
-
-  const joined = joinParallelWorkers(request.assignments, outcomes);
-  const receipt: ParallelWorkerReceipt = {
-    schema: 1,
-    runId: request.runId,
-    revision: request.revision,
-    startedAt: now().toISOString(),
-    completedAt: now().toISOString(),
-    status: joined.status,
-    maxConcurrency,
-    peakConcurrency: claimed.length,
-    outcomes: joined.outcomes,
-    failure: joined.failure,
-  };
-  const binding = {
-    groupId: identity.groupId,
-    fingerprint: identity.fingerprint,
-  };
-  const persisted = await persistReceipt(request, receipt, binding);
-  return {
-    state: 'COMPLETE',
-    group,
-    tasks: finalTasks,
-    pending: [],
-    receipt: persisted,
-  };
 }
