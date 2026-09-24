@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -36,6 +36,154 @@ test('creates child tasks idempotently and binds their parent graph', async () =
       /bound to another dependency set/,
     );
     assert.deepEqual(await store.load('child-create-1'), first);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('persists immutable child task group membership idempotently', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-child-task-store-'));
+  try {
+    const store = await FileChildTaskStore.create(root);
+    const request = {
+      groupId: 'group-membership-1',
+      runId: 'run-group-1',
+      revision: 'revision-group-1',
+      taskIds: ['task-b', 'task-a'],
+      assignmentIds: ['assignment-b', 'assignment-a'],
+      now: at('2026-09-23T12:00:00.000Z'),
+    } as const;
+    const first = await store.ensureGroup(request);
+    const replay = await store.ensureGroup({
+      ...request,
+      now: at('2026-09-23T13:00:00.000Z'),
+    });
+
+    assert.deepEqual(replay, first);
+    assert.deepEqual((await store.loadGroup(request.groupId))?.taskIds, [
+      'task-b',
+      'task-a',
+    ]);
+    assert(Object.isFrozen(first));
+    assert(Object.isFrozen(first.taskIds));
+    assert(Object.isFrozen(first.assignmentIds));
+
+    await assert.rejects(
+      store.ensureGroup({ ...request, taskIds: ['task-a', 'task-b'] }),
+      /task membership is immutable/,
+    );
+    await assert.rejects(
+      store.ensureGroup({
+        ...request,
+        assignmentIds: ['assignment-a', 'assignment-b'],
+      }),
+      /assignment membership is immutable/,
+    );
+    await assert.rejects(
+      store.ensureGroup({
+        ...request,
+        taskIds: ['task-a'],
+        assignmentIds: ['assignment-a', 'assignment-b'],
+      }),
+      /equal length/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('persists FAILED child outcomes without synthetic worker evidence', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-child-task-store-'));
+  try {
+    const store = await FileChildTaskStore.create(root);
+    await store.create({
+      taskId: 'child-failed-1',
+      runId: 'run-failed-1',
+      revision: 'revision-failed-1',
+      dependsOn: [],
+      actor: 'coordinator',
+    });
+    const claimed = await store.claim({
+      taskId: 'child-failed-1',
+      owner: 'worker-a',
+      leaseMs: 30_000,
+    });
+    assert(claimed.record.lease);
+
+    const base = {
+      taskId: 'child-failed-1',
+      owner: 'worker-a',
+      leaseToken: claimed.record.lease.token,
+      fencingEpoch: claimed.record.lease.fencingEpoch,
+      status: 'FAILED' as const,
+      idempotencyKey: 'complete:child-failed-1:1',
+    };
+    await assert.rejects(
+      store.complete({
+        ...base,
+        result: result('PASS', 'synthetic evidence'),
+        error: 'handler threw',
+      }),
+      /cannot publish a worker result/,
+    );
+    await assert.rejects(
+      store.complete({ ...base, error: '   ' }),
+      /Task error must be non-empty/,
+    );
+
+    const failed = await store.complete({
+      ...base,
+      result: null,
+      error: 'handler threw before producing a worker result',
+    });
+    assert.equal(failed.status, 'FAILED');
+    assert.equal(failed.result, null);
+    assert.equal(
+      failed.error,
+      'handler threw before producing a worker result',
+    );
+    assert.deepEqual(await store.load('child-failed-1'), failed);
+
+    await writeFile(
+      join(root, 'child-failed-1.task.json'),
+      JSON.stringify({ ...failed, error: null }),
+    );
+    await assert.rejects(store.load('child-failed-1'), /non-empty error/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('preserves semantic BLOCKED as a normal worker result', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-child-task-store-'));
+  try {
+    const store = await FileChildTaskStore.create(root);
+    await store.create({
+      taskId: 'child-blocked-1',
+      runId: 'run-blocked-1',
+      revision: 'revision-blocked-1',
+      dependsOn: [],
+      actor: 'coordinator',
+    });
+    const claimed = await store.claim({
+      taskId: 'child-blocked-1',
+      owner: 'worker-a',
+      leaseMs: 30_000,
+    });
+    assert(claimed.record.lease);
+    const blocked = await store.complete({
+      taskId: 'child-blocked-1',
+      owner: 'worker-a',
+      leaseToken: claimed.record.lease.token,
+      fencingEpoch: claimed.record.lease.fencingEpoch,
+      status: 'BLOCKED',
+      idempotencyKey: 'complete:child-blocked-1:1',
+      result: result('BLOCKED', 'worker reports a capability gap'),
+    });
+
+    assert.equal(blocked.status, 'BLOCKED');
+    assert.equal(blocked.result?.status, 'BLOCKED');
+    assert.equal(blocked.error, null);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

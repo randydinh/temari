@@ -11,6 +11,7 @@ import {
 
 import {
   CapabilityError,
+  joinParallelWorkers,
   runPlan,
   runParallelWorkers,
   runPlanWithReceipt,
@@ -203,6 +204,48 @@ test('fans out independent workers within the declared concurrency bound', async
   assert.deepEqual(
     receipt.outcomes.map((outcome) => outcome.assignment.id),
     ['worker-1', 'worker-2', 'worker-3', 'worker-4'],
+  );
+});
+
+test('joins the exact worker membership in declaration order', () => {
+  const assignments = workerAssignments(3);
+  const outcomes = assignments.map((assignment) => ({
+    assignment,
+    result: {
+      status: 'PASS' as const,
+      summary: `${assignment.id} complete`,
+      evidencePaths: [`evidence/${assignment.id}.json`],
+      rawLogPath: null,
+    },
+    error: null,
+  }));
+
+  const joined = joinParallelWorkers(assignments, [
+    outcomes[2]!,
+    outcomes[0]!,
+    outcomes[1]!,
+  ]);
+  assert.deepEqual(
+    joined.outcomes.map((outcome) => outcome.assignment.id),
+    ['worker-1', 'worker-2', 'worker-3'],
+  );
+
+  assert.throws(
+    () => joinParallelWorkers(assignments, outcomes.slice(0, 2)),
+    /outcome count 2 does not match assignment count 3/,
+  );
+  const extraAssignment = {
+    ...workerAssignments(1)[0]!,
+    id: 'worker-extra',
+  };
+  assert.throws(
+    () =>
+      joinParallelWorkers(assignments, [
+        outcomes[0]!,
+        outcomes[1]!,
+        { ...outcomes[2]!, assignment: extraAssignment },
+      ]),
+    /outcome is not declared: worker-extra/,
   );
 });
 

@@ -22,6 +22,7 @@ export type ChildTaskStatus =
   | 'ISSUES'
   | 'BLOCKED'
   | 'DROPPED'
+  | 'FAILED'
   | 'CANCELLED';
 
 export interface ChildTaskLease {
@@ -45,6 +46,16 @@ export interface ChildTaskRecord {
   readonly lease: ChildTaskLease | null;
   readonly result: WorkerResult | null;
   readonly error: string | null;
+}
+
+export interface ChildTaskGroupRecord {
+  readonly schema: 1;
+  readonly groupId: string;
+  readonly runId: string;
+  readonly revision: string;
+  readonly taskIds: readonly string[];
+  readonly assignmentIds: readonly string[];
+  readonly createdAt: string;
 }
 
 export type ChildTaskEventPayload = Readonly<
@@ -76,6 +87,15 @@ export interface CreateChildTaskRequest {
   readonly now?: Date;
 }
 
+export interface EnsureChildTaskGroupRequest {
+  readonly groupId: string;
+  readonly runId: string;
+  readonly revision: string;
+  readonly taskIds: readonly string[];
+  readonly assignmentIds: readonly string[];
+  readonly now?: Date;
+}
+
 export interface ClaimChildTaskRequest {
   readonly taskId: string;
   readonly owner: string;
@@ -86,6 +106,24 @@ export interface ClaimChildTaskRequest {
 export interface ClaimChildTaskResult {
   readonly claimed: boolean;
   readonly record: ChildTaskRecord;
+}
+
+export interface ClaimChildTaskGroupRequest {
+  readonly groupId: string;
+  readonly runId: string;
+  readonly revision: string;
+  readonly taskIds: readonly string[];
+  readonly maxConcurrency: number;
+  readonly owner: string;
+  readonly leaseMs: number;
+  readonly now?: Date;
+}
+
+export interface ClaimChildTaskGroupResult {
+  readonly group: ChildTaskGroupRecord;
+  readonly claimed: readonly ChildTaskRecord[];
+  readonly records: readonly ChildTaskRecord[];
+  readonly missingTaskIds: readonly string[];
 }
 
 export interface CompleteChildTaskRequest {
@@ -108,7 +146,14 @@ export interface ListReadyChildTasksRequest {
 export interface ChildTaskStore {
   create(request: CreateChildTaskRequest): Promise<ChildTaskRecord>;
   load(taskId: string): Promise<ChildTaskRecord | null>;
+  ensureGroup(
+    request: EnsureChildTaskGroupRequest,
+  ): Promise<ChildTaskGroupRecord>;
+  loadGroup(groupId: string): Promise<ChildTaskGroupRecord | null>;
   claim(request: ClaimChildTaskRequest): Promise<ClaimChildTaskResult>;
+  claimGroup(
+    request: ClaimChildTaskGroupRequest,
+  ): Promise<ClaimChildTaskGroupResult>;
   complete(request: CompleteChildTaskRequest): Promise<ChildTaskRecord>;
   listReady(
     request: ListReadyChildTasksRequest,
@@ -155,6 +200,19 @@ function assertDate(value: Date): void {
   assert(Number.isFinite(value.getTime()), 'Timestamp must be valid.');
 }
 
+function requestForTask(
+  request: ClaimChildTaskGroupRequest,
+  taskId: string,
+  now: Date,
+): ClaimChildTaskRequest {
+  return {
+    taskId,
+    owner: request.owner,
+    leaseMs: request.leaseMs,
+    now,
+  };
+}
+
 function normalizedDependencies(
   taskId: string,
   dependsOn: readonly string[],
@@ -170,8 +228,47 @@ function normalizedDependencies(
   return [...seen].sort();
 }
 
+function orderedIds(
+  value: readonly string[],
+  label: string,
+): readonly string[] {
+  assert(Array.isArray(value), `${label} must be an array.`);
+  assert(value.length > 0, `${label} must contain at least one ID.`);
+  const seen = new Set<string>();
+  for (const id of value) {
+    assertSafeId(id, `${label} ID`);
+    assert(!seen.has(id), `${label} IDs must be unique.`);
+    seen.add(id);
+  }
+  return [...value];
+}
+
+function assertGroupMembership(
+  taskIds: readonly string[],
+  assignmentIds: readonly string[],
+): void {
+  assert.equal(
+    taskIds.length,
+    assignmentIds.length,
+    'Child task group task and assignment membership must have equal length.',
+  );
+}
+
+function immutableGroupRecord(
+  record: ChildTaskGroupRecord,
+): ChildTaskGroupRecord {
+  return Object.freeze({
+    ...record,
+    taskIds: Object.freeze([...record.taskIds]),
+    assignmentIds: Object.freeze([...record.assignmentIds]),
+  });
+}
+
 function assertError(error: string | null): void {
-  assert(error === null || error.length <= 4096, 'Task error is too long.');
+  assert(
+    error === null || (error.trim().length > 0 && error.length <= 4096),
+    'Task error must be non-empty and no longer than 4096 characters.',
+  );
 }
 
 function isTerminal(status: ChildTaskStatus): boolean {
@@ -180,6 +277,7 @@ function isTerminal(status: ChildTaskStatus): boolean {
     status === 'ISSUES' ||
     status === 'BLOCKED' ||
     status === 'DROPPED' ||
+    status === 'FAILED' ||
     status === 'CANCELLED'
   );
 }
@@ -196,6 +294,8 @@ function expectedResultStatus(
       return 'BLOCKED';
     case 'DROPPED':
       return 'DROPPED';
+    case 'FAILED':
+      return null;
     case 'CANCELLED':
       return null;
   }
@@ -204,7 +304,18 @@ function expectedResultStatus(
 function assertCompletionPayload(
   status: Exclude<ChildTaskStatus, 'QUEUED' | 'RUNNING'>,
   result: WorkerResult | null,
+  error: string | null,
 ): void {
+  if (status === 'FAILED') {
+    assert(result === null, 'Failed tasks cannot publish a worker result.');
+    assert(
+      error !== null && error.trim().length > 0,
+      'Failed tasks require a non-empty error.',
+    );
+    return;
+  }
+
+  assert(error === null, `${status} tasks cannot retain a mechanical error.`);
   const expected = expectedResultStatus(status);
   if (expected === null) {
     assert(result === null, 'Cancelled tasks cannot publish a worker result.');
@@ -257,6 +368,7 @@ function parseRecord(value: unknown): ChildTaskRecord {
       'ISSUES',
       'BLOCKED',
       'DROPPED',
+      'FAILED',
       'CANCELLED',
     ].includes(record.status),
   );
@@ -278,16 +390,63 @@ function parseRecord(value: unknown): ChildTaskRecord {
   assert(record.result === null || typeof record.result === 'object');
   if (record.result) assertWorkerResult(record.result as WorkerResult);
   assert(record.error === null || typeof record.error === 'string');
-  assertError(record.error ?? null);
+  const result = (record.result ?? null) as WorkerResult | null;
+  const error = (record.error ?? null) as string | null;
+  assertError(error);
+  if (record.status === 'QUEUED' || record.status === 'RUNNING') {
+    assert(result === null, `${record.status} tasks cannot retain a result.`);
+    assert(error === null, `${record.status} tasks cannot retain an error.`);
+  } else {
+    assertCompletionPayload(
+      record.status as Exclude<ChildTaskStatus, 'QUEUED' | 'RUNNING'>,
+      result,
+      error,
+    );
+  }
   return {
     ...record,
     status: record.status as ChildTaskStatus,
     attempt: record.attempt as number,
     dependsOn,
     lease,
-    result: (record.result ?? null) as WorkerResult | null,
-    error: (record.error ?? null) as string | null,
+    result,
+    error,
   } as ChildTaskRecord;
+}
+
+function parseGroupRecord(value: unknown): ChildTaskGroupRecord {
+  assert(
+    value && typeof value === 'object',
+    'Child task group record is invalid.',
+  );
+  const record = value as Partial<ChildTaskGroupRecord>;
+  assert.equal(record.schema, 1);
+  assert(typeof record.groupId === 'string');
+  assertSafeId(record.groupId, 'Group ID');
+  assert(typeof record.runId === 'string');
+  assertSafeId(record.runId, 'Run ID');
+  assert(typeof record.revision === 'string');
+  assertText(record.revision, 'Revision');
+  const taskIds = orderedIds(
+    record.taskIds as readonly string[],
+    'Child task group task',
+  );
+  const assignmentIds = orderedIds(
+    record.assignmentIds as readonly string[],
+    'Child task group assignment',
+  );
+  assertGroupMembership(taskIds, assignmentIds);
+  assert(typeof record.createdAt === 'string');
+  assert(Number.isFinite(Date.parse(record.createdAt)));
+  return immutableGroupRecord({
+    schema: 1,
+    groupId: record.groupId,
+    runId: record.runId,
+    revision: record.revision,
+    taskIds,
+    assignmentIds,
+    createdAt: record.createdAt,
+  });
 }
 
 function parseEvent(value: unknown): ChildTaskEvent {
@@ -395,57 +554,186 @@ export class FileChildTaskStore implements ChildTaskStore {
     return this.readRecord(taskId);
   }
 
+  async ensureGroup(
+    request: EnsureChildTaskGroupRequest,
+  ): Promise<ChildTaskGroupRecord> {
+    assertSafeId(request.groupId, 'Group ID');
+    assertSafeId(request.runId, 'Run ID');
+    assertText(request.revision, 'Revision');
+    const taskIds = orderedIds(request.taskIds, 'Child task group task');
+    const assignmentIds = orderedIds(
+      request.assignmentIds,
+      'Child task group assignment',
+    );
+    assertGroupMembership(taskIds, assignmentIds);
+
+    return this.withGroupLock(request.groupId, async () => {
+      const existing = await this.readGroup(request.groupId);
+      if (existing) {
+        assert.equal(
+          existing.groupId,
+          request.groupId,
+          'Child task group ID does not match its filename.',
+        );
+        assert.equal(
+          existing.runId,
+          request.runId,
+          'Child task group is bound to another run.',
+        );
+        assert.equal(
+          existing.revision,
+          request.revision,
+          'Child task group is bound to another revision.',
+        );
+        assert.deepEqual(
+          existing.taskIds,
+          taskIds,
+          'Child task group task membership is immutable.',
+        );
+        assert.deepEqual(
+          existing.assignmentIds,
+          assignmentIds,
+          'Child task group assignment membership is immutable.',
+        );
+        return existing;
+      }
+
+      const now = request.now ?? new Date();
+      assertDate(now);
+      const record = immutableGroupRecord({
+        schema: 1,
+        groupId: request.groupId,
+        runId: request.runId,
+        revision: request.revision,
+        taskIds,
+        assignmentIds,
+        createdAt: now.toISOString(),
+      });
+      await this.writeGroup(record);
+      return record;
+    });
+  }
+
+  async loadGroup(groupId: string): Promise<ChildTaskGroupRecord | null> {
+    assertSafeId(groupId, 'Group ID');
+    return this.readGroup(groupId);
+  }
+
   async claim(request: ClaimChildTaskRequest): Promise<ClaimChildTaskResult> {
     assertSafeId(request.taskId, 'Task ID');
     assertText(request.owner, 'Owner');
     assertLeaseMs(request.leaseMs);
-    return this.withLock(request.taskId, async () => {
-      const record = await this.requireRecord(request.taskId);
+    return this.withLock(request.taskId, () => this.claimLocked(request));
+  }
+
+  async claimGroup(
+    request: ClaimChildTaskGroupRequest,
+  ): Promise<ClaimChildTaskGroupResult> {
+    assertSafeId(request.groupId, 'Group ID');
+    assertSafeId(request.runId, 'Run ID');
+    assertText(request.revision, 'Revision');
+    assertText(request.owner, 'Owner');
+    assertLeaseMs(request.leaseMs);
+    assert(
+      Number.isInteger(request.maxConcurrency) && request.maxConcurrency > 0,
+      'Group maxConcurrency must be a positive integer.',
+    );
+    const taskIds = orderedIds(request.taskIds, 'Child task group task');
+    return this.withGroupLock(request.groupId, async () => {
+      const group = await this.readGroup(request.groupId);
+      assert(group, `Child task group ${request.groupId} does not exist.`);
+      assert.equal(group.groupId, request.groupId);
+      assert.equal(group.runId, request.runId);
+      assert.equal(group.revision, request.revision);
+      assert.deepEqual(group.taskIds, taskIds);
+
+      const records: ChildTaskRecord[] = [];
+      const claimed: ChildTaskRecord[] = [];
+      const missingTaskIds: string[] = [];
+      let activeLeases = 0;
       const now = request.now ?? new Date();
       assertDate(now);
-      const nowMs = now.getTime();
-      if (isTerminal(record.status)) return { claimed: false, record };
-      if (record.status === 'RUNNING') {
-        assert(record.lease);
-        if (Date.parse(record.lease.expiresAt) > nowMs) {
-          return { claimed: false, record };
+      for (const taskId of taskIds) {
+        const existing = await this.readRecord(taskId);
+        if (!existing) {
+          missingTaskIds.push(taskId);
+          continue;
+        }
+        if (
+          existing.status === 'RUNNING' &&
+          existing.lease !== null &&
+          Date.parse(existing.lease.expiresAt) > now.getTime()
+        ) {
+          activeLeases += 1;
+        }
+        if (
+          activeLeases >= request.maxConcurrency ||
+          isTerminal(existing.status)
+        ) {
+          records.push(existing);
+          continue;
+        }
+        const result = await this.withLock(taskId, () =>
+          this.claimLocked(requestForTask(request, taskId, now)),
+        );
+        records.push(result.record);
+        if (result.claimed) {
+          claimed.push(result.record);
+          activeLeases += 1;
         }
       }
-      if (!(await this.dependenciesSucceeded(record))) {
+      return { group, claimed, records, missingTaskIds };
+    });
+  }
+
+  private async claimLocked(
+    request: ClaimChildTaskRequest,
+  ): Promise<ClaimChildTaskResult> {
+    const record = await this.requireRecord(request.taskId);
+    const now = request.now ?? new Date();
+    assertDate(now);
+    const nowMs = now.getTime();
+    if (isTerminal(record.status)) return { claimed: false, record };
+    if (record.status === 'RUNNING') {
+      assert(record.lease);
+      if (Date.parse(record.lease.expiresAt) > nowMs) {
         return { claimed: false, record };
       }
-      const fencingEpoch = (record.lease?.fencingEpoch ?? 0) + 1;
-      const next: ChildTaskRecord = {
-        ...record,
-        status: 'RUNNING',
-        attempt: record.attempt + 1,
-        updatedAt: now.toISOString(),
-        lease: {
-          owner: request.owner,
-          token: randomUUID(),
-          fencingEpoch,
-          acquiredAt: now.toISOString(),
-          expiresAt: new Date(nowMs + request.leaseMs).toISOString(),
-        },
-      };
-      await this.writeRecord(next);
-      assert(next.lease);
-      await this.appendEventLocked({
-        taskId: request.taskId,
-        runId: record.runId,
-        revision: record.revision,
-        actor: request.owner,
-        type: 'task-claimed',
-        idempotencyKey: `claim:${request.taskId}:${request.owner}:${next.attempt}`,
-        payload: {
-          attempt: next.attempt,
-          fencingEpoch,
-          expiresAt: next.lease.expiresAt,
-        },
-        now,
-      });
-      return { claimed: true, record: next };
+    }
+    if (!(await this.dependenciesSucceeded(record))) {
+      return { claimed: false, record };
+    }
+    const fencingEpoch = (record.lease?.fencingEpoch ?? 0) + 1;
+    const next: ChildTaskRecord = {
+      ...record,
+      status: 'RUNNING',
+      attempt: record.attempt + 1,
+      updatedAt: now.toISOString(),
+      lease: {
+        owner: request.owner,
+        token: randomUUID(),
+        fencingEpoch,
+        acquiredAt: now.toISOString(),
+        expiresAt: new Date(nowMs + request.leaseMs).toISOString(),
+      },
+    };
+    await this.writeRecord(next);
+    assert(next.lease);
+    await this.appendEventLocked({
+      taskId: request.taskId,
+      runId: record.runId,
+      revision: record.revision,
+      actor: request.owner,
+      type: 'task-claimed',
+      idempotencyKey: `claim:${request.taskId}:${request.owner}:${next.attempt}`,
+      payload: {
+        attempt: next.attempt,
+        fencingEpoch,
+        expiresAt: next.lease.expiresAt,
+      },
+      now,
     });
+    return { claimed: true, record: next };
   }
 
   async complete(request: CompleteChildTaskRequest): Promise<ChildTaskRecord> {
@@ -457,7 +745,7 @@ export class FileChildTaskStore implements ChildTaskStore {
     const result = request.result ?? null;
     const error = request.error ?? null;
     assertError(error);
-    assertCompletionPayload(request.status, result);
+    assertCompletionPayload(request.status, result, error);
     return this.withLock(request.taskId, async () => {
       const record = await this.requireRecord(request.taskId);
       const events = await this.readEvents(request.taskId, record.revision);
@@ -601,6 +889,10 @@ export class FileChildTaskStore implements ChildTaskStore {
     return join(this.root, `${taskId}.task.json`);
   }
 
+  private groupPath(groupId: string): string {
+    return join(this.root, `${groupId}.group.json`);
+  }
+
   private eventPath(taskId: string): string {
     return join(this.root, `${taskId}.events.jsonl`);
   }
@@ -609,10 +901,27 @@ export class FileChildTaskStore implements ChildTaskStore {
     return join(this.root, `.${taskId}.lock`);
   }
 
+  private groupLockPath(groupId: string): string {
+    return join(this.root, `.${groupId}.group.lock`);
+  }
+
   private async readRecord(taskId: string): Promise<ChildTaskRecord | null> {
     try {
       return parseRecord(
         JSON.parse(await readFile(this.statePath(taskId), 'utf8')),
+      );
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      throw error;
+    }
+  }
+
+  private async readGroup(
+    groupId: string,
+  ): Promise<ChildTaskGroupRecord | null> {
+    try {
+      return parseGroupRecord(
+        JSON.parse(await readFile(this.groupPath(groupId), 'utf8')),
       );
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
@@ -629,6 +938,23 @@ export class FileChildTaskStore implements ChildTaskStore {
   private async writeRecord(record: ChildTaskRecord): Promise<void> {
     const path = this.statePath(record.taskId);
     const temporary = join(this.root, `.${record.taskId}.${randomUUID()}.tmp`);
+    const file = await open(temporary, 'wx', 0o600);
+    try {
+      try {
+        await file.writeFile(canonical(record));
+        await file.sync();
+      } finally {
+        await file.close();
+      }
+      await rename(temporary, path);
+    } finally {
+      await unlink(temporary).catch(() => undefined);
+    }
+  }
+
+  private async writeGroup(record: ChildTaskGroupRecord): Promise<void> {
+    const path = this.groupPath(record.groupId);
+    const temporary = join(this.root, `.${record.groupId}.${randomUUID()}.tmp`);
     const file = await open(temporary, 'wx', 0o600);
     try {
       try {
@@ -733,7 +1059,29 @@ export class FileChildTaskStore implements ChildTaskStore {
     taskId: string,
     operation: () => Promise<T>,
   ): Promise<T> {
-    const path = this.lockPath(taskId);
+    return this.withLockPath(
+      this.lockPath(taskId),
+      `child task ${taskId}`,
+      operation,
+    );
+  }
+
+  private async withGroupLock<T>(
+    groupId: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    return this.withLockPath(
+      this.groupLockPath(groupId),
+      `child task group ${groupId}`,
+      operation,
+    );
+  }
+
+  private async withLockPath<T>(
+    path: string,
+    subject: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
     let acquired = false;
     for (let attempt = 0; attempt < 100; attempt += 1) {
       try {
@@ -755,7 +1103,7 @@ export class FileChildTaskStore implements ChildTaskStore {
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
     }
-    assert(acquired, `Could not acquire child task lock for ${taskId}.`);
+    assert(acquired, `Could not acquire ${subject} lock.`);
     try {
       return await operation();
     } catch (error) {
