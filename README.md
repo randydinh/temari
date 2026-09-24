@@ -38,6 +38,9 @@ pnpm temari:doctor
 pnpm install
 pnpm exec nx run-many -t typecheck
 pnpm exec nx graph
+
+# Shareable walkthrough.
+pnpm nx run workflow-engine:demo
 ```
 
 `temari:init` is the OS-agnostic dependency entry point. It uses Node APIs
@@ -61,3 +64,6 @@ Do not connect Nx Cloud yet. Do not cache live host journeys.
 
 One engine. Classification builds an `ExecutionPlan`; it does not fork
 the lifecycle. Chart: [docs/workflow.md](docs/workflow.md).
+
+The [facilities uptime walkthrough](docs/demos/facilities-uptime.md) shows the
+same engine applied to a synthetic hospital site-operations incident.
