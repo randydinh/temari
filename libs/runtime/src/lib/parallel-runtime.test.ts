@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -11,6 +11,7 @@ import {
   FileParallelWorkerReceiptStore,
 } from './parallel-runtime.js';
 import { FileChildTaskStore } from './child-task-store.js';
+import { FileWorkspaceManifestStore } from './workspace-manifest.js';
 
 test('resumes a bounded child batch and joins terminal results in declaration order', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
@@ -112,6 +113,65 @@ test('retains a thrown handler as FAILED mechanics and a blocked semantic receip
     assert.equal(
       result.tasks[0]?.error,
       'lease expired while contacting worker',
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('publishes and verifies a workspace manifest for every completed child', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
+  try {
+    const childStore = await FileChildTaskStore.create(join(root, 'children'));
+    const receiptStore = await FileParallelWorkerReceiptStore.create(
+      join(root, 'receipts'),
+    );
+    const manifestStore = await FileWorkspaceManifestStore.create(
+      join(root, 'manifests'),
+    );
+    const assignments = workerAssignments(2);
+    for (const assignment of assignments) {
+      const workspaceRoot = join(root, assignment.id);
+      await mkdir(workspaceRoot, { recursive: true });
+      await writeFile(join(workspaceRoot, 'input.txt'), assignment.id);
+    }
+    const request = {
+      runId: 'parallel-runtime-manifest-1',
+      revision: 'revision-parallel-runtime-manifest-1',
+      plan: parallelPlan('feature', 2),
+      capabilities: parallelCapabilities(),
+      assignments,
+      childStore,
+      receiptStore,
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      workspaceManifestStore: manifestStore,
+      workspaceForAssignment: (assignment: WorkerAssignment) => ({
+        workspaceId: assignment.id,
+        root: join(root, assignment.id),
+      }),
+      now: fixedClock(),
+      handler: async (assignment: WorkerAssignment) => {
+        await writeFile(
+          join(root, assignment.id, 'output.txt'),
+          `${assignment.id} output`,
+        );
+        return result(`${assignment.id} complete`);
+      },
+    } as const;
+
+    const completed = await executeRestartableParallelWorkers(request);
+    assert.equal(completed.state, 'COMPLETE');
+    assert.equal(completed.receipt?.status, 'PASS');
+    for (const task of completed.tasks) {
+      assert.equal(task.result?.workspaceManifestId, task.taskId);
+      assert(await manifestStore.load(request.runId, task.taskId));
+    }
+
+    await writeFile(join(root, assignments[0]!.id, 'output.txt'), 'changed');
+    await assert.rejects(
+      executeRestartableParallelWorkers(request),
+      /Workspace manifest changed|Workspace file changed/,
     );
   } finally {
     await rm(root, { recursive: true, force: true });

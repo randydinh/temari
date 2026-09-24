@@ -30,6 +30,7 @@ import type {
   ChildTaskStatus,
   ChildTaskStore,
 } from './child-task-store.js';
+import type { WorkspaceManifestStore } from './workspace-manifest.js';
 
 export interface ParallelWorkerReceiptStore {
   save(
@@ -86,11 +87,20 @@ export interface ExecuteRestartableParallelWorkersRequest {
   readonly receiptStore: ParallelWorkerReceiptStore;
   readonly owner: string;
   readonly leaseMs: number;
+  readonly workspaceManifestStore?: WorkspaceManifestStore;
+  readonly workspaceForAssignment?: (
+    assignment: WorkerAssignment,
+  ) => WorkspaceBinding | null | undefined;
   readonly maxConcurrency?: number;
   readonly handler: (
     assignment: WorkerAssignment,
   ) => Promise<WorkerResult> | WorkerResult;
   readonly now?: () => Date;
+}
+
+export interface WorkspaceBinding {
+  readonly workspaceId: string;
+  readonly root: string;
 }
 
 interface TaskIdentity {
@@ -434,6 +444,76 @@ async function ensureGroup(
   });
 }
 
+function workspaceBinding(
+  request: ExecuteRestartableParallelWorkersRequest,
+  assignment: WorkerAssignment,
+): WorkspaceBinding | null {
+  if (!request.workspaceManifestStore) return null;
+  const binding = request.workspaceForAssignment?.(assignment);
+  assert(
+    binding,
+    'Workspace manifest storage requires a workspace binding for every assignment.',
+  );
+  return binding;
+}
+
+async function persistWorkspaceManifest(
+  request: ExecuteRestartableParallelWorkersRequest,
+  assignment: WorkerAssignment,
+  taskId: string,
+  now: () => Date,
+): Promise<string | null> {
+  const store = request.workspaceManifestStore;
+  if (!store) return null;
+  const binding = workspaceBinding(request, assignment);
+  assert(binding);
+  const manifest = await store.capture({
+    runId: request.runId,
+    revision: request.revision,
+    subjectId: taskId,
+    workspaceId: binding.workspaceId,
+    workspaceRoot: binding.root,
+    now: now(),
+  });
+  return store.save(manifest);
+}
+
+async function verifyWorkspaceManifest(
+  request: ExecuteRestartableParallelWorkersRequest,
+  assignment: WorkerAssignment,
+  record: ChildTaskRecord,
+): Promise<void> {
+  const store = request.workspaceManifestStore;
+  if (!store) return;
+  if (record.status === 'QUEUED' || record.status === 'RUNNING') return;
+  if (record.status === 'CANCELLED') return;
+  const binding = workspaceBinding(request, assignment);
+  assert(binding);
+  const manifest = await store.load(request.runId, record.taskId);
+  assert(
+    manifest,
+    `Terminal child ${record.taskId} is missing its workspace manifest.`,
+  );
+  assert.equal(manifest.revision, request.revision);
+  assert.equal(manifest.workspaceId, binding.workspaceId);
+  await store.verify(manifest, binding.root);
+}
+
+async function verifyExpectedWorkspaces(
+  request: ExecuteRestartableParallelWorkersRequest,
+  records: readonly (ChildTaskRecord | null)[],
+  assignmentByTaskId: ReadonlyMap<string, WorkerAssignment>,
+): Promise<void> {
+  await Promise.all(
+    records.map(async (record) => {
+      if (!record) return;
+      const assignment = assignmentByTaskId.get(record.taskId);
+      assert(assignment);
+      await verifyWorkspaceManifest(request, assignment, record);
+    }),
+  );
+}
+
 async function reconcileExpectedTasks(
   request: ExecuteRestartableParallelWorkersRequest,
   identity: TaskIdentity,
@@ -455,7 +535,31 @@ async function executeClaimed(
   try {
     result = await request.handler(claimed.assignment);
     assertWorkerResult(result);
+    const workspaceManifestSaved = await persistWorkspaceManifest(
+      request,
+      claimed.assignment,
+      claimed.record.taskId,
+      now,
+    );
+    if (workspaceManifestSaved) {
+      result = {
+        ...result,
+        workspaceManifestId: claimed.record.taskId,
+      };
+    }
   } catch (error) {
+    try {
+      await persistWorkspaceManifest(
+        request,
+        claimed.assignment,
+        claimed.record.taskId,
+        now,
+      );
+    } catch (manifestError) {
+      error = new Error(
+        `${errorMessage(error)}; workspace manifest failed: ${errorMessage(manifestError)}`,
+      );
+    }
     try {
       await request.childStore.complete({
         taskId: claimed.record.taskId,
@@ -500,6 +604,12 @@ export async function executeRestartableParallelWorkers(
   assertText(request.revision, 'Revision');
   assertText(request.owner, 'Owner');
   assertLeaseMs(request.leaseMs);
+  if (request.workspaceManifestStore) {
+    assert(
+      request.workspaceForAssignment,
+      'Workspace manifest storage requires workspaceForAssignment.',
+    );
+  }
   const now = request.now ?? (() => new Date());
   const declaredConcurrency = request.plan.parallelism?.maxConcurrency ?? 0;
   const maxConcurrency = request.maxConcurrency ?? declaredConcurrency;
@@ -548,6 +658,13 @@ export async function executeRestartableParallelWorkers(
       replayTasks.every((task): task is ChildTaskRecord => task !== null),
       'Parallel receipt is missing an expected child task; refusing stale replay.',
     );
+    const replayAssignments = new Map(
+      identity.taskIds.map((taskId, index) => [
+        taskId,
+        request.assignments[index]!,
+      ]),
+    );
+    await verifyExpectedWorkspaces(request, replayTasks, replayAssignments);
     return {
       state: 'COMPLETE',
       group: replayGroup,
@@ -581,13 +698,14 @@ export async function executeRestartableParallelWorkers(
   );
   preflightParallelWorkers(request.assignments);
   const group = await ensureGroup(request, identity, now);
-  await reconcileExpectedTasks(request, identity);
   const assignmentByTaskId = new Map(
     identity.taskIds.map((taskId, index) => [
       taskId,
       request.assignments[index]!,
     ]),
   );
+  const expectedTasks = await reconcileExpectedTasks(request, identity);
+  await verifyExpectedWorkspaces(request, expectedTasks, assignmentByTaskId);
   const reservation = await request.childStore.claimGroup({
     groupId: identity.groupId,
     runId: request.runId,
@@ -624,6 +742,7 @@ export async function executeRestartableParallelWorkers(
       pending.push({ taskId, assignmentId: assignment.id, reason: 'missing' });
       continue;
     }
+    await verifyWorkspaceManifest(request, assignment, record);
     finalTasks.push(record);
     const pendingTask = pendingForRecord(
       record,
