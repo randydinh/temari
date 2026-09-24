@@ -4,12 +4,64 @@ import test from 'node:test';
 import {
   DAILY_VERIFICATION_MAINTENANCE,
   VERIFICATION_MAINTENANCE_SKILL,
+  classifyEngineeringRoute,
   classifySerialEngineering,
   createExecutionPlan,
   verificationMaintenanceDecision,
 } from './temari-core.js';
 
 const NOW = new Date('2026-09-20T12:00:00.000Z');
+
+const LIGHTWEIGHT_EVIDENCE = {
+  resultIsClearLocalAndReversible: true,
+  changesSharedBoundary: false,
+  isReportedDefect: false,
+  hasUnexplainedSymptom: false,
+  makesPerformanceClaim: false,
+  isDesignChoice: false,
+  isMigration: false,
+  affectedCallersAreKnown: true,
+  crossesArchitecturalBoundary: false,
+  directCheckAvailable: true,
+} as const;
+
+test('selects lightweight engineering only when every condition is proven', () => {
+  assert.deepEqual(
+    classifyEngineeringRoute({
+      workType: 'bug',
+      lightweight: LIGHTWEIGHT_EVIDENCE,
+    }),
+    {
+      route: 'lightweight-engineering',
+      playbook: 'lightweight-engineering',
+      reason: 'all-lightweight-conditions-proven',
+    },
+  );
+});
+
+test('routes a migration to a full playbook without guessing which playbook', () => {
+  assert.deepEqual(
+    classifyEngineeringRoute({
+      workType: 'migration',
+      lightweight: { ...LIGHTWEIGHT_EVIDENCE, isMigration: true },
+    }),
+    {
+      route: 'full-playbook',
+      playbook: null,
+      reason: 'lightweight-condition-not-proven',
+    },
+  );
+});
+
+test('routes uncertain callers to a full playbook', () => {
+  const decision = classifyEngineeringRoute({
+    workType: 'feature',
+    lightweight: { ...LIGHTWEIGHT_EVIDENCE, affectedCallersAreKnown: false },
+  });
+
+  assert.equal(decision.route, 'full-playbook');
+  assert.equal(decision.playbook, null);
+});
 
 test('classifies serial engineering without naming a host', () => {
   const plan = createExecutionPlan(classifySerialEngineering('feature'));

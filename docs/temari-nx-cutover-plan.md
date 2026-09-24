@@ -135,6 +135,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 **Build.**
 
 - [ ] Implement one explicit route table with a `qa-review` domain entry and existing playbook entries.
+- [x] Add a typed Poteto route boundary that requires every lightweight condition and leaves full-playbook selection explicit.
 - [ ] Convert a request into one `ExecutionPlan` and run the fixed six-stage lifecycle.
 - [ ] Preserve worker brief and worker result boundaries. A worker summary never becomes the only proof.
 - [ ] Record revision-bound evidence, blocked outcomes, and a guarded closeout result without adding a second workflow engine.
