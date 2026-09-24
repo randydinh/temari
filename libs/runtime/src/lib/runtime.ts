@@ -410,6 +410,10 @@ export interface ExecuteScheduledAndPersistRequest extends ExecuteAndPersistRequ
   readonly runStore: WorkflowRunStore;
   readonly owner: string;
   readonly leaseMs: number;
+  /** Renew the parent lease while the revision is executing. */
+  readonly leaseRenewal?: {
+    readonly intervalMs: number;
+  };
 }
 
 export interface ScheduledExecutionResult {
@@ -427,6 +431,13 @@ function mechanicalStatus(status: WorkflowReceiptStatus): MechanicalRunStatus {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function assertLeaseRenewalInterval(intervalMs: number): void {
+  assert(
+    Number.isInteger(intervalMs) && intervalMs > 0,
+    'Lease renewal interval must be a positive integer.',
+  );
 }
 
 /**
@@ -456,6 +467,10 @@ export async function executeScheduledAndPersist(
 
   const leaseToken = claim.record.lease.token;
   const attempt = claim.record.attempt;
+  const renewalIntervalMs = request.leaseRenewal?.intervalMs;
+  if (renewalIntervalMs !== undefined) {
+    assertLeaseRenewalInterval(renewalIntervalMs);
+  }
   await request.runStore.appendEvent({
     runId: request.runId,
     actor: request.owner,
@@ -464,8 +479,40 @@ export async function executeScheduledAndPersist(
     now: now(),
   });
 
+  let renewalError: unknown = null;
+  let renewalSequence = 0;
+  let renewalInFlight: Promise<void> | null = null;
+  let renewalTimer: ReturnType<typeof setInterval> | null = null;
+  const renew = async (): Promise<void> => {
+    if (renewalError) return;
+    try {
+      await request.runStore.renew({
+        runId: request.runId,
+        owner: request.owner,
+        leaseToken,
+        leaseMs: request.leaseMs,
+        idempotencyKey: `renew:${request.runId}:${attempt}:${++renewalSequence}`,
+        now: now(),
+      });
+    } catch (error) {
+      renewalError = error;
+      if (renewalTimer) clearInterval(renewalTimer);
+    }
+  };
+  if (renewalIntervalMs !== undefined) {
+    renewalTimer = setInterval(() => {
+      if (renewalInFlight) return;
+      renewalInFlight = renew().finally(() => {
+        renewalInFlight = null;
+      });
+    }, renewalIntervalMs);
+  }
+
   try {
     const receipt = await executeAndPersist(request);
+    if (renewalInFlight) await renewalInFlight;
+    if (renewalTimer) clearInterval(renewalTimer);
+    if (renewalError) throw renewalError;
     const record = await request.runStore.transition({
       runId: request.runId,
       owner: request.owner,
@@ -480,15 +527,25 @@ export async function executeScheduledAndPersist(
     });
     return { claimed: true, record, receipt };
   } catch (error) {
-    await request.runStore.transition({
-      runId: request.runId,
-      owner: request.owner,
-      leaseToken,
-      status: 'FAILED',
-      idempotencyKey: `failed:${request.runId}:${attempt}`,
-      payload: { error: errorMessage(error) },
-      now: now(),
-    });
+    if (renewalTimer) clearInterval(renewalTimer);
+    if (renewalInFlight) await renewalInFlight;
+    try {
+      await request.runStore.transition({
+        runId: request.runId,
+        owner: request.owner,
+        leaseToken,
+        status: 'FAILED',
+        idempotencyKey: `failed:${request.runId}:${attempt}`,
+        payload: { error: errorMessage(error) },
+        now: now(),
+      });
+    } catch (transitionError) {
+      throw new Error(
+        `${errorMessage(error)}; run status transition failed: ${errorMessage(transitionError)}`,
+      );
+    }
     throw error;
+  } finally {
+    if (renewalTimer) clearInterval(renewalTimer);
   }
 }

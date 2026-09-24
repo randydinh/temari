@@ -38,7 +38,11 @@ export type RunEventPayload = Readonly<
 >;
 
 export type RunEventType =
-  'run-created' | 'run-claimed' | 'run-event' | 'run-status-changed';
+  | 'run-created'
+  | 'run-claimed'
+  | 'run-lease-renewed'
+  | 'run-event'
+  | 'run-status-changed';
 
 export interface RunEvent {
   readonly schema: 1;
@@ -71,6 +75,15 @@ export interface ClaimRunResult {
   readonly record: MechanicalRunRecord;
 }
 
+export interface RenewRunLeaseRequest {
+  readonly runId: string;
+  readonly owner: string;
+  readonly leaseToken: string;
+  readonly leaseMs: number;
+  readonly idempotencyKey: string;
+  readonly now?: Date;
+}
+
 export interface AppendRunEventRequest {
   readonly runId: string;
   readonly actor: string;
@@ -95,6 +108,7 @@ export interface WorkflowRunStore {
   load(runId: string): Promise<MechanicalRunRecord | null>;
   reconcile(runId: string): Promise<MechanicalRunRecord | null>;
   claim(request: ClaimRunRequest): Promise<ClaimRunResult>;
+  renew(request: RenewRunLeaseRequest): Promise<MechanicalRunRecord>;
   appendEvent(request: AppendRunEventRequest): Promise<RunEvent>;
   transition(request: TransitionRunRequest): Promise<MechanicalRunRecord>;
   events(runId: string): Promise<readonly RunEvent[]>;
@@ -207,6 +221,7 @@ function parseEvent(value: unknown): RunEvent {
   assert(
     event.type === 'run-created' ||
       event.type === 'run-claimed' ||
+      event.type === 'run-lease-renewed' ||
       event.type === 'run-event' ||
       event.type === 'run-status-changed',
   );
@@ -281,6 +296,7 @@ function assertRunHistory(
   let status: MechanicalRunStatus = 'QUEUED';
   let attempt = 0;
   let lastClaim: RunEvent | null = null;
+  let lastLease: RunEvent | null = null;
   let lastStatusChange: RunEvent | null = null;
   for (const event of events.slice(1)) {
     if (event.type === 'run-claimed') {
@@ -290,6 +306,15 @@ function assertRunHistory(
       assert(Number.isFinite(Date.parse(event.payload.expiresAt)));
       status = 'RUNNING';
       lastClaim = event;
+      lastLease = event;
+      continue;
+    }
+    if (event.type === 'run-lease-renewed') {
+      assert.equal(status, 'RUNNING');
+      assert.equal(event.payload.attempt, attempt);
+      assert(typeof event.payload.expiresAt === 'string');
+      assert(Number.isFinite(Date.parse(event.payload.expiresAt)));
+      lastLease = event;
       continue;
     }
     if (event.type === 'run-status-changed') {
@@ -315,8 +340,9 @@ function assertRunHistory(
   if (record.status === 'RUNNING') {
     assert(record.lease);
     assert(lastClaim, 'Running run lease has no claim witness.');
-    assert.equal(lastClaim.actor, record.lease.owner);
-    assert.equal(lastClaim.payload.expiresAt, record.lease.expiresAt);
+    assert(lastLease, 'Running run lease has no lease witness.');
+    assert.equal(lastLease.actor, record.lease.owner);
+    assert.equal(lastLease.payload.expiresAt, record.lease.expiresAt);
   } else if (isTerminal(record.status)) {
     assert(lastStatusChange, 'Terminal run has no status-change witness.');
     assert.equal(lastStatusChange.payload.to, record.status);
@@ -501,6 +527,84 @@ export class FileWorkflowRunStore implements WorkflowRunStore {
         revision: record.revision,
         type: request.type ?? 'run-event',
       });
+    });
+  }
+
+  async renew(request: RenewRunLeaseRequest): Promise<MechanicalRunRecord> {
+    assertRunId(request.runId);
+    assertText(request.owner, 'Owner');
+    assertText(request.leaseToken, 'Lease token');
+    assertLeaseMs(request.leaseMs);
+    assertText(request.idempotencyKey, 'Idempotency key');
+    return this.withLock(request.runId, async () => {
+      await this.reconcileLocked(request.runId);
+      const record = await this.requireRecord(request.runId);
+      const events = await this.readEvents(request.runId, record.revision);
+      const existing = events.find(
+        (event) => event.idempotencyKey === request.idempotencyKey,
+      );
+      if (existing) {
+        assert.equal(
+          existing.type,
+          'run-lease-renewed',
+          'Idempotency key was used for another run event.',
+        );
+        assert.equal(existing.payload.attempt, record.attempt);
+        return record;
+      }
+      const now = request.now ?? new Date();
+      assertDate(now);
+      assert.equal(
+        record.status,
+        'RUNNING',
+        'Only a running lease can be renewed.',
+      );
+      assert(record.lease, 'Run lease is missing.');
+      assert.equal(
+        record.lease.owner,
+        request.owner,
+        'Run lease owner mismatch.',
+      );
+      assert.equal(
+        record.lease.token,
+        request.leaseToken,
+        'Run lease token mismatch.',
+      );
+      assert(
+        Date.parse(record.lease.expiresAt) > now.getTime(),
+        'Run lease has expired.',
+      );
+      const next: MechanicalRunRecord = {
+        ...record,
+        updatedAt: now.toISOString(),
+        lease: {
+          ...record.lease,
+          expiresAt: new Date(now.getTime() + request.leaseMs).toISOString(),
+        },
+      };
+      const expiresAt = next.lease?.expiresAt;
+      assert(expiresAt);
+      const event = this.createEvent({
+        sequence: events.length + 1,
+        runId: request.runId,
+        revision: record.revision,
+        actor: request.owner,
+        type: 'run-lease-renewed',
+        idempotencyKey: request.idempotencyKey,
+        payload: {
+          attempt: record.attempt,
+          expiresAt,
+        },
+        now,
+      });
+      await this.commitTransitionLocked({
+        runId: request.runId,
+        baseState: record,
+        baseEvents: events,
+        nextState: next,
+        nextEvents: [...events, event],
+      });
+      return next;
     });
   }
 

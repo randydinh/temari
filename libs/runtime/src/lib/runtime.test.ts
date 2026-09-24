@@ -126,6 +126,45 @@ test('executes a revision through the run lease and closes with a receipt status
   }
 });
 
+test('renews the parent lease while a scheduled revision is still executing', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-runtime-'));
+  try {
+    const receiptStore = await FileWorkflowReceiptStore.create(
+      join(root, 'receipts'),
+    );
+    const runStore = await FileWorkflowRunStore.create(join(root, 'runs'));
+    let firstStage = true;
+    const result = await executeScheduledAndPersist({
+      runId: 'scheduled-renew-1',
+      revision: 'revision-scheduled-renew-1',
+      plan: minimalPlan('feature'),
+      capabilities: serialCapabilities(),
+      store: receiptStore,
+      runStore,
+      owner: 'worker-a',
+      leaseMs: 100,
+      leaseRenewal: { intervalMs: 20 },
+      handler: async () => {
+        if (firstStage) {
+          firstStage = false;
+          await new Promise((resolve) => setTimeout(resolve, 150));
+        }
+        return { status: 'PASS' as const, summary: 'complete' };
+      },
+    });
+
+    assert.equal(result.claimed, true);
+    assert.equal(result.record.status, 'SUCCEEDED');
+    assert(
+      (await runStore.events('scheduled-renew-1')).some(
+        (event) => event.type === 'run-lease-renewed',
+      ),
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('does not start a duplicate while a lease is active', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-runtime-'));
   try {

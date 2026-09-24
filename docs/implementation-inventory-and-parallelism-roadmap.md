@@ -84,8 +84,8 @@ the canonical Nx repository and separates it from planned behavior.
   final receipt publication can therefore resume without replaying completed
   stages.
 - This is a mechanical foundation, not yet a complete durable scheduler: it
-  does not yet apply cancellation policy, send notifications, renew parent
-  leases, or provide shared-store fencing. Serial and restartable child
+  does not yet apply cancellation policy, send notifications, or provide
+  shared-store fencing. Serial and restartable child
   execution now bind completed work to local workspace manifests when callers
   provide explicit workspace bindings; shared artifact recovery remains open.
 
@@ -147,7 +147,8 @@ that a repaired terminal child is not rerun and that stale receipts are not
 replayed when expected state is missing. This remains a local child-task proof:
 it deliberately does not claim parent-run lease renewal, automatic failover,
 shared control or artifact storage, cancellation policy, or cross-machine
-execution. Local
+execution. Parent lease renewal is available through an explicit scheduler
+heartbeat, but it does not imply automatic failover. Local
 mechanical retry and cancellation gating are implemented for explicitly
 configured child attempts/assignments; they do not imply automatic failover,
 semantic retry decisions, or a complete cancellation policy.
@@ -192,9 +193,9 @@ automatic failover.
    restartable child completion and serial PASS-stage checkpoint resume;
    bounded local retry and executor-integrated provider-neutral evidence
    publication/replay verification and durable run-level concurrency evidence
-   are implemented; cancellation policy, provider-specific capture, shared
-   artifact storage, and cross-machine failover remain explicit follow-on
-   gates.
+   are implemented; cancellation policy, notifications, provider-specific
+   capture, shared artifact storage, and cross-machine failover remain explicit
+   follow-on gates.
 4. **Temporal/shared-service proof.** Move the local Stage 1 proof to a shared
    Temporal service and artifact store. Prove builder/coordinator replacement,
    approval recovery, required-concurrency failure, serial fallback only when

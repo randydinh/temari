@@ -237,7 +237,8 @@ references before reuse. An explicit bounded mechanical retry policy is
 available for child handlers. Completed parallel receipts also retain the
 child group, assignment set, declared bound, and observed peak concurrency;
 replay refuses a receipt whose execution evidence does not match the task
-identity. The
+identity. Scheduled execution can opt into an append-only parent lease-renewal
+heartbeat; renewal failure prevents the run from being marked complete. The
 dispatcher should be deterministic. It is not an LLM scheduler agent.
 
 ### Scheduling path
