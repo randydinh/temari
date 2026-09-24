@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "id": "feature-v1",
+  "route": "feature",
+  "playbook": {
+    "path": "../../playbooks/feature.md",
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "hostCapabilities": ["subagents", "forge"],
+  "stages": [
+    {
+      "id": "shape",
+      "assignment": { "owner": "coordinator", "distinctFrom": [] },
+      "requirements": [
+        {
+          "id": "feature.shape.how",
+          "sourceStep": "1",
+          "description": "Run how over the affected subsystem.",
+          "allowedEvidenceKinds": ["document", "review"],
+          "skip": { "allowed": false }
+        }
+      ]
+    },
+    {
+      "id": "build",
+      "assignment": { "owner": "non-coordinator", "distinctFrom": ["review"] },
+      "requirements": [
+        {
+          "id": "feature.build.delegated-implementation",
+          "sourceStep": "4",
+          "description": "Delegate implementation and review the resulting diff.",
+          "allowedEvidenceKinds": ["diff", "review"],
+          "requiredCapabilities": ["subagents"],
+          "skip": { "allowed": true, "whenCapabilityMissing": "subagents" }
+        }
+      ]
+    },
+    {
+      "id": "verify",
+      "assignment": { "owner": "coordinator", "distinctFrom": [] },
+      "requirements": [
+        {
+          "id": "feature.verify.matching-surface",
+          "sourceStep": "5",
+          "description": "Verify the feature on its matching surface.",
+          "allowedEvidenceKinds": ["command", "runtime"],
+          "skip": { "allowed": false }
+        }
+      ]
+    },
+    {
+      "id": "review",
+      "assignment": { "owner": "non-coordinator", "distinctFrom": ["build"] },
+      "requirements": [
+        {
+          "id": "feature.review.ordered-commits",
+          "sourceStep": "6",
+          "description": "Prepare small ordered commits whose checks prove each unit.",
+          "allowedEvidenceKinds": ["command", "diff", "review"],
+          "skip": { "allowed": false }
+        }
+      ]
+    },
+    {
+      "id": "delivery",
+      "assignment": { "owner": "coordinator", "distinctFrom": [] },
+      "requirements": [
+        {
+          "id": "feature.delivery.pull-request",
+          "sourceStep": "8",
+          "description": "Run the pull request opening workflow when forge access exists.",
+          "allowedEvidenceKinds": ["command", "runtime"],
+          "requiredCapabilities": ["forge"],
+          "skip": { "allowed": true, "whenCapabilityMissing": "forge" }
+        }
+      ]
+    }
+  ],
+  "boundaries": {
+    "final": {
+      "requirements": [
+        "feature.shape.how",
+        "feature.build.delegated-implementation",
+        "feature.verify.matching-surface"
+      ],
+      "resolvedGates": []
+    },
+    "commit": {
+      "requirements": [
+        "feature.shape.how",
+        "feature.build.delegated-implementation",
+        "feature.verify.matching-surface",
+        "feature.review.ordered-commits"
+      ],
+      "resolvedGates": []
+    },
+    "review": {
+      "requirements": [
+        "feature.shape.how",
+        "feature.build.delegated-implementation",
+        "feature.verify.matching-surface",
+        "feature.review.ordered-commits"
+      ],
+      "resolvedGates": []
+    },
+    "publish": {
+      "requirements": [
+        "feature.shape.how",
+        "feature.build.delegated-implementation",
+        "feature.verify.matching-surface",
+        "feature.review.ordered-commits",
+        "feature.delivery.pull-request"
+      ],
+      "resolvedGates": ["operator-approval"]
+    }
+  }
+}

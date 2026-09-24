@@ -4,9 +4,10 @@ This plan turns `temari-next` into the canonical Temari control plane.
 It keeps one workflow engine, treats host capabilities as explicit, and keeps
 personal, provider, and OpConnect material outside the shared repository.
 It is the living roadmap for implementation, not a waterfall schedule. The
-current candidate is a typed foundation with a bounded in-memory parallel
-worker slice; the cutover gate remains on hold until the durable and packaging
-gates below have evidence.
+current candidate is a typed foundation with bounded local restartable worker
+execution and durable local evidence. The cutover gate remains on hold until
+the compatibility, packaging, shared-service, and rollback gates below have
+evidence.
 
 ## How to read this
 
@@ -66,13 +67,14 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 
 **Files.**
 
-- [ ] Create `docs/migrations/v4.1-to-nx-matrix.md`.
+- [x] Create `docs/migrations/v4.1-to-nx-matrix.md`.
 - [ ] Extend `libs/contracts` with versioned request, route, capability, evidence, receipt, and overlay contracts only after the matrix names their consumers.
+- [x] Add the first versioned v4.1 profile and route parser under `libs/contracts`, with sanitized fixtures and no implicit `ExecutionPlan` conversion.
 - [ ] Add sanitized v4.1 fixtures under `fixtures/v4.1/` or the accepted equivalent.
 
 **Build.**
 
-- [ ] Map each carried behavior to source revision, target package, external boundary, omitted behavior, verification, and rollback.
+- [x] Map each carried behavior to source revision, target package, external boundary, omitted behavior, verification, and rollback in `docs/migrations/v4.1-to-nx-matrix.md`.
 - [ ] Define the compatibility boundary between v4.1 profile and route records and the Nx `ExecutionPlan` version.
 - [ ] Make the workflow stage sequence canonical instead of caller-controlled. Preserve explicit optional, required, and blocked capability outcomes.
 - [ ] Add capability provenance so a declared adapter does not satisfy a strict gate without a proof source.
@@ -376,9 +378,14 @@ out of scope until fencing, idempotency, and reconciliation are proven.
 
 ## Appendix A. Prototype evidence
 
-The current candidate was inspected at commit `616c8cd8ee915a301f6c3adc9f06a9993475f3fd`. Its resolved Nx projects are `contracts`, `workflow-engine`, and `host-adapters`. The observed local command `pnpm exec nx run-many -t typecheck test --parallel=1` passed the current five targets, but this proves only repository-level checks.
+The current candidate was inspected at commit `057e65e`. Its resolved Nx
+projects include `contracts`, `workflow-engine`, `host-adapters`, `runtime`,
+`temari-core`, `plan-draft`, `knowledge`, `archon-harness`, `initializer`, and
+`workflow-runtime`. Repository checks prove only repository behavior. They do
+not prove a clean host journey, shared-service recovery, or final cutover.
 
-The current worktree is dirty. Its existing edits and the untracked `.audit/` and test files belong to the user and remain outside this plan's write scope.
+The previous local `.audit/` and `graphify-out/` directories are ignored local
+artifacts. They are not migration inputs or runtime dependencies.
 
 The architecture comparison tested two candidates. Candidate A keeps the Nx repository as a core-first control plane and manages hosts, providers, plugins, and OpConnect as external overlays. Candidate B promotes runtime, QA, host implementations, and providers to first-class Nx projects. Candidate A is selected for the first increments. Candidate B remains a gated expansion after an unattended journey and a second real consumer earn the shared runtime cost.
 

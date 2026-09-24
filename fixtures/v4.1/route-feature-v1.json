@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "kind": "route",
+  "sequence": 1,
+  "at": "2026-09-24T00:00:00.000Z",
+  "actor": "coordinator",
+  "profilePath": "/old/checkout/profile.json",
+  "profileId": "feature-v1",
+  "profileSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "capabilities": ["subagents", "forge"],
+  "assignments": {
+    "shape": "coordinator",
+    "build": "builder",
+    "verify": "coordinator",
+    "review": "reviewer",
+    "delivery": "coordinator"
+  },
+  "fromProfileId": null,
+  "invalidatedRequirementIds": []
+}
