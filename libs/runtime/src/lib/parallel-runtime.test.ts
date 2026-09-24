@@ -11,6 +11,7 @@ import {
   FileParallelWorkerReceiptStore,
 } from './parallel-runtime.js';
 import { FileChildTaskStore } from './child-task-store.js';
+import { FileEvidenceStore } from './evidence-store.js';
 import { FileWorkspaceManifestStore } from './workspace-manifest.js';
 
 test('resumes a bounded child batch and joins terminal results in declaration order', async () => {
@@ -301,6 +302,72 @@ test('publishes and verifies a workspace manifest for every completed child', as
       executeRestartableParallelWorkers(request),
       /Workspace manifest changed|Workspace file changed/,
     );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('publishes portable worker evidence and refuses replay when the artifact is missing', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
+  try {
+    const childStore = await FileChildTaskStore.create(join(root, 'children'));
+    const receiptStore = await FileParallelWorkerReceiptStore.create(
+      join(root, 'receipts'),
+    );
+    const evidenceStore = await FileEvidenceStore.create(
+      join(root, 'evidence'),
+    );
+    let calls = 0;
+    const request = {
+      runId: 'parallel-runtime-evidence-1',
+      revision: 'revision-parallel-runtime-evidence-1',
+      plan: parallelPlan('feature', 1),
+      capabilities: parallelCapabilities(),
+      assignments: workerAssignments(1),
+      childStore,
+      receiptStore,
+      evidenceStore,
+      evidenceForAssignment: (assignment: WorkerAssignment) => [
+        {
+          kind: 'worker-result' as const,
+          content: JSON.stringify({
+            assignment: assignment.id,
+            verdict: 'PASS',
+          }),
+        },
+      ],
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      now: fixedClock(),
+      handler: () => {
+        calls += 1;
+        return result('evidence published');
+      },
+    } as const;
+
+    const completed = await executeRestartableParallelWorkers(request);
+    assert.equal(completed.state, 'COMPLETE');
+    assert.equal(calls, 1);
+    const reference = completed.tasks[0]?.result?.evidenceReferences?.[0];
+    assert(reference);
+    assert.equal(reference.runId, request.runId);
+    assert.equal(reference.revision, request.revision);
+    assert.equal('path' in reference, false);
+    assert.deepEqual(
+      await evidenceStore.loadPortable(reference),
+      Buffer.from(JSON.stringify({ assignment: 'worker-1', verdict: 'PASS' })),
+    );
+
+    const replay = await executeRestartableParallelWorkers(request);
+    assert.equal(replay.state, 'COMPLETE');
+    assert.equal(calls, 1);
+
+    await rm(join(root, 'evidence', `${reference.sha256}.artifact`));
+    await assert.rejects(
+      executeRestartableParallelWorkers(request),
+      /ENOENT|Evidence artifact|evidence/i,
+    );
+    assert.equal(calls, 1);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

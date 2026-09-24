@@ -23,6 +23,16 @@ test('accepts a bounded brief and an evidence-bearing worker result', () => {
     summary: 'Assessment retained with open questions.',
     evidencePaths: ['/tmp/checkpoint.json'],
     rawLogPath: null,
+    evidenceReferences: [
+      {
+        schema: 1 as const,
+        runId: 'run-1',
+        revision: 'revision-1',
+        kind: 'worker-result' as const,
+        sha256: 'a'.repeat(64),
+        bytes: 42,
+      },
+    ],
   };
 
   assert.deepEqual(validateWorkerBrief(brief), []);
@@ -63,4 +73,26 @@ test('rejects NUL-bearing evidence references at the contract boundary', () => {
   });
 
   assert(issues.some((issue) => issue.includes('NUL')));
+});
+
+test('rejects non-portable worker evidence identities', () => {
+  const issues = validateWorkerResult({
+    status: 'PASS',
+    summary: 'Result',
+    evidencePaths: ['checkpoint.json'],
+    rawLogPath: null,
+    evidenceReferences: [
+      {
+        schema: 1,
+        runId: 'run-1',
+        revision: 'revision-1',
+        kind: 'worker-result',
+        sha256: '/tmp/provider.log',
+        bytes: -1,
+      },
+    ],
+  });
+
+  assert(issues.some((issue) => issue.includes('sha256')));
+  assert(issues.some((issue) => issue.includes('bytes')));
 });

@@ -11,16 +11,11 @@ import {
 } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 
-export type EvidenceKind =
-  'stdout' | 'stderr' | 'worker-result' | 'verification' | 'other';
+import type { EvidenceKind, WorkerEvidenceReference } from '@temari/contracts';
 
-export interface EvidenceReference {
-  readonly schema: 1;
-  readonly runId: string;
-  readonly revision: string;
-  readonly kind: EvidenceKind;
-  readonly sha256: string;
-  readonly bytes: number;
+export type { EvidenceKind, WorkerEvidenceReference } from '@temari/contracts';
+
+export interface EvidenceReference extends WorkerEvidenceReference {
   readonly path: string;
 }
 
@@ -34,6 +29,7 @@ export interface PutEvidenceRequest {
 export interface EvidenceStore {
   put(request: PutEvidenceRequest): Promise<EvidenceReference>;
   load(reference: EvidenceReference): Promise<Uint8Array>;
+  loadPortable(reference: WorkerEvidenceReference): Promise<Uint8Array>;
 }
 
 const MAX_EVIDENCE_BYTES = 16 * 1024 * 1024;
@@ -131,6 +127,28 @@ export class FileEvidenceStore implements EvidenceStore {
       path,
       'Evidence path is outside its configured store.',
     );
+    return this.loadAtPath(reference, path);
+  }
+
+  async loadPortable(reference: WorkerEvidenceReference): Promise<Uint8Array> {
+    assert.equal(reference.schema, 1);
+    assertRunId(reference.runId);
+    assertRevision(reference.revision);
+    assertHash(reference.sha256);
+    assert(
+      Number.isSafeInteger(reference.bytes) && reference.bytes >= 0,
+      'Evidence byte count is invalid.',
+    );
+    return this.loadAtPath(
+      reference,
+      join(this.root, `${reference.sha256}.artifact`),
+    );
+  }
+
+  private async loadAtPath(
+    reference: WorkerEvidenceReference,
+    path: string,
+  ): Promise<Uint8Array> {
     const stat = await lstat(path);
     assert(
       stat.isFile() && !stat.isSymbolicLink(),

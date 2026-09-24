@@ -1,3 +1,5 @@
+import type { WorkerEvidenceReference } from './evidence.js';
+
 export type WorkerRole =
   | 'coordinator'
   | 'investigator'
@@ -30,6 +32,8 @@ export interface WorkerResult {
   readonly summary: string;
   readonly evidencePaths: readonly string[];
   readonly rawLogPath: string | null;
+  /** Portable identities for evidence retained by the runtime. */
+  readonly evidenceReferences?: readonly WorkerEvidenceReference[];
   readonly workspaceManifestId?: string | null;
 }
 
@@ -48,6 +52,29 @@ function evidencePath(value: string, field: string, issues: string[]): void {
   nonEmpty(value, field, issues);
   if (value.includes('\0'))
     issues.push(`${field} must not contain a NUL byte.`);
+}
+
+function evidenceReference(
+  value: WorkerEvidenceReference,
+  field: string,
+  issues: string[],
+): void {
+  if (value.schema !== 1) issues.push(`${field}.schema must be 1.`);
+  evidencePath(value.runId, `${field}.runId`, issues);
+  evidencePath(value.revision, `${field}.revision`, issues);
+  if (
+    !['stdout', 'stderr', 'worker-result', 'verification', 'other'].includes(
+      value.kind,
+    )
+  ) {
+    issues.push(`${field}.kind is not supported.`);
+  }
+  if (!/^[0-9a-f]{64}$/.test(value.sha256)) {
+    issues.push(`${field}.sha256 must be a lowercase SHA-256 digest.`);
+  }
+  if (!Number.isSafeInteger(value.bytes) || value.bytes < 0) {
+    issues.push(`${field}.bytes must be a non-negative safe integer.`);
+  }
 }
 
 /** Return shape and completeness issues without deciding whether work passed. */
@@ -89,6 +116,9 @@ export function validateWorkerResult(result: WorkerResult): readonly string[] {
   });
   if (result.rawLogPath !== null)
     evidencePath(result.rawLogPath, 'rawLogPath', issues);
+  result.evidenceReferences?.forEach((value, index) => {
+    evidenceReference(value, `evidenceReferences[${index}]`, issues);
+  });
   if (
     result.workspaceManifestId !== undefined &&
     result.workspaceManifestId !== null

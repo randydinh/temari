@@ -188,6 +188,17 @@ test('stores immutable content-addressed evidence and verifies it on reload', as
       await store.load(reference),
       Buffer.from('verification output\n'),
     );
+    assert.deepEqual(
+      await store.loadPortable({
+        schema: 1,
+        runId: reference.runId,
+        revision: reference.revision,
+        kind: reference.kind,
+        sha256: reference.sha256,
+        bytes: reference.bytes,
+      }),
+      Buffer.from('verification output\n'),
+    );
     await assert.rejects(
       store.load({ ...reference, sha256: '0'.repeat(64) }),
       /Evidence hash changed|Evidence path is outside|ENOENT/,

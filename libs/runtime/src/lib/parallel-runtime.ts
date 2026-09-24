@@ -14,8 +14,10 @@ import {
   assertWorkerResult,
   missingCapabilities,
   type ExecutionPlan,
+  type EvidenceKind,
   type HostCapabilityReport,
   type WorkerAssignment,
+  type WorkerEvidenceReference,
   type WorkerResult,
 } from '@temari/contracts';
 import {
@@ -30,6 +32,7 @@ import type {
   ChildTaskStatus,
   ChildTaskStore,
 } from './child-task-store.js';
+import type { EvidenceReference, EvidenceStore } from './evidence-store.js';
 import type { WorkspaceManifestStore } from './workspace-manifest.js';
 
 export interface ParallelWorkerReceiptStore {
@@ -87,6 +90,11 @@ export interface ExecuteRestartableParallelWorkersRequest {
   readonly receiptStore: ParallelWorkerReceiptStore;
   readonly owner: string;
   readonly leaseMs: number;
+  readonly evidenceStore?: EvidenceStore;
+  readonly evidenceForAssignment?: (
+    assignment: WorkerAssignment,
+    result: WorkerResult,
+  ) => readonly WorkerEvidenceInput[] | Promise<readonly WorkerEvidenceInput[]>;
   readonly workspaceManifestStore?: WorkspaceManifestStore;
   readonly workspaceForAssignment?: (
     assignment: WorkerAssignment,
@@ -104,6 +112,11 @@ export interface ExecuteRestartableParallelWorkersRequest {
     assignment: WorkerAssignment,
   ) => Promise<WorkerResult> | WorkerResult;
   readonly now?: () => Date;
+}
+
+export interface WorkerEvidenceInput {
+  readonly kind: EvidenceKind;
+  readonly content: string | Uint8Array;
 }
 
 export interface WorkspaceBinding {
@@ -549,11 +562,74 @@ async function verifyExpectedWorkspaces(
   await Promise.all(
     records.map(async (record) => {
       if (!record) return;
+      await verifyEvidence(request, record);
       const assignment = assignmentByTaskId.get(record.taskId);
       assert(assignment);
       await verifyWorkspaceManifest(request, assignment, record);
     }),
   );
+}
+
+function portableEvidenceReference(
+  reference: EvidenceReference,
+): WorkerEvidenceReference {
+  return {
+    schema: reference.schema,
+    runId: reference.runId,
+    revision: reference.revision,
+    kind: reference.kind,
+    sha256: reference.sha256,
+    bytes: reference.bytes,
+  };
+}
+
+async function verifyEvidence(
+  request: ExecuteRestartableParallelWorkersRequest,
+  record: ChildTaskRecord,
+): Promise<void> {
+  const references = record.result?.evidenceReferences ?? [];
+  if (references.length === 0) return;
+  const store = request.evidenceStore;
+  assert(
+    store,
+    `Child ${record.taskId} has retained evidence but no evidence store was configured.`,
+  );
+  await Promise.all(
+    references.map(async (reference) => {
+      assert.equal(reference.runId, request.runId);
+      assert.equal(reference.revision, request.revision);
+      await store.loadPortable(reference);
+    }),
+  );
+}
+
+async function publishWorkerEvidence(
+  request: ExecuteRestartableParallelWorkersRequest,
+  assignment: WorkerAssignment,
+  result: WorkerResult,
+): Promise<WorkerResult> {
+  const evidenceForAssignment = request.evidenceForAssignment;
+  if (!evidenceForAssignment) return result;
+  const store = request.evidenceStore;
+  assert(store, 'evidenceForAssignment requires an evidenceStore.');
+  const inputs = await evidenceForAssignment(assignment, result);
+  const references = await Promise.all(
+    inputs.map(async (input) => {
+      const reference = await store.put({
+        runId: request.runId,
+        revision: request.revision,
+        kind: input.kind,
+        content: input.content,
+      });
+      await store.load(reference);
+      return portableEvidenceReference(reference);
+    }),
+  );
+  if (references.length === 0) return result;
+  return {
+    ...result,
+    evidenceReferences: [...(result.evidenceReferences ?? []), ...references],
+  };
 }
 
 async function reconcileExpectedTasks(
@@ -577,6 +653,7 @@ async function executeClaimed(
   try {
     result = await request.handler(claimed.assignment);
     assertWorkerResult(result);
+    result = await publishWorkerEvidence(request, claimed.assignment, result);
     const workspaceManifestSaved = await persistWorkspaceManifest(
       request,
       claimed.assignment,
