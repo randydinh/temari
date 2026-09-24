@@ -185,6 +185,18 @@ test('maps the verified feature profile to the canonical Nx plan at final', asyn
   assert.deepEqual(boundary.plan?.requiredCapabilities, ['subagents', 'forge']);
 });
 
+test('accepts equivalent CRLF playbook text on Windows hosts', async () => {
+  const playbook = await featurePlaybookText();
+  const boundary = assessV41PlanBoundary({
+    parsed: await parsedFeatureProfile(),
+    boundary: 'final',
+    playbookText: playbook.replace(/\n/g, '\r\n'),
+    workType: 'feature',
+  });
+
+  assert.equal(boundary.status, 'supported');
+});
+
 test('blocks the feature profile at publish until operator approval is represented', async () => {
   const boundary = assessV41PlanBoundary({
     parsed: await parsedFeatureProfile(),

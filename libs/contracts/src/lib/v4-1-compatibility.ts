@@ -160,6 +160,10 @@ function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
+function canonicalPlaybookText(value: string): string {
+  return value.replace(/\r\n?/g, '\n');
+}
+
 class CompatibilityParseError extends Error {}
 
 function record(value: unknown, where: string): Record<string, unknown> {
@@ -576,7 +580,8 @@ function boundaryResult(
  * Assess the only currently verified v4.1 profile-to-plan mapping.
  * Structural parsing alone never creates an executable plan. The mapping is
  * explicit because the source profile order differs from the canonical Nx
- * stage order, and unresolved source gates remain a blocked boundary.
+ * stage order, and unresolved source gates remain a blocked boundary. The
+ * playbook identity uses canonical text line endings for cross-platform hosts.
  */
 export function assessV41PlanBoundary(
   input: V41PlanBoundaryInput,
@@ -602,7 +607,10 @@ export function assessV41PlanBoundary(
     );
   }
 
-  if (sha256(input.playbookText) !== profile.playbook.sha256) {
+  if (
+    sha256(canonicalPlaybookText(input.playbookText)) !==
+    profile.playbook.sha256
+  ) {
     return boundaryResult(
       input,
       'blocked',
