@@ -180,19 +180,25 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 
 ## Add bounded parallel worker execution (WP2P)
 
-**Depends on.** `WP2`. This work package makes parallelism executable without
-making it durable or allowing workers to mutate shared semantic state.
+**Depends on.** `WP2`. This work package made parallelism executable without
+allowing workers to mutate shared semantic state. The local durable slice is
+implemented; shared-service recovery remains a later gate.
 
 **Current evidence.** The contracts already define worker briefs and typed
 worker results, and host capability reports already distinguish
 `parallelism`. The workflow engine provides `runParallelWorkers`: it validates
 assignments, refuses a missing capability before starting work, limits fan-out
 to the declared maximum, continues collecting sibling results, and joins them
-in declaration order. `FileChildTaskStore` now provides a local durable slice
-for parent-bound child records, dependency-aware claims, leases, fencing
-epochs, result persistence, idempotent completion, and ready-frontier
-reconstruction. The executor does not yet use that store for restartable
-parallel dispatch.
+in declaration order. `FileChildTaskStore` and the restartable executor now
+provide a local durable slice for parent-bound child records, dependency-aware
+claims, leases, fencing epochs, result persistence, idempotent completion,
+ready-frontier reconstruction, bounded mechanical retry, cancellation gating,
+crash-boundary reconciliation, and restartable replay. Workspace manifests,
+provider-neutral evidence publication and replay verification, and durable
+execution-concurrency evidence are also implemented when callers provide
+explicit local bindings. This remains a local proof; shared control/artifact
+storage, provider-specific capture, and cross-machine recovery are not
+claimed.
 
 **Files.**
 
@@ -203,34 +209,36 @@ parallel dispatch.
 - [x] Add capability-gap, concurrency-bound, ordering, and failure-join tests.
 - [x] Add local durable child-task records, ownership, leases, fencing epochs,
       dependency-aware claims, result persistence, and idempotent completion.
-- [ ] Integrate child-task persistence with the executor and add explicit
-      retry, cancellation, crash-reconciliation, and unattended recovery.
+- [x] Integrate child-task persistence with the executor and add explicit
+      retry, cancellation, crash-reconciliation, and local restart recovery.
 
 **Build next.**
 
 - [x] Give each child task a stable ID, parent run ID, revision, dependency
       set, attempt, owner, lease, status, fencing epoch, and idempotent
       completion key.
-- [ ] Persist child results and evidence manifests separately from coordinator
+- [x] Persist child results and evidence manifests separately from coordinator
       state; only the coordinator may publish the joined semantic result.
 - [ ] Define join policy for `PASS`, `ISSUES`, `BLOCKED`, and `DROPPED`, plus
       required-task failure and optional-task degradation.
 - [x] Add fencing epochs so an expired worker cannot publish after takeover.
-- [ ] Prove interruption, retry, duplicate delivery, partial completion, and
-      manual takeover with shared control and artifact stores.
+- [x] Prove interruption, retry, duplicate delivery, and partial completion in
+      the local runtime; shared-store manual takeover remains open.
 
 **You see.**
 
-- [ ] Two independent assignments overlap when the host proves parallelism.
-- [ ] A serial host blocks required parallel work before any child starts.
-- [ ] A failed child does not erase sibling evidence or cause duplicate work on
+- [x] Two independent assignments overlap when the host proves parallelism.
+- [x] A serial host blocks required parallel work before any child starts.
+- [x] A failed child does not erase sibling evidence or cause duplicate work on
       replay.
-- [ ] A coordinator restart can reconstruct the child frontier and join state.
+- [x] A local coordinator restart can reconstruct the child frontier and join
+      state; cross-machine takeover remains open.
 
 **Verify.**
 
-- [ ] Unit tests cover fan-out bounds, stable joins, malformed results, worker
-      errors, capability gaps, replay, and child-task fencing.
+- [x] Unit tests cover fan-out bounds, stable joins, malformed results, worker
+      errors, capability gaps, replay, child-task fencing, retry, cancellation,
+      manifests, evidence replay, and durable concurrency evidence.
 - [ ] Live proof runs two independent tasks with separate workspaces and
       retained evidence, then interrupts and resumes one child.
 - [ ] Perf proof records peak concurrency and confirms no shared-state race or
