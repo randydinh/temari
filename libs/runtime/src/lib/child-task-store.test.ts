@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -19,9 +19,11 @@ test('creates child tasks idempotently and binds their parent graph', async () =
       now: at('2026-09-23T12:00:00.000Z'),
     } as const;
     const first = await store.create(request);
+    await rm(join(root, '.child-create-1.transaction.json'), { force: true });
     const replay = await store.create({
       ...request,
       dependsOn: ['dependency-a', 'dependency-b'],
+      actor: 'resumed-coordinator',
       now: at('2026-09-23T13:00:00.000Z'),
     });
 
@@ -275,6 +277,46 @@ test('serializes concurrent claims so only one owner receives a child lease', as
   }
 });
 
+test('serializes cyclic dependency claims without lock inversion', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-child-task-store-'));
+  try {
+    const store = await FileChildTaskStore.create(root);
+    await store.create({
+      taskId: 'child-cycle-a',
+      runId: 'run-cycle-1',
+      revision: 'revision-cycle-1',
+      dependsOn: ['child-cycle-b'],
+      actor: 'coordinator',
+    });
+    await store.create({
+      taskId: 'child-cycle-b',
+      runId: 'run-cycle-1',
+      revision: 'revision-cycle-1',
+      dependsOn: ['child-cycle-a'],
+      actor: 'coordinator',
+    });
+
+    const results = await Promise.all([
+      store.claim({
+        taskId: 'child-cycle-a',
+        owner: 'worker-a',
+        leaseMs: 30_000,
+      }),
+      store.claim({
+        taskId: 'child-cycle-b',
+        owner: 'worker-b',
+        leaseMs: 30_000,
+      }),
+    ]);
+    assert.deepEqual(
+      results.map((result) => result.record.status),
+      ['QUEUED', 'QUEUED'],
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('increments fencing epochs after expiry and rejects stale completion', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-child-task-store-'));
   try {
@@ -403,6 +445,101 @@ test('reconstructs a stable ready frontier for a run revision', async () => {
   }
 });
 
+test('repairs every transaction interruption boundary idempotently', async () => {
+  const stages = [
+    'after-sidecar-fsync',
+    'after-state-publication',
+    'after-event-publication',
+    'after-sidecar-removal',
+  ] as const;
+
+  for (const stage of stages) {
+    const root = await mkdtemp(join(tmpdir(), 'temari-child-task-store-'));
+    try {
+      const store = await FileChildTaskStore.create(root);
+      await store.create({
+        taskId: `child-recovery-${stage.slice(6, 8)}`,
+        runId: 'run-recovery-1',
+        revision: 'revision-recovery-1',
+        dependsOn: [],
+        actor: 'coordinator',
+      });
+      const claimed = await store.claim({
+        taskId: `child-recovery-${stage.slice(6, 8)}`,
+        owner: 'worker-a',
+        leaseMs: 30_000,
+      });
+      assert(claimed.record.lease);
+      const completion = {
+        taskId: claimed.record.taskId,
+        owner: 'worker-a',
+        leaseToken: claimed.record.lease.token,
+        fencingEpoch: claimed.record.lease.fencingEpoch,
+        status: 'SUCCEEDED' as const,
+        idempotencyKey: `complete:${claimed.record.taskId}:1`,
+        result: result('PASS', `recovered at ${stage}`),
+      };
+
+      setFailureInjection(stage);
+      await assert.rejects(store.complete(completion), /Injected child task/);
+      const repaired = await store.reconcile(completion.taskId);
+      assert.equal(repaired?.status, 'SUCCEEDED');
+      assert.equal((await store.events(completion.taskId)).length, 3);
+      assert.equal(
+        (await readdir(root)).filter((name) => name.includes('transaction'))
+          .length,
+        0,
+      );
+
+      const replay = await store.complete(completion);
+      assert.deepEqual(replay, repaired);
+      assert.equal((await store.events(completion.taskId)).length, 3);
+    } finally {
+      setFailureInjection(null);
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test('fails closed on partial JSONL, event-ahead state, and missing state', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-child-task-store-'));
+  try {
+    const store = await FileChildTaskStore.create(root);
+    const taskId = 'child-corrupt-1';
+    await store.create({
+      taskId,
+      runId: 'run-corrupt-1',
+      revision: 'revision-corrupt-1',
+      dependsOn: [],
+      actor: 'coordinator',
+    });
+    const eventPath = join(root, `${taskId}.events.jsonl`);
+    const originalEvents = await readFile(eventPath, 'utf8');
+
+    await writeFile(eventPath, `${originalEvents}\n`);
+    await assert.rejects(store.load(taskId), /blank or partial JSONL/);
+
+    const created = JSON.parse(originalEvents) as Record<string, unknown>;
+    await writeFile(
+      eventPath,
+      `${originalEvents}${JSON.stringify({
+        ...created,
+        sequence: 2,
+        type: 'task-claimed',
+        idempotencyKey: 'claim:corrupt',
+        actor: 'worker-a',
+        payload: { attempt: 1, fencingEpoch: 1, expiresAt: created.at },
+      })}\n`,
+    );
+    await assert.rejects(store.load(taskId), /event log is ahead of state/);
+
+    await rm(join(root, `${taskId}.task.json`));
+    await assert.rejects(store.load(taskId), /missing its state/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 function result(
   status: 'PASS' | 'ISSUES' | 'BLOCKED' | 'DROPPED',
   summary: string,
@@ -417,4 +554,17 @@ function result(
 
 function at(value: string): Date {
   return new Date(value);
+}
+
+type FailureInjectionStage =
+  | 'after-sidecar-fsync'
+  | 'after-state-publication'
+  | 'after-event-publication'
+  | 'after-sidecar-removal';
+
+function setFailureInjection(stage: FailureInjectionStage | null): void {
+  const constructor = FileChildTaskStore as unknown as {
+    failureInjection: FailureInjectionStage | null;
+  };
+  constructor.failureInjection = stage;
 }
