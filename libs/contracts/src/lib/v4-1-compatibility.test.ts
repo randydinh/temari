@@ -190,7 +190,7 @@ test('accepts equivalent CRLF playbook text on Windows hosts', async () => {
   const boundary = assessV41PlanBoundary({
     parsed: await parsedFeatureProfile(),
     boundary: 'final',
-    playbookText: playbook.replace(/\n/g, '\r\n'),
+    playbookText: playbook.replace(/\r\n?/g, '\n').replace(/\n/g, '\r\n'),
     workType: 'feature',
   });
 
