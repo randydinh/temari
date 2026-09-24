@@ -52,6 +52,7 @@ export interface V41ProfileRecord {
 
 export interface V41ProfileIdentity {
   readonly sourceRevision: string;
+  /** SHA-256 of the profile JSON with canonical LF line endings. */
   readonly profileSha256: string;
 }
 
@@ -189,6 +190,10 @@ function sha256(value: string): string {
 }
 
 function canonicalPlaybookText(value: string): string {
+  return value.replace(/\r\n?/g, '\n');
+}
+
+function canonicalProfileText(value: string): string {
   return value.replace(/\r\n?/g, '\n');
 }
 
@@ -530,7 +535,7 @@ export function parseV41Profile(
       SOURCE_REVISION,
     );
     const profileText = text(input.profileText, 'profileText');
-    const profileSha256 = sha256(profileText);
+    const profileSha256 = sha256(canonicalProfileText(profileText));
     if (input.expectedProfileSha256 !== undefined) {
       const expectedProfileSha256 = text(
         input.expectedProfileSha256,

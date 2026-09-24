@@ -34,7 +34,9 @@ function profileInput(profileText: string): V41ProfileInput {
 }
 
 function sha256(value: string): string {
-  return createHash('sha256').update(value).digest('hex');
+  return createHash('sha256')
+    .update(value.replace(/\r\n?/g, '\n'))
+    .digest('hex');
 }
 
 async function parsedFeatureProfile() {
@@ -65,6 +67,19 @@ test('parses a valid v4.1 profile and preserves source identity', async () => {
     result.value.profile.stages.map((stage) => stage.id),
     ['shape', 'build', 'verify', 'review', 'delivery'],
   );
+});
+
+test('keeps profile identity stable across LF and CRLF text', async () => {
+  const profileText = await fixture('profile-feature-v1.json');
+  const lf = parseV41Profile(profileInput(profileText.replace(/\r\n?/g, '\n')));
+  const crlf = parseV41Profile(
+    profileInput(profileText.replace(/\r\n?/g, '\n').replace(/\n/g, '\r\n')),
+  );
+
+  assert.equal(lf.status, 'valid');
+  assert.equal(crlf.status, 'valid');
+  if (lf.status !== 'valid' || crlf.status !== 'valid') return;
+  assert.deepEqual(crlf.value.identity, lf.value.identity);
 });
 
 test('rejects malformed profiles without producing an executable plan', async () => {
