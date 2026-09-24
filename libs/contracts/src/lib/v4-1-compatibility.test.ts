@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import {
+  assessV41PlanBoundary,
   parseV41Profile,
   parseV41RouteEvent,
   type V41ProfileInput,
@@ -14,6 +15,10 @@ import {
 const fixtureRoot = join(
   dirname(fileURLToPath(import.meta.url)),
   '../../../../fixtures/v4.1',
+);
+const featurePlaybookPath = join(
+  fixtureRoot,
+  '../../packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/feature.md',
 );
 
 async function fixture(name: string): Promise<string> {
@@ -29,6 +34,18 @@ function profileInput(profileText: string): V41ProfileInput {
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
+}
+
+async function parsedFeatureProfile() {
+  const result = parseV41Profile(
+    profileInput(await fixture('profile-feature-v1.json')),
+  );
+  if (result.status !== 'valid') throw new Error(result.reason);
+  return result.value;
+}
+
+async function featurePlaybookText(): Promise<string> {
+  return readFile(featurePlaybookPath, 'utf8');
 }
 
 test('parses a valid v4.1 profile and preserves source identity', async () => {
@@ -130,4 +147,166 @@ test('rejects a route event with an unsupported version or invalid assignment', 
     status: 'invalid',
     reason: 'route event version or kind is invalid',
   });
+});
+
+test('maps the verified feature profile to the canonical Nx plan at final', async () => {
+  const boundary = assessV41PlanBoundary({
+    parsed: await parsedFeatureProfile(),
+    boundary: 'final',
+    playbookText: await featurePlaybookText(),
+    workType: 'feature',
+  });
+
+  assert.equal(boundary.status, 'supported');
+  assert.equal(boundary.targetExecutionPlanVersion, 1);
+  assert.deepEqual(boundary.targetStages, [
+    'investigate',
+    'plan',
+    'build',
+    'review',
+    'verify',
+    'deliver',
+  ]);
+  assert.deepEqual(boundary.sourceStageIds, [
+    'shape',
+    'build',
+    'verify',
+    'review',
+    'delivery',
+  ]);
+  assert.deepEqual(boundary.stageMapping, {
+    investigate: ['shape'],
+    plan: ['shape'],
+    build: ['build'],
+    review: ['review'],
+    verify: ['verify'],
+    deliver: ['delivery'],
+  });
+  assert.deepEqual(boundary.plan?.requiredCapabilities, ['subagents', 'forge']);
+});
+
+test('blocks the feature profile at publish until operator approval is represented', async () => {
+  const boundary = assessV41PlanBoundary({
+    parsed: await parsedFeatureProfile(),
+    boundary: 'publish',
+    playbookText: await featurePlaybookText(),
+    workType: 'feature',
+  });
+
+  assert.equal(boundary.status, 'blocked');
+  assert.equal(boundary.plan, null);
+  assert.deepEqual(boundary.requiredGates, ['operator-approval']);
+  assert.equal(
+    boundary.reason,
+    'Source boundary requires unresolved gates: operator-approval.',
+  );
+});
+
+test('refuses a profile that points at a different playbook', async () => {
+  const profile = JSON.parse(
+    await fixture('profile-feature-v1.json'),
+  ) as Record<string, unknown>;
+  const parsed = parseV41Profile(
+    profileInput(
+      JSON.stringify({
+        ...profile,
+        playbook: {
+          ...(profile.playbook as Record<string, unknown>),
+          path: '../../playbooks/bug-fix.md',
+        },
+      }),
+    ),
+  );
+  if (parsed.status === 'invalid') throw new Error(parsed.reason);
+
+  const boundary = assessV41PlanBoundary({
+    parsed: parsed.value,
+    boundary: 'final',
+    playbookText: await featurePlaybookText(),
+    workType: 'feature',
+  });
+
+  assert.equal(boundary.status, 'incompatible');
+  assert.equal(boundary.plan, null);
+});
+
+test('does not manufacture an Nx plan for the unmapped lightweight route', async () => {
+  const profile = JSON.parse(
+    await fixture('profile-feature-v1.json'),
+  ) as Record<string, unknown>;
+  const parsed = parseV41Profile(
+    profileInput(
+      JSON.stringify({ ...profile, route: 'lightweight-engineering' }),
+    ),
+  );
+  if (parsed.status === 'invalid') throw new Error(parsed.reason);
+
+  const boundary = assessV41PlanBoundary({
+    parsed: parsed.value,
+    boundary: 'final',
+    playbookText: await featurePlaybookText(),
+    workType: 'bug',
+  });
+
+  assert.equal(boundary.status, 'incompatible');
+  assert.equal(boundary.plan, null);
+  assert.deepEqual(boundary.stageMapping.investigate, []);
+});
+
+test('blocks a structurally valid profile with an unmapped capability', async () => {
+  const profile = JSON.parse(
+    await fixture('profile-feature-v1.json'),
+  ) as Record<string, unknown>;
+  const stages = profile.stages as Array<Record<string, unknown>>;
+  const build = stages[1];
+  assert.ok(build);
+  const requirements = build.requirements as Array<Record<string, unknown>>;
+  const requirement = requirements[0];
+  assert.ok(requirement);
+  const parsed = parseV41Profile(
+    profileInput(
+      JSON.stringify({
+        ...profile,
+        stages: [
+          stages[0],
+          {
+            ...build,
+            requirements: [
+              { ...requirement, requiredCapabilities: ['credential-store'] },
+            ],
+          },
+          ...stages.slice(2),
+        ],
+      }),
+    ),
+  );
+  if (parsed.status === 'invalid') throw new Error(parsed.reason);
+
+  const boundary = assessV41PlanBoundary({
+    parsed: parsed.value,
+    boundary: 'final',
+    playbookText: await featurePlaybookText(),
+    workType: 'feature',
+  });
+
+  assert.equal(boundary.status, 'blocked');
+  assert.equal(
+    boundary.reason,
+    'Feature profile requires an unmapped capability: credential-store.',
+  );
+});
+
+test('blocks a profile when its playbook bytes do not match the identity', async () => {
+  const boundary = assessV41PlanBoundary({
+    parsed: await parsedFeatureProfile(),
+    boundary: 'final',
+    playbookText: 'stale playbook bytes',
+    workType: 'feature',
+  });
+
+  assert.equal(boundary.status, 'blocked');
+  assert.equal(
+    boundary.reason,
+    'Playbook bytes do not match the profile hash.',
+  );
 });

@@ -4,7 +4,7 @@
   "route": "feature",
   "playbook": {
     "path": "../../playbooks/feature.md",
-    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    "sha256": "6c35ad16414d05056c22b32e84693d1669994334676806540f54adbfea26dca4"
   },
   "hostCapabilities": ["subagents", "forge"],
   "stages": [

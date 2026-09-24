@@ -1,5 +1,13 @@
 import { createHash } from 'node:crypto';
 
+import {
+  DEFAULT_STAGES,
+  reconcilePlan,
+  type ExecutionPlan,
+  type WorkType,
+  type WorkflowStageId,
+} from './execution-plan.js';
+
 export type V41Route = 'lightweight-engineering' | 'feature';
 export type V41Boundary = 'final' | 'commit' | 'review' | 'publish';
 export type V41EvidenceKind =
@@ -53,6 +61,29 @@ export interface V41ParsedProfile {
   readonly validation: 'structural-only';
 }
 
+export type V41PlanBoundaryStatus = 'supported' | 'blocked' | 'incompatible';
+
+export interface V41PlanBoundaryInput {
+  readonly parsed: V41ParsedProfile;
+  readonly boundary: V41Boundary;
+  readonly playbookText: string;
+  readonly workType: WorkType;
+}
+
+export interface V41PlanBoundary {
+  readonly status: V41PlanBoundaryStatus;
+  readonly source: V41ProfileIdentity;
+  readonly profileId: string;
+  readonly route: V41Route;
+  readonly targetExecutionPlanVersion: 1;
+  readonly targetStages: readonly WorkflowStageId[];
+  readonly sourceStageIds: readonly string[];
+  readonly stageMapping: Readonly<Record<WorkflowStageId, readonly string[]>>;
+  readonly requiredGates: readonly string[];
+  readonly plan: ExecutionPlan | null;
+  readonly reason: string | null;
+}
+
 export interface V41RouteEvent {
   readonly version: 1;
   readonly kind: 'route';
@@ -95,6 +126,35 @@ const IDENTIFIER = /^[a-z][a-z0-9-]*$/;
 const REQUIREMENT_ID = /^[a-z][a-z0-9.-]*$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 const SOURCE_REVISION = /^[a-f0-9]{40}$/;
+
+const FEATURE_PLAYBOOK_PATH = '../../playbooks/feature.md';
+const FEATURE_SOURCE_STAGE_IDS = [
+  'shape',
+  'build',
+  'verify',
+  'review',
+  'delivery',
+] as const;
+const FEATURE_STAGE_MAPPING: Readonly<
+  Record<WorkflowStageId, readonly string[]>
+> = {
+  investigate: ['shape'],
+  plan: ['shape'],
+  build: ['build'],
+  review: ['review'],
+  verify: ['verify'],
+  deliver: ['delivery'],
+};
+const EMPTY_STAGE_MAPPING: Readonly<
+  Record<WorkflowStageId, readonly string[]>
+> = {
+  investigate: [],
+  plan: [],
+  build: [],
+  review: [],
+  verify: [],
+  deliver: [],
+};
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -479,4 +539,129 @@ export function parseV41RouteEvent(
   } catch (error) {
     return invalid(error);
   }
+}
+
+function sameSet(left: readonly string[], right: readonly string[]): boolean {
+  return (
+    left.length === right.length && left.every((value) => right.includes(value))
+  );
+}
+
+function boundaryResult(
+  input: V41PlanBoundaryInput,
+  status: V41PlanBoundaryStatus,
+  reason: string | null,
+  plan: ExecutionPlan | null,
+): V41PlanBoundary {
+  const { parsed } = input;
+  return {
+    status,
+    source: parsed.identity,
+    profileId: parsed.profile.id,
+    route: parsed.profile.route,
+    targetExecutionPlanVersion: 1,
+    targetStages: DEFAULT_STAGES,
+    sourceStageIds: parsed.profile.stages.map((stage) => stage.id),
+    stageMapping:
+      parsed.profile.route === 'feature'
+        ? FEATURE_STAGE_MAPPING
+        : EMPTY_STAGE_MAPPING,
+    requiredGates: parsed.profile.boundaries[input.boundary].resolvedGates,
+    plan,
+    reason,
+  };
+}
+
+/**
+ * Assess the only currently verified v4.1 profile-to-plan mapping.
+ * Structural parsing alone never creates an executable plan. The mapping is
+ * explicit because the source profile order differs from the canonical Nx
+ * stage order, and unresolved source gates remain a blocked boundary.
+ */
+export function assessV41PlanBoundary(
+  input: V41PlanBoundaryInput,
+): V41PlanBoundary {
+  const profile = input.parsed.profile;
+  const sourceStageIds = profile.stages.map((stage) => stage.id);
+
+  if (profile.route !== 'feature') {
+    return boundaryResult(
+      input,
+      'incompatible',
+      'Only the verified feature route has an explicit Nx stage mapping.',
+      null,
+    );
+  }
+
+  if (profile.playbook.path !== FEATURE_PLAYBOOK_PATH) {
+    return boundaryResult(
+      input,
+      'incompatible',
+      'Profile playbook path is not the verified feature playbook.',
+      null,
+    );
+  }
+
+  if (sha256(input.playbookText) !== profile.playbook.sha256) {
+    return boundaryResult(
+      input,
+      'blocked',
+      'Playbook bytes do not match the profile hash.',
+      null,
+    );
+  }
+
+  if (!sameSet(profile.hostCapabilities, ['subagents', 'forge'])) {
+    return boundaryResult(
+      input,
+      'incompatible',
+      'Feature profile capabilities do not match the verified route.',
+      null,
+    );
+  }
+
+  if (!sameSet(sourceStageIds, FEATURE_SOURCE_STAGE_IDS)) {
+    return boundaryResult(
+      input,
+      'incompatible',
+      'Feature profile stages do not match the verified source mapping.',
+      null,
+    );
+  }
+
+  const unsupportedCapability = profile.stages
+    .flatMap((stage) => stage.requirements)
+    .flatMap((requirement) => requirement.requiredCapabilities)
+    .find((capability) => !['subagents', 'forge'].includes(capability));
+  if (unsupportedCapability !== undefined) {
+    return boundaryResult(
+      input,
+      'blocked',
+      `Feature profile requires an unmapped capability: ${unsupportedCapability}.`,
+      null,
+    );
+  }
+
+  const requiredGates = profile.boundaries[input.boundary].resolvedGates;
+  if (requiredGates.length > 0) {
+    return boundaryResult(
+      input,
+      'blocked',
+      `Source boundary requires unresolved gates: ${requiredGates.join(', ')}.`,
+      null,
+    );
+  }
+
+  return boundaryResult(
+    input,
+    'supported',
+    null,
+    reconcilePlan({
+      workType: input.workType,
+      delegation: 'required',
+      review: 'independent',
+      evidence: 'revision-bound',
+      delivery: 'pull-request',
+    }),
+  );
 }
