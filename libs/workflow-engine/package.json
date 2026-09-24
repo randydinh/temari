@@ -27,6 +27,14 @@
           "command": "node --import @swc-node/register/esm-register --test libs/workflow-engine/src/lib/workflow-engine.test.ts",
           "cwd": "{workspaceRoot}"
         }
+      },
+      "demo": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --import @swc-node/register/esm-register libs/workflow-engine/src/demo/facilities-uptime-demo.ts",
+          "cwd": "{workspaceRoot}"
+        }
       }
     }
   },
