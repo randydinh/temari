@@ -48,17 +48,20 @@ explicit bounded `parallelism.maxConcurrency` policy enables independent
 worker fan-out when the host proves the `parallelism` capability. The engine
 joins worker results in declaration order and preserves sibling failures. The
 runtime now persists a local child-task graph with dependency-aware claims,
-per-child leases, fencing epochs, and idempotent completion, but the executor
-does not yet recover parallel work through that store after interruption.
+per-child leases, fencing epochs, and idempotent completion. The executor
+recovers terminal parallel work through that store after interruption, with
+bounded mechanical retry, cancellation gating, workspace-manifest and
+provider-neutral evidence verification. Completed parallel receipts also
+retain a portable execution-evidence envelope for the child group, assignment
+set, declared bound, and observed peak.
 Stronger obligations derive their host requirements (`subagents` for required
 delegation or independent review, `parallelism` for bounded fan-out, `forge`
 for pull-request delivery) instead of asking callers to maintain a second risk
-or host matrix. Durable child dispatch integration, retries, watchers,
-reconciliation, and provider-specific execution remain deferred. The runtime
-package persists the engine's revision-bound receipt shape without owning
-semantic decisions. A separate run-level harness port now binds native run IDs
-to a Temari run and plan digest; canonical Archon receipt parity is still a
-promotion gate.
+or host matrix. Provider-specific execution, shared control/artifact storage,
+and cross-machine failover remain deferred. The runtime package persists the
+engine's revision-bound receipt shape without owning semantic decisions. A
+separate run-level harness port now binds native run IDs to a Temari run and
+plan digest; canonical Archon receipt parity is still a promotion gate.
 
 The coordinator slice also exposes a pure daily verification-maintenance
 decision. It can return a typed intent for `maintain-verification-skill` when

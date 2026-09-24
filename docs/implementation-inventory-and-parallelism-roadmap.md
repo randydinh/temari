@@ -159,6 +159,13 @@ verifies each retained artifact before reusing a terminal child. This is a
 provider-neutral publication boundary; provider-specific log capture and
 shared artifact storage remain outside this local proof.
 
+Completed parallel receipts also retain a portable execution-evidence envelope
+with the child group identity, declared assignment IDs, and the measured
+maximum and peak concurrency. Restartable replay checks that envelope against
+the current immutable task identity before reusing the receipt. Older receipts
+without the envelope are readable by the store but are not eligible for
+restartable replay.
+
 The parent control plane now has the corresponding local recovery boundary.
 Create, claim, route-event append, transition, load, and event observation all
 reconcile a private per-run sidecar before proceeding. The sidecar repairs
@@ -184,9 +191,10 @@ automatic failover.
    workspace manifest capture/verification boundary is also implemented for
    restartable child completion and serial PASS-stage checkpoint resume;
    bounded local retry and executor-integrated provider-neutral evidence
-   publication/replay verification are implemented; cancellation policy,
-   run-level concurrency evidence, provider-specific capture, shared artifact
-   storage, and cross-machine failover remain explicit follow-on gates.
+   publication/replay verification and durable run-level concurrency evidence
+   are implemented; cancellation policy, provider-specific capture, shared
+   artifact storage, and cross-machine failover remain explicit follow-on
+   gates.
 4. **Temporal/shared-service proof.** Move the local Stage 1 proof to a shared
    Temporal service and artifact store. Prove builder/coordinator replacement,
    approval recovery, required-concurrency failure, serial fallback only when

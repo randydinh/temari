@@ -54,6 +54,13 @@ test('resumes a bounded child batch and joins terminal results in declaration or
     assert.equal(second.state, 'COMPLETE');
     assert.equal(second.receipt?.status, 'PASS');
     assert.equal(second.receipt?.peakConcurrency, 1);
+    assert.deepEqual(second.receipt?.executionEvidence, {
+      schema: 1,
+      groupId: second.group?.groupId,
+      assignmentIds: assignments.map((assignment) => assignment.id),
+      maxConcurrency: 2,
+      peakConcurrency: 1,
+    });
     assert.deepEqual(
       second.receipt?.outcomes.map((outcome) => outcome.assignment.id),
       ['worker-1', 'worker-2', 'worker-3'],
@@ -64,6 +71,23 @@ test('resumes a bounded child batch and joins terminal results in declaration or
     assert.equal(replay.state, 'COMPLETE');
     assert.deepEqual(replay.receipt, second.receipt);
     assert.deepEqual(calls, ['worker-1', 'worker-2', 'worker-3']);
+
+    const persisted = await receiptStore.load(request.runId);
+    assert(persisted);
+    const legacyReceiptStore = {
+      save: receiptStore.save.bind(receiptStore),
+      load: async () => ({
+        ...persisted,
+        receipt: { ...persisted.receipt, executionEvidence: undefined },
+      }),
+    };
+    await assert.rejects(
+      executeRestartableParallelWorkers({
+        ...request,
+        receiptStore: legacyReceiptStore,
+      }),
+      /missing execution evidence/,
+    );
 
     await assert.rejects(
       executeRestartableParallelWorkers({
