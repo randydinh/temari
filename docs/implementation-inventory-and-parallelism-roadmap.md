@@ -62,7 +62,9 @@ the canonical Nx repository and separates it from planned behavior.
   fsynced transaction sidecar containing base digests and the complete next
   state/event history. Lock-safe reconciliation repairs only a transaction
   whose base or next state is proven; ambiguous, partial, event-ahead, and
-  missing-state histories fail closed.
+  missing-state histories fail closed. Complete legacy schema-1 histories
+  without a sidecar remain readable; an ambiguous pre-sidecar crash gap has no
+  safe implicit migration and is an explicit incompatibility boundary.
 - `executeRestartableParallelWorkers` runs one bounded local claim/execute
   pass, reuses terminal children, refuses incomplete joins, records explicit
   pending reasons, and persists a content-addressed joined parallel receipt.

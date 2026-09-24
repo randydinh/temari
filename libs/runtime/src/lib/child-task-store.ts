@@ -639,69 +639,71 @@ export class FileChildTaskStore implements ChildTaskStore {
     assertText(request.revision, 'Revision');
     assertText(request.actor, 'Actor');
     const dependsOn = normalizedDependencies(request.taskId, request.dependsOn);
-    return this.withLock(request.taskId, async () => {
-      await this.reconcileLocked(request.taskId);
-      const existing = await this.readRecord(request.taskId);
-      if (existing) {
-        assert.equal(
-          existing.runId,
-          request.runId,
-          'Task ID is bound to another run.',
-        );
-        assert.equal(
-          existing.revision,
-          request.revision,
-          'Task ID is bound to another revision.',
-        );
-        assert.deepEqual(
-          existing.dependsOn,
-          dependsOn,
-          'Task ID is bound to another dependency set.',
-        );
-        return existing;
-      }
-      const now = request.now ?? new Date();
-      assertDate(now);
-      const at = now.toISOString();
-      const record: ChildTaskRecord = {
-        schema: 1,
-        taskId: request.taskId,
-        runId: request.runId,
-        revision: request.revision,
-        status: 'QUEUED',
-        attempt: 0,
-        createdAt: at,
-        updatedAt: at,
-        dependsOn,
-        lease: null,
-        result: null,
-        error: null,
-      };
-      const events = [
-        this.createEvent({
+    return this.withStoreLock(() =>
+      this.withLock(request.taskId, async () => {
+        await this.reconcileLocked(request.taskId);
+        const existing = await this.readRecord(request.taskId);
+        if (existing) {
+          assert.equal(
+            existing.runId,
+            request.runId,
+            'Task ID is bound to another run.',
+          );
+          assert.equal(
+            existing.revision,
+            request.revision,
+            'Task ID is bound to another revision.',
+          );
+          assert.deepEqual(
+            existing.dependsOn,
+            dependsOn,
+            'Task ID is bound to another dependency set.',
+          );
+          return existing;
+        }
+        const now = request.now ?? new Date();
+        assertDate(now);
+        const at = now.toISOString();
+        const record: ChildTaskRecord = {
+          schema: 1,
           taskId: request.taskId,
           runId: request.runId,
           revision: request.revision,
-          actor: request.actor,
-          type: 'task-created',
-          idempotencyKey: `create:${request.taskId}:${request.revision}`,
-          payload: {
-            status: 'QUEUED',
-            dependencyCount: dependsOn.length,
-          },
-          now,
-          sequence: 1,
-        }),
-      ];
-      await this.commitTransitionLocked({
-        taskId: request.taskId,
-        baseState: null,
-        baseEvents: [],
-        nextState: record,
-        nextEvents: events,
-      });
-      return record;
-    });
+          status: 'QUEUED',
+          attempt: 0,
+          createdAt: at,
+          updatedAt: at,
+          dependsOn,
+          lease: null,
+          result: null,
+          error: null,
+        };
+        const events = [
+          this.createEvent({
+            taskId: request.taskId,
+            runId: request.runId,
+            revision: request.revision,
+            actor: request.actor,
+            type: 'task-created',
+            idempotencyKey: `create:${request.taskId}:${request.revision}`,
+            payload: {
+              status: 'QUEUED',
+              dependencyCount: dependsOn.length,
+            },
+            now,
+            sequence: 1,
+          }),
+        ];
+        await this.commitTransitionLocked({
+          taskId: request.taskId,
+          baseState: null,
+          baseEvents: [],
+          nextState: record,
+          nextEvents: events,
+        });
+        return record;
+      }),
+    );
   }
 
   async load(taskId: string): Promise<ChildTaskRecord | null> {
@@ -730,52 +732,54 @@ export class FileChildTaskStore implements ChildTaskStore {
     );
     assertGroupMembership(taskIds, assignmentIds);
 
-    return this.withGroupLock(request.groupId, async () => {
-      for (const taskId of taskIds) await this.reconcile(taskId);
-      const existing = await this.readGroup(request.groupId);
-      if (existing) {
-        assert.equal(
-          existing.groupId,
-          request.groupId,
-          'Child task group ID does not match its filename.',
-        );
-        assert.equal(
-          existing.runId,
-          request.runId,
-          'Child task group is bound to another run.',
-        );
-        assert.equal(
-          existing.revision,
-          request.revision,
-          'Child task group is bound to another revision.',
-        );
-        assert.deepEqual(
-          existing.taskIds,
-          taskIds,
-          'Child task group task membership is immutable.',
-        );
-        assert.deepEqual(
-          existing.assignmentIds,
-          assignmentIds,
-          'Child task group assignment membership is immutable.',
-        );
-        return existing;
-      }
+    return this.withStoreLock(() =>
+      this.withGroupLock(request.groupId, async () => {
+        for (const taskId of taskIds) await this.reconcile(taskId);
+        const existing = await this.readGroup(request.groupId);
+        if (existing) {
+          assert.equal(
+            existing.groupId,
+            request.groupId,
+            'Child task group ID does not match its filename.',
+          );
+          assert.equal(
+            existing.runId,
+            request.runId,
+            'Child task group is bound to another run.',
+          );
+          assert.equal(
+            existing.revision,
+            request.revision,
+            'Child task group is bound to another revision.',
+          );
+          assert.deepEqual(
+            existing.taskIds,
+            taskIds,
+            'Child task group task membership is immutable.',
+          );
+          assert.deepEqual(
+            existing.assignmentIds,
+            assignmentIds,
+            'Child task group assignment membership is immutable.',
+          );
+          return existing;
+        }
 
-      const now = request.now ?? new Date();
-      assertDate(now);
-      const record = immutableGroupRecord({
-        schema: 1,
-        groupId: request.groupId,
-        runId: request.runId,
-        revision: request.revision,
-        taskIds,
-        assignmentIds,
-        createdAt: now.toISOString(),
-      });
-      await this.writeGroup(record);
-      return record;
-    });
+        const now = request.now ?? new Date();
+        assertDate(now);
+        const record = immutableGroupRecord({
+          schema: 1,
+          groupId: request.groupId,
+          runId: request.runId,
+          revision: request.revision,
+          taskIds,
+          assignmentIds,
+          createdAt: now.toISOString(),
+        });
+        await this.writeGroup(record);
+        return record;
+      }),
+    );
   }
 
   async loadGroup(groupId: string): Promise<ChildTaskGroupRecord | null> {
@@ -787,10 +791,12 @@ export class FileChildTaskStore implements ChildTaskStore {
     assertSafeId(request.taskId, 'Task ID');
     assertText(request.owner, 'Owner');
     assertLeaseMs(request.leaseMs);
-    return this.withLock(request.taskId, async () => {
-      await this.reconcileLocked(request.taskId);
-      return this.claimLocked(request);
-    });
+    return this.withStoreLock(() =>
+      this.withLock(request.taskId, async () => {
+        await this.reconcileLocked(request.taskId);
+        return this.claimLocked(request);
+      }),
+    );
   }
 
   async claimGroup(
@@ -806,52 +812,54 @@ export class FileChildTaskStore implements ChildTaskStore {
       'Group maxConcurrency must be a positive integer.',
     );
     const taskIds = orderedIds(request.taskIds, 'Child task group task');
-    return this.withGroupLock(request.groupId, async () => {
-      const group = await this.readGroup(request.groupId);
-      assert(group, `Child task group ${request.groupId} does not exist.`);
-      assert.equal(group.groupId, request.groupId);
-      assert.equal(group.runId, request.runId);
-      assert.equal(group.revision, request.revision);
-      assert.deepEqual(group.taskIds, taskIds);
+    return this.withStoreLock(() =>
+      this.withGroupLock(request.groupId, async () => {
+        const group = await this.readGroup(request.groupId);
+        assert(group, `Child task group ${request.groupId} does not exist.`);
+        assert.equal(group.groupId, request.groupId);
+        assert.equal(group.runId, request.runId);
+        assert.equal(group.revision, request.revision);
+        assert.deepEqual(group.taskIds, taskIds);
 
-      const records: ChildTaskRecord[] = [];
-      const claimed: ChildTaskRecord[] = [];
-      const missingTaskIds: string[] = [];
-      let activeLeases = 0;
-      const now = request.now ?? new Date();
-      assertDate(now);
-      for (const taskId of taskIds) {
-        const result = await this.withLock(taskId, async () => {
-          await this.reconcileLocked(taskId);
-          const existing = await this.readRecord(taskId);
-          if (!existing) return null;
-          if (
-            existing.status === 'RUNNING' &&
-            existing.lease !== null &&
-            Date.parse(existing.lease.expiresAt) > now.getTime()
-          ) {
+        const records: ChildTaskRecord[] = [];
+        const claimed: ChildTaskRecord[] = [];
+        const missingTaskIds: string[] = [];
+        let activeLeases = 0;
+        const now = request.now ?? new Date();
+        assertDate(now);
+        for (const taskId of taskIds) {
+          const result = await this.withLock(taskId, async () => {
+            await this.reconcileLocked(taskId);
+            const existing = await this.readRecord(taskId);
+            if (!existing) return null;
+            if (
+              existing.status === 'RUNNING' &&
+              existing.lease !== null &&
+              Date.parse(existing.lease.expiresAt) > now.getTime()
+            ) {
+              activeLeases += 1;
+            }
+            if (
+              activeLeases >= request.maxConcurrency ||
+              isTerminal(existing.status)
+            ) {
+              return { claimed: false, record: existing };
+            }
+            return this.claimLocked(requestForTask(request, taskId, now));
+          });
+          if (!result) {
+            missingTaskIds.push(taskId);
+            continue;
+          }
+          records.push(result.record);
+          if (result.claimed) {
+            claimed.push(result.record);
             activeLeases += 1;
           }
-          if (
-            activeLeases >= request.maxConcurrency ||
-            isTerminal(existing.status)
-          ) {
-            return { claimed: false, record: existing };
-          }
-          return this.claimLocked(requestForTask(request, taskId, now));
-        });
-        if (!result) {
-          missingTaskIds.push(taskId);
-          continue;
         }
-        records.push(result.record);
-        if (result.claimed) {
-          claimed.push(result.record);
-          activeLeases += 1;
-        }
-      }
-      return { group, claimed, records, missingTaskIds };
-    });
+        return { group, claimed, records, missingTaskIds };
+      }),
+    );
   }
 
   private async claimLocked(
@@ -922,124 +930,126 @@ export class FileChildTaskStore implements ChildTaskStore {
     const error = request.error ?? null;
     assertError(error);
     assertCompletionPayload(request.status, result, error);
-    return this.withLock(request.taskId, async () => {
-      await this.reconcileLocked(request.taskId);
-      const record = await this.requireRecord(request.taskId);
-      const events = await this.readEvents(request.taskId, record.revision);
-      const existing = events.find(
-        (event) => event.idempotencyKey === request.idempotencyKey,
-      );
-      const resultDigest = digest(result);
-      if (existing) {
-        assert.equal(existing.type, 'task-completed');
-        assert.equal(
-          existing.payload.to,
-          request.status,
-          'Idempotency key target changed.',
+    return this.withStoreLock(() =>
+      this.withLock(request.taskId, async () => {
+        await this.reconcileLocked(request.taskId);
+        const record = await this.requireRecord(request.taskId);
+        const events = await this.readEvents(request.taskId, record.revision);
+        const existing = events.find(
+          (event) => event.idempotencyKey === request.idempotencyKey,
         );
-        assert.equal(
-          existing.payload.fencingEpoch,
-          request.fencingEpoch,
-          'Idempotency key fencing epoch changed.',
-        );
-        assert.equal(
-          existing.payload.resultDigest,
-          resultDigest,
-          'Idempotency key result changed.',
-        );
-        assert.equal(
-          existing.payload.error,
-          error,
-          'Idempotency key error changed.',
-        );
-        assert.equal(
-          existing.actor,
-          request.owner,
-          'Idempotency key actor changed.',
-        );
-        if (existing.payload.leaseTokenDigest !== undefined) {
+        const resultDigest = digest(result);
+        if (existing) {
+          assert.equal(existing.type, 'task-completed');
           assert.equal(
-            existing.payload.leaseTokenDigest,
-            digest(request.leaseToken),
-            'Idempotency key lease changed.',
+            existing.payload.to,
+            request.status,
+            'Idempotency key target changed.',
           );
+          assert.equal(
+            existing.payload.fencingEpoch,
+            request.fencingEpoch,
+            'Idempotency key fencing epoch changed.',
+          );
+          assert.equal(
+            existing.payload.resultDigest,
+            resultDigest,
+            'Idempotency key result changed.',
+          );
+          assert.equal(
+            existing.payload.error,
+            error,
+            'Idempotency key error changed.',
+          );
+          assert.equal(
+            existing.actor,
+            request.owner,
+            'Idempotency key actor changed.',
+          );
+          if (existing.payload.leaseTokenDigest !== undefined) {
+            assert.equal(
+              existing.payload.leaseTokenDigest,
+              digest(request.leaseToken),
+              'Idempotency key lease changed.',
+            );
+          }
+          assert.equal(
+            record.status,
+            request.status,
+            'Completed task status changed.',
+          );
+          assert.equal(
+            canonical(record.result),
+            canonical(result),
+            'Completed task result changed.',
+          );
+          assert.equal(record.error, error, 'Completed task error changed.');
+          return record;
         }
+        const now = request.now ?? new Date();
+        assertDate(now);
         assert.equal(
           record.status,
-          request.status,
-          'Completed task status changed.',
+          'RUNNING',
+          'Only a running lease can complete a child task.',
+        );
+        assert(record.lease, 'Child task lease is missing.');
+        assert.equal(
+          record.lease.owner,
+          request.owner,
+          'Child task lease owner mismatch.',
         );
         assert.equal(
-          canonical(record.result),
-          canonical(result),
-          'Completed task result changed.',
+          record.lease.token,
+          request.leaseToken,
+          'Child task lease token mismatch.',
         );
-        assert.equal(record.error, error, 'Completed task error changed.');
-        return record;
-      }
-      const now = request.now ?? new Date();
-      assertDate(now);
-      assert.equal(
-        record.status,
-        'RUNNING',
-        'Only a running lease can complete a child task.',
-      );
-      assert(record.lease, 'Child task lease is missing.');
-      assert.equal(
-        record.lease.owner,
-        request.owner,
-        'Child task lease owner mismatch.',
-      );
-      assert.equal(
-        record.lease.token,
-        request.leaseToken,
-        'Child task lease token mismatch.',
-      );
-      assert.equal(
-        record.lease.fencingEpoch,
-        request.fencingEpoch,
-        'Child task fencing epoch mismatch.',
-      );
-      assert(
-        Date.parse(record.lease.expiresAt) > now.getTime(),
-        'Child task lease has expired.',
-      );
-      const next: ChildTaskRecord = {
-        ...record,
-        status: request.status,
-        updatedAt: now.toISOString(),
-        lease: null,
-        result,
-        error,
-      };
-      const event = this.createEvent({
-        taskId: request.taskId,
-        sequence: events.length + 1,
-        runId: record.runId,
-        revision: record.revision,
-        actor: request.owner,
-        type: 'task-completed',
-        idempotencyKey: request.idempotencyKey,
-        payload: {
-          from: record.status,
-          to: request.status,
-          attempt: record.attempt,
-          fencingEpoch: request.fencingEpoch,
-          resultDigest,
+        assert.equal(
+          record.lease.fencingEpoch,
+          request.fencingEpoch,
+          'Child task fencing epoch mismatch.',
+        );
+        assert(
+          Date.parse(record.lease.expiresAt) > now.getTime(),
+          'Child task lease has expired.',
+        );
+        const next: ChildTaskRecord = {
+          ...record,
+          status: request.status,
+          updatedAt: now.toISOString(),
+          lease: null,
+          result,
           error,
-          leaseTokenDigest: digest(request.leaseToken),
-        },
-        now,
-      });
-      await this.commitTransitionLocked({
-        taskId: request.taskId,
-        baseState: record,
-        baseEvents: events,
-        nextState: next,
-        nextEvents: [...events, event],
-      });
-      return next;
-    });
+        };
+        const event = this.createEvent({
+          taskId: request.taskId,
+          sequence: events.length + 1,
+          runId: record.runId,
+          revision: record.revision,
+          actor: request.owner,
+          type: 'task-completed',
+          idempotencyKey: request.idempotencyKey,
+          payload: {
+            from: record.status,
+            to: request.status,
+            attempt: record.attempt,
+            fencingEpoch: request.fencingEpoch,
+            resultDigest,
+            error,
+            leaseTokenDigest: digest(request.leaseToken),
+          },
+          now,
+        });
+        await this.commitTransitionLocked({
+          taskId: request.taskId,
+          baseState: record,
+          baseEvents: events,
+          nextState: next,
+          nextEvents: [...events, event],
+        });
+        return next;
+      }),
+    );
   }
 
   async listReady(
@@ -1107,6 +1117,10 @@ export class FileChildTaskStore implements ChildTaskStore {
 
   private groupLockPath(groupId: string): string {
     return join(this.root, `.${groupId}.group.lock`);
+  }
+
+  private storeLockPath(): string {
+    return join(this.root, '.store.lock');
   }
 
   private async readRecord(taskId: string): Promise<ChildTaskRecord | null> {
@@ -1381,6 +1395,14 @@ export class FileChildTaskStore implements ChildTaskStore {
       if (dependency.status !== 'SUCCEEDED') return false;
     }
     return true;
+  }
+
+  private async withStoreLock<T>(operation: () => Promise<T>): Promise<T> {
+    return this.withLockPath(
+      this.storeLockPath(),
+      'child task store',
+      operation,
+    );
   }
 
   private async withLock<T>(

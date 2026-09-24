@@ -19,6 +19,7 @@ test('creates child tasks idempotently and binds their parent graph', async () =
       now: at('2026-09-23T12:00:00.000Z'),
     } as const;
     const first = await store.create(request);
+    await rm(join(root, '.child-create-1.transaction.json'), { force: true });
     const replay = await store.create({
       ...request,
       dependsOn: ['dependency-a', 'dependency-b'],
@@ -271,6 +272,46 @@ test('serializes concurrent claims so only one owner receives a child lease', as
 
     assert.equal(results.filter((claim) => claim.claimed).length, 1);
     assert.equal((await store.events('child-concurrent-1')).length, 2);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('serializes cyclic dependency claims without lock inversion', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-child-task-store-'));
+  try {
+    const store = await FileChildTaskStore.create(root);
+    await store.create({
+      taskId: 'child-cycle-a',
+      runId: 'run-cycle-1',
+      revision: 'revision-cycle-1',
+      dependsOn: ['child-cycle-b'],
+      actor: 'coordinator',
+    });
+    await store.create({
+      taskId: 'child-cycle-b',
+      runId: 'run-cycle-1',
+      revision: 'revision-cycle-1',
+      dependsOn: ['child-cycle-a'],
+      actor: 'coordinator',
+    });
+
+    const results = await Promise.all([
+      store.claim({
+        taskId: 'child-cycle-a',
+        owner: 'worker-a',
+        leaseMs: 30_000,
+      }),
+      store.claim({
+        taskId: 'child-cycle-b',
+        owner: 'worker-b',
+        leaseMs: 30_000,
+      }),
+    ]);
+    assert.deepEqual(
+      results.map((result) => result.record.status),
+      ['QUEUED', 'QUEUED'],
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }

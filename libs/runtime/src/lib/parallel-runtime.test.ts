@@ -257,12 +257,51 @@ test('refuses receipt replay when an expected child state is missing', async () 
   }
 });
 
+test('concurrent receipt publication converges on one persisted winner', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
+  try {
+    const receiptStore = await FileParallelWorkerReceiptStore.create(root);
+    const binding = {
+      groupId: 'parallel-receipt-race-group',
+      fingerprint: 'a'.repeat(64),
+    };
+    const first = receipt('parallel-receipt-race', 0);
+    const second = receipt('parallel-receipt-race', 1);
+    await Promise.all([
+      receiptStore.save(first, binding),
+      receiptStore.save(second, binding),
+    ]);
+
+    const persisted = await receiptStore.load('parallel-receipt-race');
+    assert(persisted);
+    assert.equal(persisted.binding.groupId, binding.groupId);
+    assert([0, 1].includes(persisted.receipt.peakConcurrency));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 function result(summary: string) {
   return {
     status: 'PASS' as const,
     summary,
     evidencePaths: [`evidence/${summary.replaceAll(' ', '-')}.json`],
     rawLogPath: null,
+  };
+}
+
+function receipt(runId: string, peakConcurrency: number) {
+  return {
+    schema: 1 as const,
+    runId,
+    revision: 'revision-parallel-receipt-race',
+    startedAt: '2026-09-24T04:00:00.000Z',
+    completedAt: '2026-09-24T04:00:01.000Z',
+    status: 'PASS' as const,
+    maxConcurrency: 1,
+    peakConcurrency,
+    outcomes: [],
+    failure: null,
   };
 }
 

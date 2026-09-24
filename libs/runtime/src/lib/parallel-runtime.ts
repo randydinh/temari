@@ -212,11 +212,10 @@ export class FileParallelWorkerReceiptStore implements ParallelWorkerReceiptStor
         await link(temporary, path);
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-        assert.equal(
-          await readFile(path, 'utf8'),
-          body,
-          'Parallel receipt collision or mutation.',
-        );
+        const existing = parseStored(JSON.parse(await readFile(path, 'utf8')));
+        assert.equal(existing.receipt.runId, receipt.runId);
+        assert.equal(existing.receipt.revision, receipt.revision);
+        assert.deepEqual(existing.binding, binding);
       }
     } finally {
       await unlink(temporary).catch(() => undefined);
@@ -242,6 +241,18 @@ export class FileParallelWorkerReceiptStore implements ParallelWorkerReceiptStor
       throw error;
     }
   }
+}
+
+async function persistReceipt(
+  request: ExecuteRestartableParallelWorkersRequest,
+  receipt: ParallelWorkerReceipt,
+  binding: ParallelWorkerReceiptBinding,
+): Promise<ParallelWorkerReceipt> {
+  await request.receiptStore.save(receipt, binding);
+  const persisted = await request.receiptStore.load(request.runId);
+  assert(persisted, 'Parallel receipt disappeared after publication.');
+  assert.deepEqual(persisted.binding, binding);
+  return persisted.receipt;
 }
 
 function taskIdentity(
@@ -549,16 +560,17 @@ export async function executeRestartableParallelWorkers(
   const failure = capabilityFailure(request.plan, request.capabilities);
   if (failure) {
     const receipt = blockedReceipt(request, failure, maxConcurrency, now);
-    await request.receiptStore.save(receipt, {
+    const binding = {
       groupId: identity.groupId,
       fingerprint: identity.fingerprint,
-    });
+    };
+    const persisted = await persistReceipt(request, receipt, binding);
     return {
       state: 'BLOCKED',
       group: null,
       tasks: [],
       pending: [],
-      receipt,
+      receipt: persisted,
     };
   }
   assert(
@@ -649,15 +661,16 @@ export async function executeRestartableParallelWorkers(
     outcomes: joined.outcomes,
     failure: joined.failure,
   };
-  await request.receiptStore.save(receipt, {
+  const binding = {
     groupId: identity.groupId,
     fingerprint: identity.fingerprint,
-  });
+  };
+  const persisted = await persistReceipt(request, receipt, binding);
   return {
     state: 'COMPLETE',
     group,
     tasks: finalTasks,
     pending: [],
-    receipt,
+    receipt: persisted,
   };
 }
