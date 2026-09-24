@@ -78,6 +78,16 @@ export interface ParallelWorkerRunRequest {
   readonly now?: () => Date;
 }
 
+export interface ParallelWorkerPreflight {
+  readonly assignmentIds: readonly string[];
+}
+
+export interface ParallelWorkerJoin {
+  readonly status: WorkflowReceiptStatus;
+  readonly outcomes: readonly ParallelWorkerOutcome[];
+  readonly failure: ParallelWorkerFailure | null;
+}
+
 export interface ReceiptRunRequest {
   readonly runId: string;
   readonly revision: string;
@@ -259,9 +269,9 @@ function isWorkerId(value: string): boolean {
   return /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value);
 }
 
-function validateParallelAssignments(
+export function preflightParallelWorkers(
   assignments: readonly WorkerAssignment[],
-): void {
+): ParallelWorkerPreflight {
   if (assignments.length === 0) {
     throw new Error(
       'Parallel worker execution requires at least one assignment.',
@@ -279,6 +289,8 @@ function validateParallelAssignments(
     ids.add(assignment.id);
     assertWorkerBrief(assignment.brief);
   });
+
+  return { assignmentIds: assignments.map((assignment) => assignment.id) };
 }
 
 function aggregateWorkerStatus(
@@ -319,6 +331,62 @@ function firstWorkerFailure(
     message: nonPass.result.summary,
     workerId: nonPass.assignment.id,
     missingCapabilities: [],
+  };
+}
+
+/**
+ * Join worker outcomes only when they describe the exact declared membership.
+ * Arrival order is irrelevant; the returned outcomes always follow the
+ * assignment declaration order.
+ */
+export function joinParallelWorkers(
+  assignments: readonly WorkerAssignment[],
+  outcomes: readonly ParallelWorkerOutcome[],
+): ParallelWorkerJoin {
+  const preflight = preflightParallelWorkers(assignments);
+  if (outcomes.length !== preflight.assignmentIds.length) {
+    throw new Error(
+      `Parallel worker outcome count ${outcomes.length} does not match assignment count ${preflight.assignmentIds.length}.`,
+    );
+  }
+
+  const expected = new Set(preflight.assignmentIds);
+  const byId = new Map<string, ParallelWorkerOutcome>();
+  for (const outcome of outcomes) {
+    const workerId = outcome.assignment.id;
+    if (!expected.has(workerId)) {
+      throw new Error(`Parallel worker outcome is not declared: ${workerId}.`);
+    }
+    if (byId.has(workerId)) {
+      throw new Error(`Parallel worker outcome is duplicated: ${workerId}.`);
+    }
+    if (outcome.error === null) {
+      if (outcome.result === null) {
+        throw new Error(
+          `Parallel worker ${workerId} has neither a result nor an error.`,
+        );
+      }
+      assertWorkerResult(outcome.result);
+    } else if (outcome.result !== null) {
+      throw new Error(
+        `Parallel worker ${workerId} cannot retain a result with an error.`,
+      );
+    }
+    byId.set(workerId, outcome);
+  }
+
+  const stableOutcomes = preflight.assignmentIds.map((workerId) => {
+    const outcome = byId.get(workerId);
+    if (!outcome) {
+      throw new Error(`Parallel worker outcome is missing: ${workerId}.`);
+    }
+    return outcome;
+  });
+
+  return {
+    outcomes: stableOutcomes,
+    status: aggregateWorkerStatus(stableOutcomes),
+    failure: firstWorkerFailure(stableOutcomes),
   };
 }
 
@@ -398,7 +466,7 @@ export async function runParallelWorkers(
     };
   }
 
-  validateParallelAssignments(request.assignments);
+  preflightParallelWorkers(request.assignments);
   const outcomes = new Array<ParallelWorkerOutcome>(request.assignments.length);
   let next = 0;
   let active = 0;
@@ -439,16 +507,17 @@ export async function runParallelWorkers(
   const stableOutcomes = outcomes.filter(
     (outcome): outcome is ParallelWorkerOutcome => outcome !== undefined,
   );
+  const joined = joinParallelWorkers(request.assignments, stableOutcomes);
   return {
     schema: 1,
     runId: request.runId,
     revision: request.revision,
     startedAt: started.toISOString(),
     completedAt: completed.toISOString(),
-    status: aggregateWorkerStatus(stableOutcomes),
+    status: joined.status,
     maxConcurrency,
     peakConcurrency: peak,
-    outcomes: stableOutcomes,
-    failure: firstWorkerFailure(stableOutcomes),
+    outcomes: joined.outcomes,
+    failure: joined.failure,
   };
 }
