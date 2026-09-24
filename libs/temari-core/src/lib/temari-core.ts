@@ -55,6 +55,73 @@ export function createExecutionPlan(
   return reconcilePlan(obligations);
 }
 
+export interface PotetoRouteInput {
+  readonly workType: WorkType;
+  readonly lightweight: {
+    readonly resultIsClearLocalAndReversible: boolean;
+    /** Includes public interfaces, shared data, persistence, permissions,
+     * security, concurrency, deployment, dependencies, and external effects. */
+    readonly changesSharedBoundary: boolean;
+    readonly isReportedDefect: boolean;
+    readonly hasUnexplainedSymptom: boolean;
+    readonly makesPerformanceClaim: boolean;
+    readonly isDesignChoice: boolean;
+    readonly isMigration: boolean;
+    readonly affectedCallersAreKnown: boolean;
+    readonly crossesArchitecturalBoundary: boolean;
+    readonly directCheckAvailable: boolean;
+  };
+}
+
+export type PotetoRoute = 'lightweight-engineering' | 'full-playbook';
+
+export type PotetoRouteReason =
+  'all-lightweight-conditions-proven' | 'lightweight-condition-not-proven';
+
+export interface PotetoRouteDecision {
+  readonly route: PotetoRoute;
+  /** A full route still needs the matching playbook selected by the coordinator. */
+  readonly playbook: 'lightweight-engineering' | null;
+  readonly reason: PotetoRouteReason;
+}
+
+/**
+ * Apply the packaged Poteto route conditions without selecting a host or
+ * inventing a full-playbook choice. A false or uncertain condition always
+ * leaves lightweight engineering and requires the coordinator to choose the
+ * appropriate full playbook.
+ */
+export function classifyEngineeringRoute(
+  input: PotetoRouteInput,
+): PotetoRouteDecision {
+  const conditions = input.lightweight;
+  const qualifies =
+    conditions.resultIsClearLocalAndReversible &&
+    !conditions.changesSharedBoundary &&
+    !conditions.isReportedDefect &&
+    !conditions.hasUnexplainedSymptom &&
+    !conditions.makesPerformanceClaim &&
+    !conditions.isDesignChoice &&
+    !conditions.isMigration &&
+    conditions.affectedCallersAreKnown &&
+    !conditions.crossesArchitecturalBoundary &&
+    conditions.directCheckAvailable;
+
+  if (qualifies) {
+    return {
+      route: 'lightweight-engineering',
+      playbook: 'lightweight-engineering',
+      reason: 'all-lightweight-conditions-proven',
+    };
+  }
+
+  return {
+    route: 'full-playbook',
+    playbook: null,
+    reason: 'lightweight-condition-not-proven',
+  };
+}
+
 /**
  * Classify the smallest serial engineering route without naming a host.
  * Stronger routes are supplied explicitly as obligations by the coordinator.
