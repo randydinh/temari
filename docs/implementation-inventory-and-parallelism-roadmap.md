@@ -1,6 +1,6 @@
 # Temari implementation inventory and parallelism roadmap
 
-Status: recovery-proof working baseline `1a788e0`; this document records what is actually in
+Status: parent-recovery working baseline `188e73f`; this document records what is actually in
 the canonical Nx repository and separates it from planned behavior.
 
 ## Lossless implementation inventory
@@ -51,7 +51,10 @@ the canonical Nx repository and separates it from planned behavior.
 - `libs/runtime` persists hashed workflow receipts atomically and idempotently.
 - `FileWorkflowRunStore` persists queued/running/terminal state, append-only
   route events, owner leases, expiry-based re-claim, idempotent transitions,
-  and per-run filesystem locking.
+  and per-run filesystem locking. Parent state/event transitions now use the
+  same private fsynced transaction sidecar and strict reconciliation boundary
+  as child tasks; arbitrary route events remain valid, while ambiguous crash
+  gaps fail closed.
 - `FileChildTaskStore` persists revision-bound child-task records, dependency
   edges, attempts, per-child leases, fencing epochs, append-only task events,
   worker results, and idempotent terminal completion. Claims are dependency
@@ -137,6 +140,13 @@ it deliberately does not claim parent-run lease renewal, automatic failover,
 shared control or artifact storage, stage checkpoints, retry/cancellation
 policy, workspace manifests, or cross-machine execution.
 
+The parent control plane now has the corresponding local recovery boundary.
+Create, claim, route-event append, transition, load, and event observation all
+reconcile a private per-run sidecar before proceeding. The sidecar repairs
+state/event publication gaps only when the base or complete next history is
+proven. This does not imply parent lease renewal, shared control storage, or
+automatic failover.
+
 ## Completion roadmap
 
 1. **Bounded local parallelism — implemented.** The worker batch primitive is
@@ -147,13 +157,13 @@ policy, workspace manifests, or cross-machine execution.
    terminal replay, fenced leases, mechanical failure preservation, explicit
    incomplete-join refusal, and a durable joined receipt. Do not let child
    workers mutate shared semantic state.
-3. **Recovery and join proof — child-task boundary implemented in this
-   increment.** The private child transaction sidecar, strict digest/history
-   proof, lock-safe reconciliation, crash-boundary tests, no-rerun recovery,
-   and receipt replay refusal are now implemented. Parent run-store repair,
-   child evidence/workspace manifests, retry/cancellation policy, run-level
-   concurrency evidence, artifact recovery, and cross-machine failover remain
-   explicit follow-on gates.
+3. **Recovery and join proof — local child and parent control boundaries
+   implemented.** The private transaction sidecars, strict digest/history
+   proofs, lock-safe reconciliation, crash-boundary tests, no-rerun recovery,
+   and receipt replay refusal are now implemented for child tasks and the
+   parent run store. Child evidence/workspace manifests, retry/cancellation
+   policy, run-level concurrency evidence, artifact recovery, shared storage,
+   and cross-machine failover remain explicit follow-on gates.
 4. **Temporal/shared-service proof.** Move the local Stage 1 proof to a shared
    Temporal service and artifact store. Prove builder/coordinator replacement,
    approval recovery, required-concurrency failure, serial fallback only when
