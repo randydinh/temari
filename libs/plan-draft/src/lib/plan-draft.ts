@@ -575,7 +575,6 @@ export async function createLocalPlanDraft(
     await runPlan(
       {
         ...minimalPlan('feature'),
-        stages: ['investigate', 'plan', 'review', 'build', 'verify', 'deliver'],
         review: 'independent',
         evidence: 'revision-bound',
       },
@@ -620,6 +619,25 @@ export async function createLocalPlanDraft(
               }
               break;
             }
+            case 'build': {
+              assert(candidate);
+              await dependencies('before');
+              output = await observe(subject.destination, candidate.markdown);
+              if (prepared.kind === 'prepared') {
+                const completed = await completionExists();
+                if (output.kind === 'absent')
+                  assert(
+                    !completed,
+                    'Completed output is missing; automatic recreation is refused',
+                  );
+                else
+                  assert(
+                    output.kind === 'matching',
+                    `Output ${output.kind}; existing bytes preserved`,
+                  );
+              }
+              break;
+            }
             case 'review': {
               assert(candidate && checkpoint && authority);
               if (prepared.kind === 'prepared')
@@ -648,10 +666,6 @@ export async function createLocalPlanDraft(
                 );
               }
               requireApproval(attemptedReview);
-              break;
-            }
-            case 'build': {
-              assert(candidate && attemptedReview);
               if (prepared.kind === 'unprepared') {
                 const record: Preparation = {
                   schema: 1,
@@ -675,8 +689,10 @@ export async function createLocalPlanDraft(
                 attemptedReview = prepared.record.review;
                 paths.add(preparationPath);
               }
-              const completed = await completionExists();
+              // A reviewer can mutate or invalidate source evidence. Recheck
+              // after the accepted review is durable and before output.
               await dependencies('before');
+              const completed = await completionExists();
               output = await observe(subject.destination, candidate.markdown);
               if (output.kind === 'absent') {
                 assert(

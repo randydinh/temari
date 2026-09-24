@@ -148,6 +148,21 @@ export function assertCapabilities(
 }
 
 /**
+ * Reject hand-built plans that attempt to reorder or omit the lifecycle.
+ * Policy changes through the plan's obligations; lifecycle order does not.
+ */
+export function assertCanonicalStageSequence(plan: ExecutionPlan): void {
+  if (
+    plan.stages.length !== DEFAULT_STAGES.length ||
+    plan.stages.some((stage, index) => stage !== DEFAULT_STAGES[index])
+  ) {
+    throw new Error(
+      `Execution plan must use the canonical workflow stage sequence: ${DEFAULT_STAGES.join(', ')}.`,
+    );
+  }
+}
+
+/**
  * Same stage sequence for every plan. Policy (delegation, review,
  * evidence, delivery) is read from the plan — never from a second engine.
  */
@@ -156,9 +171,9 @@ export async function runPlan(
   available: readonly HostCapability[],
   handler: StageHandler,
 ): Promise<void> {
+  assertCanonicalStageSequence(plan);
   assertCapabilities(plan, available);
-  const stages = plan.stages.length > 0 ? plan.stages : DEFAULT_STAGES;
-  for (const stage of stages) {
+  for (const stage of DEFAULT_STAGES) {
     await handler(stage, plan);
   }
 }
@@ -262,10 +277,9 @@ function assertCheckpoint(
 export async function runPlanWithReceipt(
   request: ReceiptRunRequest,
 ): Promise<WorkflowReceipt> {
+  assertCanonicalStageSequence(request.plan);
   const now = request.now ?? (() => new Date());
-  const declaredStages =
-    request.plan.stages.length > 0 ? request.plan.stages : DEFAULT_STAGES;
-  const checkpointStages = assertCheckpoint(request, declaredStages);
+  const checkpointStages = assertCheckpoint(request, DEFAULT_STAGES);
   const startedAt = request.checkpoint?.startedAt ?? now().toISOString();
   const stages: WorkflowStageReceipt[] = [...checkpointStages];
   const missing = missingCapabilities(
@@ -294,7 +308,7 @@ export async function runPlanWithReceipt(
     };
   }
 
-  for (const stage of declaredStages.slice(checkpointStages.length)) {
+  for (const stage of DEFAULT_STAGES.slice(checkpointStages.length)) {
     const stageStarted = now();
     let result: StageReceiptResult;
     try {

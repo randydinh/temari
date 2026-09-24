@@ -50,7 +50,7 @@ test('derives parallelism as an explicit plan capability', () => {
   ]);
 });
 
-test('runs the same declared stage sequence serially', async () => {
+test('runs the canonical stage sequence serially', async () => {
   const stages: string[] = [];
   const plan = minimalPlan('bug');
 
@@ -66,6 +66,33 @@ test('runs the same declared stage sequence serially', async () => {
     'verify',
     'deliver',
   ]);
+});
+
+test('rejects a reordered or partial serial lifecycle before invoking the handler', async () => {
+  const started: string[] = [];
+
+  await assert.rejects(
+    runPlan(
+      {
+        ...minimalPlan('bug'),
+        stages: ['investigate', 'plan', 'review', 'build', 'verify', 'deliver'],
+      },
+      [],
+      (stage) => {
+        started.push(stage);
+      },
+    ),
+    /canonical workflow stage sequence/i,
+  );
+
+  await assert.rejects(
+    runPlan({ ...minimalPlan('bug'), stages: ['investigate'] }, [], (stage) => {
+      started.push(stage);
+    }),
+    /canonical workflow stage sequence/i,
+  );
+
+  assert.deepEqual(started, []);
 });
 
 test('stops before execution when required capabilities are absent', async () => {
@@ -108,6 +135,22 @@ test('returns a revision-bound receipt for a completed serial run', async () => 
     'evidence/investigate.json',
   );
   assert.equal(receipt.failure, null);
+});
+
+test('rejects a non-canonical receipt lifecycle before creating a receipt', async () => {
+  await assert.rejects(
+    runPlanWithReceipt({
+      runId: 'non-canonical',
+      revision: 'revision-non-canonical',
+      plan: {
+        ...minimalPlan('feature'),
+        stages: ['investigate', 'plan', 'review', 'build', 'verify', 'deliver'],
+      },
+      capabilities: serialCapabilities(),
+      handler: () => ({ status: 'PASS', summary: 'must not run' }),
+    }),
+    /canonical workflow stage sequence/i,
+  );
 });
 
 test('returns a blocked receipt without invoking stages for a capability gap', async () => {
