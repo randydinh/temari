@@ -1,0 +1,225 @@
+import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import test from 'node:test';
+
+import { parallelPlan, type WorkerAssignment } from '@temari/contracts';
+
+import {
+  executeRestartableParallelWorkers,
+  FileParallelWorkerReceiptStore,
+} from './parallel-runtime.js';
+import { FileChildTaskStore } from './child-task-store.js';
+
+test('resumes a bounded child batch and joins terminal results in declaration order', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
+  try {
+    const childStore = await FileChildTaskStore.create(join(root, 'children'));
+    const receiptStore = await FileParallelWorkerReceiptStore.create(
+      join(root, 'receipts'),
+    );
+    const assignments = workerAssignments(3);
+    const calls: string[] = [];
+    const request = {
+      runId: 'parallel-runtime-1',
+      revision: 'revision-parallel-runtime-1',
+      plan: parallelPlan('feature', 2),
+      capabilities: parallelCapabilities(),
+      assignments,
+      childStore,
+      receiptStore,
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      now: fixedClock(),
+      handler: async (assignment: WorkerAssignment) => {
+        calls.push(assignment.id);
+        await new Promise((resolve) => setTimeout(resolve, 2));
+        return result(`${assignment.id} complete`);
+      },
+    } as const;
+
+    const first = await executeRestartableParallelWorkers(request);
+    assert.equal(first.state, 'RUNNING');
+    assert.equal(first.receipt, null);
+    assert.deepEqual(
+      first.pending.map((item) => item.reason),
+      ['queued'],
+    );
+    assert.equal(calls.length, 2);
+
+    const second = await executeRestartableParallelWorkers(request);
+    assert.equal(second.state, 'COMPLETE');
+    assert.equal(second.receipt?.status, 'PASS');
+    assert.equal(second.receipt?.peakConcurrency, 1);
+    assert.deepEqual(
+      second.receipt?.outcomes.map((outcome) => outcome.assignment.id),
+      ['worker-1', 'worker-2', 'worker-3'],
+    );
+    assert.deepEqual(calls, ['worker-1', 'worker-2', 'worker-3']);
+
+    const replay = await executeRestartableParallelWorkers(request);
+    assert.equal(replay.state, 'COMPLETE');
+    assert.deepEqual(replay.receipt, second.receipt);
+    assert.deepEqual(calls, ['worker-1', 'worker-2', 'worker-3']);
+
+    await assert.rejects(
+      executeRestartableParallelWorkers({
+        ...request,
+        assignments: workerAssignments(2),
+      }),
+      /Parallel receipt binding changed/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('retains a thrown handler as FAILED mechanics and a blocked semantic receipt', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
+  try {
+    const childStore = await FileChildTaskStore.create(join(root, 'children'));
+    const receiptStore = await FileParallelWorkerReceiptStore.create(
+      join(root, 'receipts'),
+    );
+    const assignments = workerAssignments(1);
+    const result = await executeRestartableParallelWorkers({
+      runId: 'parallel-runtime-2',
+      revision: 'revision-parallel-runtime-2',
+      plan: parallelPlan('feature', 1),
+      capabilities: parallelCapabilities(),
+      assignments,
+      childStore,
+      receiptStore,
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      now: fixedClock(),
+      handler: () => {
+        throw new Error('lease expired while contacting worker');
+      },
+    });
+
+    assert.equal(result.state, 'COMPLETE');
+    assert.equal(result.receipt?.status, 'BLOCKED');
+    assert.equal(result.receipt?.failure?.kind, 'worker-error');
+    assert.equal(result.receipt?.outcomes[0]?.result, null);
+    assert.equal(
+      result.receipt?.outcomes[0]?.error,
+      'lease expired while contacting worker',
+    );
+    assert.equal(result.tasks[0]?.status, 'FAILED');
+    assert.equal(result.tasks[0]?.result, null);
+    assert.equal(
+      result.tasks[0]?.error,
+      'lease expired while contacting worker',
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('refuses a partial join while another owner holds a child lease', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
+  try {
+    const childStore = await FileChildTaskStore.create(join(root, 'children'));
+    const receiptStore = await FileParallelWorkerReceiptStore.create(
+      join(root, 'receipts'),
+    );
+    let markStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    let release!: () => void;
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const request = {
+      runId: 'parallel-runtime-3',
+      revision: 'revision-parallel-runtime-3',
+      plan: parallelPlan('feature', 1),
+      capabilities: parallelCapabilities(),
+      assignments: workerAssignments(2),
+      childStore,
+      receiptStore,
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      now: fixedClock(),
+      handler: async () => {
+        markStarted();
+        await blocked;
+        return result('complete after lease');
+      },
+    } as const;
+    const firstPromise = executeRestartableParallelWorkers(request);
+    await started;
+
+    const concurrent = await executeRestartableParallelWorkers({
+      ...request,
+      owner: 'worker-b',
+      handler: () => result('must not execute'),
+    });
+    assert.equal(concurrent.state, 'RUNNING');
+    assert.equal(concurrent.receipt, null);
+    assert.equal(concurrent.pending[0]?.reason, 'active-lease');
+    assert.equal(concurrent.pending[1]?.reason, 'queued');
+
+    release();
+    const first = await firstPromise;
+    assert.equal(first.state, 'RUNNING');
+    assert.equal(first.pending[0]?.reason, 'queued');
+
+    const resumed = await executeRestartableParallelWorkers({
+      ...request,
+      handler: () => result('second child complete'),
+    });
+    assert.equal(resumed.state, 'COMPLETE');
+    assert.equal(resumed.receipt?.status, 'PASS');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+function result(summary: string) {
+  return {
+    status: 'PASS' as const,
+    summary,
+    evidencePaths: [`evidence/${summary.replaceAll(' ', '-')}.json`],
+    rawLogPath: null,
+  };
+}
+
+function workerAssignments(count: number): WorkerAssignment[] {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `worker-${index + 1}`,
+    role: 'investigator' as const,
+    brief: {
+      goal: `Inspect work item ${index + 1}`,
+      context: 'The coordinator supplied bounded context.',
+      scope: `Work item ${index + 1} only`,
+      acceptanceCriteria: ['Return retained evidence.'],
+      verificationCommand: null,
+      reportFormat: 'json' as const,
+      forbiddenActions: ['Do not modify shared state.'],
+    },
+  }));
+}
+
+function parallelCapabilities() {
+  return {
+    host: 'cursor',
+    available: [
+      'subagents',
+      'parallelism',
+      'model_diversity',
+      'worktree_isolation',
+      'durable_delivery',
+      'forge',
+    ] as const,
+    missing: [] as const,
+    notes: {},
+  };
+}
+
+function fixedClock(): () => Date {
+  return () => new Date('2026-09-24T04:00:00.000Z');
+}
