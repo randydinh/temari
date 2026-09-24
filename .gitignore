@@ -52,4 +52,8 @@ Thumbs.db
 # local overlays (personal / OpConnect / secrets)
 overlays/local/**
 !overlays/local/.gitkeep
+
+# local engineering audit and Graphify-generated artifacts
+/.audit/
+/graphify-out/
 .temari/
