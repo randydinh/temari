@@ -152,6 +152,13 @@ mechanical retry and cancellation gating are implemented for explicitly
 configured child attempts/assignments; they do not imply automatic failover,
 semantic retry decisions, or a complete cancellation policy.
 
+The executor can also publish callback-supplied worker evidence through the
+immutable content-addressed store. Child results retain revision-bound,
+portable SHA-256 identities rather than local artifact paths, and replay
+verifies each retained artifact before reusing a terminal child. This is a
+provider-neutral publication boundary; provider-specific log capture and
+shared artifact storage remain outside this local proof.
+
 The parent control plane now has the corresponding local recovery boundary.
 Create, claim, route-event append, transition, load, and event observation all
 reconcile a private per-run sidecar before proceeding. The sidecar repairs
@@ -176,9 +183,10 @@ automatic failover.
    for child tasks, the parent run store, and the serial stage engine. A local
    workspace manifest capture/verification boundary is also implemented for
    restartable child completion and serial PASS-stage checkpoint resume;
-   bounded local retry is implemented; cancellation policy, run-level
-   concurrency evidence, provider evidence publication, artifact recovery,
-   shared storage, and cross-machine failover remain explicit follow-on gates.
+   bounded local retry and executor-integrated provider-neutral evidence
+   publication/replay verification are implemented; cancellation policy,
+   run-level concurrency evidence, provider-specific capture, shared artifact
+   storage, and cross-machine failover remain explicit follow-on gates.
 4. **Temporal/shared-service proof.** Move the local Stage 1 proof to a shared
    Temporal service and artifact store. Prove builder/coordinator replacement,
    approval recovery, required-concurrency failure, serial fallback only when

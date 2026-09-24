@@ -230,9 +230,11 @@ manifest capture/verification, child manifest publication during restartable
 parallel execution, and serial-stage manifest publication and verification
 before checkpoint resume. Callers must provide explicit bindings for the
 workspace associated with each child or stage; this local boundary does not
-yet provide executor-integrated provider evidence publication, cancellation
-policy, or shared-store reconciliation. An explicit bounded mechanical retry
-policy is available for child handlers. The
+yet provide provider-specific log capture, cancellation policy, or shared-store
+reconciliation. A provider-neutral callback can publish worker evidence through
+the immutable content-addressed store; child replay verifies those portable
+references before reuse. An explicit bounded mechanical retry policy is
+available for child handlers. The
 dispatcher should be deterministic. It is not an LLM scheduler agent.
 
 ### Scheduling path
