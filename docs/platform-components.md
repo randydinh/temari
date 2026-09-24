@@ -225,10 +225,11 @@ receipt persistence, immutable content-addressed evidence, basic run leases,
 append-only route events, idempotent transitions, a scheduled execution
 wrapper, and a local `FileChildTaskStore` with dependency-aware claims,
 per-child leases, fencing epochs, result persistence, and idempotent
-completion. It now provides durable PASS-stage checkpoints and local recovery
-of parent and child state/event boundaries. It does not yet provide full
-executor-backed child checkpoints, retry/cancellation policy, workspace
-manifests, or shared-store reconciliation. The
+completion. It now provides durable PASS-stage checkpoints, bounded workspace
+manifest capture/verification, and local recovery of parent and child
+state/event boundaries. It does not yet provide executor-integrated child
+artifact publication, retry/cancellation policy, or shared-store
+reconciliation. The
 dispatcher should be deterministic. It is not an LLM scheduler agent.
 
 ### Scheduling path
@@ -269,8 +270,8 @@ receipt.
 
 The receipt remains an in-memory semantic boundary in the engine. Persistence,
 content-addressed evidence, leases, idempotency, and route events are runtime
-concerns. Cancellation, durable notifications, workspace manifests, and shared
-store reconciliation remain open runtime work.
+concerns. Cancellation, durable notifications, executor-integrated workspace
+manifests, and shared store reconciliation remain open runtime work.
 
 ## 5. Execution harnesses and Archon
 

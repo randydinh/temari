@@ -45,6 +45,9 @@ the canonical Nx repository and separates it from planned behavior.
   review.
 - Runtime evidence is immutable and content-addressed through
   `FileEvidenceStore`; receipt and evidence paths are revision-bound.
+- `FileWorkspaceManifestStore` captures a bounded, sorted, revision-bound
+  snapshot of regular workspace files with SHA-256, size, and mode; it stores
+  immutable manifests and verifies a workspace without following symlinks.
 
 ### Runtime and scheduling foundation
 
@@ -81,8 +84,9 @@ the canonical Nx repository and separates it from planned behavior.
   final receipt publication can therefore resume without replaying completed
   stages.
 - This is a mechanical foundation, not yet a complete durable scheduler: it
-  does not yet persist workspace manifests, apply retry/cancellation policy,
-  send notifications, renew parent leases, or provide shared-store fencing.
+  does not yet wire workspace manifests into child completion, apply
+  retry/cancellation policy, send notifications, renew parent leases, or
+  provide shared-store fencing.
 
 ### Archon and cross-platform delivery
 
@@ -142,7 +146,7 @@ that a repaired terminal child is not rerun and that stale receipts are not
 replayed when expected state is missing. This remains a local child-task proof:
 it deliberately does not claim parent-run lease renewal, automatic failover,
 shared control or artifact storage, retry/cancellation policy, workspace
-manifests, or cross-machine execution.
+manifests integrated with child completion, or cross-machine execution.
 
 The parent control plane now has the corresponding local recovery boundary.
 Create, claim, route-event append, transition, load, and event observation all
@@ -165,10 +169,11 @@ automatic failover.
    implemented.** The private transaction sidecars, strict digest/history
    proofs, lock-safe reconciliation, crash-boundary tests, no-rerun recovery,
    receipt replay refusal, and PASS-stage checkpoint/resume are now implemented
-   for child tasks, the parent run store, and the serial stage engine. Child
-   evidence/workspace manifests, retry/cancellation policy, run-level
-   concurrency evidence, artifact recovery, shared storage, and cross-machine
-   failover remain explicit follow-on gates.
+   for child tasks, the parent run store, and the serial stage engine. A local
+   workspace manifest capture/verification boundary is also implemented;
+   executor-integrated child evidence/manifests, retry/cancellation policy,
+   run-level concurrency evidence, artifact recovery, shared storage, and
+   cross-machine failover remain explicit follow-on gates.
 4. **Temporal/shared-service proof.** Move the local Stage 1 proof to a shared
    Temporal service and artifact store. Prove builder/coordinator replacement,
    approval recovery, required-concurrency failure, serial fallback only when
