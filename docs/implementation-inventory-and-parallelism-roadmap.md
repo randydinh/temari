@@ -1,6 +1,6 @@
 # Temari implementation inventory and parallelism roadmap
 
-Status: merged baseline `860ef85`; this document records what is actually in
+Status: recovery-proof working baseline `1a788e0`; this document records what is actually in
 the canonical Nx repository and separates it from planned behavior.
 
 ## Lossless implementation inventory
@@ -58,7 +58,11 @@ the canonical Nx repository and separates it from planned behavior.
   aware, and `listReady` reconstructs a stable ready frontier from disk. A
   durable immutable child-task group records the exact ordered membership, and
   mechanical `FAILED` completion keeps handler errors distinct from semantic
-  worker `BLOCKED` results.
+  worker `BLOCKED` results. Each child transition is staged in a private,
+  fsynced transaction sidecar containing base digests and the complete next
+  state/event history. Lock-safe reconciliation repairs only a transaction
+  whose base or next state is proven; ambiguous, partial, event-ahead, and
+  missing-state histories fail closed.
 - `executeRestartableParallelWorkers` runs one bounded local claim/execute
   pass, reuses terminal children, refuses incomplete joins, records explicit
   pending reasons, and persists a content-addressed joined parallel receipt.
@@ -120,13 +124,16 @@ workflow engine. The executor validates briefs and results, never starts work
 when the capability is missing, bounds active workers, collects sibling
 outcomes, and returns a stable declaration-order join.
 
-The next increment now adds a local restartable executor boundary. It persists
-an immutable ordered child group, claims only up to the declared bound, reuses
-terminal children after restart, fences stale completion, and emits a receipt
-only after every expected child is terminal and valid. It deliberately does
-not claim parent-run lease renewal, automatic failover, shared control or
-artifact storage, stage checkpoints, retry/cancellation policy, workspace
-manifests, failure reconciliation, or cross-machine execution.
+The current increments provide a local restartable executor boundary. They
+persist an immutable ordered child group, claim only up to the declared bound,
+reuse terminal children after restart, fence stale completion, reconcile every
+expected child before claim, join, or receipt replay, and emit a receipt only
+after every expected child is terminal and valid. Crash-boundary tests prove
+that a repaired terminal child is not rerun and that stale receipts are not
+replayed when expected state is missing. This remains a local child-task proof:
+it deliberately does not claim parent-run lease renewal, automatic failover,
+shared control or artifact storage, stage checkpoints, retry/cancellation
+policy, workspace manifests, or cross-machine execution.
 
 ## Completion roadmap
 
@@ -138,11 +145,13 @@ manifests, failure reconciliation, or cross-machine execution.
    terminal replay, fenced leases, mechanical failure preservation, explicit
    incomplete-join refusal, and a durable joined receipt. Do not let child
    workers mutate shared semantic state.
-3. **Recovery and join proof — next.** Persist child evidence and workspace
-   manifests; reconcile state/event gaps after process failure; define explicit
-   retry/cancellation policy; retain run-level concurrency evidence; join all
-   required results with explicit optional degradation; and prove recovery
-   under missing or corrupt artifacts.
+3. **Recovery and join proof — child-task boundary implemented in this
+   increment.** The private child transaction sidecar, strict digest/history
+   proof, lock-safe reconciliation, crash-boundary tests, no-rerun recovery,
+   and receipt replay refusal are now implemented. Parent run-store repair,
+   child evidence/workspace manifests, retry/cancellation policy, run-level
+   concurrency evidence, artifact recovery, and cross-machine failover remain
+   explicit follow-on gates.
 4. **Temporal/shared-service proof.** Move the local Stage 1 proof to a shared
    Temporal service and artifact store. Prove builder/coordinator replacement,
    approval recovery, required-concurrency failure, serial fallback only when

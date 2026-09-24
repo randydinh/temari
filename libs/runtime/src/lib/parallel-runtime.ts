@@ -423,6 +423,15 @@ async function ensureGroup(
   });
 }
 
+async function reconcileExpectedTasks(
+  request: ExecuteRestartableParallelWorkersRequest,
+  identity: TaskIdentity,
+): Promise<readonly (ChildTaskRecord | null)[]> {
+  return Promise.all(
+    identity.taskIds.map((taskId) => request.childStore.reconcile(taskId)),
+  );
+}
+
 async function executeClaimed(
   request: ExecuteRestartableParallelWorkersRequest,
   claimed: ClaimedTask,
@@ -501,10 +510,37 @@ export async function executeRestartableParallelWorkers(
       },
       'Parallel receipt binding changed; refusing stale replay.',
     );
+    if (
+      replay.receipt.failure?.kind === 'plan-gap' ||
+      replay.receipt.failure?.kind === 'capability-gap'
+    ) {
+      return {
+        state: 'BLOCKED',
+        group: null,
+        tasks: [],
+        pending: [],
+        receipt: replay.receipt,
+      };
+    }
+    const replayGroup = await request.childStore.loadGroup(identity.groupId);
+    assert(
+      replayGroup,
+      'Parallel receipt child group is missing; refusing stale replay.',
+    );
+    assert.deepEqual(
+      replayGroup.taskIds,
+      identity.taskIds,
+      'Parallel receipt child group membership changed; refusing stale replay.',
+    );
+    const replayTasks = await reconcileExpectedTasks(request, identity);
+    assert(
+      replayTasks.every((task): task is ChildTaskRecord => task !== null),
+      'Parallel receipt is missing an expected child task; refusing stale replay.',
+    );
     return {
       state: 'COMPLETE',
-      group: await request.childStore.loadGroup(identity.groupId),
-      tasks: [],
+      group: replayGroup,
+      tasks: replayTasks,
       pending: [],
       receipt: replay.receipt,
     };
@@ -533,6 +569,7 @@ export async function executeRestartableParallelWorkers(
   );
   preflightParallelWorkers(request.assignments);
   const group = await ensureGroup(request, identity, now);
+  await reconcileExpectedTasks(request, identity);
   const assignmentByTaskId = new Map(
     identity.taskIds.map((taskId, index) => [
       taskId,
@@ -570,7 +607,7 @@ export async function executeRestartableParallelWorkers(
   for (const taskId of identity.taskIds) {
     const assignment = assignmentByTaskId.get(taskId);
     assert(assignment);
-    const record = await request.childStore.load(taskId);
+    const record = await request.childStore.reconcile(taskId);
     if (!record) {
       pending.push({ taskId, assignmentId: assignment.id, reason: 'missing' });
       continue;

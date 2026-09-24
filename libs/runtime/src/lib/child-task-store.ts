@@ -146,6 +146,7 @@ export interface ListReadyChildTasksRequest {
 export interface ChildTaskStore {
   create(request: CreateChildTaskRequest): Promise<ChildTaskRecord>;
   load(taskId: string): Promise<ChildTaskRecord | null>;
+  reconcile(taskId: string): Promise<ChildTaskRecord | null>;
   ensureGroup(
     request: EnsureChildTaskGroupRequest,
   ): Promise<ChildTaskGroupRecord>;
@@ -470,7 +471,22 @@ function parseEvent(value: unknown): ChildTaskEvent {
   );
   assert(typeof event.actor === 'string' && event.actor.length > 0);
   assert(typeof event.at === 'string' && Number.isFinite(Date.parse(event.at)));
-  assert(event.payload && typeof event.payload === 'object');
+  assert(
+    event.payload &&
+      typeof event.payload === 'object' &&
+      !Array.isArray(event.payload),
+  );
+  for (const payloadValue of Object.values(
+    event.payload as Record<string, unknown>,
+  )) {
+    assert(
+      payloadValue === null ||
+        typeof payloadValue === 'string' ||
+        typeof payloadValue === 'number' ||
+        typeof payloadValue === 'boolean',
+      'Child task event payload is invalid.',
+    );
+  }
   return {
     ...event,
     sequence: event.sequence as number,
@@ -479,7 +495,136 @@ function parseEvent(value: unknown): ChildTaskEvent {
   } as ChildTaskEvent;
 }
 
+type FailureInjectionStage =
+  | 'after-sidecar-fsync'
+  | 'after-state-publication'
+  | 'after-event-publication'
+  | 'after-sidecar-removal';
+
+interface ChildTaskTransaction {
+  readonly version: 1;
+  readonly taskId: string;
+  readonly baseStateDigest: string | null;
+  readonly baseEventDigest: string;
+  readonly baseEventSequence: number;
+  readonly nextState: ChildTaskRecord;
+  readonly nextEvents: readonly ChildTaskEvent[];
+}
+
+function assertDigest(value: unknown, label: string): asserts value is string {
+  assert(
+    typeof value === 'string' && /^[a-f0-9]{64}$/.test(value),
+    `${label} is invalid.`,
+  );
+}
+
+function assertEventHistory(
+  taskId: string,
+  record: ChildTaskRecord,
+  events: readonly ChildTaskEvent[],
+): void {
+  assert(events.length > 0, `Child task ${taskId} event history is missing.`);
+  const expectedLength =
+    1 + record.attempt + (isTerminal(record.status) ? 1 : 0);
+  assert.equal(
+    events.length,
+    expectedLength,
+    events.length > expectedLength
+      ? 'Child task event log is ahead of state.'
+      : 'Child task state is ahead of its event log.',
+  );
+  const idempotencyKeys = new Set<string>();
+  events.forEach((event, index) => {
+    assert.equal(event.taskId, taskId);
+    assert.equal(event.runId, record.runId);
+    assert.equal(event.revision, record.revision);
+    assert.equal(event.sequence, index + 1);
+    assert(!idempotencyKeys.has(event.idempotencyKey));
+    idempotencyKeys.add(event.idempotencyKey);
+  });
+
+  const created = events[0];
+  assert(created);
+  assert.equal(created.type, 'task-created');
+  assert.equal(created.idempotencyKey, `create:${taskId}:${record.revision}`);
+  assert.equal(created.payload.status, 'QUEUED');
+  assert.equal(created.payload.dependencyCount, record.dependsOn.length);
+
+  for (let index = 1; index <= record.attempt; index += 1) {
+    const claimed = events[index];
+    assert(claimed);
+    assert.equal(claimed.type, 'task-claimed');
+    assert.equal(claimed.payload.attempt, index);
+    assert(Number.isInteger(claimed.payload.fencingEpoch));
+    assert(typeof claimed.payload.expiresAt === 'string');
+    assert(Number.isFinite(Date.parse(claimed.payload.expiresAt)));
+  }
+
+  if (record.status === 'RUNNING') {
+    assert(record.lease, 'Running task lease is missing.');
+    assert(record.attempt > 0, 'Running task attempt is missing.');
+    const claimed = events[record.attempt];
+    assert(claimed);
+    assert.equal(claimed.payload.fencingEpoch, record.lease.fencingEpoch);
+    assert.equal(claimed.payload.expiresAt, record.lease.expiresAt);
+    return;
+  }
+
+  if (isTerminal(record.status)) {
+    const completed = events[events.length - 1];
+    assert(completed);
+    assert.equal(completed.type, 'task-completed');
+    assert.equal(completed.payload.from, 'RUNNING');
+    assert.equal(completed.payload.to, record.status);
+    assert.equal(completed.payload.attempt, record.attempt);
+    assert.equal(completed.payload.resultDigest, digest(record.result));
+    assert.equal(completed.payload.error, record.error);
+  }
+}
+
+function parseTransaction(
+  value: unknown,
+  taskId: string,
+): ChildTaskTransaction {
+  assert(
+    value && typeof value === 'object',
+    'Child task transaction is invalid.',
+  );
+  const transaction = value as Partial<ChildTaskTransaction>;
+  assert.equal(transaction.version, 1);
+  assert.equal(transaction.taskId, taskId);
+  assert(
+    transaction.baseStateDigest === null ||
+      typeof transaction.baseStateDigest === 'string',
+  );
+  if (transaction.baseStateDigest !== null) {
+    assertDigest(transaction.baseStateDigest, 'Base state digest');
+  }
+  assertDigest(transaction.baseEventDigest, 'Base event digest');
+  assert(
+    Number.isInteger(transaction.baseEventSequence) &&
+      (transaction.baseEventSequence as number) >= 0,
+  );
+  const nextState = parseRecord(transaction.nextState);
+  assert.equal(nextState.taskId, taskId);
+  assert(Array.isArray(transaction.nextEvents));
+  const nextEvents = transaction.nextEvents.map(parseEvent);
+  assertEventHistory(taskId, nextState, nextEvents);
+  assert(nextEvents.length > (transaction.baseEventSequence as number));
+  return {
+    version: 1,
+    taskId,
+    baseStateDigest: transaction.baseStateDigest as string | null,
+    baseEventDigest: transaction.baseEventDigest as string,
+    baseEventSequence: transaction.baseEventSequence as number,
+    nextState,
+    nextEvents,
+  };
+}
+
 export class FileChildTaskStore implements ChildTaskStore {
+  private static failureInjection: FailureInjectionStage | null = null;
+
   private constructor(private readonly root: string) {}
 
   static async create(root: string): Promise<FileChildTaskStore> {
@@ -495,6 +640,7 @@ export class FileChildTaskStore implements ChildTaskStore {
     assertText(request.actor, 'Actor');
     const dependsOn = normalizedDependencies(request.taskId, request.dependsOn);
     return this.withLock(request.taskId, async () => {
+      await this.reconcileLocked(request.taskId);
       const existing = await this.readRecord(request.taskId);
       if (existing) {
         assert.equal(
@@ -531,19 +677,28 @@ export class FileChildTaskStore implements ChildTaskStore {
         result: null,
         error: null,
       };
-      await this.writeRecord(record);
-      await this.appendEventLocked({
+      const events = [
+        this.createEvent({
+          taskId: request.taskId,
+          runId: request.runId,
+          revision: request.revision,
+          actor: request.actor,
+          type: 'task-created',
+          idempotencyKey: `create:${request.taskId}:${request.revision}`,
+          payload: {
+            status: 'QUEUED',
+            dependencyCount: dependsOn.length,
+          },
+          now,
+          sequence: 1,
+        }),
+      ];
+      await this.commitTransitionLocked({
         taskId: request.taskId,
-        runId: request.runId,
-        revision: request.revision,
-        actor: request.actor,
-        type: 'task-created',
-        idempotencyKey: `create:${request.taskId}:${request.revision}`,
-        payload: {
-          status: 'QUEUED',
-          dependencyCount: dependsOn.length,
-        },
-        now,
+        baseState: null,
+        baseEvents: [],
+        nextState: record,
+        nextEvents: events,
       });
       return record;
     });
@@ -551,7 +706,15 @@ export class FileChildTaskStore implements ChildTaskStore {
 
   async load(taskId: string): Promise<ChildTaskRecord | null> {
     assertSafeId(taskId, 'Task ID');
-    return this.readRecord(taskId);
+    return this.withLock(taskId, async () => {
+      await this.reconcileLocked(taskId);
+      return this.readRecord(taskId);
+    });
+  }
+
+  async reconcile(taskId: string): Promise<ChildTaskRecord | null> {
+    assertSafeId(taskId, 'Task ID');
+    return this.withLock(taskId, () => this.reconcileLocked(taskId));
   }
 
   async ensureGroup(
@@ -568,6 +731,7 @@ export class FileChildTaskStore implements ChildTaskStore {
     assertGroupMembership(taskIds, assignmentIds);
 
     return this.withGroupLock(request.groupId, async () => {
+      for (const taskId of taskIds) await this.reconcile(taskId);
       const existing = await this.readGroup(request.groupId);
       if (existing) {
         assert.equal(
@@ -616,14 +780,17 @@ export class FileChildTaskStore implements ChildTaskStore {
 
   async loadGroup(groupId: string): Promise<ChildTaskGroupRecord | null> {
     assertSafeId(groupId, 'Group ID');
-    return this.readGroup(groupId);
+    return this.withGroupLock(groupId, () => this.readGroup(groupId));
   }
 
   async claim(request: ClaimChildTaskRequest): Promise<ClaimChildTaskResult> {
     assertSafeId(request.taskId, 'Task ID');
     assertText(request.owner, 'Owner');
     assertLeaseMs(request.leaseMs);
-    return this.withLock(request.taskId, () => this.claimLocked(request));
+    return this.withLock(request.taskId, async () => {
+      await this.reconcileLocked(request.taskId);
+      return this.claimLocked(request);
+    });
   }
 
   async claimGroup(
@@ -654,28 +821,29 @@ export class FileChildTaskStore implements ChildTaskStore {
       const now = request.now ?? new Date();
       assertDate(now);
       for (const taskId of taskIds) {
-        const existing = await this.readRecord(taskId);
-        if (!existing) {
+        const result = await this.withLock(taskId, async () => {
+          await this.reconcileLocked(taskId);
+          const existing = await this.readRecord(taskId);
+          if (!existing) return null;
+          if (
+            existing.status === 'RUNNING' &&
+            existing.lease !== null &&
+            Date.parse(existing.lease.expiresAt) > now.getTime()
+          ) {
+            activeLeases += 1;
+          }
+          if (
+            activeLeases >= request.maxConcurrency ||
+            isTerminal(existing.status)
+          ) {
+            return { claimed: false, record: existing };
+          }
+          return this.claimLocked(requestForTask(request, taskId, now));
+        });
+        if (!result) {
           missingTaskIds.push(taskId);
           continue;
         }
-        if (
-          existing.status === 'RUNNING' &&
-          existing.lease !== null &&
-          Date.parse(existing.lease.expiresAt) > now.getTime()
-        ) {
-          activeLeases += 1;
-        }
-        if (
-          activeLeases >= request.maxConcurrency ||
-          isTerminal(existing.status)
-        ) {
-          records.push(existing);
-          continue;
-        }
-        const result = await this.withLock(taskId, () =>
-          this.claimLocked(requestForTask(request, taskId, now)),
-        );
         records.push(result.record);
         if (result.claimed) {
           claimed.push(result.record);
@@ -717,10 +885,11 @@ export class FileChildTaskStore implements ChildTaskStore {
         expiresAt: new Date(nowMs + request.leaseMs).toISOString(),
       },
     };
-    await this.writeRecord(next);
     assert(next.lease);
-    await this.appendEventLocked({
+    const events = await this.readEvents(request.taskId, record.revision);
+    const event = this.createEvent({
       taskId: request.taskId,
+      sequence: events.length + 1,
       runId: record.runId,
       revision: record.revision,
       actor: request.owner,
@@ -732,6 +901,13 @@ export class FileChildTaskStore implements ChildTaskStore {
         expiresAt: next.lease.expiresAt,
       },
       now,
+    });
+    await this.commitTransitionLocked({
+      taskId: request.taskId,
+      baseState: record,
+      baseEvents: events,
+      nextState: next,
+      nextEvents: [...events, event],
     });
     return { claimed: true, record: next };
   }
@@ -747,6 +923,7 @@ export class FileChildTaskStore implements ChildTaskStore {
     assertError(error);
     assertCompletionPayload(request.status, result, error);
     return this.withLock(request.taskId, async () => {
+      await this.reconcileLocked(request.taskId);
       const record = await this.requireRecord(request.taskId);
       const events = await this.readEvents(request.taskId, record.revision);
       const existing = events.find(
@@ -775,6 +952,18 @@ export class FileChildTaskStore implements ChildTaskStore {
           error,
           'Idempotency key error changed.',
         );
+        assert.equal(
+          existing.actor,
+          request.owner,
+          'Idempotency key actor changed.',
+        );
+        if (existing.payload.leaseTokenDigest !== undefined) {
+          assert.equal(
+            existing.payload.leaseTokenDigest,
+            digest(request.leaseToken),
+            'Idempotency key lease changed.',
+          );
+        }
         assert.equal(
           record.status,
           request.status,
@@ -823,9 +1012,9 @@ export class FileChildTaskStore implements ChildTaskStore {
         result,
         error,
       };
-      await this.writeRecord(next);
-      await this.appendEventLocked({
+      const event = this.createEvent({
         taskId: request.taskId,
+        sequence: events.length + 1,
         runId: record.runId,
         revision: record.revision,
         actor: request.owner,
@@ -838,8 +1027,16 @@ export class FileChildTaskStore implements ChildTaskStore {
           fencingEpoch: request.fencingEpoch,
           resultDigest,
           error,
+          leaseTokenDigest: digest(request.leaseToken),
         },
         now,
+      });
+      await this.commitTransitionLocked({
+        taskId: request.taskId,
+        baseState: record,
+        baseEvents: events,
+        nextState: next,
+        nextEvents: [...events, event],
       });
       return next;
     });
@@ -856,7 +1053,7 @@ export class FileChildTaskStore implements ChildTaskStore {
       if (!entry.isFile() || !entry.name.endsWith('.task.json')) continue;
       const taskId = entry.name.slice(0, -'.task.json'.length);
       assertSafeId(taskId, 'Task ID');
-      const record = await this.readRecord(taskId);
+      const record = await this.load(taskId);
       if (
         !record ||
         record.runId !== request.runId ||
@@ -881,8 +1078,11 @@ export class FileChildTaskStore implements ChildTaskStore {
 
   async events(taskId: string): Promise<readonly ChildTaskEvent[]> {
     assertSafeId(taskId, 'Task ID');
-    const record = await this.requireRecord(taskId);
-    return this.readEvents(taskId, record.revision);
+    return this.withLock(taskId, async () => {
+      await this.reconcileLocked(taskId);
+      const record = await this.requireRecord(taskId);
+      return this.readEvents(taskId, record.revision);
+    });
   }
 
   private statePath(taskId: string): string {
@@ -895,6 +1095,10 @@ export class FileChildTaskStore implements ChildTaskStore {
 
   private eventPath(taskId: string): string {
     return join(this.root, `${taskId}.events.jsonl`);
+  }
+
+  private transactionPath(taskId: string): string {
+    return join(this.root, `.${taskId}.transaction.json`);
   }
 
   private lockPath(taskId: string): string {
@@ -935,30 +1139,152 @@ export class FileChildTaskStore implements ChildTaskStore {
     return record;
   }
 
-  private async writeRecord(record: ChildTaskRecord): Promise<void> {
-    const path = this.statePath(record.taskId);
-    const temporary = join(this.root, `.${record.taskId}.${randomUUID()}.tmp`);
-    const file = await open(temporary, 'wx', 0o600);
+  private async readTransaction(
+    taskId: string,
+  ): Promise<ChildTaskTransaction | null> {
     try {
-      try {
-        await file.writeFile(canonical(record));
-        await file.sync();
-      } finally {
-        await file.close();
-      }
-      await rename(temporary, path);
-    } finally {
-      await unlink(temporary).catch(() => undefined);
+      return parseTransaction(
+        JSON.parse(await readFile(this.transactionPath(taskId), 'utf8')),
+        taskId,
+      );
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      throw error;
     }
   }
 
+  private async reconcileLocked(
+    taskId: string,
+  ): Promise<ChildTaskRecord | null> {
+    const transaction = await this.readTransaction(taskId);
+    const currentState = await this.readRecord(taskId);
+    const currentEvents = await this.readEvents(taskId);
+    if (!transaction) {
+      if (!currentState) {
+        assert(
+          currentEvents.length === 0,
+          `Child task ${taskId} is missing its state.`,
+        );
+        return null;
+      }
+      assertEventHistory(taskId, currentState, currentEvents);
+      return currentState;
+    }
+
+    const currentStateDigest = currentState ? digest(currentState) : null;
+    const currentEventDigest = digest(currentEvents);
+    const baseState = currentStateDigest === transaction.baseStateDigest;
+    const baseEvents =
+      currentEvents.length === transaction.baseEventSequence &&
+      currentEventDigest === transaction.baseEventDigest;
+    const nextState = currentStateDigest === digest(transaction.nextState);
+    const nextEvents =
+      currentEvents.length === transaction.nextEvents.length &&
+      currentEventDigest === digest(transaction.nextEvents);
+
+    if (nextState && nextEvents) {
+      await this.removeTransaction(taskId);
+      return transaction.nextState;
+    }
+    if (baseState && nextEvents && !nextState) {
+      throw new Error('Child task state conflicts with its transaction.');
+    }
+    if (baseEvents && nextState && !nextEvents) {
+      await this.publishTransaction(transaction);
+      return transaction.nextState;
+    }
+    if (baseState && baseEvents) {
+      await this.publishTransaction(transaction);
+      return transaction.nextState;
+    }
+    if (baseEvents && !nextEvents) {
+      throw new Error('Child task transaction base digest conflict.');
+    }
+    if (nextState && !nextEvents) {
+      throw new Error('Child task transaction event publication is ambiguous.');
+    }
+    throw new Error('Child task transaction state is ambiguous.');
+  }
+
+  private async commitTransitionLocked(input: {
+    readonly taskId: string;
+    readonly baseState: ChildTaskRecord | null;
+    readonly baseEvents: readonly ChildTaskEvent[];
+    readonly nextState: ChildTaskRecord;
+    readonly nextEvents: readonly ChildTaskEvent[];
+  }): Promise<void> {
+    assertEventHistory(input.taskId, input.nextState, input.nextEvents);
+    assert.equal(
+      input.baseEvents.length,
+      input.nextEvents.length - 1,
+      'Child task transition must append exactly one event.',
+    );
+    const transaction: ChildTaskTransaction = {
+      version: 1,
+      taskId: input.taskId,
+      baseStateDigest: input.baseState ? digest(input.baseState) : null,
+      baseEventDigest: digest(input.baseEvents),
+      baseEventSequence: input.baseEvents.length,
+      nextState: input.nextState,
+      nextEvents: input.nextEvents,
+    };
+    await this.writeTransaction(transaction);
+    this.injectFailure('after-sidecar-fsync');
+    await this.publishTransaction(transaction);
+  }
+
+  private async publishTransaction(
+    transaction: ChildTaskTransaction,
+  ): Promise<void> {
+    await this.writeRecord(transaction.nextState);
+    this.injectFailure('after-state-publication');
+    await this.writeEvents(transaction.taskId, transaction.nextEvents);
+    this.injectFailure('after-event-publication');
+    await this.removeTransaction(transaction.taskId);
+    this.injectFailure('after-sidecar-removal');
+  }
+
+  private async removeTransaction(taskId: string): Promise<void> {
+    await unlink(this.transactionPath(taskId)).catch((error) => {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    });
+  }
+
+  private injectFailure(stage: FailureInjectionStage): void {
+    if (FileChildTaskStore.failureInjection !== stage) return;
+    FileChildTaskStore.failureInjection = null;
+    throw new Error(`Injected child task store interruption at ${stage}.`);
+  }
+
+  private async writeTransaction(
+    transaction: ChildTaskTransaction,
+  ): Promise<void> {
+    await this.writeFileAtomic(
+      this.transactionPath(transaction.taskId),
+      canonical(transaction),
+    );
+  }
+
+  private async writeRecord(record: ChildTaskRecord): Promise<void> {
+    await this.writeFileAtomic(
+      this.statePath(record.taskId),
+      canonical(record),
+    );
+  }
+
   private async writeGroup(record: ChildTaskGroupRecord): Promise<void> {
-    const path = this.groupPath(record.groupId);
-    const temporary = join(this.root, `.${record.groupId}.${randomUUID()}.tmp`);
+    await this.writeFileAtomic(
+      this.groupPath(record.groupId),
+      canonical(record),
+    );
+  }
+
+  private async writeFileAtomic(path: string, body: string): Promise<void> {
+    const temporary = join(this.root, `.${randomUUID()}.tmp`);
     const file = await open(temporary, 'wx', 0o600);
     try {
       try {
-        await file.writeFile(canonical(record));
+        await file.writeFile(body);
         await file.sync();
       } finally {
         await file.close();
@@ -971,7 +1297,7 @@ export class FileChildTaskStore implements ChildTaskStore {
 
   private async readEvents(
     taskId: string,
-    revision: string,
+    revision?: string,
   ): Promise<readonly ChildTaskEvent[]> {
     let body: string;
     try {
@@ -980,13 +1306,17 @@ export class FileChildTaskStore implements ChildTaskStore {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
       throw error;
     }
-    const events = body
-      .split('\n')
-      .filter((line) => line.length > 0)
-      .map((line) => parseEvent(JSON.parse(line)));
+    if (body.length === 0) return [];
+    const lines = body.split('\n');
+    if (lines[lines.length - 1] === '') lines.pop();
+    assert(
+      lines.every((line) => line.length > 0),
+      'Child task event log contains a blank or partial JSONL record.',
+    );
+    const events = lines.map((line) => parseEvent(JSON.parse(line)));
     events.forEach((event, index) => {
       assert.equal(event.taskId, taskId);
-      assert.equal(event.revision, revision);
+      if (revision !== undefined) assert.equal(event.revision, revision);
       assert.equal(
         event.sequence,
         index + 1,
@@ -996,49 +1326,47 @@ export class FileChildTaskStore implements ChildTaskStore {
     return events;
   }
 
-  private async appendEventLocked(
-    input: Omit<ChildTaskEvent, 'schema' | 'sequence' | 'at' | 'payload'> & {
-      readonly payload: ChildTaskEventPayload;
-      readonly now?: Date;
-    },
-  ): Promise<ChildTaskEvent> {
-    const events = await this.readEvents(input.taskId, input.revision);
-    const existing = events.find(
-      (event) => event.idempotencyKey === input.idempotencyKey,
+  private async writeEvents(
+    taskId: string,
+    events: readonly ChildTaskEvent[],
+  ): Promise<void> {
+    await this.writeFileAtomic(
+      this.eventPath(taskId),
+      events.map((event) => canonical(event)).join('\n') + '\n',
     );
-    if (existing) {
-      assert.equal(canonical(existing.payload), canonical(input.payload));
-      return existing;
-    }
-    const now = input.now ?? new Date();
-    assertDate(now);
-    const event: ChildTaskEvent = {
+  }
+
+  private createEvent(input: {
+    readonly sequence: number;
+    readonly taskId: string;
+    readonly runId: string;
+    readonly revision: string;
+    readonly type: ChildTaskEventType;
+    readonly idempotencyKey: string;
+    readonly actor: string;
+    readonly payload: ChildTaskEventPayload;
+    readonly now: Date;
+  }): ChildTaskEvent {
+    assertDate(input.now);
+    return {
       schema: 1,
-      sequence: events.length + 1,
+      sequence: input.sequence,
       taskId: input.taskId,
       runId: input.runId,
       revision: input.revision,
       type: input.type,
       idempotencyKey: input.idempotencyKey,
       actor: input.actor,
-      at: now.toISOString(),
+      at: input.now.toISOString(),
       payload: input.payload,
     };
-    const file = await open(this.eventPath(input.taskId), 'a', 0o600);
-    try {
-      await file.writeFile(`${canonical(event)}\n`);
-      await file.sync();
-    } finally {
-      await file.close();
-    }
-    return event;
   }
 
   private async dependenciesSucceeded(
     record: ChildTaskRecord,
   ): Promise<boolean> {
     for (const dependencyId of record.dependsOn) {
-      const dependency = await this.readRecord(dependencyId);
+      const dependency = await this.load(dependencyId);
       assert(dependency, `Dependency ${dependencyId} does not exist.`);
       assert.equal(
         dependency.runId,

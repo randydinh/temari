@@ -179,6 +179,84 @@ test('refuses a partial join while another owner holds a child lease', async () 
   }
 });
 
+test('repairs an interrupted completion without rerunning the handler', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
+  try {
+    const childStore = await FileChildTaskStore.create(join(root, 'children'));
+    const receiptStore = await FileParallelWorkerReceiptStore.create(
+      join(root, 'receipts'),
+    );
+    const assignments = workerAssignments(1);
+    let calls = 0;
+    const request = {
+      runId: 'parallel-runtime-recovery-1',
+      revision: 'revision-parallel-runtime-recovery-1',
+      plan: parallelPlan('feature', 1),
+      capabilities: parallelCapabilities(),
+      assignments,
+      childStore,
+      receiptStore,
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      now: fixedClock(),
+      handler: () => {
+        calls += 1;
+        return result('recovered completion');
+      },
+    } as const;
+
+    setFailureInjection('after-state-publication');
+    await assert.rejects(
+      executeRestartableParallelWorkers(request),
+      /Injected child task store interruption/,
+    );
+
+    const resumed = await executeRestartableParallelWorkers(request);
+    assert.equal(resumed.state, 'COMPLETE');
+    assert.equal(resumed.receipt?.status, 'PASS');
+    assert.equal(calls, 1);
+  } finally {
+    setFailureInjection(null);
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('refuses receipt replay when an expected child state is missing', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
+  try {
+    const childStore = await FileChildTaskStore.create(join(root, 'children'));
+    const receiptStore = await FileParallelWorkerReceiptStore.create(
+      join(root, 'receipts'),
+    );
+    const request = {
+      runId: 'parallel-runtime-recovery-2',
+      revision: 'revision-parallel-runtime-recovery-2',
+      plan: parallelPlan('feature', 1),
+      capabilities: parallelCapabilities(),
+      assignments: workerAssignments(1),
+      childStore,
+      receiptStore,
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      now: fixedClock(),
+      handler: () => result('complete before corruption'),
+    } as const;
+
+    const completed = await executeRestartableParallelWorkers(request);
+    assert.equal(completed.state, 'COMPLETE');
+    const taskId = completed.tasks[0]?.taskId;
+    assert(taskId);
+    await rm(join(root, 'children', `${taskId}.task.json`));
+
+    await assert.rejects(
+      executeRestartableParallelWorkers(request),
+      /missing its state|refusing stale replay/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 function result(summary: string) {
   return {
     status: 'PASS' as const,
@@ -222,4 +300,17 @@ function parallelCapabilities() {
 
 function fixedClock(): () => Date {
   return () => new Date('2026-09-24T04:00:00.000Z');
+}
+
+type FailureInjectionStage =
+  | 'after-sidecar-fsync'
+  | 'after-state-publication'
+  | 'after-event-publication'
+  | 'after-sidecar-removal';
+
+function setFailureInjection(stage: FailureInjectionStage | null): void {
+  const constructor = FileChildTaskStore as unknown as {
+    failureInjection: FailureInjectionStage | null;
+  };
+  constructor.failureInjection = stage;
 }
