@@ -63,7 +63,11 @@ export type ChildTaskEventPayload = Readonly<
 >;
 
 export type ChildTaskEventType =
-  'task-created' | 'task-claimed' | 'task-completed' | 'task-retried';
+  | 'task-created'
+  | 'task-claimed'
+  | 'task-completed'
+  | 'task-retried'
+  | 'task-cancelled';
 
 export interface ChildTaskEvent {
   readonly schema: 1;
@@ -145,6 +149,13 @@ export interface RetryChildTaskRequest {
   readonly now?: Date;
 }
 
+export interface CancelChildTaskRequest {
+  readonly taskId: string;
+  readonly actor: string;
+  readonly idempotencyKey: string;
+  readonly now?: Date;
+}
+
 export interface ListReadyChildTasksRequest {
   readonly runId: string;
   readonly revision: string;
@@ -164,6 +175,7 @@ export interface ChildTaskStore {
   ): Promise<ClaimChildTaskGroupResult>;
   complete(request: CompleteChildTaskRequest): Promise<ChildTaskRecord>;
   retry(request: RetryChildTaskRequest): Promise<ChildTaskRecord>;
+  cancel(request: CancelChildTaskRequest): Promise<ChildTaskRecord>;
   listReady(
     request: ListReadyChildTasksRequest,
   ): Promise<readonly ChildTaskRecord[]>;
@@ -473,7 +485,8 @@ function parseEvent(value: unknown): ChildTaskEvent {
     event.type === 'task-created' ||
       event.type === 'task-claimed' ||
       event.type === 'task-completed' ||
-      event.type === 'task-retried',
+      event.type === 'task-retried' ||
+      event.type === 'task-cancelled',
   );
   assert(
     typeof event.idempotencyKey === 'string' && event.idempotencyKey.length > 0,
@@ -552,10 +565,10 @@ function assertEventHistory(
 
   let status: ChildTaskStatus = 'QUEUED';
   let attempts = 0;
-  let completions = 0;
+  let terminalEvents = 0;
   let retries = 0;
   let latestClaim: ChildTaskEvent | null = null;
-  let latestCompletion: ChildTaskEvent | null = null;
+  let latestTerminal: ChildTaskEvent | null = null;
   for (const event of events.slice(1)) {
     if (event.type === 'task-claimed') {
       assert(status === 'QUEUED' || status === 'RUNNING');
@@ -577,20 +590,30 @@ function assertEventHistory(
       );
       assert.equal(event.payload.attempt, attempts);
       status = event.payload.to as ChildTaskStatus;
-      completions += 1;
-      latestCompletion = event;
+      terminalEvents += 1;
+      latestTerminal = event;
       continue;
     }
-    assert.equal(event.type, 'task-retried');
-    assert.equal(status, 'FAILED');
-    assert.equal(event.payload.from, 'FAILED');
-    assert.equal(event.payload.to, 'QUEUED');
+    if (event.type === 'task-retried') {
+      assert.equal(status, 'FAILED');
+      assert.equal(event.payload.from, 'FAILED');
+      assert.equal(event.payload.to, 'QUEUED');
+      assert.equal(event.payload.attempt, attempts);
+      status = 'QUEUED';
+      retries += 1;
+      continue;
+    }
+    assert.equal(event.type, 'task-cancelled');
+    assert(status === 'QUEUED' || status === 'RUNNING');
+    assert.equal(event.payload.from, status);
+    assert.equal(event.payload.to, 'CANCELLED');
     assert.equal(event.payload.attempt, attempts);
-    status = 'QUEUED';
-    retries += 1;
+    status = 'CANCELLED';
+    terminalEvents += 1;
+    latestTerminal = event;
   }
 
-  const expectedLength = 1 + record.attempt + completions + retries;
+  const expectedLength = 1 + record.attempt + terminalEvents + retries;
   assert(
     events.length <= expectedLength,
     'Child task event log is ahead of state.',
@@ -608,10 +631,16 @@ function assertEventHistory(
     assert.equal(latestClaim.payload.expiresAt, record.lease.expiresAt);
   }
   if (isTerminal(record.status)) {
-    assert(latestCompletion);
-    assert.equal(latestCompletion.payload.to, record.status);
-    assert.equal(latestCompletion.payload.resultDigest, digest(record.result));
-    assert.equal(latestCompletion.payload.error, record.error);
+    assert(latestTerminal);
+    assert.equal(latestTerminal.payload.to, record.status);
+    if (latestTerminal.type === 'task-completed') {
+      assert.equal(latestTerminal.payload.resultDigest, digest(record.result));
+      assert.equal(latestTerminal.payload.error, record.error);
+    } else {
+      assert.equal(latestTerminal.type, 'task-cancelled');
+      assert.equal(latestTerminal.payload.resultDigest, digest(null));
+      assert.equal(latestTerminal.payload.error, null);
+    }
   }
 }
 
@@ -1131,6 +1160,70 @@ export class FileChildTaskStore implements ChildTaskStore {
             to: 'QUEUED',
             attempt: record.attempt,
             error: record.error,
+          },
+          now,
+        });
+        await this.commitTransitionLocked({
+          taskId: request.taskId,
+          baseState: record,
+          baseEvents: events,
+          nextState: next,
+          nextEvents: [...events, event],
+        });
+        return next;
+      }),
+    );
+  }
+
+  async cancel(request: CancelChildTaskRequest): Promise<ChildTaskRecord> {
+    assertSafeId(request.taskId, 'Task ID');
+    assertText(request.actor, 'Actor');
+    assertText(request.idempotencyKey, 'Idempotency key');
+    return this.withStoreLock(() =>
+      this.withLock(request.taskId, async () => {
+        await this.reconcileLocked(request.taskId);
+        const record = await this.requireRecord(request.taskId);
+        const events = await this.readEvents(request.taskId, record.revision);
+        const existing = events.find(
+          (event) => event.idempotencyKey === request.idempotencyKey,
+        );
+        if (existing) {
+          assert.equal(existing.type, 'task-cancelled');
+          assert.equal(existing.actor, request.actor);
+          return record;
+        }
+        if (isTerminal(record.status)) return record;
+        const now = request.now ?? new Date();
+        assertDate(now);
+        if (
+          record.status === 'RUNNING' &&
+          record.lease !== null &&
+          Date.parse(record.lease.expiresAt) > now.getTime()
+        ) {
+          return record;
+        }
+        const next: ChildTaskRecord = {
+          ...record,
+          status: 'CANCELLED',
+          updatedAt: now.toISOString(),
+          lease: null,
+          result: null,
+          error: null,
+        };
+        const event = this.createEvent({
+          taskId: request.taskId,
+          sequence: events.length + 1,
+          runId: record.runId,
+          revision: record.revision,
+          actor: request.actor,
+          type: 'task-cancelled',
+          idempotencyKey: request.idempotencyKey,
+          payload: {
+            from: record.status,
+            to: 'CANCELLED',
+            attempt: record.attempt,
+            resultDigest: digest(null),
+            error: null,
           },
           now,
         });

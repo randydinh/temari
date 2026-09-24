@@ -241,6 +241,60 @@ test('requeues mechanical failures with an append-only retry event', async () =>
   }
 });
 
+test('durably cancels queued work and fences an active lease until it expires', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-child-task-store-'));
+  try {
+    const store = await FileChildTaskStore.create(root);
+    await store.create({
+      taskId: 'child-cancel-1',
+      runId: 'run-cancel-1',
+      revision: 'revision-cancel-1',
+      dependsOn: [],
+      actor: 'coordinator',
+      now: at('2026-09-24T12:00:00.000Z'),
+    });
+    const firstClaim = await store.claim({
+      taskId: 'child-cancel-1',
+      owner: 'worker-a',
+      leaseMs: 1_000,
+      now: at('2026-09-24T12:00:01.000Z'),
+    });
+    const active = await store.cancel({
+      taskId: 'child-cancel-1',
+      actor: 'coordinator',
+      idempotencyKey: 'cancel:child-cancel-1',
+      now: at('2026-09-24T12:00:01.500Z'),
+    });
+    assert.equal(active.status, 'RUNNING');
+    assert.equal(active.lease?.owner, 'worker-a');
+
+    const cancelled = await store.cancel({
+      taskId: 'child-cancel-1',
+      actor: 'coordinator',
+      idempotencyKey: 'cancel:child-cancel-1',
+      now: at('2026-09-24T12:00:02.001Z'),
+    });
+    assert.equal(cancelled.status, 'CANCELLED');
+    assert.equal(cancelled.attempt, firstClaim.record.attempt);
+    assert.equal(cancelled.lease, null);
+    assert.equal(cancelled.result, null);
+    assert.equal(cancelled.error, null);
+    const replay = await store.cancel({
+      taskId: 'child-cancel-1',
+      actor: 'coordinator',
+      idempotencyKey: 'cancel:child-cancel-1',
+      now: at('2026-09-24T12:00:03.000Z'),
+    });
+    assert.deepEqual(replay, cancelled);
+    assert.deepEqual(
+      (await store.events('child-cancel-1')).map((event) => event.type),
+      ['task-created', 'task-claimed', 'task-cancelled'],
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('preserves semantic BLOCKED as a normal worker result', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-child-task-store-'));
   try {

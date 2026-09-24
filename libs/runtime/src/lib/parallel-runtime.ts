@@ -91,6 +91,10 @@ export interface ExecuteRestartableParallelWorkersRequest {
   readonly workspaceForAssignment?: (
     assignment: WorkerAssignment,
   ) => WorkspaceBinding | null | undefined;
+  readonly cancellation?: {
+    /** Assignment IDs whose queued or expired work should be durably cancelled. */
+    readonly assignmentIds: readonly string[];
+  };
   readonly retryPolicy?: {
     /** Total mechanical handler attempts allowed for one child, including the first. */
     readonly maxAttempts: number;
@@ -293,6 +297,33 @@ function taskIdentity(
         `pwt-${digest({ groupId, index, assignmentId: assignment.id }).slice(0, 48)}`,
     ),
   };
+}
+
+function cancellationTaskIds(
+  assignments: readonly WorkerAssignment[],
+  taskIds: readonly string[],
+  requested: readonly string[],
+): readonly string[] {
+  const requestedIds = new Set<string>();
+  const taskByAssignment = new Map(
+    assignments.map((assignment, index) => [assignment.id, taskIds[index]!]),
+  );
+  for (const assignmentId of requested) {
+    assert(
+      !requestedIds.has(assignmentId),
+      `Cancellation assignment ID is duplicated: ${assignmentId}.`,
+    );
+    requestedIds.add(assignmentId);
+    assert(
+      taskByAssignment.has(assignmentId),
+      `Cancellation assignment is not declared: ${assignmentId}.`,
+    );
+  }
+  return requested.map((assignmentId) => {
+    const taskId = taskByAssignment.get(assignmentId);
+    assert(taskId);
+    return taskId;
+  });
 }
 
 function workerStatus(
@@ -719,6 +750,21 @@ export async function executeRestartableParallelWorkers(
   );
   const expectedTasks = await reconcileExpectedTasks(request, identity);
   await verifyExpectedWorkspaces(request, expectedTasks, assignmentByTaskId);
+  const cancellationIds = cancellationTaskIds(
+    request.assignments,
+    identity.taskIds,
+    request.cancellation?.assignmentIds ?? [],
+  );
+  await Promise.all(
+    cancellationIds.map((taskId) =>
+      request.childStore.cancel({
+        taskId,
+        actor: request.owner,
+        idempotencyKey: `cancel:${taskId}`,
+        now: now(),
+      }),
+    ),
+  );
   let peakConcurrency = 0;
   while (true) {
     const reservation = await request.childStore.claimGroup({
