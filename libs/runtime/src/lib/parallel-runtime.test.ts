@@ -119,6 +119,94 @@ test('retains a thrown handler as FAILED mechanics and a blocked semantic receip
   }
 });
 
+test('retries mechanical child failures within an explicit attempt bound', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
+  try {
+    const childStore = await FileChildTaskStore.create(join(root, 'children'));
+    const receiptStore = await FileParallelWorkerReceiptStore.create(
+      join(root, 'receipts'),
+    );
+    let calls = 0;
+    const request = {
+      runId: 'parallel-runtime-retry-1',
+      revision: 'revision-parallel-runtime-retry-1',
+      plan: parallelPlan('feature', 1),
+      capabilities: parallelCapabilities(),
+      assignments: workerAssignments(1),
+      childStore,
+      receiptStore,
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      retryPolicy: { maxAttempts: 2 },
+      now: fixedClock(),
+      handler: () => {
+        calls += 1;
+        if (calls === 1) throw new Error('transient worker failure');
+        return result('retry succeeded');
+      },
+    } as const;
+
+    const completed = await executeRestartableParallelWorkers(request);
+    assert.equal(completed.state, 'COMPLETE');
+    assert.equal(completed.receipt?.status, 'PASS');
+    assert.equal(calls, 2);
+    assert.equal(completed.tasks[0]?.attempt, 2);
+    assert.equal(completed.tasks[0]?.status, 'SUCCEEDED');
+    assert.deepEqual(
+      (await childStore.events(completed.tasks[0]?.taskId as string)).map(
+        (event) => event.type,
+      ),
+      [
+        'task-created',
+        'task-claimed',
+        'task-completed',
+        'task-retried',
+        'task-claimed',
+        'task-completed',
+      ],
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('stops mechanical retries at the declared attempt bound', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
+  try {
+    const childStore = await FileChildTaskStore.create(join(root, 'children'));
+    const receiptStore = await FileParallelWorkerReceiptStore.create(
+      join(root, 'receipts'),
+    );
+    let calls = 0;
+    const completed = await executeRestartableParallelWorkers({
+      runId: 'parallel-runtime-retry-2',
+      revision: 'revision-parallel-runtime-retry-2',
+      plan: parallelPlan('feature', 1),
+      capabilities: parallelCapabilities(),
+      assignments: workerAssignments(1),
+      childStore,
+      receiptStore,
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      retryPolicy: { maxAttempts: 2 },
+      now: fixedClock(),
+      handler: () => {
+        calls += 1;
+        throw new Error(`failure ${calls}`);
+      },
+    });
+
+    assert.equal(completed.state, 'COMPLETE');
+    assert.equal(completed.receipt?.status, 'BLOCKED');
+    assert.equal(calls, 2);
+    assert.equal(completed.tasks[0]?.attempt, 2);
+    assert.equal(completed.tasks[0]?.status, 'FAILED');
+    assert.equal(completed.tasks[0]?.error, 'failure 2');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('publishes and verifies a workspace manifest for every completed child', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
   try {

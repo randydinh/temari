@@ -63,7 +63,7 @@ export type ChildTaskEventPayload = Readonly<
 >;
 
 export type ChildTaskEventType =
-  'task-created' | 'task-claimed' | 'task-completed';
+  'task-created' | 'task-claimed' | 'task-completed' | 'task-retried';
 
 export interface ChildTaskEvent {
   readonly schema: 1;
@@ -138,6 +138,13 @@ export interface CompleteChildTaskRequest {
   readonly now?: Date;
 }
 
+export interface RetryChildTaskRequest {
+  readonly taskId: string;
+  readonly actor: string;
+  readonly idempotencyKey: string;
+  readonly now?: Date;
+}
+
 export interface ListReadyChildTasksRequest {
   readonly runId: string;
   readonly revision: string;
@@ -156,6 +163,7 @@ export interface ChildTaskStore {
     request: ClaimChildTaskGroupRequest,
   ): Promise<ClaimChildTaskGroupResult>;
   complete(request: CompleteChildTaskRequest): Promise<ChildTaskRecord>;
+  retry(request: RetryChildTaskRequest): Promise<ChildTaskRecord>;
   listReady(
     request: ListReadyChildTasksRequest,
   ): Promise<readonly ChildTaskRecord[]>;
@@ -464,7 +472,8 @@ function parseEvent(value: unknown): ChildTaskEvent {
   assert(
     event.type === 'task-created' ||
       event.type === 'task-claimed' ||
-      event.type === 'task-completed',
+      event.type === 'task-completed' ||
+      event.type === 'task-retried',
   );
   assert(
     typeof event.idempotencyKey === 'string' && event.idempotencyKey.length > 0,
@@ -524,15 +533,6 @@ function assertEventHistory(
   events: readonly ChildTaskEvent[],
 ): void {
   assert(events.length > 0, `Child task ${taskId} event history is missing.`);
-  const expectedLength =
-    1 + record.attempt + (isTerminal(record.status) ? 1 : 0);
-  assert.equal(
-    events.length,
-    expectedLength,
-    events.length > expectedLength
-      ? 'Child task event log is ahead of state.'
-      : 'Child task state is ahead of its event log.',
-  );
   const idempotencyKeys = new Set<string>();
   events.forEach((event, index) => {
     assert.equal(event.taskId, taskId);
@@ -550,35 +550,68 @@ function assertEventHistory(
   assert.equal(created.payload.status, 'QUEUED');
   assert.equal(created.payload.dependencyCount, record.dependsOn.length);
 
-  for (let index = 1; index <= record.attempt; index += 1) {
-    const claimed = events[index];
-    assert(claimed);
-    assert.equal(claimed.type, 'task-claimed');
-    assert.equal(claimed.payload.attempt, index);
-    assert(Number.isInteger(claimed.payload.fencingEpoch));
-    assert(typeof claimed.payload.expiresAt === 'string');
-    assert(Number.isFinite(Date.parse(claimed.payload.expiresAt)));
+  let status: ChildTaskStatus = 'QUEUED';
+  let attempts = 0;
+  let completions = 0;
+  let retries = 0;
+  let latestClaim: ChildTaskEvent | null = null;
+  let latestCompletion: ChildTaskEvent | null = null;
+  for (const event of events.slice(1)) {
+    if (event.type === 'task-claimed') {
+      assert(status === 'QUEUED' || status === 'RUNNING');
+      attempts += 1;
+      assert.equal(event.payload.attempt, attempts);
+      assert(Number.isInteger(event.payload.fencingEpoch));
+      assert(typeof event.payload.expiresAt === 'string');
+      assert(Number.isFinite(Date.parse(event.payload.expiresAt)));
+      status = 'RUNNING';
+      latestClaim = event;
+      continue;
+    }
+    if (event.type === 'task-completed') {
+      assert.equal(status, 'RUNNING');
+      assert.equal(event.payload.from, 'RUNNING');
+      assert(
+        typeof event.payload.to === 'string' &&
+          isTerminal(event.payload.to as ChildTaskStatus),
+      );
+      assert.equal(event.payload.attempt, attempts);
+      status = event.payload.to as ChildTaskStatus;
+      completions += 1;
+      latestCompletion = event;
+      continue;
+    }
+    assert.equal(event.type, 'task-retried');
+    assert.equal(status, 'FAILED');
+    assert.equal(event.payload.from, 'FAILED');
+    assert.equal(event.payload.to, 'QUEUED');
+    assert.equal(event.payload.attempt, attempts);
+    status = 'QUEUED';
+    retries += 1;
   }
 
+  const expectedLength = 1 + record.attempt + completions + retries;
+  assert(
+    events.length <= expectedLength,
+    'Child task event log is ahead of state.',
+  );
+  assert(
+    events.length >= expectedLength,
+    'Child task state is ahead of its event log.',
+  );
+  assert.equal(attempts, record.attempt);
+  assert.equal(status, record.status);
   if (record.status === 'RUNNING') {
     assert(record.lease, 'Running task lease is missing.');
-    assert(record.attempt > 0, 'Running task attempt is missing.');
-    const claimed = events[record.attempt];
-    assert(claimed);
-    assert.equal(claimed.payload.fencingEpoch, record.lease.fencingEpoch);
-    assert.equal(claimed.payload.expiresAt, record.lease.expiresAt);
-    return;
+    assert(latestClaim);
+    assert.equal(latestClaim.payload.fencingEpoch, record.lease.fencingEpoch);
+    assert.equal(latestClaim.payload.expiresAt, record.lease.expiresAt);
   }
-
   if (isTerminal(record.status)) {
-    const completed = events[events.length - 1];
-    assert(completed);
-    assert.equal(completed.type, 'task-completed');
-    assert.equal(completed.payload.from, 'RUNNING');
-    assert.equal(completed.payload.to, record.status);
-    assert.equal(completed.payload.attempt, record.attempt);
-    assert.equal(completed.payload.resultDigest, digest(record.result));
-    assert.equal(completed.payload.error, record.error);
+    assert(latestCompletion);
+    assert.equal(latestCompletion.payload.to, record.status);
+    assert.equal(latestCompletion.payload.resultDigest, digest(record.result));
+    assert.equal(latestCompletion.payload.error, record.error);
   }
 }
 
@@ -1037,6 +1070,67 @@ export class FileChildTaskStore implements ChildTaskStore {
             resultDigest,
             error,
             leaseTokenDigest: digest(request.leaseToken),
+          },
+          now,
+        });
+        await this.commitTransitionLocked({
+          taskId: request.taskId,
+          baseState: record,
+          baseEvents: events,
+          nextState: next,
+          nextEvents: [...events, event],
+        });
+        return next;
+      }),
+    );
+  }
+
+  async retry(request: RetryChildTaskRequest): Promise<ChildTaskRecord> {
+    assertSafeId(request.taskId, 'Task ID');
+    assertText(request.actor, 'Actor');
+    assertText(request.idempotencyKey, 'Idempotency key');
+    return this.withStoreLock(() =>
+      this.withLock(request.taskId, async () => {
+        await this.reconcileLocked(request.taskId);
+        const record = await this.requireRecord(request.taskId);
+        const events = await this.readEvents(request.taskId, record.revision);
+        const existing = events.find(
+          (event) => event.idempotencyKey === request.idempotencyKey,
+        );
+        if (existing) {
+          assert.equal(existing.type, 'task-retried');
+          assert.equal(existing.actor, request.actor);
+          return record;
+        }
+        assert.equal(
+          record.status,
+          'FAILED',
+          'Only mechanically failed child tasks can be retried.',
+        );
+        assert(record.error, 'Failed child task error is missing.');
+        const now = request.now ?? new Date();
+        assertDate(now);
+        const next: ChildTaskRecord = {
+          ...record,
+          status: 'QUEUED',
+          updatedAt: now.toISOString(),
+          lease: null,
+          result: null,
+          error: null,
+        };
+        const event = this.createEvent({
+          taskId: request.taskId,
+          sequence: events.length + 1,
+          runId: record.runId,
+          revision: record.revision,
+          actor: request.actor,
+          type: 'task-retried',
+          idempotencyKey: request.idempotencyKey,
+          payload: {
+            from: 'FAILED',
+            to: 'QUEUED',
+            attempt: record.attempt,
+            error: record.error,
           },
           now,
         });
