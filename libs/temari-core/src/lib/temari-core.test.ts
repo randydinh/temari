@@ -3,10 +3,13 @@ import test from 'node:test';
 
 import {
   DAILY_VERIFICATION_MAINTENANCE,
+  TEMARI_ROUTE_TABLE,
   VERIFICATION_MAINTENANCE_SKILL,
   classifyEngineeringRoute,
   classifySerialEngineering,
+  classifyTemariRoute,
   createExecutionPlan,
+  validateTemariRouteTable,
   verificationMaintenanceDecision,
 } from './temari-core.js';
 
@@ -61,6 +64,137 @@ test('routes uncertain callers to a full playbook', () => {
 
   assert.equal(decision.route, 'full-playbook');
   assert.equal(decision.playbook, null);
+});
+
+test('keeps a closed route table with one QA domain owner', () => {
+  validateTemariRouteTable();
+  assert.deepEqual(
+    TEMARI_ROUTE_TABLE.map(({ profileKind, route, owner }) => ({
+      profileKind,
+      route,
+      owner,
+    })),
+    [
+      {
+        profileKind: 'playbook',
+        route: 'lightweight-engineering',
+        owner: 'poteto-mode',
+      },
+      { profileKind: 'playbook', route: 'full-playbook', owner: 'poteto-mode' },
+      { profileKind: 'domain', route: 'qa-review', owner: './qa-review' },
+    ],
+  );
+});
+
+test('routes explicit ticket QA to the domain owner before playbook matching', () => {
+  assert.deepEqual(
+    classifyTemariRoute({
+      workType: 'qa',
+      lightweight: LIGHTWEIGHT_EVIDENCE,
+      qaResponsibility: 'ticket-coverage',
+    }),
+    {
+      profileKind: 'domain',
+      route: 'qa-review',
+      owner: './qa-review',
+      requestScope: 'full',
+      responsibility: 'ticket-coverage',
+    },
+  );
+});
+
+test('preserves an explicitly narrow QA assignment as a domain route', () => {
+  const decision = classifyTemariRoute({
+    workType: 'qa',
+    lightweight: LIGHTWEIGHT_EVIDENCE,
+    qaResponsibility: 'test-plan-review',
+    requestScope: 'explicitly-narrow',
+  });
+
+  assert.equal(decision.profileKind, 'domain');
+  assert.equal(decision.route, 'qa-review');
+  assert.equal(decision.requestScope, 'explicitly-narrow');
+});
+
+test('keeps QA exclusions on the existing playbook route', () => {
+  const decision = classifyTemariRoute({
+    workType: 'bug',
+    lightweight: { ...LIGHTWEIGHT_EVIDENCE, isReportedDefect: true },
+    qaExclusion: 'known-defect-repair',
+  });
+
+  assert.deepEqual(decision, {
+    profileKind: 'playbook',
+    route: 'full-playbook',
+    owner: 'poteto-mode',
+    requestScope: 'full',
+    playbook: null,
+    reason: 'qa-exclusion',
+  });
+});
+
+test('prevents a bounded QA callback from rematching qa-review', () => {
+  const decision = classifyTemariRoute({
+    workType: 'feature',
+    lightweight: LIGHTWEIGHT_EVIDENCE,
+    qaResponsibility: 'validation-disposition',
+    requestScope: 'bounded-subtask',
+    parentReviewId: 'qa-review-1',
+  });
+
+  assert.deepEqual(decision, {
+    profileKind: 'playbook',
+    route: 'lightweight-engineering',
+    owner: 'poteto-mode',
+    requestScope: 'bounded-subtask',
+    parentReviewId: 'qa-review-1',
+    playbook: 'lightweight-engineering',
+    reason: 'bounded-subtask',
+  });
+});
+
+test('fails closed on invalid QA routing metadata', () => {
+  assert.throws(
+    () =>
+      classifyTemariRoute({
+        workType: 'qa',
+        lightweight: LIGHTWEIGHT_EVIDENCE,
+        qaResponsibility: 'ticket-readiness',
+        requestScope: 'bounded-subtask',
+      }),
+    /parentReviewId recursion guard/,
+  );
+  assert.throws(
+    () =>
+      classifyTemariRoute({
+        workType: 'qa',
+        lightweight: LIGHTWEIGHT_EVIDENCE,
+        qaResponsibility: 'ticket-readiness',
+        qaExclusion: 'ambiguous-review',
+      }),
+    /both QA responsibility and a QA exclusion/,
+  );
+});
+
+test('rejects malformed closed route tables', () => {
+  assert.throws(
+    () =>
+      validateTemariRouteTable([...TEMARI_ROUTE_TABLE, TEMARI_ROUTE_TABLE[0]!]),
+    /duplicate playbook:lightweight-engineering/,
+  );
+  assert.throws(
+    () =>
+      validateTemariRouteTable([
+        TEMARI_ROUTE_TABLE[0]!,
+        TEMARI_ROUTE_TABLE[1]!,
+        {
+          profileKind: 'domain',
+          route: 'qa-review',
+          owner: '',
+        } as never,
+      ]),
+    /has no owner/,
+  );
 });
 
 test('classifies serial engineering without naming a host', () => {

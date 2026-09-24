@@ -85,6 +85,130 @@ export interface PotetoRouteDecision {
   readonly reason: PotetoRouteReason;
 }
 
+export type TemariRequestScope =
+  'full' | 'explicitly-narrow' | 'bounded-subtask';
+
+export type QaResponsibility =
+  | 'ticket-coverage'
+  | 'test-plan-review'
+  | 'validation-disposition'
+  | 'ticket-readiness';
+
+export type QaRouteExclusion =
+  | 'test-implementation'
+  | 'known-defect-repair'
+  | 'code-review'
+  | 'agent-evaluation'
+  | 'ambiguous-review';
+
+export interface TemariRouteInput extends PotetoRouteInput {
+  /** Structured intent; route selection never infers QA from keywords. */
+  readonly qaResponsibility?: QaResponsibility;
+  /** An explicit exclusion keeps a superficially similar request on a playbook. */
+  readonly qaExclusion?: QaRouteExclusion;
+  readonly requestScope?: TemariRequestScope;
+  /** Required when a QA-owned bounded subtask calls back into Poteto. */
+  readonly parentReviewId?: string;
+}
+
+export type TemariPlaybookRoute = 'lightweight-engineering' | 'full-playbook';
+
+export interface TemariPlaybookRouteEntry {
+  readonly profileKind: 'playbook';
+  readonly route: TemariPlaybookRoute;
+  readonly owner: 'poteto-mode';
+}
+
+export interface TemariDomainRouteEntry {
+  readonly profileKind: 'domain';
+  readonly route: 'qa-review';
+  /** Package-relative owner reserved for the internal QA domain implementation. */
+  readonly owner: './qa-review';
+}
+
+export type TemariRouteEntry =
+  TemariPlaybookRouteEntry | TemariDomainRouteEntry;
+
+/**
+ * The first closed route table. It is deliberately data, not a plugin registry:
+ * adding a route requires changing this reviewed package and its tests.
+ */
+export const TEMARI_ROUTE_TABLE: readonly TemariRouteEntry[] = Object.freeze([
+  {
+    profileKind: 'playbook',
+    route: 'lightweight-engineering',
+    owner: 'poteto-mode',
+  },
+  { profileKind: 'playbook', route: 'full-playbook', owner: 'poteto-mode' },
+  { profileKind: 'domain', route: 'qa-review', owner: './qa-review' },
+]);
+
+export interface TemariPlaybookRouteDecision {
+  readonly profileKind: 'playbook';
+  readonly route: TemariPlaybookRoute;
+  readonly owner: 'poteto-mode';
+  readonly requestScope: TemariRequestScope;
+  readonly parentReviewId?: string;
+  readonly playbook: 'lightweight-engineering' | null;
+  readonly reason:
+    PotetoRouteReason | 'qa-exclusion' | 'qa-not-requested' | 'bounded-subtask';
+}
+
+export interface TemariQaRouteDecision {
+  readonly profileKind: 'domain';
+  readonly route: 'qa-review';
+  readonly owner: './qa-review';
+  readonly requestScope: Exclude<TemariRequestScope, 'bounded-subtask'>;
+  readonly responsibility: QaResponsibility;
+}
+
+export type TemariRouteDecision =
+  TemariPlaybookRouteDecision | TemariQaRouteDecision;
+
+function routeEntry<T extends TemariRouteEntry>(
+  profileKind: T['profileKind'],
+  route: T['route'],
+): T {
+  const entry = TEMARI_ROUTE_TABLE.find(
+    (candidate) =>
+      candidate.profileKind === profileKind && candidate.route === route,
+  );
+  if (!entry || entry.profileKind !== profileKind || entry.route !== route) {
+    throw new Error(`Temari route table is missing ${profileKind}:${route}.`);
+  }
+  return entry as T;
+}
+
+/**
+ * Validate the closed table at the package boundary. This keeps a missing QA
+ * owner or duplicate route from silently degrading to a generic playbook.
+ */
+export function validateTemariRouteTable(
+  entries: readonly TemariRouteEntry[] = TEMARI_ROUTE_TABLE,
+): void {
+  const seen = new Set<string>();
+  for (const entry of entries) {
+    const key = `${entry.profileKind}:${entry.route}`;
+    if (seen.has(key)) {
+      throw new Error(`Temari route table contains duplicate ${key}.`);
+    }
+    seen.add(key);
+    if (!entry.owner) {
+      throw new Error(`Temari route table entry ${key} has no owner.`);
+    }
+  }
+
+  const qa = entries.find(
+    (entry): entry is TemariDomainRouteEntry =>
+      entry.profileKind === 'domain' && entry.route === 'qa-review',
+  );
+  if (!qa?.owner) {
+    throw new Error('Temari route table has no qa-review domain owner.');
+  }
+}
+
+validateTemariRouteTable();
+
 /**
  * Apply the packaged Poteto route conditions without selecting a host or
  * inventing a full-playbook choice. A false or uncertain condition always
@@ -119,6 +243,65 @@ export function classifyEngineeringRoute(
     route: 'full-playbook',
     playbook: null,
     reason: 'lightweight-condition-not-proven',
+  };
+}
+
+/**
+ * Classify the public Temari request boundary. QA responsibility is explicit
+ * and wins over playbook similarity, except for a bounded callback from an
+ * existing QA review, which is required to stay out of qa-review.
+ */
+export function classifyTemariRoute(
+  input: TemariRouteInput,
+): TemariRouteDecision {
+  const requestScope = input.requestScope ?? 'full';
+
+  if (input.qaResponsibility && input.qaExclusion) {
+    throw new Error(
+      'A Temari route cannot declare both QA responsibility and a QA exclusion.',
+    );
+  }
+
+  if (requestScope === 'bounded-subtask' && !input.parentReviewId) {
+    throw new Error(
+      'A bounded QA subtask must carry its parentReviewId recursion guard.',
+    );
+  }
+
+  if (requestScope !== 'bounded-subtask' && input.parentReviewId) {
+    throw new Error(
+      'parentReviewId is only valid for a bounded-subtask request.',
+    );
+  }
+
+  if (input.qaResponsibility && requestScope !== 'bounded-subtask') {
+    const qaRoute = routeEntry<TemariDomainRouteEntry>('domain', 'qa-review');
+    return {
+      ...qaRoute,
+      requestScope,
+      responsibility: input.qaResponsibility,
+    };
+  }
+
+  const playbook = classifyEngineeringRoute(input);
+  const playbookRoute = routeEntry<TemariPlaybookRouteEntry>(
+    'playbook',
+    playbook.route,
+  );
+
+  return {
+    ...playbookRoute,
+    requestScope,
+    ...(requestScope === 'bounded-subtask'
+      ? { parentReviewId: input.parentReviewId }
+      : {}),
+    playbook: playbook.playbook,
+    reason:
+      requestScope === 'bounded-subtask'
+        ? 'bounded-subtask'
+        : input.qaExclusion
+          ? 'qa-exclusion'
+          : playbook.reason,
   };
 }
 
