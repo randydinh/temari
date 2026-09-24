@@ -30,6 +30,7 @@ export interface WorkerResult {
   readonly summary: string;
   readonly evidencePaths: readonly string[];
   readonly rawLogPath: string | null;
+  readonly workspaceManifestId?: string | null;
 }
 
 const WORKER_RESULT_STATUSES: readonly WorkerResultStatus[] = [
@@ -88,6 +89,12 @@ export function validateWorkerResult(result: WorkerResult): readonly string[] {
   });
   if (result.rawLogPath !== null)
     evidencePath(result.rawLogPath, 'rawLogPath', issues);
+  if (
+    result.workspaceManifestId !== undefined &&
+    result.workspaceManifestId !== null
+  ) {
+    evidencePath(result.workspaceManifestId, 'workspaceManifestId', issues);
+  }
   if (result.evidencePaths.length === 0 && result.rawLogPath === null) {
     issues.push('a worker result must retain evidencePaths or rawLogPath.');
   }
