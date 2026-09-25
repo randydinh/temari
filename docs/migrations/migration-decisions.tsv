@@ -1,0 +1,7 @@
+ts	phase	decision	why	evidence	result
+2026-09-25T18:22:24Z	frame	Keep privacy work out of the migration branch	The main checkout contains pre-existing unrelated changes	git status at baseline 2a2b8c942e8883c0cc24014781b9ed1aafb7c2b3	Isolated worktree created
+2026-09-25T18:22:24Z	baseline	Run canonical contracts and runtime checks before changes	A known-good baseline separates new failures from existing ones	pnpm exec nx run-many -t typecheck test --projects=contracts,temari-core,workflow-engine,runtime --parallel=1 --skipNxCache --skipSync	Eight tasks passed
+2026-09-25T18:22:24Z	acceptance	Test existing APIs with a fresh process and filesystem artifacts	Existing local callbacks do not establish recovery across process exit	libs/runtime/src/lib/migration-acceptance.test.ts	Implementation in progress
+2026-09-25T18:22:24Z	ci	Run canonical core tests in Linux CI	Linux CI previously typechecked the core but did not run its test targets	.github/workflows/ci.yml	Verification pending
+2026-09-25T18:28:22Z	verification	Retain the process-restart acceptance suite	Six acceptance scenarios and the eight-task core regression bracket passed locally	libs/runtime/src/lib/migration-acceptance.test.ts	Local verification passed; independent review and CI pending
+2026-09-25T18:28:22Z	forge	Use GitHub CLI for this milestone	Origin cannot resolve randydinh/temari	git remote origin and origin repo view	GitHub selected

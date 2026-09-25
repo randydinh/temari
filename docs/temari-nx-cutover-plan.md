@@ -141,6 +141,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 - [x] Convert a request into one `ExecutionPlan` and run the fixed six-stage lifecycle. The pure coordinator returns the route, obligations, and canonical plan, and the runtime wrapper feeds that plan to the existing persisted serial engine; sanitized and live evidence fixtures remain open.
 - [ ] Preserve worker brief and worker result boundaries. A worker summary never becomes the only proof.
 - [x] Record revision-bound evidence, blocked outcomes, and a guarded closeout result without adding a second workflow engine. `libs/temari-core` derives a resumable closeout decision from receipt and portable evidence identities; `libs/runtime` persists the artifact and keeps loading/verification with the evidence store.
+- [x] Add a sanitized process-restart acceptance suite through the canonical request coordinator and filesystem runtime. `runtime:migration-acceptance` verifies literal artifact output, saved-stage reuse across process exit, missing QA capability, changed workspace, revision mismatch, and evidence-byte rejection. This composes existing APIs in a deterministic fixture; it does not close the installed-host or independent QA journey gates. See `docs/migrations/runtime-acceptance.md`.
 
 **You see.**
 
