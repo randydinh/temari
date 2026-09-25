@@ -32,7 +32,7 @@ test('renews a child lease while a long-running worker is executing', async () =
       owner: 'worker-a',
       leaseMs: 300,
       leaseRenewal: { intervalMs: 50 },
-      handler: async (assignment) => {
+      handler: async (assignment: WorkerAssignment) => {
         await new Promise((resolve) => setTimeout(resolve, 650));
         return result(`${assignment.id} completed after lease renewal`);
       },
@@ -49,6 +49,52 @@ test('renews a child lease while a long-running worker is executing', async () =
       'The long-running child should publish at least one lease renewal.',
     );
     assert.equal(events.at(-1)?.type, 'task-completed');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('keeps a larger restartable batch within its declared concurrency bound', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
+  try {
+    const childStore = await FileChildTaskStore.create(join(root, 'children'));
+    const receiptStore = await FileParallelWorkerReceiptStore.create(
+      join(root, 'receipts'),
+    );
+    let active = 0;
+    let peak = 0;
+    let calls = 0;
+    const request = {
+      runId: 'parallel-runtime-bound-1',
+      revision: 'revision-parallel-runtime-bound-1',
+      plan: parallelPlan('feature', 3),
+      capabilities: parallelCapabilities(),
+      assignments: workerAssignments(12),
+      childStore,
+      receiptStore,
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      now: fixedClock(),
+      handler: async (assignment: WorkerAssignment) => {
+        calls += 1;
+        active += 1;
+        peak = Math.max(peak, active);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        active -= 1;
+        return result(`${assignment.id} bounded complete`);
+      },
+    } as const;
+    let completed = await executeRestartableParallelWorkers(request);
+    while (completed.state === 'RUNNING') {
+      completed = await executeRestartableParallelWorkers(request);
+    }
+
+    assert.equal(completed.state, 'COMPLETE');
+    assert.equal(completed.receipt?.status, 'PASS');
+    assert.equal(calls, 12);
+    assert(peak <= 3);
+    assert.equal(completed.receipt?.peakConcurrency, peak);
+    assert.equal(completed.receipt?.executionEvidence?.maxConcurrency, 3);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

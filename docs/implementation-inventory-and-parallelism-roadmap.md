@@ -162,6 +162,10 @@ publishes the resumed child workspace/evidence, converges on one receipt, and
 the stale coordinator cannot complete the fenced child. This is still a local
 filesystem proof, not evidence for a shared remote control service.
 
+A larger local batch guard also compares observed handler concurrency with the
+durable receipt peak and the declared bound. It protects against unbounded
+local fan-out; it is not a remote load or shared-service race proof.
+
 The executor can also publish callback-supplied worker evidence through the
 immutable content-addressed store. Child results retain revision-bound,
 portable SHA-256 identities rather than local artifact paths, and replay
