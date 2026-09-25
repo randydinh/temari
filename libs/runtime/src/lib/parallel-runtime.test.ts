@@ -501,8 +501,7 @@ test('refuses a partial join while another owner holds a child lease', async () 
 test('recovers one expired child through a second independent coordinator', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
   let release = (): void => undefined;
-  let first: ReturnType<typeof executeRestartableParallelWorkers> | null =
-    null;
+  let first: ReturnType<typeof executeRestartableParallelWorkers> | null = null;
   try {
     const childRoot = join(root, 'children');
     const receiptRoot = join(root, 'receipts');
@@ -510,16 +509,16 @@ test('recovers one expired child through a second independent coordinator', asyn
     const manifestRoot = join(root, 'manifests');
     const childStoreA = await FileChildTaskStore.create(childRoot);
     const childStoreB = await FileChildTaskStore.create(childRoot);
-    const receiptStoreA = await FileParallelWorkerReceiptStore.create(
-      receiptRoot,
-    );
-    const receiptStoreB = await FileParallelWorkerReceiptStore.create(
-      receiptRoot,
-    );
+    const receiptStoreA =
+      await FileParallelWorkerReceiptStore.create(receiptRoot);
+    const receiptStoreB =
+      await FileParallelWorkerReceiptStore.create(receiptRoot);
     const evidenceStoreA = await FileEvidenceStore.create(evidenceRoot);
     const evidenceStoreB = await FileEvidenceStore.create(evidenceRoot);
-    const manifestStoreA = await FileWorkspaceManifestStore.create(manifestRoot);
-    const manifestStoreB = await FileWorkspaceManifestStore.create(manifestRoot);
+    const manifestStoreA =
+      await FileWorkspaceManifestStore.create(manifestRoot);
+    const manifestStoreB =
+      await FileWorkspaceManifestStore.create(manifestRoot);
     const assignments = workerAssignments(2);
     for (const assignment of assignments) {
       const workspaceRoot = join(root, assignment.id);
