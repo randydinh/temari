@@ -1,9 +1,12 @@
 import type {
+  EvidenceKind,
   ExecutionPlan,
   PlanObligations,
+  WorkerEvidenceReference,
   WorkType,
+  WorkflowReceipt,
 } from '@temari/contracts';
-import { reconcilePlan } from '@temari/contracts';
+import { reconcilePlan, WORKFLOW_STAGES } from '@temari/contracts';
 
 export const VERIFICATION_MAINTENANCE_SKILL =
   'maintain-verification-skill' as const;
@@ -174,6 +177,34 @@ export interface TemariRequestPlan {
   readonly obligations: PlanObligations;
   readonly plan: ExecutionPlan;
 }
+
+export type CloseoutBlockReason =
+  | 'receipt-not-pass'
+  | 'stages-incomplete'
+  | 'stage-evidence-missing'
+  | 'evidence-missing'
+  | 'evidence-identity-invalid'
+  | 'evidence-run-mismatch'
+  | 'evidence-revision-mismatch'
+  | 'evidence-hash-invalid'
+  | 'evidence-size-invalid';
+
+export interface ReadyCloseoutDecision {
+  readonly status: 'ready';
+  readonly runId: string;
+  readonly revision: string;
+  readonly evidence: readonly WorkerEvidenceReference[];
+}
+
+export interface BlockedCloseoutDecision {
+  readonly status: 'blocked';
+  readonly runId: string;
+  readonly revision: string;
+  readonly reasons: readonly CloseoutBlockReason[];
+  readonly resumable: true;
+}
+
+export type CloseoutDecision = ReadyCloseoutDecision | BlockedCloseoutDecision;
 
 function routeEntry<T extends TemariRouteEntry>(
   profileKind: T['profileKind'],
@@ -356,6 +387,86 @@ export function createRequestPlan(input: TemariPlanRequest): TemariRequestPlan {
     route,
     obligations,
     plan: createExecutionPlan(obligations),
+  };
+}
+
+const EVIDENCE_KINDS: ReadonlySet<EvidenceKind> = new Set([
+  'stdout',
+  'stderr',
+  'worker-result',
+  'verification',
+  'other',
+]);
+
+/**
+ * Derive a guarded closeout from immutable receipt facts and portable evidence
+ * identities. This function does not load artifacts or judge product behavior;
+ * the configured runtime/evidence store owns those observations.
+ */
+export function deriveCloseout(
+  receipt: WorkflowReceipt,
+  evidence: readonly WorkerEvidenceReference[],
+): CloseoutDecision {
+  const reasons = new Set<CloseoutBlockReason>();
+  const add = (reason: CloseoutBlockReason): void => {
+    reasons.add(reason);
+  };
+
+  if (receipt.status !== 'PASS') add('receipt-not-pass');
+
+  const canonicalPlan =
+    receipt.plan.stages.length === WORKFLOW_STAGES.length &&
+    receipt.plan.stages.every(
+      (stage, index) => stage === WORKFLOW_STAGES[index],
+    );
+  const completeStages =
+    receipt.stages.length === WORKFLOW_STAGES.length &&
+    receipt.stages.every(
+      (stage, index) =>
+        stage.stage === WORKFLOW_STAGES[index] && stage.status === 'PASS',
+    );
+  if (!canonicalPlan || !completeStages) add('stages-incomplete');
+  if (receipt.stages.some((stage) => stage.evidencePaths.length === 0)) {
+    add('stage-evidence-missing');
+  }
+  if (evidence.length === 0) add('evidence-missing');
+
+  for (const reference of evidence) {
+    if (
+      reference.schema !== 1 ||
+      !EVIDENCE_KINDS.has(reference.kind) ||
+      !reference.runId ||
+      !reference.revision
+    ) {
+      add('evidence-identity-invalid');
+    }
+    if (reference.runId !== receipt.runId) add('evidence-run-mismatch');
+    if (reference.revision !== receipt.revision) {
+      add('evidence-revision-mismatch');
+    }
+    if (!/^[0-9a-f]{64}$/.test(reference.sha256)) {
+      add('evidence-hash-invalid');
+    }
+    if (!Number.isSafeInteger(reference.bytes) || reference.bytes < 0) {
+      add('evidence-size-invalid');
+    }
+  }
+
+  if (reasons.size > 0) {
+    return {
+      status: 'blocked',
+      runId: receipt.runId,
+      revision: receipt.revision,
+      reasons: [...reasons],
+      resumable: true,
+    };
+  }
+
+  return {
+    status: 'ready',
+    runId: receipt.runId,
+    revision: receipt.revision,
+    evidence: [...evidence],
   };
 }
 

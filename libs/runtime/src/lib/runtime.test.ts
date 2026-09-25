@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { createRequestPlan } from '@temari/temari-core';
+import { createRequestPlan, deriveCloseout } from '@temari/temari-core';
 import { minimalPlan, type WorkflowStageId } from '@temari/contracts';
 
 import {
@@ -83,7 +83,11 @@ test('executes a coordinator-produced serial request through the persisted engin
       now: sequenceClock(),
       handler: (stage) => {
         stages.push(stage);
-        return { status: 'PASS', summary: `${stage} complete` };
+        return {
+          status: 'PASS',
+          summary: `${stage} complete`,
+          evidencePaths: [`evidence/${stage}.json`],
+        };
       },
     });
 
@@ -97,6 +101,21 @@ test('executes a coordinator-produced serial request through the persisted engin
       'deliver',
     ]);
     assert.deepEqual(await store.load('request-plan-1'), receipt);
+
+    const evidenceStore = await FileEvidenceStore.create(
+      join(root, 'evidence'),
+    );
+    const evidence = await evidenceStore.put({
+      runId: 'request-plan-1',
+      revision: 'revision-request-plan-1',
+      kind: 'verification',
+      content: 'all six stages completed\n',
+    });
+    assert.equal(deriveCloseout(receipt, [evidence]).status, 'ready');
+    assert.deepEqual(
+      await evidenceStore.load(evidence),
+      Buffer.from('all six stages completed\n'),
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }
