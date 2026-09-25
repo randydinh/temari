@@ -225,7 +225,8 @@ receipt persistence, immutable content-addressed evidence, basic run leases,
 append-only route events, idempotent transitions, a scheduled execution
 wrapper, and a local `FileChildTaskStore` with dependency-aware claims,
 per-child leases, fencing epochs, result persistence, and idempotent
-completion. It now provides durable PASS-stage checkpoints, bounded workspace
+completion, plus an optional fenced child-lease heartbeat for long-running
+handlers. It now provides durable PASS-stage checkpoints, bounded workspace
 manifest capture/verification, child manifest publication during restartable
 parallel execution, and serial-stage manifest publication and verification
 before checkpoint resume. Callers must provide explicit bindings for the

@@ -498,6 +498,143 @@ test('refuses a partial join while another owner holds a child lease', async () 
   }
 });
 
+test('recovers one expired child through a second independent coordinator', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
+  let release = (): void => undefined;
+  let first: ReturnType<typeof executeRestartableParallelWorkers> | null = null;
+  try {
+    const childRoot = join(root, 'children');
+    const receiptRoot = join(root, 'receipts');
+    const evidenceRoot = join(root, 'evidence');
+    const manifestRoot = join(root, 'manifests');
+    const childStoreA = await FileChildTaskStore.create(childRoot);
+    const childStoreB = await FileChildTaskStore.create(childRoot);
+    const receiptStoreA =
+      await FileParallelWorkerReceiptStore.create(receiptRoot);
+    const receiptStoreB =
+      await FileParallelWorkerReceiptStore.create(receiptRoot);
+    const evidenceStoreA = await FileEvidenceStore.create(evidenceRoot);
+    const evidenceStoreB = await FileEvidenceStore.create(evidenceRoot);
+    const manifestStoreA =
+      await FileWorkspaceManifestStore.create(manifestRoot);
+    const manifestStoreB =
+      await FileWorkspaceManifestStore.create(manifestRoot);
+    const assignments = workerAssignments(2);
+    for (const assignment of assignments) {
+      const workspaceRoot = join(root, assignment.id);
+      await mkdir(workspaceRoot, { recursive: true });
+      await writeFile(join(workspaceRoot, 'input.txt'), assignment.id);
+    }
+
+    let markStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    let markWorkerOneDone!: () => void;
+    const workerOneDone = new Promise<void>((resolve) => {
+      markWorkerOneDone = resolve;
+    });
+    const interrupted = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let firstWorkerCalls = 0;
+    let resumedWorkerCalls = 0;
+    let clockMs = Date.now();
+    const now = () => new Date(clockMs);
+    const common = {
+      runId: 'parallel-runtime-takeover-1',
+      revision: 'revision-parallel-runtime-takeover-1',
+      plan: parallelPlan('feature', 2),
+      capabilities: parallelCapabilities(),
+      assignments,
+      leaseMs: 200,
+      maxConcurrency: 2,
+      evidenceForAssignment: (assignment: WorkerAssignment) => [
+        {
+          kind: 'worker-result' as const,
+          content: `${assignment.id}:retained-evidence`,
+        },
+      ],
+      workspaceForAssignment: (assignment: WorkerAssignment) => ({
+        workspaceId: assignment.id,
+        root: join(root, assignment.id),
+      }),
+      now,
+    } as const;
+    first = executeRestartableParallelWorkers({
+      ...common,
+      childStore: childStoreA,
+      receiptStore: receiptStoreA,
+      evidenceStore: evidenceStoreA,
+      workspaceManifestStore: manifestStoreA,
+      owner: 'coordinator-a',
+      handler: async (assignment: WorkerAssignment) => {
+        firstWorkerCalls += 1;
+        await writeFile(
+          join(root, assignment.id, 'output.txt'),
+          `${assignment.id}:resumed-output`,
+        );
+        if (assignment.id === 'worker-1') markWorkerOneDone();
+        if (assignment.id === 'worker-2') {
+          markStarted();
+          await interrupted;
+        }
+        return result(`${assignment.id} complete`);
+      },
+    });
+    await started;
+    await workerOneDone;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    clockMs += 350;
+
+    const resumed = await executeRestartableParallelWorkers({
+      ...common,
+      childStore: childStoreB,
+      receiptStore: receiptStoreB,
+      evidenceStore: evidenceStoreB,
+      workspaceManifestStore: manifestStoreB,
+      owner: 'coordinator-b',
+      handler: async (assignment: WorkerAssignment) => {
+        resumedWorkerCalls += 1;
+        assert.equal(assignment.id, 'worker-2');
+        await writeFile(
+          join(root, assignment.id, 'output.txt'),
+          `${assignment.id}:resumed-output`,
+        );
+        return result(`${assignment.id} complete`);
+      },
+    });
+
+    assert.equal(resumed.state, 'COMPLETE');
+    assert.equal(resumed.receipt?.status, 'PASS');
+    assert.equal(resumed.receipt?.peakConcurrency, 1);
+    assert.equal(resumedWorkerCalls, 1);
+    for (const outcome of resumed.receipt?.outcomes ?? []) {
+      assert(outcome.result?.evidenceReferences?.length);
+      for (const reference of outcome.result.evidenceReferences) {
+        await evidenceStoreB.loadPortable(reference);
+      }
+    }
+    for (const task of resumed.tasks) {
+      assert(await manifestStoreB.load(common.runId, task.taskId));
+    }
+
+    release();
+    assert(first);
+    const firstResult = await first;
+    assert.equal(firstResult.state, 'COMPLETE');
+    assert.equal(firstResult.receipt?.status, 'PASS');
+    assert.equal(firstWorkerCalls, 2);
+    const persisted = await receiptStoreB.load(common.runId);
+    assert(persisted);
+    assert.equal(persisted.receipt.status, 'PASS');
+  } finally {
+    release();
+    if (first) await first.catch(() => undefined);
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('repairs an interrupted completion without rerunning the handler', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
   try {
