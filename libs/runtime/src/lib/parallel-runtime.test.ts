@@ -588,6 +588,7 @@ function workerAssignments(count: number): WorkerAssignment[] {
   return Array.from({ length: count }, (_, index) => ({
     id: `worker-${index + 1}`,
     role: 'investigator' as const,
+    required: true,
     brief: {
       goal: `Inspect work item ${index + 1}`,
       context: 'The coordinator supplied bounded context.',

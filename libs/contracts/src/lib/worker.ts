@@ -24,6 +24,8 @@ export interface WorkerBrief {
 export interface WorkerAssignment {
   readonly id: string;
   readonly role: WorkerRole;
+  /** Required work fails the join; optional work may be reported as degraded. */
+  readonly required: boolean;
   readonly brief: WorkerBrief;
 }
 
@@ -141,4 +143,22 @@ export function assertWorkerResult(result: WorkerResult): void {
   const issues = validateWorkerResult(result);
   if (issues.length > 0)
     throw new Error(`Invalid WorkerResult: ${issues.join(' ')}`);
+}
+
+export function validateWorkerAssignment(
+  assignment: WorkerAssignment,
+): readonly string[] {
+  const issues: string[] = [];
+  if (typeof assignment.required !== 'boolean') {
+    issues.push('required must be a boolean.');
+  }
+  issues.push(...validateWorkerBrief(assignment.brief));
+  return issues;
+}
+
+export function assertWorkerAssignment(assignment: WorkerAssignment): void {
+  const issues = validateWorkerAssignment(assignment);
+  if (issues.length > 0) {
+    throw new Error(`Invalid WorkerAssignment: ${issues.join(' ')}`);
+  }
 }
