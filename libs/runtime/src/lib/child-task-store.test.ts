@@ -503,6 +503,68 @@ test('increments fencing epochs after expiry and rejects stale completion', asyn
   }
 });
 
+test('renews active child leases idempotently and rejects expired or fenced renewals', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-child-task-store-'));
+  try {
+    const store = await FileChildTaskStore.create(root);
+    await store.create({
+      taskId: 'child-renew-1',
+      runId: 'run-renew-1',
+      revision: 'revision-renew-1',
+      dependsOn: [],
+      actor: 'coordinator',
+      now: at('2026-09-23T12:00:00.000Z'),
+    });
+    const first = await store.claim({
+      taskId: 'child-renew-1',
+      owner: 'worker-a',
+      leaseMs: 1_000,
+      now: at('2026-09-23T12:00:01.000Z'),
+    });
+    assert(first.record.lease);
+    const renewal = {
+      taskId: 'child-renew-1',
+      owner: 'worker-a',
+      leaseToken: first.record.lease.token,
+      fencingEpoch: first.record.lease.fencingEpoch,
+      leaseMs: 5_000,
+      idempotencyKey: 'renew:child-renew-1:1:1:1',
+      now: at('2026-09-23T12:00:01.500Z'),
+    } as const;
+    const renewed = await store.renew(renewal);
+    assert(renewed.lease);
+    assert.equal(renewed.lease.expiresAt, '2026-09-23T12:00:06.500Z');
+    assert.deepEqual(await store.renew(renewal), renewed);
+    assert.deepEqual(
+      (await store.events('child-renew-1')).map((event) => event.type),
+      ['task-created', 'task-claimed', 'task-lease-renewed'],
+    );
+
+    await assert.rejects(
+      store.renew({
+        ...renewal,
+        idempotencyKey: 'renew:child-renew-1:1:1:2',
+        now: at('2026-09-23T12:00:06.501Z'),
+      }),
+      /lease has expired/,
+    );
+    const resumed = await store.claim({
+      taskId: 'child-renew-1',
+      owner: 'worker-b',
+      leaseMs: 1_000,
+      now: at('2026-09-23T12:00:07.000Z'),
+    });
+    assert(resumed.record.lease);
+    assert.equal(resumed.record.lease.fencingEpoch, 2);
+    await assert.rejects(
+      store.renew(renewal),
+      /no longer current|owner mismatch|token mismatch|fencing epoch mismatch/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('replays an idempotent completion but rejects a changed payload', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-child-task-store-'));
   try {

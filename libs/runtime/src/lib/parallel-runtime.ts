@@ -90,6 +90,10 @@ export interface ExecuteRestartableParallelWorkersRequest {
   readonly receiptStore: ParallelWorkerReceiptStore;
   readonly owner: string;
   readonly leaseMs: number;
+  /** Renew child leases while their handlers and evidence work are running. */
+  readonly leaseRenewal?: {
+    readonly intervalMs: number;
+  };
   readonly evidenceStore?: EvidenceStore;
   readonly evidenceForAssignment?: (
     assignment: WorkerAssignment,
@@ -167,6 +171,13 @@ function assertLeaseMs(value: number): void {
   assert(
     Number.isInteger(value) && value > 0,
     'Lease duration must be positive.',
+  );
+}
+
+function assertLeaseRenewalInterval(value: number): void {
+  assert(
+    Number.isInteger(value) && value > 0,
+    'Lease renewal interval must be a positive integer.',
   );
 }
 
@@ -712,6 +723,42 @@ async function executeClaimed(
   const lease = claimed.record.lease;
   assert(lease);
   const idempotencyKey = `complete:${claimed.record.taskId}:${claimed.record.attempt}:${lease.fencingEpoch}`;
+  let renewalError: unknown = null;
+  let renewalSequence = 0;
+  let renewalInFlight: Promise<void> | null = null;
+  let renewalTimer: ReturnType<typeof setInterval> | null = null;
+  const renew = async (): Promise<void> => {
+    if (renewalError) return;
+    try {
+      await request.childStore.renew({
+        taskId: claimed.record.taskId,
+        owner: request.owner,
+        leaseToken: lease.token,
+        fencingEpoch: lease.fencingEpoch,
+        leaseMs: request.leaseMs,
+        idempotencyKey: `renew:${claimed.record.taskId}:${claimed.record.attempt}:${lease.fencingEpoch}:${++renewalSequence}`,
+        now: now(),
+      });
+    } catch (error) {
+      renewalError = error;
+      if (renewalTimer) clearInterval(renewalTimer);
+    }
+  };
+  const stopRenewal = async (): Promise<void> => {
+    if (renewalTimer) clearInterval(renewalTimer);
+    if (renewalInFlight) await renewalInFlight;
+    renewalTimer = null;
+    renewalInFlight = null;
+  };
+  const renewalIntervalMs = request.leaseRenewal?.intervalMs;
+  if (renewalIntervalMs !== undefined) {
+    renewalTimer = setInterval(() => {
+      if (renewalInFlight) return;
+      renewalInFlight = renew().finally(() => {
+        renewalInFlight = null;
+      });
+    }, renewalIntervalMs);
+  }
   let result: WorkerResult;
   try {
     result = await request.handler(claimed.assignment);
@@ -729,7 +776,15 @@ async function executeClaimed(
         workspaceManifestId: claimed.record.taskId,
       };
     }
+    await stopRenewal();
+    if (renewalError) throw renewalError;
   } catch (error) {
+    await stopRenewal();
+    if (renewalError && renewalError !== error) {
+      error = new Error(
+        `${errorMessage(error)}; lease renewal failed: ${errorMessage(renewalError)}`,
+      );
+    }
     try {
       await persistWorkspaceManifest(
         request,
@@ -786,6 +841,9 @@ export async function executeRestartableParallelWorkers(
   assertText(request.revision, 'Revision');
   assertText(request.owner, 'Owner');
   assertLeaseMs(request.leaseMs);
+  if (request.leaseRenewal) {
+    assertLeaseRenewalInterval(request.leaseRenewal.intervalMs);
+  }
   const maxAttempts = request.retryPolicy?.maxAttempts ?? 1;
   assertMaxAttempts(maxAttempts);
   if (request.workspaceManifestStore) {

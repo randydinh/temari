@@ -14,6 +14,46 @@ import { FileChildTaskStore } from './child-task-store.js';
 import { FileEvidenceStore } from './evidence-store.js';
 import { FileWorkspaceManifestStore } from './workspace-manifest.js';
 
+test('renews a child lease while a long-running worker is executing', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
+  try {
+    const childStore = await FileChildTaskStore.create(join(root, 'children'));
+    const receiptStore = await FileParallelWorkerReceiptStore.create(
+      join(root, 'receipts'),
+    );
+    const completed = await executeRestartableParallelWorkers({
+      runId: 'parallel-runtime-renew-1',
+      revision: 'revision-parallel-runtime-renew-1',
+      plan: parallelPlan('feature', 1),
+      capabilities: parallelCapabilities(),
+      assignments: workerAssignments(1),
+      childStore,
+      receiptStore,
+      owner: 'worker-a',
+      leaseMs: 300,
+      leaseRenewal: { intervalMs: 50 },
+      handler: async (assignment) => {
+        await new Promise((resolve) => setTimeout(resolve, 650));
+        return result(`${assignment.id} completed after lease renewal`);
+      },
+    });
+
+    assert.equal(completed.state, 'COMPLETE');
+    assert.equal(completed.receipt?.status, 'PASS');
+    assert(completed.tasks[0]);
+    const events = await childStore.events(completed.tasks[0].taskId);
+    assert.equal(events[0]?.type, 'task-created');
+    assert.equal(events[1]?.type, 'task-claimed');
+    assert(
+      events.some((event) => event.type === 'task-lease-renewed'),
+      'The long-running child should publish at least one lease renewal.',
+    );
+    assert.equal(events.at(-1)?.type, 'task-completed');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('resumes a bounded child batch and joins terminal results in declaration order', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
   try {
