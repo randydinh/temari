@@ -16,6 +16,7 @@ import type {
   WorkflowReceiptStatus,
   WorkflowStageId,
 } from '@temari/contracts';
+import type { TemariRequestPlan } from '@temari/temari-core';
 import {
   runPlanWithReceipt,
   type WorkflowCheckpoint,
@@ -404,6 +405,28 @@ export async function executeAndPersist(
   });
   await request.store.save(receipt);
   return receipt;
+}
+
+export interface ExecuteRequestPlanAndPersistRequest extends Omit<
+  ExecuteAndPersistRequest,
+  'plan'
+> {
+  /** The coordinator has already classified this request and reconciled its plan. */
+  readonly requestPlan: TemariRequestPlan;
+}
+
+/**
+ * Execute a coordinator-produced request plan through the existing persisted
+ * serial engine. Runtime services receive policy; they do not classify or
+ * reinterpret the request.
+ */
+export async function executeRequestPlanAndPersist(
+  request: ExecuteRequestPlanAndPersistRequest,
+): Promise<WorkflowReceipt> {
+  return executeAndPersist({
+    ...request,
+    plan: request.requestPlan.plan,
+  });
 }
 
 export interface ExecuteScheduledAndPersistRequest extends ExecuteAndPersistRequest {
