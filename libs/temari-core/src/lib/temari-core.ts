@@ -150,8 +150,7 @@ export interface TemariPlaybookRouteDecision {
   readonly requestScope: TemariRequestScope;
   readonly parentReviewId?: string;
   readonly playbook: 'lightweight-engineering' | null;
-  readonly reason:
-    PotetoRouteReason | 'qa-exclusion' | 'qa-not-requested' | 'bounded-subtask';
+  readonly reason: PotetoRouteReason | 'qa-exclusion' | 'bounded-subtask';
 }
 
 export interface TemariQaRouteDecision {
@@ -164,6 +163,17 @@ export interface TemariQaRouteDecision {
 
 export type TemariRouteDecision =
   TemariPlaybookRouteDecision | TemariQaRouteDecision;
+
+export interface TemariPlanRequest extends TemariRouteInput {
+  /** Optional policy refinements supplied by the coordinator, never by a host. */
+  readonly obligations?: Omit<PlanObligations, 'workType'>;
+}
+
+export interface TemariRequestPlan {
+  readonly route: TemariRouteDecision;
+  readonly obligations: PlanObligations;
+  readonly plan: ExecutionPlan;
+}
 
 function routeEntry<T extends TemariRouteEntry>(
   profileKind: T['profileKind'],
@@ -302,6 +312,50 @@ export function classifyTemariRoute(
         : input.qaExclusion
           ? 'qa-exclusion'
           : playbook.reason,
+  };
+}
+
+function qaPlanObligations(
+  obligations: Omit<PlanObligations, 'workType'> | undefined,
+): Omit<PlanObligations, 'workType'> {
+  if (obligations?.review && obligations.review !== 'independent') {
+    throw new Error(
+      'QA domain routes require independent review; the policy cannot be weakened.',
+    );
+  }
+  if (obligations?.evidence && obligations.evidence !== 'revision-bound') {
+    throw new Error(
+      'QA domain routes require revision-bound evidence; the policy cannot be weakened.',
+    );
+  }
+
+  return {
+    ...obligations,
+    review: 'independent',
+    evidence: 'revision-bound',
+  };
+}
+
+/**
+ * Convert one classified public request into the single canonical plan shape.
+ * This is the coordinator boundary; execution and host capability handling
+ * remain owned by workflow-engine and host adapters.
+ */
+export function createRequestPlan(input: TemariPlanRequest): TemariRequestPlan {
+  const route = classifyTemariRoute(input);
+  const routeObligations =
+    route.profileKind === 'domain'
+      ? qaPlanObligations(input.obligations)
+      : (input.obligations ?? {});
+  const obligations: PlanObligations = {
+    ...routeObligations,
+    workType: input.workType,
+  };
+
+  return {
+    route,
+    obligations,
+    plan: createExecutionPlan(obligations),
   };
 }
 
