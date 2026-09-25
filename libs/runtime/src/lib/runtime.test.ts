@@ -11,17 +11,32 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { createRequestPlan } from '@temari/temari-core';
 import { minimalPlan, type WorkflowStageId } from '@temari/contracts';
 
 import {
   FileWorkflowCheckpointStore,
   FileWorkflowReceiptStore,
   executeAndPersist,
+  executeRequestPlanAndPersist,
   executeScheduledAndPersist,
 } from './runtime.js';
 import { FileWorkflowRunStore } from './run-store.js';
 import { FileEvidenceStore } from './evidence-store.js';
 import { FileWorkspaceManifestStore } from './workspace-manifest.js';
+
+const LIGHTWEIGHT_EVIDENCE = {
+  resultIsClearLocalAndReversible: true,
+  changesSharedBoundary: false,
+  isReportedDefect: false,
+  hasUnexplainedSymptom: false,
+  makesPerformanceClaim: false,
+  isDesignChoice: false,
+  isMigration: false,
+  affectedCallersAreKnown: true,
+  crossesArchitecturalBoundary: false,
+  directCheckAvailable: true,
+} as const;
 
 test('persists and reloads a revision-bound receipt idempotently', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-runtime-'));
@@ -45,6 +60,74 @@ test('persists and reloads a revision-bound receipt idempotently', async () => {
       (await readFile(path, 'utf8')).includes(receipt.revision),
       true,
     );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('executes a coordinator-produced serial request through the persisted engine', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-runtime-'));
+  try {
+    const store = await FileWorkflowReceiptStore.create(join(root, 'receipts'));
+    const requestPlan = createRequestPlan({
+      workType: 'feature',
+      lightweight: LIGHTWEIGHT_EVIDENCE,
+    });
+    const stages: WorkflowStageId[] = [];
+    const receipt = await executeRequestPlanAndPersist({
+      runId: 'request-plan-1',
+      revision: 'revision-request-plan-1',
+      requestPlan,
+      capabilities: serialCapabilities(),
+      store,
+      now: sequenceClock(),
+      handler: (stage) => {
+        stages.push(stage);
+        return { status: 'PASS', summary: `${stage} complete` };
+      },
+    });
+
+    assert.equal(receipt.status, 'PASS');
+    assert.deepEqual(stages, [
+      'investigate',
+      'plan',
+      'build',
+      'review',
+      'verify',
+      'deliver',
+    ]);
+    assert.deepEqual(await store.load('request-plan-1'), receipt);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('stops a coordinator-produced QA request before serial execution lacks review capability', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-runtime-'));
+  try {
+    const store = await FileWorkflowReceiptStore.create(join(root, 'receipts'));
+    const requestPlan = createRequestPlan({
+      workType: 'qa',
+      lightweight: LIGHTWEIGHT_EVIDENCE,
+      qaResponsibility: 'ticket-coverage',
+    });
+    let handlerCalls = 0;
+    const receipt = await executeRequestPlanAndPersist({
+      runId: 'request-plan-2',
+      revision: 'revision-request-plan-2',
+      requestPlan,
+      capabilities: serialCapabilities(),
+      store,
+      handler: () => {
+        handlerCalls += 1;
+        return { status: 'PASS', summary: 'must not execute' };
+      },
+    });
+
+    assert.equal(receipt.status, 'BLOCKED');
+    assert.equal(handlerCalls, 0);
+    assert.deepEqual(receipt.failure?.missingCapabilities, ['subagents']);
+    assert.deepEqual(await store.load('request-plan-2'), receipt);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
