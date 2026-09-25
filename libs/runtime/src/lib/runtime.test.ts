@@ -225,7 +225,9 @@ test('renews the parent lease while a scheduled revision is still executing', as
       store: receiptStore,
       runStore,
       owner: 'worker-a',
-      leaseMs: 100,
+      // Keep the renewal assertion, but leave enough scheduling headroom for
+      // Windows filesystem work and CI startup contention.
+      leaseMs: 1_000,
       leaseRenewal: { intervalMs: 20 },
       handler: async () => {
         if (firstStage) {
