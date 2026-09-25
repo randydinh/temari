@@ -254,6 +254,9 @@ claimed.
       errors, capability gaps, replay, child-task fencing and renewal, retry,
       cancellation, manifests, evidence replay, durable concurrency evidence,
       and local multi-owner takeover.
+- [x] A larger local restartable batch records observed handler concurrency and
+      refuses to exceed its declared bound; remote load and shared-service
+      race proof remain open.
 - [ ] Live proof runs two independent tasks with separate workspaces and
       retained evidence, then interrupts and resumes one child.
 - [ ] Perf proof records peak concurrency and confirms no shared-state race or
