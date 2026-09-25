@@ -60,7 +60,8 @@ the canonical Nx repository and separates it from planned behavior.
   gaps fail closed.
 - `FileChildTaskStore` persists revision-bound child-task records, dependency
   edges, attempts, per-child leases, fencing epochs, append-only task events,
-  worker results, and idempotent terminal completion. Claims are dependency
+  idempotent lease-renewal witnesses, worker results, and idempotent terminal
+  completion. Claims are dependency
   aware, and `listReady` reconstructs a stable ready frontier from disk. A
   durable immutable child-task group records the exact ordered membership, and
   mechanical `FAILED` completion keeps handler errors distinct from semantic
@@ -142,7 +143,9 @@ The current increments provide a local restartable executor boundary. They
 persist an immutable ordered child group, claim only up to the declared bound,
 reuse terminal children after restart, fence stale completion, reconcile every
 expected child before claim, join, or receipt replay, and emit a receipt only
-after every expected child is terminal and valid. Crash-boundary tests prove
+after every expected child is terminal and valid. Child handlers may opt into
+fenced lease-heartbeat renewal for work that exceeds the initial lease.
+Crash-boundary tests prove
 that a repaired terminal child is not rerun and that stale receipts are not
 replayed when expected state is missing. This remains a local child-task proof:
 it deliberately does not claim parent-run lease renewal, automatic failover,
@@ -152,6 +155,12 @@ heartbeat, but it does not imply automatic failover. Local
 mechanical retry and cancellation gating are implemented for explicitly
 configured child attempts/assignments; they do not imply automatic failover,
 semantic retry decisions, or a complete cancellation policy.
+
+Two independently opened local coordinators now have an integration proof for
+expired-child takeover: the replacement reuses the completed sibling,
+publishes the resumed child workspace/evidence, converges on one receipt, and
+the stale coordinator cannot complete the fenced child. This is still a local
+filesystem proof, not evidence for a shared remote control service.
 
 The executor can also publish callback-supplied worker evidence through the
 immutable content-addressed store. Child results retain revision-bound,
@@ -182,7 +191,8 @@ automatic failover.
 2. **Restartable local child-task execution — implemented in this increment.**
    The runtime has immutable expected membership, bounded claim/execute passes,
    terminal replay, fenced leases, mechanical failure preservation, explicit
-   incomplete-join refusal, and a durable joined receipt. Do not let child
+   incomplete-join refusal, lease renewal for long-running handlers, and a
+   durable joined receipt. Do not let child
    workers mutate shared semantic state.
 3. **Recovery and join proof — local child and parent control boundaries
    implemented.** The private transaction sidecars, strict digest/history

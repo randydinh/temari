@@ -199,7 +199,8 @@ in declaration order. `FileChildTaskStore` and the restartable executor now
 provide a local durable slice for parent-bound child records, dependency-aware
 claims, leases, fencing epochs, result persistence, idempotent completion,
 ready-frontier reconstruction, bounded mechanical retry, cancellation gating,
-crash-boundary reconciliation, and restartable replay. Workspace manifests,
+crash-boundary reconciliation, restartable replay, and optional fenced child
+lease renewal during long-running handlers. Workspace manifests,
 provider-neutral evidence publication and replay verification, and durable
 execution-concurrency evidence are also implemented when callers provide
 explicit local bindings. This remains a local proof; shared control/artifact
@@ -230,8 +231,11 @@ claimed.
       determine the receipt status; optional non-pass outcomes remain explicit
       degradations.
 - [x] Add fencing epochs so an expired worker cannot publish after takeover.
-- [x] Prove interruption, retry, duplicate delivery, and partial completion in
-      the local runtime; shared-store manual takeover remains open.
+- [x] Add an explicit child-lease heartbeat with idempotent renewal events;
+      renewal is rejected after expiry or fencing takeover.
+- [x] Prove interruption, retry, duplicate delivery, partial completion, and
+      local multi-owner takeover in the local runtime; shared-store manual
+      takeover remains open.
 
 **You see.**
 
@@ -240,13 +244,16 @@ claimed.
 - [x] A failed child does not erase sibling evidence or cause duplicate work on
       replay.
 - [x] A local coordinator restart can reconstruct the child frontier and join
-      state; cross-machine takeover remains open.
+      state; an independently opened local coordinator can reclaim an expired
+      child while stale completion remains fenced; cross-machine takeover
+      remains open.
 
 **Verify.**
 
 - [x] Unit tests cover fan-out bounds, stable joins, malformed results, worker
-      errors, capability gaps, replay, child-task fencing, retry, cancellation,
-      manifests, evidence replay, and durable concurrency evidence.
+      errors, capability gaps, replay, child-task fencing and renewal, retry,
+      cancellation, manifests, evidence replay, durable concurrency evidence,
+      and local multi-owner takeover.
 - [ ] Live proof runs two independent tasks with separate workspaces and
       retained evidence, then interrupts and resumes one child.
 - [ ] Perf proof records peak concurrency and confirms no shared-state race or
