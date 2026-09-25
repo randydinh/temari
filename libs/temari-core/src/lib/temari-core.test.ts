@@ -2,6 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  WORKFLOW_STAGES,
+  type WorkflowReceipt,
+  type WorkflowReceiptStatus,
+  type WorkerEvidenceReference,
+} from '@temari/contracts';
+
+import {
   DAILY_VERIFICATION_MAINTENANCE,
   TEMARI_ROUTE_TABLE,
   VERIFICATION_MAINTENANCE_SKILL,
@@ -10,6 +17,7 @@ import {
   classifyTemariRoute,
   createExecutionPlan,
   createRequestPlan,
+  deriveCloseout,
   validateTemariRouteTable,
   verificationMaintenanceDecision,
 } from './temari-core.js';
@@ -28,6 +36,50 @@ const LIGHTWEIGHT_EVIDENCE = {
   crossesArchitecturalBoundary: false,
   directCheckAvailable: true,
 } as const;
+
+function closeoutReceipt(
+  status: WorkflowReceiptStatus = 'PASS',
+  includeStageEvidence = true,
+): WorkflowReceipt {
+  const plan = createRequestPlan({
+    workType: 'feature',
+    lightweight: LIGHTWEIGHT_EVIDENCE,
+  }).plan;
+  return {
+    schema: 1,
+    runId: 'closeout-run-1',
+    revision: 'closeout-revision-1',
+    plan,
+    capabilities: {
+      host: 'generic',
+      available: [],
+      missing: [],
+      notes: {},
+    },
+    startedAt: '2026-09-24T12:00:00.000Z',
+    completedAt: '2026-09-24T12:01:00.000Z',
+    status,
+    stages: WORKFLOW_STAGES.map((stage) => ({
+      stage,
+      status: 'PASS' as const,
+      startedAt: '2026-09-24T12:00:00.000Z',
+      completedAt: '2026-09-24T12:01:00.000Z',
+      summary: `${stage} complete`,
+      evidencePaths: includeStageEvidence ? [`evidence/${stage}.json`] : [],
+      rawLogPath: null,
+    })),
+    failure: null,
+  };
+}
+
+const CLOSEOUT_EVIDENCE: WorkerEvidenceReference = {
+  schema: 1,
+  runId: 'closeout-run-1',
+  revision: 'closeout-revision-1',
+  kind: 'verification',
+  sha256: 'a'.repeat(64),
+  bytes: 1,
+};
 
 test('selects lightweight engineering only when every condition is proven', () => {
   assert.deepEqual(
@@ -196,6 +248,50 @@ test('rejects malformed closed route tables', () => {
       ]),
     /has no owner/,
   );
+});
+
+test('derives ready closeout only from a complete revision-bound receipt', () => {
+  const decision = deriveCloseout(closeoutReceipt(), [CLOSEOUT_EVIDENCE]);
+
+  assert.deepEqual(decision, {
+    status: 'ready',
+    runId: 'closeout-run-1',
+    revision: 'closeout-revision-1',
+    evidence: [CLOSEOUT_EVIDENCE],
+  });
+});
+
+test('blocks closeout for a non-pass receipt and tampered evidence identity', () => {
+  const decision = deriveCloseout(closeoutReceipt('ISSUES'), [
+    {
+      ...CLOSEOUT_EVIDENCE,
+      revision: 'stale-revision',
+      sha256: 'tampered',
+      bytes: -1,
+    },
+  ]);
+
+  assert.equal(decision.status, 'blocked');
+  if (decision.status === 'blocked') {
+    assert.equal(decision.resumable, true);
+    assert.deepEqual(decision.reasons, [
+      'receipt-not-pass',
+      'evidence-revision-mismatch',
+      'evidence-hash-invalid',
+      'evidence-size-invalid',
+    ]);
+  }
+});
+
+test('blocks closeout when any completed stage lacks evidence paths', () => {
+  const decision = deriveCloseout(closeoutReceipt('PASS', false), [
+    CLOSEOUT_EVIDENCE,
+  ]);
+
+  assert.equal(decision.status, 'blocked');
+  if (decision.status === 'blocked') {
+    assert.deepEqual(decision.reasons, ['stage-evidence-missing']);
+  }
 });
 
 test('converts one ordinary request into one canonical execution plan', () => {
