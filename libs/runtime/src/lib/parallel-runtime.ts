@@ -476,6 +476,7 @@ function blockedReceipt(
       peakConcurrency: 0,
     },
     outcomes: [],
+    degradations: [],
     failure,
   };
 }
@@ -1018,6 +1019,7 @@ export async function executeRestartableParallelWorkers(
         peakConcurrency,
       },
       outcomes: joined.outcomes,
+      degradations: joined.degradations,
       failure: joined.failure,
     };
     const binding = {

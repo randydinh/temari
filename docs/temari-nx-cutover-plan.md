@@ -225,8 +225,10 @@ claimed.
       completion key.
 - [x] Persist child results and evidence manifests separately from coordinator
       state; only the coordinator may publish the joined semantic result.
-- [ ] Define join policy for `PASS`, `ISSUES`, `BLOCKED`, and `DROPPED`, plus
-      required-task failure and optional-task degradation.
+- [x] Define join policy for `PASS`, `ISSUES`, `BLOCKED`, and `DROPPED`, plus
+      required-task failure and optional-task degradation. Required assignments
+      determine the receipt status; optional non-pass outcomes remain explicit
+      degradations.
 - [x] Add fencing epochs so an expired worker cannot publish after takeover.
 - [x] Prove interruption, retry, duplicate delivery, and partial completion in
       the local runtime; shared-store manual takeover remains open.

@@ -373,6 +373,43 @@ test('joins the exact worker membership in declaration order', () => {
   );
 });
 
+test('degrades optional worker failures without hiding required success', () => {
+  const required = workerAssignments(2);
+  const assignments = [required[0]!, { ...required[1]!, required: false }];
+  const joined = joinParallelWorkers(assignments, [
+    {
+      assignment: assignments[0]!,
+      result: {
+        status: 'PASS',
+        summary: 'required work complete',
+        evidencePaths: ['evidence/required.json'],
+        rawLogPath: null,
+      },
+      error: null,
+    },
+    {
+      assignment: assignments[1]!,
+      result: {
+        status: 'BLOCKED',
+        summary: 'optional provider unavailable',
+        evidencePaths: ['evidence/optional.json'],
+        rawLogPath: null,
+      },
+      error: null,
+    },
+  ]);
+
+  assert.equal(joined.status, 'PASS');
+  assert.equal(joined.failure, null);
+  assert.deepEqual(joined.degradations, [
+    {
+      workerId: 'worker-2',
+      status: 'BLOCKED',
+      message: 'optional provider unavailable',
+    },
+  ]);
+});
+
 test('blocks parallel workers before execution when the host lacks parallelism', async () => {
   let invoked = false;
   const receipt = await runParallelWorkers({
@@ -470,6 +507,7 @@ function workerAssignments(count: number): WorkerAssignment[] {
   return Array.from({ length: count }, (_, index) => ({
     id: `worker-${index + 1}`,
     role: 'investigator' as const,
+    required: true,
     brief: {
       goal: `Inspect work item ${index + 1}`,
       context: 'The coordinator supplied bounded context.',

@@ -4,10 +4,11 @@ import {
   type ExecutionPlan,
   type HostCapability,
   type HostCapabilityReport,
-  assertWorkerBrief,
+  assertWorkerAssignment,
   assertWorkerResult,
   type WorkerAssignment,
   type WorkerResult,
+  type WorkerResultStatus,
   type WorkflowReceipt,
   type WorkflowReceiptStatus,
   type WorkflowStageReceipt,
@@ -80,7 +81,14 @@ export interface ParallelWorkerReceipt {
   /** Optional portable evidence describing the execution measured above. */
   readonly executionEvidence?: ParallelExecutionEvidence;
   readonly outcomes: readonly ParallelWorkerOutcome[];
+  readonly degradations?: readonly ParallelWorkerDegradation[];
   readonly failure: ParallelWorkerFailure | null;
+}
+
+export interface ParallelWorkerDegradation {
+  readonly workerId: string;
+  readonly status: WorkerResultStatus | 'ERROR';
+  readonly message: string;
 }
 
 export interface ParallelExecutionEvidence {
@@ -111,6 +119,7 @@ export interface ParallelWorkerPreflight {
 export interface ParallelWorkerJoin {
   readonly status: WorkflowReceiptStatus;
   readonly outcomes: readonly ParallelWorkerOutcome[];
+  readonly degradations: readonly ParallelWorkerDegradation[];
   readonly failure: ParallelWorkerFailure | null;
 }
 
@@ -412,7 +421,7 @@ export function preflightParallelWorkers(
       throw new Error(`Worker assignment ID is duplicated: ${assignment.id}.`);
     }
     ids.add(assignment.id);
-    assertWorkerBrief(assignment.brief);
+    assertWorkerAssignment(assignment);
   });
 
   return { assignmentIds: assignments.map((assignment) => assignment.id) };
@@ -421,23 +430,50 @@ export function preflightParallelWorkers(
 function aggregateWorkerStatus(
   outcomes: readonly ParallelWorkerOutcome[],
 ): WorkflowReceiptStatus {
-  if (outcomes.some((outcome) => outcome.error !== null)) return 'BLOCKED';
-  if (outcomes.some((outcome) => outcome.result?.status === 'BLOCKED')) {
+  const required = outcomes.filter((outcome) => outcome.assignment.required);
+  if (required.some((outcome) => outcome.error !== null)) return 'BLOCKED';
+  if (required.some((outcome) => outcome.result?.status === 'BLOCKED')) {
     return 'BLOCKED';
   }
-  if (outcomes.some((outcome) => outcome.result?.status === 'ISSUES')) {
+  if (required.some((outcome) => outcome.result?.status === 'ISSUES')) {
     return 'ISSUES';
   }
-  if (outcomes.some((outcome) => outcome.result?.status === 'DROPPED')) {
+  if (required.some((outcome) => outcome.result?.status === 'DROPPED')) {
     return 'DROPPED';
   }
   return 'PASS';
 }
 
+function parallelWorkerDegradations(
+  outcomes: readonly ParallelWorkerOutcome[],
+): readonly ParallelWorkerDegradation[] {
+  return outcomes.flatMap((outcome): ParallelWorkerDegradation[] => {
+    if (outcome.assignment.required) return [];
+    if (outcome.error !== null) {
+      return [
+        {
+          workerId: outcome.assignment.id,
+          status: 'ERROR' as const,
+          message: outcome.error,
+        },
+      ];
+    }
+    if (!outcome.result || outcome.result.status === 'PASS') return [];
+    return [
+      {
+        workerId: outcome.assignment.id,
+        status: outcome.result.status,
+        message: outcome.result.summary,
+      },
+    ];
+  });
+}
+
 function firstWorkerFailure(
   outcomes: readonly ParallelWorkerOutcome[],
 ): ParallelWorkerFailure | null {
-  const errored = outcomes.find((outcome) => outcome.error !== null);
+  const required = outcomes.filter((outcome) => outcome.assignment.required);
+  const errored = required.find((outcome) => outcome.error !== null);
   if (errored) {
     return {
       kind: 'worker-error',
@@ -447,7 +483,7 @@ function firstWorkerFailure(
     };
   }
 
-  const nonPass = outcomes.find(
+  const nonPass = required.find(
     (outcome) => outcome.result && outcome.result.status !== 'PASS',
   );
   if (!nonPass?.result) return null;
@@ -511,6 +547,7 @@ export function joinParallelWorkers(
   return {
     outcomes: stableOutcomes,
     status: aggregateWorkerStatus(stableOutcomes),
+    degradations: parallelWorkerDegradations(stableOutcomes),
     failure: firstWorkerFailure(stableOutcomes),
   };
 }
@@ -654,6 +691,7 @@ export async function runParallelWorkers(
       peak,
     ),
     outcomes: joined.outcomes,
+    degradations: joined.degradations,
     failure: joined.failure,
   };
 }
