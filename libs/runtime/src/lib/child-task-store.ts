@@ -65,6 +65,7 @@ export type ChildTaskEventPayload = Readonly<
 export type ChildTaskEventType =
   | 'task-created'
   | 'task-claimed'
+  | 'task-lease-renewed'
   | 'task-completed'
   | 'task-retried'
   | 'task-cancelled';
@@ -110,6 +111,16 @@ export interface ClaimChildTaskRequest {
 export interface ClaimChildTaskResult {
   readonly claimed: boolean;
   readonly record: ChildTaskRecord;
+}
+
+export interface RenewChildTaskLeaseRequest {
+  readonly taskId: string;
+  readonly owner: string;
+  readonly leaseToken: string;
+  readonly fencingEpoch: number;
+  readonly leaseMs: number;
+  readonly idempotencyKey: string;
+  readonly now?: Date;
 }
 
 export interface ClaimChildTaskGroupRequest {
@@ -173,6 +184,7 @@ export interface ChildTaskStore {
   claimGroup(
     request: ClaimChildTaskGroupRequest,
   ): Promise<ClaimChildTaskGroupResult>;
+  renew(request: RenewChildTaskLeaseRequest): Promise<ChildTaskRecord>;
   complete(request: CompleteChildTaskRequest): Promise<ChildTaskRecord>;
   retry(request: RetryChildTaskRequest): Promise<ChildTaskRecord>;
   cancel(request: CancelChildTaskRequest): Promise<ChildTaskRecord>;
@@ -484,6 +496,7 @@ function parseEvent(value: unknown): ChildTaskEvent {
   assert(
     event.type === 'task-created' ||
       event.type === 'task-claimed' ||
+      event.type === 'task-lease-renewed' ||
       event.type === 'task-completed' ||
       event.type === 'task-retried' ||
       event.type === 'task-cancelled',
@@ -581,6 +594,20 @@ function assertEventHistory(
       latestClaim = event;
       continue;
     }
+    if (event.type === 'task-lease-renewed') {
+      assert.equal(status, 'RUNNING');
+      assert(latestClaim, 'A lease renewal requires an active claim.');
+      assert.equal(event.payload.attempt, attempts);
+      assert.equal(
+        event.payload.fencingEpoch,
+        latestClaim.payload.fencingEpoch,
+      );
+      assert(typeof event.payload.expiresAt === 'string');
+      assert(Number.isFinite(Date.parse(event.payload.expiresAt)));
+      assert(typeof event.payload.leaseTokenDigest === 'string');
+      latestClaim = event;
+      continue;
+    }
     if (event.type === 'task-completed') {
       assert.equal(status, 'RUNNING');
       assert.equal(event.payload.from, 'RUNNING');
@@ -613,7 +640,11 @@ function assertEventHistory(
     latestTerminal = event;
   }
 
-  const expectedLength = 1 + record.attempt + terminalEvents + retries;
+  const leaseRenewals = events.filter(
+    (event) => event.type === 'task-lease-renewed',
+  ).length;
+  const expectedLength =
+    1 + record.attempt + leaseRenewals + terminalEvents + retries;
   assert(
     events.length <= expectedLength,
     'Child task event log is ahead of state.',
@@ -980,6 +1011,126 @@ export class FileChildTaskStore implements ChildTaskStore {
       nextEvents: [...events, event],
     });
     return { claimed: true, record: next };
+  }
+
+  async renew(request: RenewChildTaskLeaseRequest): Promise<ChildTaskRecord> {
+    assertSafeId(request.taskId, 'Task ID');
+    assertText(request.owner, 'Owner');
+    assertText(request.leaseToken, 'Lease token');
+    assert(
+      Number.isInteger(request.fencingEpoch) && request.fencingEpoch > 0,
+      'Fencing epoch must be positive.',
+    );
+    assertLeaseMs(request.leaseMs);
+    assertText(request.idempotencyKey, 'Idempotency key');
+    return this.withStoreLock(() =>
+      this.withLock(request.taskId, async () => {
+        await this.reconcileLocked(request.taskId);
+        const record = await this.requireRecord(request.taskId);
+        const events = await this.readEvents(request.taskId, record.revision);
+        const now = request.now ?? new Date();
+        assertDate(now);
+        const expiresAt = new Date(
+          now.getTime() + request.leaseMs,
+        ).toISOString();
+        const existing = events.find(
+          (event) => event.idempotencyKey === request.idempotencyKey,
+        );
+        if (existing) {
+          assert.equal(
+            existing.type,
+            'task-lease-renewed',
+            'Idempotency key was used for another child task event.',
+          );
+          assert.equal(existing.actor, request.owner);
+          assert.equal(existing.payload.fencingEpoch, request.fencingEpoch);
+          assert.equal(existing.payload.expiresAt, expiresAt);
+          assert.equal(
+            existing.payload.leaseTokenDigest,
+            digest(request.leaseToken),
+          );
+          assert.equal(
+            record.lease?.fencingEpoch,
+            request.fencingEpoch,
+            'Idempotent lease renewal is no longer current.',
+          );
+          assert.equal(
+            record.status,
+            'RUNNING',
+            'Idempotent lease renewal is no longer current.',
+          );
+          assert.equal(
+            record.lease?.owner,
+            request.owner,
+            'Idempotent lease renewal owner changed.',
+          );
+          assert.equal(
+            record.lease?.token,
+            request.leaseToken,
+            'Idempotent lease renewal token changed.',
+          );
+          assert.equal(existing.payload.attempt, record.attempt);
+          return record;
+        }
+        assert.equal(
+          record.status,
+          'RUNNING',
+          'Only a running lease can be renewed.',
+        );
+        assert(record.lease, 'Child task lease is missing.');
+        assert.equal(
+          record.lease.owner,
+          request.owner,
+          'Child task lease owner mismatch.',
+        );
+        assert.equal(
+          record.lease.token,
+          request.leaseToken,
+          'Child task lease token mismatch.',
+        );
+        assert.equal(
+          record.lease.fencingEpoch,
+          request.fencingEpoch,
+          'Child task fencing epoch mismatch.',
+        );
+        assert(
+          Date.parse(record.lease.expiresAt) > now.getTime(),
+          'Child task lease has expired.',
+        );
+        const next: ChildTaskRecord = {
+          ...record,
+          updatedAt: now.toISOString(),
+          lease: {
+            ...record.lease,
+            expiresAt,
+          },
+        };
+        const event = this.createEvent({
+          taskId: request.taskId,
+          sequence: events.length + 1,
+          runId: record.runId,
+          revision: record.revision,
+          actor: request.owner,
+          type: 'task-lease-renewed',
+          idempotencyKey: request.idempotencyKey,
+          payload: {
+            attempt: record.attempt,
+            fencingEpoch: request.fencingEpoch,
+            expiresAt,
+            leaseTokenDigest: digest(request.leaseToken),
+          },
+          now,
+        });
+        await this.commitTransitionLocked({
+          taskId: request.taskId,
+          baseState: record,
+          baseEvents: events,
+          nextState: next,
+          nextEvents: [...events, event],
+        });
+        return next;
+      }),
+    );
   }
 
   async complete(request: CompleteChildTaskRequest): Promise<ChildTaskRecord> {
