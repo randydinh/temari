@@ -24,7 +24,7 @@
       "test": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "node --import @swc-node/register/esm-register --test libs/temari-core/src/lib/temari-core.test.ts",
+          "command": "node --import @swc-node/register/esm-register --test libs/temari-core/src/lib/temari-core.test.ts libs/temari-core/src/lib/qa-review.test.ts",
           "cwd": "{workspaceRoot}"
         }
       }

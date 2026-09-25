@@ -138,7 +138,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 
 - [x] Implement one explicit route table with a `qa-review` domain entry and existing playbook entries. `libs/temari-core` keeps a closed table for the existing lightweight/full playbook routes and the package-relative QA owner; structured QA responsibility takes domain precedence, while exclusions and bounded callbacks remain on the playbook path.
 - [x] Add a typed Poteto route boundary that requires every lightweight condition and leaves full-playbook selection explicit.
-- [x] Convert a request into one `ExecutionPlan` and run the fixed six-stage lifecycle. The pure coordinator returns the route, obligations, and canonical plan, and the runtime wrapper feeds that plan to the existing persisted serial engine; evidence and closeout fixtures remain open.
+- [x] Convert a request into one `ExecutionPlan` and run the fixed six-stage lifecycle. The pure coordinator returns the route, obligations, and canonical plan, and the runtime wrapper feeds that plan to the existing persisted serial engine; sanitized and live evidence fixtures remain open.
 - [ ] Preserve worker brief and worker result boundaries. A worker summary never becomes the only proof.
 - [x] Record revision-bound evidence, blocked outcomes, and a guarded closeout result without adding a second workflow engine. `libs/temari-core` derives a resumable closeout decision from receipt and portable evidence identities; `libs/runtime` persists the artifact and keeps loading/verification with the evidence store.
 
