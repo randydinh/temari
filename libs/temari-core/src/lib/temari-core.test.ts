@@ -9,6 +9,7 @@ import {
   classifySerialEngineering,
   classifyTemariRoute,
   createExecutionPlan,
+  createRequestPlan,
   validateTemariRouteTable,
   verificationMaintenanceDecision,
 } from './temari-core.js';
@@ -194,6 +195,72 @@ test('rejects malformed closed route tables', () => {
         } as never,
       ]),
     /has no owner/,
+  );
+});
+
+test('converts one ordinary request into one canonical execution plan', () => {
+  const request = createRequestPlan({
+    workType: 'feature',
+    lightweight: LIGHTWEIGHT_EVIDENCE,
+    obligations: { delivery: 'commit' },
+  });
+
+  assert.equal(request.route.profileKind, 'playbook');
+  assert.equal(request.route.route, 'lightweight-engineering');
+  assert.deepEqual(request.obligations, {
+    workType: 'feature',
+    delivery: 'commit',
+  });
+  assert.deepEqual(request.plan.stages, [
+    'investigate',
+    'plan',
+    'build',
+    'review',
+    'verify',
+    'deliver',
+  ]);
+  assert.equal(request.plan.delivery, 'commit');
+});
+
+test('maps a QA domain route to independent revision-bound plan policy', () => {
+  const request = createRequestPlan({
+    workType: 'qa',
+    lightweight: LIGHTWEIGHT_EVIDENCE,
+    qaResponsibility: 'validation-disposition',
+  });
+
+  assert.equal(request.route.profileKind, 'domain');
+  assert.equal(request.route.route, 'qa-review');
+  assert.deepEqual(request.obligations, {
+    workType: 'qa',
+    review: 'independent',
+    evidence: 'revision-bound',
+  });
+  assert.equal(request.plan.review, 'independent');
+  assert.equal(request.plan.evidence, 'revision-bound');
+  assert.deepEqual(request.plan.requiredCapabilities, ['subagents']);
+});
+
+test('fails closed when a QA policy is weakened at the coordinator boundary', () => {
+  assert.throws(
+    () =>
+      createRequestPlan({
+        workType: 'qa',
+        lightweight: LIGHTWEIGHT_EVIDENCE,
+        qaResponsibility: 'ticket-coverage',
+        obligations: { review: 'self' },
+      }),
+    /require independent review/,
+  );
+  assert.throws(
+    () =>
+      createRequestPlan({
+        workType: 'qa',
+        lightweight: LIGHTWEIGHT_EVIDENCE,
+        qaResponsibility: 'ticket-coverage',
+        obligations: { evidence: 'minimal' },
+      }),
+    /require revision-bound evidence/,
   );
 });
 
