@@ -178,6 +178,29 @@ Linux run `36225287151` and Windows run `36225285286` were started for that
 repair head; final documentation review and CI at the eventual merge head
 remain required. Source review does not establish host installation or cutover.
 
+Repair-head Linux CI passed, but Windows CI failed the older local child-takeover
+test: 177 runtime tests, 175 passed, one failed and one skipped. The failing
+path surfaced the child store's error-length assertion; later Windows acceptance
+steps were skipped. This is a failed gate, not a successful candidate run.
+The fixture advanced its fake clock after a handler-return signal and a 100 ms
+delay without waiting for durable child completion. Adding a 250 ms evidence
+publication delay reproduced a local failure (`BLOCKED` instead of `PASS`),
+recorded in test-first commit `ac4ef8c`. The exact Windows interleaving was not
+captured, so this local trigger is not claimed as an identical platform trace.
+Hold merge for a reviewed fix and fresh native Windows/Linux checks.
+
+The fixture fix now signals worker-1 completion only after the genuine store
+has persisted SUCCEEDED and an independently opened store reads that state.
+The delayed publication remains, worker-2 stays blocked until takeover, and
+the replacement-count, evidence, manifest and receipt assertions are unchanged.
+Worker and main runs passed all 177 runtime tests; main also reproduced the
+four core typechecks and all 267 core tests. This changes only the fixture,
+not production timing, leases, fencing or store validation. Final delta review
+and current-head CI remain gates. The separate independently reproduced
+empty/oversized-worker-error persistence gap is retained in the
+[roadmap](../implementation-inventory-and-parallelism-roadmap.md#retained-local-failure-reporting-gap),
+not hidden by this fix or claimed resolved.
+
 Data follows the existing types. `TemariPlanRequest` becomes a
 `TemariRequestPlan`, then persisted `WorkflowCheckpoint` and `WorkflowReceipt`
 records. Evidence bytes must verify before interpreting a `CloseoutDecision`.

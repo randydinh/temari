@@ -580,6 +580,21 @@ test('recovers one expired child through a second independent coordinator', asyn
     const workerOneDone = new Promise<void>((resolve) => {
       markWorkerOneDone = resolve;
     });
+    const completeChildA = childStoreA.complete.bind(childStoreA);
+    childStoreA.complete = async (request) => {
+      const record = await completeChildA(request);
+      if (
+        record.status === 'SUCCEEDED' &&
+        record.result?.summary === 'worker-1 complete'
+      ) {
+        assert.equal(
+          (await childStoreB.load(record.taskId))?.status,
+          'SUCCEEDED',
+        );
+        markWorkerOneDone();
+      }
+      return record;
+    };
     const interrupted = new Promise<void>((resolve) => {
       release = resolve;
     });
@@ -625,7 +640,6 @@ test('recovers one expired child through a second independent coordinator', asyn
           join(root, assignment.id, 'output.txt'),
           `${assignment.id}:resumed-output`,
         );
-        if (assignment.id === 'worker-1') markWorkerOneDone();
         if (assignment.id === 'worker-2') {
           markStarted();
           await interrupted;
@@ -635,7 +649,6 @@ test('recovers one expired child through a second independent coordinator', asyn
     });
     await started;
     await workerOneDone;
-    await new Promise((resolve) => setTimeout(resolve, 100));
     clockMs += 350;
 
     const resumed = await executeRestartableParallelWorkers({

@@ -253,6 +253,23 @@ failover.
    local parallelism. It becomes eligible only after shared control storage,
    fencing, idempotency, reconciliation, and failure-injection evidence pass.
 
+### Retained local failure-reporting gap
+
+PR #52's CI investigation independently reproduced a pre-existing boundary gap:
+`executeClaimed` forwards arbitrary handler error messages to a child store that
+requires nonempty text of at most 4096 characters. A 4097-character message or
+an empty `Error` message is replaced by the store's validation error; the child
+remains RUNNING with no receipt. This is separate from the takeover fixture's
+premature clock advancement, and the original Windows error payload was not
+retained. The exact Windows causal chain is therefore not established.
+
+Before claiming complete worker-failure recovery, define a bounded diagnostic
+representation, preserve the original diagnostic in retained evidence where
+appropriate, and test empty, whitespace-only, oversized and combined errors.
+Verify FAILED mechanics, semantic refusal, retry bounds and stale-owner fencing
+without weakening the store contract or masking the fixture race. This follow-up
+does not authorize a new service or expand the local proof to multi-machine use.
+
 ## Explicit non-goals
 
 - No second workflow engine for parallel routes.
