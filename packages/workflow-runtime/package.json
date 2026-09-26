@@ -31,6 +31,18 @@
       "check": {
         "command": "node --import @swc-node/register/esm-register packages/workflow-runtime/src/cli.ts check",
         "cache": false
+      },
+      "canonical-package": {
+        "command": "node tools/canonical-runtime.mjs package",
+        "cache": false
+      },
+      "canonical-check": {
+        "command": "node tools/canonical-runtime.mjs check",
+        "cache": false
+      },
+      "canonical-test": {
+        "command": "node --test tools/canonical-runtime.test.mjs",
+        "cache": false
       }
     }
   },

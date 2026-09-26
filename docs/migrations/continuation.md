@@ -23,7 +23,7 @@ The canonical contracts, coordinator, workflow engine, and runtime passed
 their eight Nx typecheck and test tasks from an isolated checkout before
 this increment.
 
-The current unit adds process-restart migration acceptance tests against the
+The first completed unit added process-restart migration acceptance tests against the
 existing request-plan API and persisted runtime. Its boundary is a sanitized
 filesystem fixture. It does not prove an installed agent host, independent
 reviewer execution, or cross-machine coordination.
@@ -46,8 +46,40 @@ run. The scoped repair is
 requires a deliberately seeded real update notice. Independent review and
 Linux/Windows runs `36203664260` / `36203623339` passed at that head. PR #49
 merged as `214bc1de910bf7908036c090a245f226898ec4f2`, and its repair is now
-included in #48. Require green checks at #48's current head before merge;
-do not reuse #49's passing runs as proof for #48.
+included in #48. PR #48 then passed its own Linux run `36204513002` and
+Windows run `36204509941` at final head
+`5fc750b569ace0f19109232f193f9e848ebaae30`. The independent reviewer checked
+the final CI/documentation delta without treating the prior failed run as
+success. PR #48 merged as `dbcd8ba9bcd20eea48773e96185a24dbc6da02ce`.
+
+The active unit is additive compiled canonical packaging on branch
+`codex/canonical-runtime-package-20260925`, based on that merge,
+[PR #50](https://github.com/randydinh/temari/pull/50). Source candidate
+`2407705332cd1b361f8aabafdbbe140a74f73aae` received an independent PASS
+review, with stable patch ID `a575c8f3d4f445f93afc636f4350e85ab1236be8`.
+The reviewer reproduced all six packaging checks, built a clean-head artifact,
+and independently typechecked all 28 emitted declarations without source
+libraries entering the consumer program. The six packaging checks pass locally,
+including fresh-process recovery and denied-source evidence readback. Core
+typecheck/tests and workflow-runtime typecheck passed; the legacy test first
+stopped at missing Bun, then all 34 tests (including the copied upstream ten-test
+suite) passed with the existing Bun 1.4.2 on the search path. The 234-file pinned
+payload check passed. Local tools were Node 26.9.0 and pnpm 11.25.0; CI remains
+pinned to Node 24 and pnpm 9.15.9. Linux run `36218487553` and Windows run
+`36218440080` passed on source candidate `2407705`. A documentation-only
+follow-up records these results and updates the roadmap; it still requires
+a delta review and green CI at the final head before merge. Before resuming,
+check the branch's current head and PR state rather than assuming this snapshot
+is final. The PR is linked here and in the task; the app's attachment-writing
+tool was unavailable after the interruption, so a queued review panel is not
+claimed as a saved attachment.
+The working copy is the ignored `.audit/worktrees/canonical-runtime-package`
+under the main checkout. The earlier temporary worktree and worker session
+were unavailable after the 2026-09-26 interruption; their uncommitted parent
+drafts were reconstructed from the task record. No completion or test result
+is inferred from that interrupted worker. Keep durable continuation evidence
+inside the checkout or on the forge, not only in an operating-system temporary
+directory. Leave unrelated missing-worktree metadata untouched.
 
 Data follows the existing types. `TemariPlanRequest` becomes a
 `TemariRequestPlan`, then persisted `WorkflowCheckpoint` and `WorkflowReceipt`
@@ -86,6 +118,16 @@ checkpoint and run-store semantics already own recovery and claims. A future
 host integration must support real candidate-changing builds and reconcile
 with those owners; it must not silently add a second lifecycle. Prove compiled
 dependency closure before selecting that interface.
+
+After reconciling PR #50, the next design boundary is a runtime-owned closeout
+operation that loads actual evidence bytes, validates complete stage bindings,
+and checks the expected current candidate. Preserve the existing engine and
+run-store owners. Establish how real builds change candidate identity before
+selecting the installed host transport; freezing the candidate for all six
+stages does not support normal engineering. Keep archive permission separate
+from a verified workflow receipt. Then connect the three public entries in an
+isolated installation and retain actual host/independent-QA evidence before
+moving on to shared-service workers.
 
 ## Resume safely
 

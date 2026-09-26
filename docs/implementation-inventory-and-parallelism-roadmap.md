@@ -1,7 +1,8 @@
 # Temari implementation inventory and parallelism roadmap
 
-Status: local parallelism implemented through PR #47; this document records what is actually in
-the canonical Nx repository and separates it from planned behavior.
+Status: local parallelism is implemented through PR #47. Subsequent migration
+and packaging evidence is recorded below, separately from remaining host and
+distributed acceptance gates.
 
 ## Lossless implementation inventory
 
@@ -110,6 +111,19 @@ the canonical Nx repository and separates it from planned behavior.
 
 ### Packaged workflow and legacy boundary
 
+- PR #48 added six fresh-process recovery acceptance scenarios through the
+  canonical coordinator and persisted runtime, with literal artifact bytes
+  and rejection of changed workspaces, revisions, and evidence. PR #49 fixed
+  native Windows smoke JSON parsing without suppressing stderr or assertions.
+- PR #50 adds a separate compiled canonical library artifact with ordinary ESM
+  package exports, declaration files, exact content inventory, and no source
+  loader or dependency-install step at runtime. Six packaging checks exercise
+  relocation, durable checkpoint recovery, fresh-process evidence readback,
+  dependency tampering, unsafe inventory paths, and existing-output refusal.
+  Source candidate `2407705` passed independent review and Linux/Windows CI;
+  check the PR's current head for final merge status. Restricted readback does
+  not imply restricted recovery writes, installed-host migration, or remote
+  workers. See [canonical package verification](./migrations/canonical-packages.md).
 - `9bb0874` imported the portable v4.1 workflow runtime, skills, host
   projections, verification assets, and optional Archon integration under
   `packages/workflow-runtime/assets/v4.1/` with provenance.

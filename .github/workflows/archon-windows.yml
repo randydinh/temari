@@ -8,8 +8,13 @@ on:
       - '.github/workflows/archon-windows.yml'
       - 'libs/archon-harness/**'
       - 'libs/contracts/**'
+      - 'libs/temari-core/**'
+      - 'libs/workflow-engine/**'
       - 'libs/runtime/**'
       - 'packages/initializer/**'
+      - 'tools/canonical-runtime*'
+      - 'tools/fixtures/canonical-consumer.mjs'
+      - 'packages/workflow-runtime/package.json'
       - 'packages/workflow-runtime/assets/v4.1/integrations/archon/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -44,6 +49,9 @@ jobs:
 
       - name: Test harness, initializer, runtime, and contracts
         run: pnpm exec nx run-many -t typecheck test -p archon-harness,initializer,runtime,workflow-engine,contracts --parallel=1 --skip-nx-cache
+
+      - name: Verify relocated canonical packages under stock Node
+        run: pnpm exec nx run workflow-runtime:canonical-test --skipSync
 
       - name: Initialize Temari and install pinned Archon
         run: |
