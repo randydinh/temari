@@ -43,7 +43,11 @@ async function fixture(t, changes = {}) {
   const root = await realpath(
     await mkdtemp(join(tmpdir(), 'temari host café-')),
   );
-  t.after(() => rm(root, { recursive: true, force: true }));
+  const cleanups = [];
+  t.after(async () => {
+    for (const cleanup of cleanups) await cleanup();
+    await rm(root, { recursive: true, force: true });
+  });
   const artifact = join(root, 'runtime');
   await cp(join(build, 'runtime'), artifact, { recursive: true });
   for (const file of ['entry.mjs', 'stdio.mjs'])
@@ -87,9 +91,14 @@ async function fixture(t, changes = {}) {
     let stderr = '';
     let tail = '';
     let closed = false;
+    let timedOut = false;
+    let spawnError;
     let pending;
     const messages = [];
-    const deadline = setTimeout(() => child.kill('SIGKILL'), 30_000);
+    const deadline = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGKILL');
+    }, 30_000);
     const deliver = (message) => {
       if (pending) {
         const resolve = pending.resolve;
@@ -117,6 +126,7 @@ async function fixture(t, changes = {}) {
     child.stdin.on('error', () => undefined);
     const done = new Promise((resolve) => {
       child.once('error', (error) => {
+        spawnError = error;
         stderr += error.message;
       });
       child.once('close', (code, signal) => {
@@ -132,13 +142,19 @@ async function fixture(t, changes = {}) {
         resolve({ code, signal, stderr, tail, messages });
       });
     });
-    t.after(async () => {
+    cleanups.push(async () => {
       if (!closed) child.kill('SIGKILL');
       await done;
     });
+    const checkedDone = done.then((result) => {
+      assert.equal(timedOut, false, `Bridge process timed out: ${stderr}`);
+      assert.equal(spawnError, undefined);
+      return result;
+    });
+    void checkedDone.catch(() => undefined);
     return {
       child,
-      done,
+      done: checkedDone,
       next() {
         if (messages.length) return Promise.resolve(messages.shift());
         if (closed)
@@ -551,4 +567,125 @@ test('SIGINT leaves pending work unacknowledged and no manufactured terminal rec
   assert.notEqual((await session.done).code, 0);
   await f.absentReceipt();
   assert.equal((await f.checkpoint()).stages.length, 0);
+});
+
+test('an orphan manifest remains a runtime refusal rather than transport recovery', async (t) => {
+  const f = await fixture(t);
+  const session = f.launch();
+  const message = await session.next();
+  await resultFile(message);
+  const store = await f.api.FileWorkspaceManifestStore.create(
+    join(f.request.runDirectory, 'manifests'),
+  );
+  await store.save(
+    await store.capture({
+      runId: f.request.runId,
+      revision: f.request.revision,
+      subjectId: 'investigate',
+      workspaceId: 'investigate',
+      workspaceRoot: message.workspace,
+      now: new Date(),
+    }),
+  );
+  session.child.stdin.end();
+  assert.notEqual((await session.done).code, 0);
+  const resumed = await f.launch(true).done;
+  assert.notEqual(resumed.code, 0);
+  assert(!resumed.messages.some((item) => item.type === 'stage'));
+  await f.absentReceipt();
+});
+
+test('leftover result files cannot answer a new session without matching identities', async (t) => {
+  const f = await fixture(t);
+  const first = f.launch();
+  const old = await first.next();
+  await resultFile(old);
+  first.child.stdin.end();
+  assert.notEqual((await first.done).code, 0);
+  const resumed = f.launch(true);
+  const current = await resumed.next();
+  assert.notEqual(current.sessionId, old.sessionId);
+  resumed.reply(current);
+  assert.notEqual((await resumed.done).code, 0);
+  assert.equal((await f.receipt()).status, 'BLOCKED');
+  assert.deepEqual((await f.checkpoint()).stages, []);
+});
+
+test('caller-authored capabilities and unknown obligations refuse before reserving a run', async (t) => {
+  for (const mode of ['capabilities', 'route', 'workType', 'obligation']) {
+    await t.test(mode, async (t) => {
+      const f = await fixture(t);
+      if (mode === 'capabilities')
+        f.request.capabilities = { available: ['subagents'] };
+      if (mode === 'route') f.request.route = 'full-playbook';
+      if (mode === 'workType') f.request.obligations.workType = 'invented-work';
+      if (mode === 'obligation') f.request.obligations.noReviewNeeded = true;
+      await writeFile(f.path, JSON.stringify(f.request));
+      const result = await f.launch().done;
+      assert.notEqual(result.code, 0);
+      assert(!result.messages.some((item) => item.type === 'stage'));
+      await assert.rejects(access(f.request.runDirectory), { code: 'ENOENT' });
+    });
+  }
+});
+
+test('resume refuses changed retained intent and runtime manifest before dispatch', async (t) => {
+  for (const mode of ['manifest', 'initial', 'plan', 'missing-checkpoint']) {
+    await t.test(mode, async (t) => {
+      const f = await fixture(t);
+      const session = f.launch();
+      await session.next();
+      session.child.stdin.end();
+      assert.notEqual((await session.done).code, 0);
+      if (mode === 'manifest') {
+        const path = join(f.artifact, 'canonical-manifest.json');
+        await writeFile(path, (await readFile(path, 'utf8')) + '\n');
+      } else if (mode === 'missing-checkpoint') {
+        await rm(
+          join(
+            f.request.runDirectory,
+            'checkpoints',
+            `${f.request.runId}.checkpoint.json`,
+          ),
+        );
+      } else {
+        const path = join(f.request.runDirectory, 'config', 'input.json');
+        const descriptor = JSON.parse(await readFile(path, 'utf8'));
+        if (mode === 'initial')
+          descriptor.expectedInitial.sha256 = '0'.repeat(64);
+        else descriptor.plan.evidence = 'minimal';
+        await writeFile(path, JSON.stringify(descriptor));
+      }
+      const result = await f.launch(true).done;
+      assert.notEqual(result.code, 0);
+      assert(!result.messages.some((item) => item.type === 'stage'));
+      await f.absentReceipt();
+    });
+  }
+});
+
+test('retained stage mutation refuses before requesting new work', async (t) => {
+  const f = await fixture(t);
+  const session = f.launch();
+  const first = await session.next();
+  await respond(f, session, first);
+  const checkpoint = await session.next();
+  assert.equal(checkpoint.type, 'checkpoint');
+  session.child.stdin.end();
+  assert.notEqual((await session.done).code, 0);
+  await writeFile(join(first.workspace, 'observation.txt'), 'tampered');
+  const result = await f.launch(true).done;
+  assert.notEqual(result.code, 0);
+  assert(!result.messages.some((item) => item.type === 'stage'));
+});
+
+test('closed output terminates the session without manufacturing completion', async (t) => {
+  const f = await fixture(t);
+  const session = f.launch();
+  const first = await session.next();
+  session.child.stdout.destroy();
+  await resultFile(first);
+  session.reply(first);
+  assert.notEqual((await session.done).code, 0);
+  await f.absentReceipt();
 });

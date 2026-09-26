@@ -13,6 +13,8 @@ on:
       - 'libs/runtime/**'
       - 'packages/initializer/**'
       - 'tools/canonical-runtime*'
+      - 'tools/host-session.test.mjs'
+      - 'packages/workflow-runtime/host/**'
       - 'tools/fixtures/canonical-consumer.mjs'
       - 'tools/fixtures/canonical-candidate-consumer.mjs'
       - 'packages/workflow-runtime/package.json'
@@ -53,6 +55,9 @@ jobs:
 
       - name: Verify relocated canonical packages under stock Node
         run: pnpm exec nx run workflow-runtime:canonical-test --skipSync
+
+      - name: Verify experimental host dialogue and process recovery
+        run: pnpm exec nx run workflow-runtime:host-session-test --skipSync
 
       - name: Initialize Temari and install pinned Archon
         run: |
