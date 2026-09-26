@@ -29,9 +29,25 @@ filesystem fixture. It does not prove an installed agent host, independent
 reviewer execution, or cross-machine coordination.
 
 Local acceptance and all eight core typecheck/test tasks pass. Independent
-review and CI are still required before this unit merges. The branch is
-`codex/migration-acceptance-20260925`. Find its PR and current head before
-resuming; do not infer merge status from this paragraph.
+read-only review of head `b0ecf8badcffd32aff52c9686f3962b57e1d4bd4` against the
+starting trunk returned PASS+NOTES with no blocking findings and reproduced
+the six acceptance scenarios. The stable patch ID was
+`25977de0ac6dbfd34c0bed90dc48de092c2a65f1`.
+
+The branch is `codex/migration-acceptance-20260925`,
+[PR #48](https://github.com/randydinh/temari/pull/48). Linux CI passed at that
+head (run `36174260034`). Windows core checks passed, but the later native
+Archon smoke failed when the script combined a stderr update notice with
+stdout JSON (run `36174236786`). Do not treat that failure as a passing CI
+run. The scoped repair is
+[PR #49](https://github.com/randydinh/temari/pull/49), branch
+`codex/windows-json-streams-20260925`, head
+`c8f93a0c8be69f601d9961ca64eec0ebaae8b526`. It separates the streams and
+requires a deliberately seeded real update notice. Independent review and
+Linux/Windows runs `36203664260` / `36203623339` passed at that head. PR #49
+merged as `214bc1de910bf7908036c090a245f226898ec4f2`, and its repair is now
+included in #48. Require green checks at #48's current head before merge;
+do not reuse #49's passing runs as proof for #48.
 
 Data follows the existing types. `TemariPlanRequest` becomes a
 `TemariRequestPlan`, then persisted `WorkflowCheckpoint` and `WorkflowReceipt`
@@ -45,9 +61,13 @@ does not load artifacts or prove the product result.
    Assert literal product output, durable stage reuse, missing-capability
    refusal, altered-workspace refusal, revision mismatch, and evidence
    integrity. Review independently and run the affected Nx checks and CI.
-2. Complete an isolated public-entry installation that invokes the canonical
-   engine without reading a legacy checkout. Verify the engineering and QA
-   paths on the actual host. Keep optional private overlays absent by default.
+2. First package the existing canonical library closure as executable JS, with
+   ordinary package resolution, an exact artifact inventory, and a relocated
+   stock-Node recovery check. Keep this separate from the pinned v4.1 payload.
+   This establishes portable packages, not an installed engineering entry.
+   Then complete isolated public-entry installation invoking the canonical
+   engine without a legacy checkout. Verify engineering and QA on the actual
+   host. Keep optional private overlays absent by default.
 3. Implement one distributed workflow with shared durable control records,
    shared evidence, and independent worker dispatch. Reuse the existing
    contracts. Record backend decisions before expanding dependencies.
@@ -59,6 +79,13 @@ The first two steps complete only when the public entry works from a clean
 installation with retained evidence. Local callbacks and copied skill assets
 do not satisfy that predicate. Report local, process, host, and multi-machine
 evidence separately.
+
+Design review rejected combining packaging with a new execution facade,
+transport protocol, candidate-freezing policy, or reservation store. Existing
+checkpoint and run-store semantics already own recovery and claims. A future
+host integration must support real candidate-changing builds and reconcile
+with those owners; it must not silently add a second lifecycle. Prove compiled
+dependency closure before selecting that interface.
 
 ## Resume safely
 
