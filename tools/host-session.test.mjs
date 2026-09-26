@@ -689,3 +689,37 @@ test('closed output terminates the session without manufacturing completion', as
   assert.notEqual((await session.done).code, 0);
   await f.absentReceipt();
 });
+
+test('identical bytes at a substituted candidate root do not redirect retained work', async (t) => {
+  const f = await fixture(t);
+  const session = f.launch();
+  await session.next();
+  session.child.stdin.end();
+  assert.notEqual((await session.done).code, 0);
+  const substitute = join(f.root, 'substituted-product');
+  await cp(f.candidate, substitute, { recursive: true });
+  const path = join(f.request.runDirectory, 'config', 'input.json');
+  const descriptor = JSON.parse(await readFile(path, 'utf8'));
+  descriptor.candidate.root = substitute;
+  await writeFile(path, JSON.stringify(descriptor));
+  const resumed = f.launch(true);
+  const outcome = await Promise.race([
+    resumed.next().then((message) => ({ message }), () => ({ message: null })),
+    resumed.done.then((result) => ({ result })),
+  ]);
+  assert(!outcome.message, 'Changed candidate root must refuse before dispatch.');
+  assert.notEqual((await resumed.done).code, 0);
+  await f.absentReceipt();
+  assert.equal(await readFile(join(f.candidate, 'product.txt'), 'utf8'), initial);
+  assert.equal(await readFile(join(substitute, 'product.txt'), 'utf8'), initial);
+});
+
+test('a control byte in a pipe is malformed input, not a keyboard interruption', async (t) => {
+  const f = await fixture(t);
+  const session = f.launch();
+  await session.next();
+  session.child.stdin.write(Buffer.from([123, 3, 10]));
+  const result = await session.done;
+  assert.equal(result.code, 1);
+  assert.equal((await f.receipt()).status, 'BLOCKED');
+});
