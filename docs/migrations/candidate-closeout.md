@@ -69,6 +69,12 @@ identity retained by the caller's review decision, not inferred from the receipt
 under verification. Persist the original `expectedInitial` for later recovery;
 do not replace it with a fresh observation after a build or crash.
 
+Direct and scheduled execution capture and admit the candidate request at their
+public boundary. The scheduled wrapper does so before its clock and run-store
+callbacks, retains the selected stage bindings, and rechecks resolved roots
+before dispatch. A callback cannot change the selected profile, original
+expectation, or forwarding configuration by mutating the caller's request.
+
 Candidate execution selects `candidate-stage-evidence-v1`. Its receipts and
 checkpoints retain the initial binding; successor attestations retain compact
 before/after identities. Existing evidence-only records remain on their old

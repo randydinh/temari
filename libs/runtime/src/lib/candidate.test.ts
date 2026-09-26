@@ -26,6 +26,7 @@ import type { WorkflowCheckpoint } from '@temari/workflow-engine';
 import { observeCandidate, type CandidateRunOptions } from './candidate.js';
 import {
   executeAndPersist,
+  executeScheduledAndPersist,
   verifyCandidateCloseout,
   FileWorkflowCheckpointStore,
   FileWorkflowReceiptStore,
@@ -34,6 +35,7 @@ import {
   type ExecuteScheduledAndPersistRequest,
 } from './runtime.js';
 import { FileEvidenceStore } from './evidence-store.js';
+import { FileWorkflowRunStore, type WorkflowRunStore } from './run-store.js';
 import {
   captureWorkspaceManifest,
   FileWorkspaceManifestStore,
@@ -971,4 +973,184 @@ test('candidate root policy rejects static ancestor aliases and changed resoluti
   assert.equal(receipt.status, 'BLOCKED');
   assert.match(receipt.failure!.message, /resolution changed/);
   assert.equal(f.calls.length, 1);
+});
+
+function interceptRunStore(
+  store: WorkflowRunStore,
+  method: keyof WorkflowRunStore,
+  before: () => void | Promise<void>,
+): WorkflowRunStore {
+  return new Proxy(store, {
+    get(target, key) {
+      const value = Reflect.get(target, key);
+      if (typeof value !== 'function') return value;
+      if (key !== method) return value.bind(target);
+      return async (...args: unknown[]) => {
+        await before();
+        return Reflect.apply(value, target, args);
+      };
+    },
+  });
+}
+
+for (const candidate of [false, true])
+  test(`scheduled ${candidate ? 'candidate' : 'legacy'} control retains its selected profile`, async (t) => {
+    const f = await fixture(t);
+    const runStore = await FileWorkflowRunStore.create(join(f.storage, 'runs'));
+    const result = await executeScheduledAndPersist({
+      ...f.request,
+      ...(candidate ? {} : { candidate: undefined, stageEvidence: undefined }),
+      runStore,
+      owner: 'scheduled-owner',
+      leaseMs: 60_000,
+    });
+    assert.equal(result.claimed, true);
+    assert.equal(result.record.status, 'SUCCEEDED');
+    assert.equal(result.receipt?.status, 'PASS');
+    assert.equal(
+      result.receipt.evidenceProfile,
+      candidate ? 'candidate-stage-evidence-v1' : undefined,
+    );
+    assert.deepEqual(f.calls, DEFAULT_STAGES);
+    if (candidate)
+      await verifyCandidateCloseout(f.reader(await observeCandidate(f.scope)));
+  });
+
+for (const method of ['create', 'claim', 'appendEvent'] as const)
+  test(`scheduled ${method} cannot replace the initially selected candidate`, async (t) => {
+    const f = await fixture(t);
+    const runStore = await FileWorkflowRunStore.create(join(f.storage, 'runs'));
+    await assert.rejects(
+      executeScheduledAndPersist({
+        ...f.request,
+        owner: 'scheduled-owner',
+        leaseMs: 60_000,
+        runStore: interceptRunStore(runStore, method, async () => {
+          await writeFile(f.file, 'X');
+          Object.assign(
+            f.request.candidate.expectedInitial,
+            await observeCandidate(f.scope),
+          );
+        }),
+      }),
+      /Candidate identity/,
+    );
+    assert.equal(f.calls.length, 0);
+    assert.equal(await f.store.load(f.request.runId), null);
+    assert.equal(await f.checkpointStore.load(f.request.runId), null);
+    assert.equal((await runStore.load(f.request.runId))?.status, 'FAILED');
+  });
+
+for (const boundary of ['create', 'now'] as const)
+  test(`scheduled ${boundary} cannot downgrade profile or replace forwarding configuration`, async (t) => {
+    const f = await fixture(t);
+    const initial = structuredClone(f.initial);
+    const runStore: WorkflowRunStore = await FileWorkflowRunStore.create(
+      join(f.storage, 'runs'),
+    );
+    const request = {
+      ...f.request,
+      runStore,
+      owner: 'scheduled-owner',
+      leaseMs: 60_000,
+      now: () => new Date(),
+      leaseRenewal: { intervalMs: 10_000 },
+      cancellation: { onRequested: 'cancel-before-completion' as const },
+    };
+    let mutations = 0;
+    const mutate = () => {
+      if (mutations++) return;
+      Object.assign(request.candidate.expectedInitial, {
+        sha256: '0'.repeat(64),
+      });
+      Object.assign(request.plan, { stages: ['build'] });
+      Object.assign(request.capabilities, { available: ['subagents'] });
+      Object.assign(request.leaseRenewal, { intervalMs: -1 });
+      Reflect.deleteProperty(request, 'candidate');
+      Reflect.deleteProperty(request, 'stageEvidence');
+      Reflect.deleteProperty(request, 'checkpointStore');
+      Reflect.deleteProperty(request, 'workspaceManifestStore');
+      Object.assign(request, {
+        runId: 'substituted',
+        revision: 'substituted',
+        owner: 'substituted',
+        handler: () => {
+          throw new Error('substituted handler');
+        },
+        workspaceForStage: () => ({ workspaceId: 'wrong', root: f.scope.root }),
+      });
+    };
+    if (boundary === 'create')
+      request.runStore = interceptRunStore(runStore, 'create', mutate);
+    else
+      request.now = () => {
+        mutate();
+        return new Date();
+      };
+    const result = await executeScheduledAndPersist(request);
+    assert(mutations > 0);
+    assert.equal(result.record.runId, f.request.runId);
+    assert.equal(result.record.status, 'SUCCEEDED');
+    assert.equal(result.receipt?.status, 'PASS');
+    assert.equal(result.receipt.evidenceProfile, 'candidate-stage-evidence-v1');
+    assert.equal(result.receipt.revision, f.request.revision);
+    assert.deepEqual(result.receipt.candidateBinding?.initial, initial);
+    assert.deepEqual(result.receipt.plan.stages, DEFAULT_STAGES);
+    assert.deepEqual(f.calls, DEFAULT_STAGES);
+    assert.equal(await runStore.load('substituted'), null);
+  });
+
+test('scheduled candidate service admission runs before callbacks and mechanical writes', async (t) => {
+  const f = await fixture(t);
+  const runStore = await FileWorkflowRunStore.create(join(f.storage, 'runs'));
+  let callbacks = 0;
+  await assert.rejects(
+    Reflect.apply(executeScheduledAndPersist, undefined, [
+      {
+        ...f.request,
+        runStore,
+        owner: 'scheduled-owner',
+        leaseMs: 60_000,
+        checkpointStore: undefined,
+        now: () => {
+          callbacks++;
+          return new Date();
+        },
+      },
+    ]),
+    /requires/,
+  );
+  assert.equal(callbacks, 0);
+  assert.equal(f.calls.length, 0);
+  assert.equal(await runStore.load(f.request.runId), null);
+});
+
+test('scheduled prelude rejects a changed root alias before handler dispatch', async (t) => {
+  const f = await fixture(t);
+  const runStore = await FileWorkflowRunStore.create(join(f.storage, 'runs'));
+  const alias = join(f.root, 'scheduled-alias');
+  const replacement = join(f.root, 'replacement');
+  await mkdir(join(replacement, 'candidate'), { recursive: true });
+  await writeFile(join(replacement, 'candidate', 'output.txt'), 'A');
+  const linkType = process.platform === 'win32' ? 'junction' : 'dir';
+  await symlink(f.root, alias, linkType);
+  const scope = { ...f.scope, root: join(alias, 'candidate') };
+  assert.deepEqual(await observeCandidate(scope), f.initial);
+  await assert.rejects(
+    executeScheduledAndPersist({
+      ...f.request,
+      candidate: { ...f.request.candidate, scope },
+      owner: 'scheduled-owner',
+      leaseMs: 60_000,
+      runStore: interceptRunStore(runStore, 'create', async () => {
+        await unlink(alias);
+        await symlink(replacement, alias, linkType);
+      }),
+    }),
+    /resolution changed/,
+  );
+  assert.equal(f.calls.length, 0);
+  assert.equal(await f.store.load(f.request.runId), null);
+  assert.equal(await f.checkpointStore.load(f.request.runId), null);
+  assert.equal((await runStore.load(f.request.runId))?.status, 'FAILED');
 });

@@ -146,6 +146,26 @@ patch passed all eight core typecheck/test targets (168 runtime tests, 258 core
 tests total) and all eleven compiled checks. No new comments or suppressions
 were added by this guard and its regression test.
 
+[PR #52](https://github.com/randydinh/temari/pull/52) is open. Independent source
+and decision-trail review of `c93fcdc12116f6f7bb56da7180a29a88a87fb8a8` returned
+FAIL: the scheduled wrapper could accept caller mutations during its run-store
+prelude before the direct entry captured candidate intent, including a silent
+downgrade to legacy execution. The reviewer reproduced four typechecks, 258 core
+tests and eleven compiled checks, then exposed the gap with two failing safety
+probes and three passing controls. Linux run `36224516207` and Windows run
+`36224485760` passed at that source head; neither green run clears this finding.
+That candidate was not merged.
+
+The repair captures and admits the selected execution request before scheduler
+callbacks, preserves stage bindings and scheduler options, and rechecks resolved
+roots before dispatch. Scheduled candidate/legacy controls and clock/create/claim/
+dispatch mutation regressions are added. The packaging guide now distinguishes
+the original evidence-only fixture from the newer candidate scenarios. The repair
+passes the eight core targets (267 tests, including runtime177) and all eleven
+compiled checks. Independent re-review and current-head CI are required before merge.
+The PR is linked here and in the task. The available app tools could queue its
+page but could not save a PR attachment; no saved-attachment claim is made.
+
 Data follows the existing types. `TemariPlanRequest` becomes a
 `TemariRequestPlan`, then persisted `WorkflowCheckpoint` and `WorkflowReceipt`
 records. Evidence bytes must verify before interpreting a `CloseoutDecision`.

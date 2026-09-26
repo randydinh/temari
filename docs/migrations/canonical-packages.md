@@ -66,6 +66,16 @@ bytes. Negative checks reject missing or changed dependency bytes, extra files,
 links, unsafe inventory paths, and a rewritten manifest when an expected
 manifest is supplied. An existing destination must remain unchanged.
 
+Five additional candidate-bound scenarios use the same compiled packages and
+separate stable stage directories. Build changes actual candidate bytes from
+`pear\napple\n` to `APPLE\nPEAR\n`; the expected final digest comes from literal
+expected output, not the receipt being checked. Fresh processes recover from
+empty, build, and complete checkpoints. Other processes stop after an
+unacknowledged build mutation or after manifest/evidence publication before
+checkpoint save. Recovery refuses those ambiguous gaps. Reader checks reject
+stale expectations, changed candidates, changed stage artifacts, and missing or
+tampered evidence, with restored-byte success controls.
+
 Run the adjacent regression checks before publishing:
 
 ```sh
@@ -80,12 +90,17 @@ the package, inspect its stderr and the generated package exports first.
 
 ## Acceptance boundary
 
-Passing this check establishes a portable canonical library artifact with
-fixture-based process recovery. It does not establish live host dispatch,
-independent QA evaluation, candidate-changing build policy, runtime-owned
-byte-backed closeout, installed-entry migration, or multi-machine execution.
-Interruption occurs after an acknowledged checkpoint, not between an external
-effect and its checkpoint; general exactly-once execution is not claimed.
+Passing the eleven checks establishes portable canonical libraries with
+fixture-based local process recovery. The original evidence-only fixture and
+the newer [candidate-bound verifier](./candidate-closeout.md) have different
+claims: the latter verifies bounded regular-file identity and complete retained
+stage evidence under a cooperative exclusive writer. It does not prove
+independent QA, truthful evidence, or archive/merge authority.
+
+The candidate scenarios cover both acknowledged recovery and refusal of selected
+pre-acknowledgment gaps. They do not establish automatic rollback, exactly-once
+execution, atomic filesystem snapshots, live host dispatch, installed-entry
+migration, or multi-machine operation.
 
 See the [continuation record](./continuation.md) for actual verification and
 remaining gates. Do not mark the public-entry or cutover gates complete from

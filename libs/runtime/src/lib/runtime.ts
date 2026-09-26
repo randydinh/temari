@@ -452,9 +452,9 @@ async function saveCandidateCheckpoint(
   );
 }
 
-export async function executeAndPersist(
-  request: ExecuteAndPersistRequest,
-): Promise<WorkflowReceipt> {
+function captureExecutionRequest<T extends ExecuteAndPersistRequest>(
+  request: T,
+) {
   assert(
     request.candidate === undefined ||
       (request.candidate !== null &&
@@ -503,6 +503,16 @@ export async function executeAndPersist(
     !('candidateBinding' in request),
     'Runtime constructs candidateBinding from candidate options.',
   );
+  return { request: { ...request }, binding, evidenceProfile } as const;
+}
+
+export async function executeAndPersist(
+  request: ExecuteAndPersistRequest,
+): Promise<WorkflowReceipt> {
+  const captured = captureExecutionRequest(request);
+  request = captured.request;
+  const { binding, evidenceProfile } = captured;
+  const candidate = request.candidate;
   const roots = candidate
     ? await prepareCandidateRoots(
         candidate.scope,
@@ -884,6 +894,24 @@ function assertLeaseRenewalInterval(intervalMs: number): void {
 export async function executeScheduledAndPersist(
   request: ExecuteScheduledAndPersistRequest,
 ): Promise<ScheduledExecutionResult> {
+  request = {
+    ...captureExecutionRequest(request).request,
+    leaseRenewal: request.leaseRenewal
+      ? immutableCopy(request.leaseRenewal)
+      : undefined,
+    cancellation: request.cancellation
+      ? immutableCopy(request.cancellation)
+      : undefined,
+  };
+  const roots = request.candidate
+    ? await prepareCandidateRoots(
+        request.candidate.scope,
+        request.workspaceForStage,
+        request.candidate.knownWriteRoots,
+      )
+    : undefined;
+  if (roots && request.candidate)
+    request = { ...request, workspaceForStage: roots.workspaceForStage };
   const now = request.now ?? (() => new Date());
   await request.runStore.create({
     runId: request.runId,
@@ -945,6 +973,7 @@ export async function executeScheduledAndPersist(
   }
 
   try {
+    await roots?.recheck();
     const receipt = await executeAndPersist(request);
     if (renewalInFlight) await renewalInFlight;
     if (renewalTimer) clearInterval(renewalTimer);
