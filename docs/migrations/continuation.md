@@ -554,10 +554,13 @@ Actual local evidence for this unit:
 
 This is still packaging/preflight evidence, not installed-host acceptance,
 independent product-QA evidence, or distributed/multi-machine proof. The next
-safe action is independent source review, exact-head Linux/Windows CI, then
-merge this scoped packaging unit if those gates pass. Afterward, implement
-trusted installed closeout and live host/QA evidence before shared-service
-workers and real multi-machine recovery.
+safe action is to open a PR from the pushed branch, obtain independent source
+review and exact-head Linux/Windows CI, then merge this scoped packaging unit if
+those gates pass. PR creation is currently blocked because this host has no
+`gh` executable and its Mac browser surface is unavailable while the Mac is
+locked; no PR or merge is claimed. Afterward, implement trusted installed
+closeout and live host/QA evidence before shared-service workers and real
+multi-machine recovery.
 
 ## Remaining gates
 
