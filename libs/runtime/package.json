@@ -24,7 +24,7 @@
       "test": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "node --import @swc-node/register/esm-register --test libs/runtime/src/lib/runtime.test.ts libs/runtime/src/lib/run-store.test.ts libs/runtime/src/lib/child-task-store.test.ts libs/runtime/src/lib/parallel-runtime.test.ts libs/runtime/src/lib/harness-selector.test.ts libs/runtime/src/lib/harness-runtime.test.ts libs/runtime/src/lib/v4-1-route-replay.test.ts libs/runtime/src/lib/migration-acceptance.test.ts",
+          "command": "node --import @swc-node/register/esm-register --test libs/runtime/src/lib/runtime.test.ts libs/runtime/src/lib/run-store.test.ts libs/runtime/src/lib/child-task-store.test.ts libs/runtime/src/lib/parallel-runtime.test.ts libs/runtime/src/lib/harness-selector.test.ts libs/runtime/src/lib/harness-runtime.test.ts libs/runtime/src/lib/v4-1-route-replay.test.ts libs/runtime/src/lib/migration-acceptance.test.ts libs/runtime/src/lib/stage-evidence.test.ts",
           "cwd": "{workspaceRoot}"
         }
       },

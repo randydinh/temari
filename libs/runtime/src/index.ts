@@ -1,4 +1,9 @@
 export * from './lib/runtime.js';
+export {
+  verifyPersistedStageEvidence,
+  type StageEvidencePayload,
+  type VerifiedStageEvidence,
+} from './lib/stage-evidence.js';
 export * from './lib/run-store.js';
 export * from './lib/child-task-store.js';
 export * from './lib/parallel-runtime.js';

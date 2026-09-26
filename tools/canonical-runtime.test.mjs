@@ -176,9 +176,49 @@ test('relocated stock Node resumes an acknowledged prefix and verifies bytes wit
     stages.slice(0, 3),
   );
   assert.equal(prefix.revision, revision);
+  const attestationPath = join(
+    state,
+    'evidence',
+    `${prefix.stages[0].stageEvidence.sha256}.artifact`,
+  );
+  const attestationBytes = await readFile(attestationPath);
+  const handlersBeforeResume = await readFile(
+    join(state, 'handlers.jsonl'),
+    'utf8',
+  );
+  await unlink(attestationPath);
+  await run('resume', 1);
+  const changedAttestation = Buffer.from(attestationBytes);
+  changedAttestation[0] ^= 1;
+  await writeFile(attestationPath, changedAttestation);
+  await run('resume', 1);
+  assert.equal(
+    await readFile(join(state, 'handlers.jsonl'), 'utf8'),
+    handlersBeforeResume,
+  );
+  await assert.rejects(
+    access(join(state, 'receipts', `${runId}.receipt.json`)),
+    { code: 'ENOENT' },
+  );
+  await writeFile(attestationPath, attestationBytes);
   await run('resume');
   const { stdout } = await run('inspect');
-  const { receipt, checkpoint, artifacts } = JSON.parse(stdout);
+  const { receipt, checkpoint, artifacts, verified } = JSON.parse(stdout);
+  assert.equal(receipt.evidenceProfile, 'stage-evidence-v1');
+  assert.equal(checkpoint.evidenceProfile, 'stage-evidence-v1');
+  assert.equal(verified.status, 'evidence-verified');
+  assert.equal(verified.scope, 'persisted-stage-evidence-only');
+  assert.deepEqual(
+    verified.stages.map((s) => s.payloads[0].text),
+    [
+      'investigate:\npear\napple\n',
+      'plan:\nuppercase-sort',
+      'build:\nAPPLE\nPEAR\n',
+      'review:\nAPPLE\nPEAR\n',
+      'verify:\nAPPLE\nPEAR\n',
+      'deliver:\nAPPLE\nPEAR\n',
+    ],
+  );
   assert.equal(receipt.runId, runId);
   assert.equal(receipt.revision, revision);
   assert.equal(receipt.status, 'PASS');
@@ -207,6 +247,21 @@ test('relocated stock Node resumes an acknowledged prefix and verifies bytes wit
     'APPLE\nPEAR\n',
   );
   assert.deepEqual(await checkCanonicalArtifact(artifact, manifest), manifest);
+  const attestation = JSON.parse(attestationBytes.toString('utf8'));
+  const payloadPath = join(
+    state,
+    'evidence',
+    `${attestation.payloads[0].reference.sha256}.artifact`,
+  );
+  const payloadBytes = await readFile(payloadPath);
+  await unlink(payloadPath);
+  await run('inspect', 1);
+  const changedPayload = Buffer.from(payloadBytes);
+  changedPayload[0] ^= 1;
+  await writeFile(payloadPath, changedPayload);
+  await run('inspect', 1);
+  await writeFile(payloadPath, payloadBytes);
+  await run('inspect');
 });
 
 test('canonical inventory rejects missing and same-size tampered dependency bytes', async (t) => {

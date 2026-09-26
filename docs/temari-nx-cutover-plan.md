@@ -142,6 +142,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 - [ ] Preserve worker brief and worker result boundaries. A worker summary never becomes the only proof.
 - [x] Record revision-bound evidence, blocked outcomes, and a guarded closeout result without adding a second workflow engine. `libs/temari-core` derives a resumable closeout decision from receipt and portable evidence identities; `libs/runtime` persists the artifact and keeps loading/verification with the evidence store.
 - [x] Add a sanitized process-restart acceptance suite through the canonical request coordinator and filesystem runtime. `runtime:migration-acceptance` verifies literal artifact output, saved-stage reuse across process exit, missing QA capability, changed workspace, revision mismatch, and evidence-byte rejection. This composes existing APIs in a deterministic fixture; it does not close the installed-host or independent QA journey gates. See `docs/migrations/runtime-acceptance.md`.
+- [x] Publish and verify complete persisted serial stage evidence through the existing runtime and compiled packages. `stage-evidence-v1` binds contextual attestations to payload bytes and refuses profile downgrade on resume, including complete checkpoints. Verification is evidence-only; it does not establish candidate freshness or closeout readiness. See `docs/migrations/stage-evidence.md`.
 
 **You see.**
 
@@ -280,7 +281,7 @@ out of scope until fencing, idempotency, and reconciliation are proven.
 
 **Build.**
 
-- [x] Produce a separate compiled canonical library artifact with concrete ESM dependencies and exact content inventory. `workflow-runtime:canonical-test` verifies relocation, stock-Node checkpoint recovery, and isolated receipt/evidence readback, with dependency-tamper and unsafe-path controls. Source candidate `2407705` passed independent review and Linux/Windows CI in PR #50. This preparatory artifact does not complete the three public-entry installs or live-host gate. See `docs/migrations/canonical-packages.md`.
+- [x] Produce a separate compiled canonical library artifact with concrete ESM dependencies and exact content inventory. `workflow-runtime:canonical-test` verifies relocation, stock-Node checkpoint recovery, and isolated receipt/evidence readback, with dependency-tamper and unsafe-path controls. Source candidate `2407705` and final head `369a092` passed independent review and Linux/Windows CI in PR #50, merged as `5c5a66e`. This preparatory artifact does not complete the three public-entry installs or live-host gate. See `docs/migrations/canonical-packages.md`.
 - [ ] Keep public packages thin. They call core contracts and the one engine rather than defining a second lifecycle.
 - [ ] Add a static, reviewed overlay manifest contract for optional plugins, host projections, and provider adapters.
 - [ ] Require overlay version, digest, compatibility range, capability requirements, and credential references. An overlay cannot grant authority or add engine stages.

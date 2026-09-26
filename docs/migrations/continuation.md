@@ -52,7 +52,7 @@ Windows run `36204509941` at final head
 the final CI/documentation delta without treating the prior failed run as
 success. PR #48 merged as `dbcd8ba9bcd20eea48773e96185a24dbc6da02ce`.
 
-The active unit is additive compiled canonical packaging on branch
+The next completed unit added compiled canonical packaging on branch
 `codex/canonical-runtime-package-20260925`, based on that merge,
 [PR #50](https://github.com/randydinh/temari/pull/50). Source candidate
 `2407705332cd1b361f8aabafdbbe140a74f73aae` received an independent PASS
@@ -67,19 +67,54 @@ suite) passed with the existing Bun 1.4.2 on the search path. The 234-file pinne
 payload check passed. Local tools were Node 26.9.0 and pnpm 11.25.0; CI remains
 pinned to Node 24 and pnpm 9.15.9. Linux run `36218487553` and Windows run
 `36218440080` passed on source candidate `2407705`. A documentation-only
-follow-up records these results and updates the roadmap; it still requires
-a delta review and green CI at the final head before merge. Before resuming,
-check the branch's current head and PR state rather than assuming this snapshot
-is final. The PR is linked here and in the task; the app's attachment-writing
+follow-up at `369a092144032183e0dc94f712bd3b4a6af9625c` received an independent
+delta PASS review. Linux run `36218761742` and Windows run `36218779513`
+passed at that final head. PR #50 merged as
+`5c5a66ecb3c357976a9f94df3a98320c7b6cab2a`. Main was fast-forwarded without
+changing the pre-existing lockfile and tsconfig hashes. The PR is linked here
+and in the task; the app's attachment-writing
 tool was unavailable after the interruption, so a queued review panel is not
 claimed as a saved attachment.
-The working copy is the ignored `.audit/worktrees/canonical-runtime-package`
+The completed working copy is the ignored `.audit/worktrees/canonical-runtime-package`
 under the main checkout. The earlier temporary worktree and worker session
 were unavailable after the 2026-09-26 interruption; their uncommitted parent
 drafts were reconstructed from the task record. No completion or test result
 is inferred from that interrupted worker. Keep durable continuation evidence
 inside the checkout or on the forge, not only in an operating-system temporary
 directory. Leave unrelated missing-worktree metadata untouched.
+
+The active unit starts from the PR #50 merge on
+`codex/stage-evidence-20260926`, in `.audit/worktrees/stage-evidence`.
+It adds persisted per-stage evidence ownership and byte verification before
+candidate-aware closeout. The eight core typecheck/test tasks and six compiled
+package checks passed at this baseline. The initial implementation passed all ten
+workspace typecheck targets and 490 tests across contracts, core, engine,
+runtime, knowledge, and plan-draft. The six compiled-package checks pass with
+fresh-process evidence refusal and restoration. Independent comment review
+found no deletions or suppressions. The packaged legacy runtime's 34 tests and
+234-file pinned payload check also pass.
+
+[PR #51](https://github.com/randydinh/temari/pull/51) initially passed Linux
+run `36220736618` and Windows run `36220715987` at
+`da6ba0cd6e6340e19d7b468ba5d734e59e402ab0`. Independent code/trail review
+returned FAIL after reproducing a custom store substituting different valid
+bytes during publication. That candidate was not merged. The scoped repair
+compares returned identities against intended bytes before acknowledgment,
+with payload, kind, attestation, and mutable-input fault tests. The reader also
+rejects invalid expected identity before contacting its receipt store.
+The repair passes the eight core typecheck/test targets, including 124 runtime
+tests and 214 core tests in total, plus all six compiled-package checks.
+Independent re-review of repaired source head
+`80f13355ec75d6eac1d0268321419ff6d5fa9798` returned PASS, with base-to-head
+stable patch ID `1f70b928bccbe9a406a0be8a86676e63e5879b9f`. The reviewer
+reproduced the 214 core tests, four typechecks, and six compiled-package checks,
+and ran twelve additional in-memory adapter probes (ten refusals, two positive
+controls). The scoped decision-trail audit found no blocker. Linux run
+`36221336318` and Windows run `36221334558` passed at that repaired source head.
+This documentation follow-up still requires delta review and current-head CI
+before merge. Candidate-aware closeout is the next implementation unit;
+do not start a competing branch before reconciling this PR.
+See [the runtime API and limits](./stage-evidence.md).
 
 Data follows the existing types. `TemariPlanRequest` becomes a
 `TemariRequestPlan`, then persisted `WorkflowCheckpoint` and `WorkflowReceipt`
@@ -119,9 +154,12 @@ host integration must support real candidate-changing builds and reconcile
 with those owners; it must not silently add a second lifecycle. Prove compiled
 dependency closure before selecting that interface.
 
-After reconciling PR #50, the next design boundary is a runtime-owned closeout
-operation that loads actual evidence bytes, validates complete stage bindings,
-and checks the expected current candidate. Preserve the existing engine and
+The active evidence verifier loads actual bytes and validates complete
+persisted stage bindings. Its success says evidence-only, not closeout-ready.
+It throws on refusal, consistent with the existing storage APIs; it does not
+return the blocked-result union considered in the design sketches.
+A separate candidate-aware operation must check the expected current candidate.
+Preserve the existing engine and
 run-store owners. Establish how real builds change candidate identity before
 selecting the installed host transport; freezing the candidate for all six
 stages does not support normal engineering. Keep archive permission separate

@@ -3,6 +3,14 @@ import type { ExecutionPlan, WorkflowStageId } from './execution-plan.js';
 
 export type WorkflowReceiptStatus = 'PASS' | 'ISSUES' | 'BLOCKED' | 'DROPPED';
 
+export type StageEvidenceProfile = 'stage-evidence-v1';
+
+export interface StageEvidenceReference {
+  readonly schema: 1;
+  readonly sha256: string;
+  readonly bytes: number;
+}
+
 export type WorkflowReceiptFailureKind =
   'capability-gap' | 'stage-handler-error';
 
@@ -14,6 +22,7 @@ export interface WorkflowReceiptFailure {
 }
 
 export interface WorkflowStageReceipt {
+  readonly stageEvidence?: StageEvidenceReference;
   readonly stage: WorkflowStageId;
   readonly status: WorkflowReceiptStatus;
   readonly startedAt: string;
@@ -32,6 +41,7 @@ export interface WorkflowStageReceipt {
  * the same shape without changing stage ownership or semantic decisions.
  */
 export interface WorkflowReceipt {
+  readonly evidenceProfile?: StageEvidenceProfile;
   readonly schema: 1;
   readonly runId: string;
   readonly revision: string;
