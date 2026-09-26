@@ -614,6 +614,11 @@ test('recovers one expired child through a second independent coordinator', asyn
       evidenceStore: evidenceStoreA,
       workspaceManifestStore: manifestStoreA,
       owner: 'coordinator-a',
+      evidenceForAssignment: async (assignment: WorkerAssignment) => {
+        if (assignment.id === 'worker-1')
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        return common.evidenceForAssignment(assignment);
+      },
       handler: async (assignment: WorkerAssignment) => {
         firstWorkerCalls += 1;
         await writeFile(
