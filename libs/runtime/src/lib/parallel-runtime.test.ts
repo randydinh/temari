@@ -551,6 +551,7 @@ for (const fault of [
   'readback',
   'missing-signal',
   'failed-drain',
+  'slow-held-start',
 ] as const) {
   test(
     fault === 'none'
@@ -680,7 +681,11 @@ for (const fault of [
             evidenceForAssignment: async (assignment: WorkerAssignment) => {
               if (assignment.id === 'worker-1') {
                 await new Promise((resolve) => setTimeout(resolve, 250));
-                if (fault === 'evidence' || fault === 'failed-drain')
+                if (
+                  fault === 'evidence' ||
+                  fault === 'failed-drain' ||
+                  fault === 'slow-held-start'
+                )
                   throw new Error(`takeover probe: ${fault}`);
               }
               if (assignment.id === 'worker-2' && fault === 'failed-drain')
@@ -689,6 +694,8 @@ for (const fault of [
             },
             handler: async (assignment: WorkerAssignment) => {
               firstWorkerCalls += 1;
+              if (assignment.id === 'worker-2' && fault === 'slow-held-start')
+                await new Promise((resolve) => setTimeout(resolve, 750));
               await writeFile(
                 join(root, assignment.id, 'output.txt'),
                 `${assignment.id}:resumed-output`,
