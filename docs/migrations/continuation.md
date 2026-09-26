@@ -506,6 +506,59 @@ The source task's 30-minute continuation named
 thread closeout. It must not resume alongside the successor owner. Any future
 recurring continuation must have one explicit owner and avoid duplicate workers.
 
+## Current unit — public-entry packaging (working)
+
+This unit is being developed from `bd826463ab35bf2746381437ed33cba295f31c85`
+(`origin/main`) on the isolated branch
+`codex/public-entry-packaging-20260926`. The protected successor checkout and
+main-checkout privacy, lockfile and tsconfig work are not in this branch.
+The implementation commit for this unit is
+`19b5fbc73fb6b47988fe748c21c2cdef14cc34c7`; later documentation-only
+amendments preserve that implementation unchanged.
+
+The new outer bundle keeps the exact four-package canonical runtime under a
+nested `runtime/` directory, copies the reviewed experimental bridge under
+`host/`, and adds a separate outer inventory/provenance manifest. It exposes
+three current public skill wrappers plus executable preflight entries for
+`temari`, `poteto-mode`, and `closeout`. The wrappers do not define a second
+lifecycle: scheduling, checkpoints, receipts, evidence and closeout remain
+owned by the canonical runtime and existing stores.
+
+The public admission policy is intentionally narrow and explicit. It records
+the exact v4.1 feature profile/playbook hashes as provenance, admits only the
+reviewed `full-playbook` / `feature-v1` shape with required delegation,
+independent review, revision-bound evidence and pull-request delivery, and
+refuses lightweight and QA routes. Because the experimental bridge proves no
+host capabilities, a matching feature request returns `blocked` with missing
+`subagents` and `forge`; it never accepts caller-authored capability labels.
+The closeout entry returns `blocked` until trusted invocation input and
+independent current-candidate selection are implemented.
+
+Actual local evidence for this unit:
+
+- `workflow-runtime:public-entry-test`: 5/5 passed, including relocation,
+  provenance hash matching, unsupported-route refusal, capability blocking,
+  closeout blocking, tamper/symlink refusal and no-overwrite publication.
+- `workflow-runtime:canonical-test`: 11/11 passed.
+- `workflow-runtime:host-session-test`: 39/39 passed.
+- Five affected-project typechecks passed (`contracts`, `temari-core`,
+  `workflow-engine`, `runtime`, `workflow-runtime`). Core, engine and runtime
+  test projects passed (24 + 48 + 18 + 185 tests). The legacy
+  `workflow-runtime:test` lane ran 33/34 tests but its pre-existing upstream
+  maintenance test cannot start because this environment has no `bun`
+  executable (`spawnSync bun ENOENT`); no legacy source or tooling was changed.
+- Plugin JSON and all three skill frontmatters passed structural checks. The
+  bundled Python validators could not run because this environment lacks the
+  `yaml` module; the equivalent manifest/frontmatter fields were checked with
+  Node and Ruby.
+
+This is still packaging/preflight evidence, not installed-host acceptance,
+independent product-QA evidence, or distributed/multi-machine proof. The next
+safe action is independent source review, exact-head Linux/Windows CI, then
+merge this scoped packaging unit if those gates pass. Afterward, implement
+trusted installed closeout and live host/QA evidence before shared-service
+workers and real multi-machine recovery.
+
 ## Remaining gates
 
 - Public entry packaging and proof that the installed host uses the new core.

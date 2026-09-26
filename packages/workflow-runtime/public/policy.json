@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "policyId": "temari-public-feature-v1",
+  "entries": {
+    "temari": {
+      "supportedRoute": "full-playbook",
+      "supportedProfile": "feature-v1"
+    },
+    "poteto-mode": {
+      "supportedRoute": "full-playbook",
+      "supportedProfile": "feature-v1"
+    },
+    "closeout": {
+      "supportedRoute": null,
+      "supportedProfile": null
+    }
+  },
+  "feature": {
+    "source": {
+      "family": "v4.1",
+      "sourceRevision": "959c8f7be3d7b684207d9e626263d41540d5ecdc",
+      "profilePath": "skills/poteto-mode/playbook-contracts/v1/feature.json",
+      "profileSha256": "27afa4044e7e1b0238b2ed6a33f7cff26417d7f905372bd6b5409f4d0462f959",
+      "playbookPath": "skills/poteto-mode/playbooks/feature.md",
+      "playbookSha256": "6c35ad16414d05056c22b32e84693d1669994334676806540f54adbfea26dca4"
+    },
+    "obligations": {
+      "workType": "feature",
+      "delegation": "required",
+      "review": "independent",
+      "evidence": "revision-bound",
+      "delivery": "pull-request"
+    },
+    "requiredCapabilities": ["subagents", "forge"],
+    "unsupportedRoutes": ["lightweight-engineering", "qa-review"]
+  },
+  "admission": {
+    "capabilitiesMustBeProvenByHost": true,
+    "callerDeclaredCapabilitiesAreNotProof": true,
+    "publicEntriesStartNoLifecycle": true,
+    "closeoutRequiresTrustedInvocationAndCurrentCandidate": true
+  }
+}

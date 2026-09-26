@@ -47,6 +47,10 @@
       "host-session-test": {
         "command": "node --test tools/host-session.test.mjs",
         "cache": false
+      },
+      "public-entry-test": {
+        "command": "node --test tools/public-entry-runtime.test.mjs",
+        "cache": false
       }
     }
   },
