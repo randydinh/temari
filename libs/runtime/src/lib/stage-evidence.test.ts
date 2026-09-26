@@ -464,3 +464,95 @@ test('final publication rechecks earlier acknowledged evidence after later handl
   );
   assert.equal(await f.store.load(f.request.runId), null);
 });
+
+test('publication refuses store-substituted payloads, kinds, and attestations before acknowledgment', async (t) => {
+  for (const variant of [
+    'payload',
+    'kind',
+    'attestation',
+    'mutated-input',
+  ] as const) {
+    await t.test(variant, async (t) => {
+      const f = await fixture(t);
+      const evidenceStore = {
+        put: async (request: Parameters<typeof f.evidenceStore.put>[0]) => {
+          if (request.kind === 'verification') {
+            if (variant === 'payload') {
+              return f.evidenceStore.put({
+                ...request,
+                content: 'substituted',
+              });
+            }
+            if (variant === 'kind') {
+              return f.evidenceStore.put({ ...request, kind: 'stdout' });
+            }
+            if (
+              variant === 'mutated-input' &&
+              request.content instanceof Uint8Array
+            ) {
+              request.content[0] ^= 1;
+            }
+          }
+          if (variant === 'attestation' && request.kind === 'other') {
+            const record = JSON.parse(
+              typeof request.content === 'string'
+                ? request.content
+                : Buffer.from(request.content).toString('utf8'),
+            );
+            const altered = await f.evidenceStore.put({
+              runId: request.runId,
+              revision: request.revision,
+              kind: 'verification',
+              content: 'substituted',
+            });
+            const { path: _path, ...reference } = altered;
+            record.payloads[0].reference = reference;
+            return f.evidenceStore.put({
+              ...request,
+              content: JSON.stringify(record),
+            });
+          }
+          return f.evidenceStore.put(request);
+        },
+        load: f.evidenceStore.load.bind(f.evidenceStore),
+        loadPortable: f.evidenceStore.loadPortable.bind(f.evidenceStore),
+      };
+      const receipt = await executeAndPersist({
+        ...f.request,
+        stageEvidence: { store: evidenceStore },
+      });
+      assert.equal(receipt.status, 'BLOCKED');
+      assert.equal(receipt.stages.length, 1);
+      assert.match(
+        receipt.failure!.message,
+        /Evidence publication .* mismatch/,
+      );
+      assert.equal(await f.checkpointStore.load(f.request.runId), null);
+      await assert.rejects(f.verify());
+    });
+  }
+});
+
+test('invalid verifier identity is rejected before contacting the receipt store', async (t) => {
+  const f = await fixture(t);
+  let loads = 0;
+  for (const identity of [
+    { runId: '../invalid', revision: 'r1' },
+    { runId: 'valid', revision: '' },
+  ]) {
+    await assert.rejects(
+      verifyPersistedStageEvidence({
+        ...identity,
+        store: {
+          save: async () => '',
+          load: async () => {
+            loads++;
+            return null;
+          },
+        },
+        evidenceStore: f.evidenceStore,
+      }),
+    );
+  }
+  assert.equal(loads, 0);
+});

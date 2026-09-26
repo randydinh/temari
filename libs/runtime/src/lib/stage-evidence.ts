@@ -8,7 +8,7 @@ import {
   type WorkflowStageId,
 } from '@temari/contracts';
 import type { StageReceiptResult } from '@temari/workflow-engine';
-import type { EvidenceStore } from './evidence-store.js';
+import type { EvidenceStore, PutEvidenceRequest } from './evidence-store.js';
 import type { WorkflowReceiptStore } from './runtime.js';
 
 export interface StageEvidencePayload {
@@ -299,6 +299,40 @@ export async function verifyStageEvidenceRecord(
   };
 }
 
+async function publish(
+  store: EvidenceStore,
+  request: PutEvidenceRequest,
+): Promise<WorkerEvidenceReference> {
+  const content =
+    typeof request.content === 'string'
+      ? Buffer.from(request.content, 'utf8')
+      : Buffer.from(request.content);
+  const expected: WorkerEvidenceReference = {
+    schema: 1,
+    runId: request.runId,
+    revision: request.revision,
+    kind: request.kind,
+    sha256: createHash('sha256').update(content).digest('hex'),
+    bytes: content.byteLength,
+  };
+  const stored = object(await store.put({ ...request, content }));
+  for (const key of [
+    'schema',
+    'runId',
+    'revision',
+    'kind',
+    'sha256',
+    'bytes',
+  ] as const) {
+    assert.equal(
+      stored[key],
+      expected[key],
+      `Evidence publication ${key} mismatch.`,
+    );
+  }
+  return expected;
+}
+
 export async function publishStageEvidence(
   store: EvidenceStore,
   runId: string,
@@ -343,23 +377,15 @@ export async function publishStageEvidence(
   }
   const references = [];
   for (const payload of payloads) {
-    const stored = await store.put({
+    const portable = await publish(store, {
       runId,
       revision,
       kind: payload.kind,
       content: payload.content,
     });
-    const portable = {
-      schema: stored.schema,
-      runId: stored.runId,
-      revision: stored.revision,
-      kind: stored.kind,
-      sha256: stored.sha256,
-      bytes: stored.bytes,
-    };
     references.push({ name: payload.name, reference: portable });
   }
-  const stored = await store.put({
+  const stored = await publish(store, {
     runId,
     revision,
     kind: 'other',
@@ -393,6 +419,7 @@ export async function verifyPersistedStageEvidence(request: {
   readonly store: WorkflowReceiptStore;
   readonly evidenceStore: EvidenceStore;
 }): Promise<VerifiedStageEvidence> {
+  identity(request.runId, request.revision);
   const receipt = await request.store.load(request.runId);
   assert(receipt, 'Persisted workflow receipt is missing.');
   return verifyStageEvidenceRecord(

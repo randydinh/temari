@@ -14,6 +14,12 @@ a stage. Named payloads become content-addressed artifacts. A separate hashed
 attestation binds those references to the run, stable run revision, stage,
 status, summary, and workspace manifest ID.
 
+Before each asynchronous publication, the runtime copies and hashes the bytes
+it intends to retain. The store's returned schema, context, kind, digest, and
+size must match that identity. Reload verification then checks the actual bytes.
+This applies to payloads and attestations, so a faulty adapter cannot silently
+substitute another internally valid artifact.
+
 The receipt and checkpoint retain the attestation reference and the versioned
 `stage-evidence-v1` profile. No mutable side index or second lifecycle store
 decides whether a stage completed. A crash before a checkpoint can leave

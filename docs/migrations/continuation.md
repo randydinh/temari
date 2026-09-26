@@ -87,13 +87,25 @@ The active unit starts from the PR #50 merge on
 `codex/stage-evidence-20260926`, in `.audit/worktrees/stage-evidence`.
 It adds persisted per-stage evidence ownership and byte verification before
 candidate-aware closeout. The eight core typecheck/test tasks and six compiled
-package checks passed at this baseline. The implementation now passes all ten
+package checks passed at this baseline. The initial implementation passed all ten
 workspace typecheck targets and 490 tests across contracts, core, engine,
 runtime, knowledge, and plan-draft. The six compiled-package checks pass with
 fresh-process evidence refusal and restoration. Independent comment review
 found no deletions or suppressions. The packaged legacy runtime's 34 tests and
-234-file pinned payload check also pass. Code/trail review and current-head CI
-remain required before merge. See [the runtime API and limits](./stage-evidence.md).
+234-file pinned payload check also pass.
+
+[PR #51](https://github.com/randydinh/temari/pull/51) initially passed Linux
+run `36220736618` and Windows run `36220715987` at
+`da6ba0cd6e6340e19d7b468ba5d734e59e402ab0`. Independent code/trail review
+returned FAIL after reproducing a custom store substituting different valid
+bytes during publication. That candidate was not merged. The scoped repair
+compares returned identities against intended bytes before acknowledgment,
+with payload, kind, attestation, and mutable-input fault tests. The reader also
+rejects invalid expected identity before contacting its receipt store.
+The repair passes the eight core typecheck/test targets, including 124 runtime
+tests and 214 core tests in total, plus all six compiled-package checks.
+Fresh review and current-head CI remain required before merge.
+See [the runtime API and limits](./stage-evidence.md).
 
 Data follows the existing types. `TemariPlanRequest` becomes a
 `TemariRequestPlan`, then persisted `WorkflowCheckpoint` and `WorkflowReceipt`
