@@ -181,6 +181,25 @@ async function writeDescriptor(path, descriptor) {
   }
 }
 
+function invocationScope(input) {
+  const canonical = (value) => {
+    if (Array.isArray(value)) return value.map(canonical);
+    if (value && typeof value === 'object')
+      return Object.fromEntries(
+        Object.keys(value)
+          .sort()
+          .map((key) => [key, canonical(value[key])]),
+      );
+    return value;
+  };
+  return {
+    scopeId: `host-${createHash('sha256')
+      .update(JSON.stringify(canonical(input)))
+      .digest('hex')}`,
+    root: input.candidate.root,
+  };
+}
+
 async function main(session) {
   const [
     mode,
@@ -389,7 +408,7 @@ async function main(session) {
     workspaceManifestStore,
     workspaceForStage: paths.workspaceForStage,
     candidate: {
-      scope: input.candidate,
+      scope: invocationScope(input),
       expectedInitial: input.expectedInitial,
       knownWriteRoots: paths.knownWriteRoots,
     },

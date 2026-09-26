@@ -283,7 +283,7 @@ export function createStdioSession() {
   }
   function onData(chunk) {
     if (disposed) return;
-    if (chunk.includes(3)) crash('Interrupted.', 130); // Ctrl-C in raw TTY mode.
+    if (process.stdin.isTTY && chunk.includes(3)) crash('Interrupted.', 130);
     if (fault) return;
     try {
       for (let start = 0; start < chunk.length;) {

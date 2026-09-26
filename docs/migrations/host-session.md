@@ -100,18 +100,33 @@ It never replaces an existing destination. That descriptor is input, not a
 second stage ledger. Checkpoints and receipts remain owned by the existing
 runtime. Resume preserves the original initial candidate, plan and roots; it
 does not adopt the current product as a fresh initial state. The canonical
+JSON of the validated descriptor (recursively sorted object keys) is SHA-256
+bound into the runtime candidate scope ID as `host-<digest>`. The original
+scope label remains in the descriptor and host messages; the checkpoint's
+bound scope ID prevents edits from redirecting a resume to identical bytes at
+a different path. Reordering JSON object keys does not change this identity.
+Future closeout must derive this bound scope from trusted invocation input,
+not copy it from an unverified receipt. Changing both descriptor and checkpoint
+maliciously is outside this cooperative local integrity boundary. The canonical
 manifest digest pins the selected manifest across restarts, not authenticity
 of the artifact. Verify the trusted runtime with its existing checker before
 use; neither an adjacent manifest nor a parent-written transcript is a signature.
 
 Connected invalid results settle through the engine's error path. A legitimate
 `ISSUES`, `BLOCKED` or `DROPPED` result is terminal, not a pause or retry request.
-EOF, interruption, lost output or the bounded session wait ending is process
+EOF, a signal or raw-terminal Ctrl-C, lost output or the fixed 30-minute
+session deadline ending is process
 loss: no synthetic PASS or BLOCKED is created to pretend work completed.
 Read durable state after such a loss. An acknowledged prefix can resume;
 unacknowledged candidate mutation and orphan manifests must be investigated,
 not adopted. A terminal receipt is read-only and cannot be resumed, including
 when the host missed the final output message.
+Control bytes in a pipe are malformed protocol input, not keyboard signals.
+Late invalid input outside a pending handler can prevent final publication,
+leaving a complete acknowledged checkpoint but no receipt; that checkpoint can
+resume with zero stage reruns. A fault after a receipt has already been persisted
+cannot roll it back. Read durable state and do not infer failure or retry solely
+from process exit or missing final stdout.
 
 The parent must stop and join its own writers before resume or verification.
 Exiting the bridge does not cancel native host workers. This interface assumes

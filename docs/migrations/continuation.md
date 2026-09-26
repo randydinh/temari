@@ -297,6 +297,21 @@ requested; no independent product QA or host capability was claimed. Retained
 local evidence is under the ignored `.audit/host-dialogue-native` directory.
 Source/trail review and exact-head Linux/Windows CI remain merge gates.
 
+[PR #53](https://github.com/randydinh/temari/pull/53) was opened at `3c77814`.
+Independent review reproduced a candidate-root substitution: changing only the
+descriptor to a different directory with identical bytes redirected resumed
+work and could still yield PASS. It also found that ETX in an ordinary pipe was
+misclassified as a keyboard interrupt. Test-first commit `cfb2599` reproduced
+both failures (37 passing checks, two failing). That head is not mergeable on
+the strength of its other passing tests or CI.
+
+The scoped repair derives the runtime's candidate scope ID from the canonical
+validated invocation descriptor. Existing empty-checkpoint identity now binds
+the original root, run directory and runtime selection without a new progress
+ledger or shared-library change. Raw Ctrl-C handling applies only to a terminal;
+malformed pipe bytes produce terminal BLOCKED. All 39 focused checks pass after
+the repair. Independent re-review and fresh exact-head CI remain required.
+
 Data follows the existing types. `TemariPlanRequest` becomes a
 `TemariRequestPlan`, then persisted `WorkflowCheckpoint` and `WorkflowReceipt`
 records. Evidence bytes must verify before interpreting a `CloseoutDecision`.
