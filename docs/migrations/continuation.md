@@ -166,6 +166,18 @@ compiled checks. Independent re-review and current-head CI are required before m
 The PR is linked here and in the task. The available app tools could queue its
 page but could not save a PR attachment; no saved-attachment claim is made.
 
+Independent re-review passed at repaired head
+`3cf507c61bb783ab10c0545a43cb5e079e762e77`, base-to-head patch ID
+`0b911f0bd8a2cb9344099ce8db93151de9268f57`. The reviewer read all six repair
+files, reproduced four typechecks, 267 core tests and eleven compiled checks,
+and ran five independent probes with fresh state. Both original faults now
+pass their safety assertions; no new findings remain. The original FAIL and
+its probe state are retained separately. Review used an independent context
+with the inherited model, not a cross-model or independent product-QA claim.
+Linux run `36225287151` and Windows run `36225285286` were started for that
+repair head; final documentation review and CI at the eventual merge head
+remain required. Source review does not establish host installation or cutover.
+
 Data follows the existing types. `TemariPlanRequest` becomes a
 `TemariRequestPlan`, then persisted `WorkflowCheckpoint` and `WorkflowReceipt`
 records. Evidence bytes must verify before interpreting a `CloseoutDecision`.
