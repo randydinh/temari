@@ -14,43 +14,139 @@ import { FileChildTaskStore } from './child-task-store.js';
 import { FileEvidenceStore } from './evidence-store.js';
 import { FileWorkspaceManifestStore } from './workspace-manifest.js';
 
-test('renews a child lease while a long-running worker is executing', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
-  try {
-    const childStore = await FileChildTaskStore.create(join(root, 'children'));
-    const receiptStore = await FileParallelWorkerReceiptStore.create(
-      join(root, 'receipts'),
-    );
-    const completed = await executeRestartableParallelWorkers({
-      runId: 'parallel-runtime-renew-1',
-      revision: 'revision-parallel-runtime-renew-1',
-      plan: parallelPlan('feature', 1),
-      capabilities: parallelCapabilities(),
-      assignments: workerAssignments(1),
-      childStore,
-      receiptStore,
-      owner: 'worker-a',
-      leaseMs: 300,
-      leaseRenewal: { intervalMs: 50 },
-      handler: async (assignment: WorkerAssignment) => {
-        await new Promise((resolve) => setTimeout(resolve, 650));
-        return result(`${assignment.id} completed after lease renewal`);
-      },
-    });
+test('renews a child lease while a long-running worker is executing', async (t) => {
+  for (const missedDeadline of [false, true]) {
+    await t.test(
+      missedDeadline
+        ? 'a missed logical deadline leaves the child incomplete'
+        : 'durable renewals carry the child beyond its initial lease',
+      async () => {
+        const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
+        try {
+          const childStore = await FileChildTaskStore.create(
+            join(root, 'children'),
+          );
+          const receiptStore = await FileParallelWorkerReceiptStore.create(
+            join(root, 'receipts'),
+          );
+          const initialTime = Date.parse('2026-09-24T04:00:00.000Z');
+          let clockMs = initialTime;
+          let renewals = 0;
+          let handlerCalls = 0;
+          type RenewalOutcome = { ok: true } | { ok: false; error: unknown };
+          let signalRenewals!: (outcome: RenewalOutcome) => void;
+          const renewalsDone = new Promise<RenewalOutcome>((resolve) => {
+            signalRenewals = resolve;
+          });
+          const renew = childStore.renew.bind(childStore);
+          childStore.renew = async (request) => {
+            try {
+              const record = await renew(request);
+              assert.deepEqual(await childStore.load(record.taskId), record);
+              renewals += 1;
+              if (!missedDeadline && renewals < 3) clockMs += 250;
+              else signalRenewals({ ok: true });
+              return record;
+            } catch (error) {
+              signalRenewals({ ok: false, error });
+              throw error;
+            }
+          };
+          const completed = await executeRestartableParallelWorkers({
+            runId: 'parallel-runtime-renew-1',
+            revision: 'revision-parallel-runtime-renew-1',
+            plan: parallelPlan('feature', 1),
+            capabilities: parallelCapabilities(),
+            assignments: workerAssignments(1),
+            childStore,
+            receiptStore,
+            owner: 'worker-a',
+            leaseMs: 300,
+            leaseRenewal: { intervalMs: 50 },
+            now: () => new Date(clockMs),
+            handler: async (assignment: WorkerAssignment) => {
+              handlerCalls += 1;
+              clockMs += missedDeadline ? 300 : 250;
+              const deadline = setTimeout(
+                () =>
+                  signalRenewals({
+                    ok: false,
+                    error: new Error('Child lease renewal deadline exceeded'),
+                  }),
+                10_000,
+              );
+              try {
+                const outcome = await renewalsDone;
+                if (!outcome.ok) throw outcome.error;
+                return result(`${assignment.id} completed after lease renewal`);
+              } finally {
+                clearTimeout(deadline);
+              }
+            },
+          });
 
-    assert.equal(completed.state, 'COMPLETE');
-    assert.equal(completed.receipt?.status, 'PASS');
-    assert(completed.tasks[0]);
-    const events = await childStore.events(completed.tasks[0].taskId);
-    assert.equal(events[0]?.type, 'task-created');
-    assert.equal(events[1]?.type, 'task-claimed');
-    assert(
-      events.some((event) => event.type === 'task-lease-renewed'),
-      'The long-running child should publish at least one lease renewal.',
+          assert.equal(handlerCalls, 1);
+          const outcome = await renewalsDone;
+          assert(completed.tasks[0]);
+          const events = await childStore.events(completed.tasks[0].taskId);
+          if (missedDeadline) {
+            assert.equal(outcome.ok, false);
+            if (!outcome.ok) {
+              assert(outcome.error instanceof Error);
+              assert.match(
+                outcome.error.message,
+                /Child task lease has expired/,
+              );
+            }
+            assert.equal(renewals, 0);
+            assert.equal(completed.state, 'RUNNING');
+            assert.equal(completed.receipt, null);
+            assert.equal(completed.tasks[0].status, 'RUNNING');
+            assert.equal(
+              completed.tasks[0].lease?.expiresAt,
+              '2026-09-24T04:00:00.300Z',
+            );
+            assert.deepEqual(
+              completed.pending.map((pending) => pending.reason),
+              ['lease-lost'],
+            );
+            assert.deepEqual(
+              events.map((event) => event.type),
+              ['task-created', 'task-claimed'],
+            );
+            assert.equal(
+              await receiptStore.load('parallel-runtime-renew-1'),
+              null,
+            );
+          } else {
+            if (!outcome.ok) throw outcome.error;
+            assert.equal(clockMs - initialTime, 750);
+            assert.equal(completed.state, 'COMPLETE');
+            assert.equal(completed.receipt?.status, 'PASS');
+            assert.equal(events[0]?.type, 'task-created');
+            assert.equal(events[1]?.type, 'task-claimed');
+            assert(
+              events.some((event) => event.type === 'task-lease-renewed'),
+              'The long-running child should publish at least one lease renewal.',
+            );
+            assert.deepEqual(
+              events
+                .filter((event) => event.type === 'task-lease-renewed')
+                .slice(0, 3)
+                .map((event) => event.payload.expiresAt),
+              [
+                '2026-09-24T04:00:00.550Z',
+                '2026-09-24T04:00:00.800Z',
+                '2026-09-24T04:00:01.050Z',
+              ],
+            );
+            assert.equal(events.at(-1)?.type, 'task-completed');
+          }
+        } finally {
+          await rm(root, { recursive: true, force: true });
+        }
+      },
     );
-    assert.equal(events.at(-1)?.type, 'task-completed');
-  } finally {
-    await rm(root, { recursive: true, force: true });
   }
 });
 

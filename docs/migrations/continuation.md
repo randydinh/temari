@@ -228,6 +228,33 @@ main reproduced four core typechecks and 273 tests (runtime183). No production
 code changed. The rejected head was not merged; this final delta still needs
 independent review and current-head CI.
 
+Independent review passed at `66256008244b70e8b579495c7ba03fc727559b23`,
+patch ID `ea7f83256f0b8a34674ffbf27ecca91e186dc4f6`; it reproduced all
+273 core tests and a fresh delayed-start probe showing settlement before
+cleanup. Linux `36226915057` passed, but Windows `36226913657` failed a
+different existing test: child-lease renewal expected COMPLETE and observed
+RUNNING. Later Windows packaging/Archon steps were skipped, so this is not a
+passing platform gate. The renewal fixture uses a 300 ms wall-clock lease,
+a 50 ms timer and a 650 ms handler delay. The exact missed-renewal interleaving
+was not retained; investigate that timing boundary without weakening production
+expiry or treating another head's green checks as acceptance. The PR remains
+unmerged pending a scoped repair, review and fresh CI.
+
+A bounded local probe with genuine stores reproduced lease starvation: a
+350 ms event-loop pause yielded RUNNING, `lease-lost`, no receipt and no renewal
+event. This confirms a reachable mechanism, not the unobserved Windows schedule.
+The test-only repair retains the runtime's 50 ms interval and store's 300 ms
+lease, using an injected clock advanced only after durable renewal readback.
+It asserts three literal renewed deadlines and successful completion beyond
+the initial expiry. A separate missed-deadline control requires RUNNING,
+`lease-lost`, the original expiry and no receipt or completion event. The bounded
+handler wait settles through the runtime before fixture cleanup. Worker local
+verification passed runtime185 and dependency typechecks. Production behavior
+and all previously reviewed takeover tests remain unchanged; independent delta
+review and fresh platform CI are still required.
+Main independently reproduced the four core typechecks and all 275 core tests
+(including runtime185), then passed formatting and whitespace checks.
+
 Data follows the existing types. `TemariPlanRequest` becomes a
 `TemariRequestPlan`, then persisted `WorkflowCheckpoint` and `WorkflowReceipt`
 records. Evidence bytes must verify before interpreting a `CloseoutDecision`.
