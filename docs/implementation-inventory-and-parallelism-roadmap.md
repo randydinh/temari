@@ -4,6 +4,14 @@ Status: local parallelism is implemented through PR #47. Subsequent migration
 and packaging evidence is recorded below, separately from remaining host and
 distributed acceptance gates.
 
+The next development owner is
+[Choose temari build source (3)](codex://threads/01a0dcca-d913-7d52-9f1b-16e47b5bd90a),
+working from current `randydinh/temari` main in the **temari-next Nx monorepo**,
+not v4.1. Follow the [current handoff](./migrations/continuation.md#current-handoff--2026-09-26).
+Finish isolated public-entry installation and actual host/independent-QA
+acceptance before shared-service integration; local proof is not multi-machine
+acceptance. Historical milestone numbering below does not change that priority.
+
 ## Lossless implementation inventory
 
 ### Canonical platform
@@ -140,6 +148,15 @@ distributed acceptance gates.
   cooperative local-filesystem boundary, not atomic snapshots or independent QA.
   Public-entry installation and actual host closeout remain open. See
   [candidate verification](./migrations/candidate-closeout.md).
+- PR #53 merged experimental local host dialogue as `4d316e3`. The stock-Node
+  bridge binds invocation identity to existing checkpoints, confines evidence,
+  distinguishes interrupted sessions from terminal refusals, and resumes verified
+  prefixes without a second lifecycle. All 39 focused checks and eleven compiled
+  checks passed; independent review and exact-head Linux/Windows CI passed.
+  It reports no available host capabilities and is not an installed public
+  policy adapter, independent QA proof or distributed worker. See
+  [host dialogue](./migrations/host-session.md) and the
+  [final review/merge record](./migrations/continuation.md).
 - `9bb0874` imported the portable v4.1 workflow runtime, skills, host
   projections, verification assets, and optional Archon integration under
   `packages/workflow-runtime/assets/v4.1/` with provenance.

@@ -4,6 +4,46 @@ This record is for the maintainer who resumes the migration. Read the current
 Git state and pull requests before acting. A checked implementation item does
 not replace acceptance evidence from the installed product.
 
+## Current handoff — 2026-09-26
+
+Continue in [Choose temari build source (3)](codex://threads/01a0dcca-d913-7d52-9f1b-16e47b5bd90a).
+The user requested closure of the completed increment in the source thread and
+continued development in that existing thread. The development base is current
+`origin/main` of `randydinh/temari`, the **temari-next / Temari Nx monorepo**,
+not the old v4.1 checkout. PR #53 is merged as
+`4d316e31fb8cbd7cbb3011e59896fafacc5aaead`; reconcile subsequent main commits
+before starting. The historical pending gates below are superseded only by
+their explicitly recorded review, CI and merge outcomes.
+
+The successor's `b203/temari-next` worktree was detached at `0d6c7a1` during
+handoff preparation and contains uncommitted privacy, lockfile and tsconfig
+work plus an untracked `.pnpm-store/`. Preserve it. Use a clean isolated branch
+from current Nx main for the next increment; do not reset the successor or
+commit its unrelated work. Main's separate protected changes also remain.
+
+The source thread's `continue-temari-migration-and-parallelism` heartbeat is
+paused for this handoff. Earlier engineering workers and native probe processes
+have ended. No branch, worktree, legacy checkout, evidence or installed plugin
+was deleted. The completed canonical-package, stage-evidence and
+candidate-closeout worktrees are clean and their heads are pushed. The clean
+host worktree is reused for the docs-only closeout branch
+`codex/nx-thread-closeout-20260926`; the merged host branch remains preserved.
+
+This closes an experimental local host-transport increment, **not** public
+migration, installed-product acceptance or distributed parallelism. The next
+owner should follow the bounded sequence below and retain all remaining gates.
+
+Closeout verification reran from the isolated branch based on `4d316e3`, with
+only the four documentation files changed: all ten workspace typechecks,
+557 tests across contracts/core/engine/runtime/knowledge/plan-draft, 34 legacy
+distribution tests, eleven compiled-package checks, 39 host-session checks,
+and the 234-file pinned inventory passed. Nx cache and sync were disabled;
+no protected WIP entered this test checkout. Nx changed-file formatting,
+whitespace and six-column decision-trail checks also passed. The successor
+acknowledged the Nx base and WIP boundary at 08:45 UTC and is waiting for the
+final handoff. The docs-only closeout PR must record its exact head, final
+independent review, CI and merge before final delivery and source-thread archive.
+
 ## Outcome and authority
 
 Finish migration acceptance and isolated installation of `temari`,
@@ -325,6 +365,25 @@ here and in the task; the app could queue its page but exposed no attachment
 writer, so no saved attachment is claimed. Finish current-head review and CI
 before merge, then proceed to isolated packaging and public policy admission.
 
+Final independent source and decision-trail review passed at
+`937ee6392c4ce215f5c1c2de417b646c20462427`. The reviewer reproduced all 39
+host checks and eleven compiled-package checks, verified both repaired faults,
+and checked descriptor key-order equivalence and changed-scope refusal. Review
+used a separate context with the inherited model, not cross-model review or
+independent product QA. Linux run
+[36230021028](https://github.com/randydinh/temari/actions/runs/36230021028)
+and Windows run
+[36230019066](https://github.com/randydinh/temari/actions/runs/36230019066)
+passed at that exact head. PR #53 merged as
+`4d316e31fb8cbd7cbb3011e59896fafacc5aaead` at 2026-09-26T08:38:09Z.
+The reviewed and merged stable patch ID is
+`6fcef8dee2940bcc3d74dc246e3a58464655e4e2`.
+The [PR evidence record](https://github.com/randydinh/temari/pull/53#issuecomment-5844661301)
+retains the final verdict and verification; the earlier failed candidate was
+not merged. Main was fast-forwarded with all nine protected privacy, lockfile
+and tsconfig file hashes unchanged. The native probe directories above remain
+ignored local-only evidence, not runtime dependencies or portable acceptance.
+
 Data follows the existing types. `TemariPlanRequest` becomes a
 `TemariRequestPlan`, then persisted `WorkflowCheckpoint` and `WorkflowReceipt`
 records. Evidence bytes must verify before interpreting a `CloseoutDecision`.
@@ -380,6 +439,45 @@ host and independent-QA evidence before shared-service workers. Keep archive
 permission separate from a verified receipt. Do not replace the user's installed
 plugin or bring in private overlays without specific authority.
 
+### Next owner's first bounded increment
+
+Package the experimental bridge and three public entries into a new, explicit
+isolated destination. Keep the exact four-package canonical runtime artifact
+as a nested unit with its existing checker; give wrappers, bridge and policy
+references their own outer inventory and provenance. Preserve the pinned v4.1
+inventory and license as migration references, not the development base. Test
+relocation, transitive references, symlink/overlap/tamper refusal, partial
+publication and no-overwrite behavior. Do not run the legacy installer against
+real discovery roots or replace the currently installed plugin.
+
+Before advertising an installed entry, resolve these policy and evidence gaps:
+
+- Full-playbook route classification alone does not enforce its obligations;
+  `createRequestPlan` can default to minimal obligations without supplied policy.
+  Admit supported routes explicitly and refuse unsupported routes rather than
+  silently falling back to a minimal feature plan.
+- The pinned lightweight profile has four source steps (intake, route, build,
+  verify), while the canonical engine has six stages. Its current compatibility
+  mapping is unsupported. Add a reviewed mapping and requirement evidence;
+  preserve final/commit/review requirements and the additional publish approval.
+  Do not omit canonical review or deliver to imitate the source labels.
+- The bridge deliberately reports zero available capabilities. Caller-written
+  capability labels, evaluator IDs or `freshContext` fields are not live proof.
+  Retain actual host-tool observations and a genuinely independent QA journey.
+  Keep the existing frozen QA input allowlist and mechanical verdict boundary.
+- Installed closeout must derive its host-bound scope from trusted invocation
+  input and use an independently selected expected current candidate, not copy
+  values from a receipt to make verification pass. Reuse existing store readers.
+  Some store creation factories create directories; verify open-existing
+  semantics before describing closeout as strictly read-only. A verified receipt
+  does not grant merge or archive authority.
+
+After installed engineering and QA acceptance, progress the shared-service and
+worker integration gates, then real multi-machine recovery. Also retain the
+[worker-error persistence gap](../implementation-inventory-and-parallelism-roadmap.md#retained-local-failure-reporting-gap)
+as a separately scoped repair before claiming complete worker-failure recovery.
+No next implementation or backend choice is implied by this handoff.
+
 ## Resume safely
 
 1. Inspect `git status`, `git worktree list`, current trunk, and open PRs in
@@ -403,10 +501,10 @@ plugin or bring in private overlays without specific authority.
 6. Append decisions and actual results to [the decision trail](./migration-decisions.tsv).
    Update this record with the next safe action and unresolved gates.
 
-The task has a 30-minute continuation named
-`continue-temari-migration-and-parallelism`. It should remain quiet when no
-actionable state changed and stop repeated runs at completion or a genuine
-user-input gate.
+The source task's 30-minute continuation named
+`continue-temari-migration-and-parallelism` is paused for the user-requested
+thread closeout. It must not resume alongside the successor owner. Any future
+recurring continuation must have one explicit owner and avoid duplicate workers.
 
 ## Remaining gates
 

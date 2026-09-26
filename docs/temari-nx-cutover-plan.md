@@ -9,6 +9,11 @@ execution and durable local evidence. The cutover gate remains on hold until
 the compatibility, packaging, shared-service, and rollback gates below have
 evidence.
 
+For current execution status and the user-requested transfer to the next Nx
+development thread, read the [continuation handoff](migrations/continuation.md#current-handoff--2026-09-26).
+The source thread's closure is not program completion. Continue from current
+`randydinh/temari` main in `temari-next`, never from the legacy v4.1 checkout.
+
 ## How to read this
 
 One box is one unit of work. Every box names the evidence that checks it. A nested box is a sub-step of the box above it. Check a box only when its evidence exists, a file, a log line, a screenshot, a test run, or a SHA. The body is a how-to. The appendices explain and record.
@@ -283,6 +288,7 @@ out of scope until fencing, idempotency, and reconciliation are proven.
 **Build.**
 
 - [x] Produce a separate compiled canonical library artifact with concrete ESM dependencies and exact content inventory. `workflow-runtime:canonical-test` verifies relocation, stock-Node checkpoint recovery, and isolated receipt/evidence readback, with dependency-tamper and unsafe-path controls. Source candidate `2407705` and final head `369a092` passed independent review and Linux/Windows CI in PR #50, merged as `5c5a66e`. This preparatory artifact does not complete the three public-entry installs or live-host gate. See `docs/migrations/canonical-packages.md`.
+- [x] Add experimental local host dialogue over the canonical runtime (PR #53, merge `4d316e3`). Invocation-bound checkpoints, confined evidence, terminal refusal and process-interruption recovery pass focused checks and exact-head Linux/Windows CI after independent review. This is transport only; isolated public packaging, policy admission, live capability proof and independent QA remain open. See `docs/migrations/host-session.md`.
 - [ ] Keep public packages thin. They call core contracts and the one engine rather than defining a second lifecycle.
 - [ ] Add a static, reviewed overlay manifest contract for optional plugins, host projections, and provider adapters.
 - [ ] Require overlay version, digest, compatibility range, capability requirements, and credential references. An overlay cannot grant authority or add engine stages.
