@@ -201,6 +201,22 @@ empty/oversized-worker-error persistence gap is retained in the
 [roadmap](../implementation-inventory-and-parallelism-roadmap.md#retained-local-failure-reporting-gap),
 not hidden by this fix or claimed resolved.
 
+Both platforms passed at `7aaef6f83e3eeb7cf748c1b7a608fd5b5eb0115b`
+(Linux `36226124466`, Windows `36226122596`), but final independent review
+returned FAIL for the fixture's success-only barrier: a durably failed child
+could leave it waiting without reaching cleanup. A separate negative probe
+timed out after five seconds instead of surfacing its retained diagnostic.
+That head was not merged. The next fixture-only repair propagates completion
+and readback errors, observes coordinator rejection, bounds readiness inside
+the cleanup path, and drains the held child using the persisted group mapping.
+Five controls cover evidence failure, completion rejection, readback rejection,
+an absent signal, and failure while draining the held child. They assert exact
+diagnostics and completed cleanup; the delayed successful takeover and its
+original assertions remain. Main reproduced four core typechecks and 272 tests
+(runtime182). Production runtime/store code is unchanged from the independently
+reviewed `3cf507c`; this test/docs delta still requires independent re-review
+and fresh exact-head Linux/Windows CI.
+
 Data follows the existing types. `TemariPlanRequest` becomes a
 `TemariRequestPlan`, then persisted `WorkflowCheckpoint` and `WorkflowReceipt`
 records. Evidence bytes must verify before interpreting a `CloseoutDecision`.
