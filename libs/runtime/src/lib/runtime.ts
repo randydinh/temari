@@ -25,6 +25,12 @@ import {
 } from '@temari/workflow-engine';
 import type { MechanicalRunStatus, WorkflowRunStore } from './run-store.js';
 import type { WorkspaceManifestStore } from './workspace-manifest.js';
+import type { EvidenceStore } from './evidence-store.js';
+import {
+  publishStageEvidence,
+  verifyStageEvidenceRecord,
+  type StageEvidencePayload,
+} from './stage-evidence.js';
 
 export interface WorkflowReceiptStore {
   save(receipt: WorkflowReceipt): Promise<string>;
@@ -293,7 +299,23 @@ export class FileWorkflowReceiptStore implements WorkflowReceiptStore {
   }
 }
 
-export interface ExecuteAndPersistRequest extends ReceiptRunRequest {
+export interface ExecuteAndPersistRequest extends Omit<
+  ReceiptRunRequest,
+  'handler'
+> {
+  readonly stageEvidence?: { readonly store: EvidenceStore };
+  readonly handler: (
+    stage: WorkflowStageId,
+    plan: ReceiptRunRequest['plan'],
+  ) =>
+    | (StageReceiptResult & {
+        readonly evidence?: readonly StageEvidencePayload[];
+      })
+    | Promise<
+        StageReceiptResult & {
+          readonly evidence?: readonly StageEvidencePayload[];
+        }
+      >;
   readonly store: WorkflowReceiptStore;
   readonly checkpointStore?: WorkflowCheckpointStore;
   readonly workspaceManifestStore?: WorkspaceManifestStore;
@@ -383,26 +405,78 @@ export async function executeAndPersist(
     (await request.checkpointStore?.load(request.runId)) ??
     request.checkpoint ??
     null;
+  const evidenceProfile = request.stageEvidence
+    ? 'stage-evidence-v1'
+    : undefined;
+  assert(
+    request.evidenceProfile === undefined ||
+      request.evidenceProfile === evidenceProfile,
+    'Runtime evidence profile requires stageEvidence storage.',
+  );
+  if (checkpoint) {
+    assert.equal(
+      checkpoint.evidenceProfile,
+      evidenceProfile,
+      'Checkpoint evidence profile mismatch.',
+    );
+    if (request.stageEvidence)
+      await verifyStageEvidenceRecord(
+        checkpoint,
+        request.runId,
+        request.revision,
+        request.stageEvidence.store,
+        false,
+      );
+  }
   await verifyCheckpointWorkspaceManifests(request, checkpoint);
   const receipt = await runPlanWithReceipt({
     ...request,
+    ...(evidenceProfile ? { evidenceProfile } : {}),
     checkpoint,
     handler: async (stage, plan): Promise<StageReceiptResult> => {
-      const result = await request.handler(stage, plan);
+      const result = { ...(await request.handler(stage, plan)) };
+      if (request.stageEvidence)
+        assert(
+          result.stageEvidence === undefined,
+          'Handlers cannot supply raw stage evidence bindings.',
+        );
       const manifestId = await persistStageWorkspaceManifest(
         request,
         stage,
         request.now ?? (() => new Date()),
       );
-      return manifestId
+      const bound = manifestId
         ? { ...result, workspaceManifestId: manifestId }
         : result;
+      if (request.stageEvidence && result.status === 'PASS') {
+        return {
+          ...bound,
+          stageEvidence: await publishStageEvidence(
+            request.stageEvidence.store,
+            request.runId,
+            request.revision,
+            stage,
+            bound,
+            result.evidence,
+          ),
+        };
+      }
+      return bound;
     },
     onStageCheckpoint: async (nextCheckpoint) => {
       await request.checkpointStore?.save(nextCheckpoint);
       await request.onStageCheckpoint?.(nextCheckpoint);
     },
   });
+  if (request.stageEvidence && receipt.status === 'PASS') {
+    await verifyStageEvidenceRecord(
+      receipt,
+      request.runId,
+      request.revision,
+      request.stageEvidence.store,
+      true,
+    );
+  }
   await request.store.save(receipt);
   return receipt;
 }

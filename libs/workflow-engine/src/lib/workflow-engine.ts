@@ -13,6 +13,8 @@ import {
   type WorkflowReceiptStatus,
   type WorkflowStageReceipt,
   type WorkflowStageId,
+  type StageEvidenceProfile,
+  type StageEvidenceReference,
 } from '@temari/contracts';
 
 export interface CapabilityGap {
@@ -26,6 +28,7 @@ export type StageHandler = (
 ) => Promise<void> | void;
 
 export interface StageReceiptResult {
+  readonly stageEvidence?: StageEvidenceReference;
   readonly status: WorkflowReceiptStatus;
   readonly summary: string;
   readonly evidencePaths?: readonly string[];
@@ -44,6 +47,7 @@ export type StageReceiptHandler = (
  * retried rather than treated as completed.
  */
 export interface WorkflowCheckpoint {
+  readonly evidenceProfile?: StageEvidenceProfile;
   readonly schema: 1;
   readonly runId: string;
   readonly revision: string;
@@ -124,6 +128,7 @@ export interface ParallelWorkerJoin {
 }
 
 export interface ReceiptRunRequest {
+  readonly evidenceProfile?: StageEvidenceProfile;
   readonly runId: string;
   readonly revision: string;
   readonly plan: ExecutionPlan;
@@ -199,6 +204,9 @@ function stageReceipt(
 ): WorkflowStageReceipt {
   return {
     stage,
+    ...(result.stageEvidence
+      ? { stageEvidence: { ...result.stageEvidence } }
+      : {}),
     status: result.status,
     startedAt: startedAt.toISOString(),
     completedAt: completedAt.toISOString(),
@@ -241,7 +249,18 @@ function assertCheckpoint(
   declaredStages: readonly WorkflowStageId[],
 ): readonly WorkflowStageReceipt[] {
   const checkpoint = request.checkpoint;
+  if (
+    request.evidenceProfile !== undefined &&
+    request.evidenceProfile !== 'stage-evidence-v1'
+  ) {
+    throw new Error('Unsupported stage evidence profile.');
+  }
   if (!checkpoint) return [];
+  if (checkpoint.evidenceProfile !== request.evidenceProfile) {
+    throw new Error(
+      'Workflow checkpoint evidence profile does not match the request.',
+    );
+  }
   if (checkpoint.schema !== 1)
     throw new Error('Unsupported workflow checkpoint schema.');
   if (checkpoint.runId !== request.runId) {
@@ -265,6 +284,7 @@ function assertCheckpoint(
     throw new Error('Workflow checkpoint contains too many stages.');
   }
   checkpoint.stages.forEach((stage, index) => {
+    assertStageEvidence(request.evidenceProfile, stage);
     if (stage.stage !== declaredStages[index]) {
       throw new Error('Workflow checkpoint stages are not a declared prefix.');
     }
@@ -273,6 +293,28 @@ function assertCheckpoint(
     }
   });
   return [...checkpoint.stages];
+}
+
+function assertStageEvidence(
+  profile: StageEvidenceProfile | undefined,
+  result: StageReceiptResult,
+): void {
+  const reference = result.stageEvidence;
+  if (!profile) {
+    if (reference !== undefined)
+      throw new Error('Stage evidence requires an evidence profile.');
+    return;
+  }
+  if (result.status !== 'PASS' && reference === undefined) return;
+  if (
+    !reference ||
+    reference.schema !== 1 ||
+    !/^[0-9a-f]{64}$/.test(reference.sha256) ||
+    !Number.isSafeInteger(reference.bytes) ||
+    reference.bytes < 1
+  ) {
+    throw new Error('Invalid or missing stage evidence reference.');
+  }
 }
 
 /**
@@ -288,6 +330,10 @@ export async function runPlanWithReceipt(
 ): Promise<WorkflowReceipt> {
   assertCanonicalStageSequence(request.plan);
   const now = request.now ?? (() => new Date());
+  const profile =
+    request.evidenceProfile === undefined
+      ? {}
+      : { evidenceProfile: request.evidenceProfile };
   const checkpointStages = assertCheckpoint(request, DEFAULT_STAGES);
   const startedAt = request.checkpoint?.startedAt ?? now().toISOString();
   const stages: WorkflowStageReceipt[] = [...checkpointStages];
@@ -300,6 +346,7 @@ export async function runPlanWithReceipt(
     const completed = now();
     return {
       schema: 1,
+      ...profile,
       runId: request.runId,
       revision: request.revision,
       plan: request.plan,
@@ -322,6 +369,7 @@ export async function runPlanWithReceipt(
     let result: StageReceiptResult;
     try {
       result = await request.handler(stage, request.plan);
+      assertStageEvidence(request.evidenceProfile, result);
     } catch (error) {
       const completed = now();
       stages.push(
@@ -332,6 +380,7 @@ export async function runPlanWithReceipt(
       );
       return {
         schema: 1,
+        ...profile,
         runId: request.runId,
         revision: request.revision,
         plan: request.plan,
@@ -357,6 +406,7 @@ export async function runPlanWithReceipt(
       const completed = now();
       return {
         schema: 1,
+        ...profile,
         runId: request.runId,
         revision: request.revision,
         plan: request.plan,
@@ -371,6 +421,7 @@ export async function runPlanWithReceipt(
 
     await request.onStageCheckpoint?.({
       schema: 1,
+      ...profile,
       runId: request.runId,
       revision: request.revision,
       plan: request.plan,
@@ -383,6 +434,7 @@ export async function runPlanWithReceipt(
   const completed = now();
   return {
     schema: 1,
+    ...profile,
     runId: request.runId,
     revision: request.revision,
     plan: request.plan,

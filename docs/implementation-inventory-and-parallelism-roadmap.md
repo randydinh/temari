@@ -115,15 +115,23 @@ distributed acceptance gates.
   canonical coordinator and persisted runtime, with literal artifact bytes
   and rejection of changed workspaces, revisions, and evidence. PR #49 fixed
   native Windows smoke JSON parsing without suppressing stderr or assertions.
-- PR #50 adds a separate compiled canonical library artifact with ordinary ESM
+- PR #50 merged a separate compiled canonical library artifact with ordinary ESM
   package exports, declaration files, exact content inventory, and no source
   loader or dependency-install step at runtime. Six packaging checks exercise
   relocation, durable checkpoint recovery, fresh-process evidence readback,
   dependency tampering, unsafe inventory paths, and existing-output refusal.
-  Source candidate `2407705` passed independent review and Linux/Windows CI;
-  check the PR's current head for final merge status. Restricted readback does
+  Source candidate `2407705` and final documentation head `369a092` passed
+  independent review and Linux/Windows CI. The merge is `5c5a66e`.
+  Restricted readback does
   not imply restricted recovery writes, installed-host migration, or remote
   workers. See [canonical package verification](./migrations/canonical-packages.md).
+- The serial runtime now has opt-in `stage-evidence-v1` attestations and
+  `verifyPersistedStageEvidence`. It verifies complete persisted stage coverage
+  and payload bytes, rejects profile changes on resume, and rechecks evidence
+  before final receipt publication. The compiled-package journey includes
+  missing/tampered evidence and restoration. Success is explicitly evidence-only;
+  current candidate identity, independent reviewer provenance, and actual host
+  closeout remain open. See [stage evidence](./migrations/stage-evidence.md).
 - `9bb0874` imported the portable v4.1 workflow runtime, skills, host
   projections, verification assets, and optional Archon integration under
   `packages/workflow-runtime/assets/v4.1/` with provenance.

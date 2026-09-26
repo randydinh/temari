@@ -33,6 +33,7 @@ const {
   FileWorkflowCheckpointStore,
   FileEvidenceStore,
   FileWorkspaceManifestStore,
+  verifyPersistedStageEvidence,
 } = await load('@temari/runtime');
 const request = JSON.parse(await readFile(join(state, 'request.json'), 'utf8'));
 const { runId, revision } = request;
@@ -50,6 +51,12 @@ const workspace = (stage) => join(state, 'workspaces', stage);
 if (mode === 'inspect') {
   const receipt = await store.load(runId);
   assert(receipt);
+  const verified = await verifyPersistedStageEvidence({
+    runId,
+    revision,
+    store,
+    evidenceStore: evidence,
+  });
   const artifacts = [];
   for (const stage of WORKFLOW_STAGES) {
     const reference = JSON.parse(
@@ -69,6 +76,17 @@ if (mode === 'inspect') {
       receipt,
       checkpoint: await checkpointStore.load(runId),
       artifacts,
+      verified: {
+        ...verified,
+        stages: verified.stages.map((s) => ({
+          stage: s.stage,
+          payloads: s.payloads.map((p) => ({
+            name: p.name,
+            kind: p.kind,
+            text: Buffer.from(p.content).toString('utf8'),
+          })),
+        })),
+      },
     }),
   );
 } else {
@@ -82,6 +100,7 @@ if (mode === 'inspect') {
       missing: [...HOST_CAPABILITIES],
     },
     store,
+    stageEvidence: { store: evidence },
     checkpointStore,
     workspaceManifestStore,
     workspaceForStage: (stage) => ({
@@ -137,6 +156,13 @@ if (mode === 'inspect') {
         status: 'PASS',
         summary: `Fixture bytes written for ${stage}`,
         evidencePaths: [output],
+        evidence: [
+          {
+            name: 'stage-output',
+            kind: 'verification',
+            content: `${stage}:\n${text}`,
+          },
+        ],
       };
     },
     onStageCheckpoint: async (checkpoint) => {
