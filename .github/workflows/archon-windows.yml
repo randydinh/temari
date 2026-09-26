@@ -68,6 +68,12 @@ jobs:
           $env:DO_NOT_TRACK = '1'
           $env:LOG_LEVEL = 'error'
           New-Item -ItemType Directory -Force -Path $env:ARCHON_HOME | Out-Null
+          # Force a real stderr notice without an update-check network request.
+          @{
+            latestVersion = '999.0.0'
+            releaseUrl = 'https://example.invalid/temari-ci-update-probe'
+            checkedAt = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+          } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $env:ARCHON_HOME 'update-check.json') -Encoding utf8NoBOM
 
           $versionText = (& $archon version 2>&1 | Out-String)
           if ($LASTEXITCODE -ne 0) { throw "Archon version check failed: $versionText" }
@@ -88,14 +94,22 @@ jobs:
 
           & $archon validate workflows temari-windows-smoke --cwd $workspace
           if ($LASTEXITCODE -ne 0) { throw 'Archon workflow validation failed on Windows.' }
-          $launchText = (& $archon workflow run temari-windows-smoke --cwd $workspace --workflow-source $workspace --no-worktree --detach --json 2>&1 | Out-String)
-          if ($LASTEXITCODE -ne 0) { throw "Archon workflow launch failed: $launchText" }
+          $launchStderrPath = Join-Path $env:RUNNER_TEMP 'archon-launch-stderr.txt'
+          $launchText = (& $archon workflow run temari-windows-smoke --cwd $workspace --workflow-source $workspace --no-worktree --detach --json 2> $launchStderrPath | Out-String)
+          $launchExitCode = $LASTEXITCODE
+          $launchStderr = Get-Content -Raw -LiteralPath $launchStderrPath
+          if ($launchStderr) { Write-Host $launchStderr }
+          if ($launchExitCode -ne 0) { throw "Archon workflow launch failed: $launchText" }
+          if ($launchStderr -notmatch 'Update available: v0\.10\.1 .* v999\.0\.0 .* https://example\.invalid/temari-ci-update-probe') { throw 'Archon launch did not emit the seeded update notice on stderr.' }
           $launch = $launchText | ConvertFrom-Json
           if (-not $launch.runId) { throw "Archon launch did not return a native run ID: $launchText" }
           & $archon workflow wait $launch.runId --timeout 90 --json
           if ($LASTEXITCODE -ne 0) { throw "Archon native workflow did not finish successfully: $($launch.runId)" }
-          $statusText = (& $archon workflow get $launch.runId --json 2>&1 | Out-String)
-          if ($LASTEXITCODE -ne 0) { throw "Could not read Archon workflow status: $statusText" }
+          $statusStderrPath = Join-Path $env:RUNNER_TEMP 'archon-status-stderr.txt'
+          $statusText = (& $archon workflow get $launch.runId --json 2> $statusStderrPath | Out-String)
+          $statusExitCode = $LASTEXITCODE
+          Get-Content -LiteralPath $statusStderrPath | Write-Host
+          if ($statusExitCode -ne 0) { throw "Could not read Archon workflow status: $statusText" }
           $status = $statusText | ConvertFrom-Json
           if ($status.id -ne $launch.runId -or $status.status -ne 'completed') { throw "Unexpected Archon workflow result: $statusText" }
           $marker = Join-Path $workspace 'archon-windows-smoke.txt'
