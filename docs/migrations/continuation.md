@@ -83,7 +83,7 @@ is inferred from that interrupted worker. Keep durable continuation evidence
 inside the checkout or on the forge, not only in an operating-system temporary
 directory. Leave unrelated missing-worktree metadata untouched.
 
-The active unit starts from the PR #50 merge on
+The next completed unit started from the PR #50 merge on
 `codex/stage-evidence-20260926`, in `.audit/worktrees/stage-evidence`.
 It adds persisted per-stage evidence ownership and byte verification before
 candidate-aware closeout. The eight core typecheck/test tasks and six compiled
@@ -111,10 +111,23 @@ reproduced the 214 core tests, four typechecks, and six compiled-package checks,
 and ran twelve additional in-memory adapter probes (ten refusals, two positive
 controls). The scoped decision-trail audit found no blocker. Linux run
 `36221336318` and Windows run `36221334558` passed at that repaired source head.
-This documentation follow-up still requires delta review and current-head CI
-before merge. Candidate-aware closeout is the next implementation unit;
-do not start a competing branch before reconciling this PR.
+The final documentation head `7ecd1381b936a072ee1665c80e2e6db6786b622a`
+received a separate independent delta PASS. Linux run `36221717118` and
+Windows run `36221728823` passed at that exact final head. PR #51 merged as
+`64bd51fa640da5c96910b7ba294de0066cbe5153`. Main was fast-forwarded, with
+the same stable patch ID as the final review,
+`edba8ae1bd531c5fd2713011763a2134fac2330d`. The pre-existing main changes and
+protected file hashes were preserved. No branch, worktree, or task was deleted.
 See [the runtime API and limits](./stage-evidence.md).
+
+The active candidate-aware closeout unit is on
+`codex/candidate-closeout-20260926`, in `.audit/worktrees/candidate-closeout`,
+based on the PR #51 merge. There was no open PR or active previous worker when
+this unit began. The unmodified baseline passed all eight core typecheck/test
+targets and all six compiled-package checks. The implementation is not yet
+verified or merged. The next contract must permit build changes while binding
+review, verification, recovery, and closeout to observed candidate bytes. It
+must retain existing stage workspace checks and reject unacknowledged mutation.
 
 Data follows the existing types. `TemariPlanRequest` becomes a
 `TemariRequestPlan`, then persisted `WorkflowCheckpoint` and `WorkflowReceipt`
@@ -154,7 +167,7 @@ host integration must support real candidate-changing builds and reconcile
 with those owners; it must not silently add a second lifecycle. Prove compiled
 dependency closure before selecting that interface.
 
-The active evidence verifier loads actual bytes and validates complete
+The existing evidence verifier loads actual bytes and validates complete
 persisted stage bindings. Its success says evidence-only, not closeout-ready.
 It throws on refusal, consistent with the existing storage APIs; it does not
 return the blocked-result union considered in the design sketches.
