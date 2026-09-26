@@ -5,11 +5,15 @@ import {
   chmod,
   lstat,
   mkdir,
+  mkdtemp,
+  open,
   readFile,
   readdir,
+  rename,
+  rm,
   writeFile,
 } from 'node:fs/promises';
-import { dirname, isAbsolute, join, posix, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, posix, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import {
@@ -79,6 +83,10 @@ function safePath(path) {
 
 function jsonBytes(value) {
   return Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
+}
+
+export function manifestSha256(manifest) {
+  return digest(jsonBytes(manifest));
 }
 
 function sortedRecords(files) {
@@ -153,11 +161,22 @@ function assertPolicy(policy) {
 }
 
 /** Checks the complete outer bundle, including the nested canonical runtime. */
-export async function checkPublicEntryArtifact(root, expectedManifest) {
+export async function checkPublicEntryArtifact(root, expectedManifestSha256) {
   assert(isAbsolute(root), 'Artifact path must be absolute');
+  assert.match(
+    expectedManifestSha256 ?? '',
+    /^[a-f0-9]{64}$/,
+    'An external expected manifest digest is required.',
+  );
   const files = await artifactFiles(root);
   assert(files.has(manifestName), `Missing ${manifestName}`);
-  const manifest = JSON.parse(files.get(manifestName).toString());
+  const manifestBytes = files.get(manifestName);
+  assert.equal(
+    digest(manifestBytes),
+    expectedManifestSha256,
+    'Manifest does not match the external expected digest.',
+  );
+  const manifest = JSON.parse(manifestBytes.toString());
   assert.equal(manifest.schemaVersion, 1);
   assert.match(manifest.source.revision, /^[a-f0-9]{40,64}$/);
   assert.equal(typeof manifest.source.dirty, 'boolean');
@@ -170,9 +189,6 @@ export async function checkPublicEntryArtifact(root, expectedManifest) {
     assert.match(entry.sha256, /^[a-f0-9]{64}$/);
     assert(Number.isSafeInteger(entry.bytes) && entry.bytes >= 0);
   }
-  if (expectedManifest !== undefined)
-    assert.deepEqual(manifest, expectedManifest);
-
   files.delete(manifestName);
   assert.deepEqual(
     manifest.files,
@@ -212,7 +228,10 @@ export async function checkPublicEntryArtifact(root, expectedManifest) {
 }
 
 /** Builds an exclusive outer bundle; it never replaces an existing destination. */
-export async function packagePublicEntries(output) {
+export async function packagePublicEntries(
+  output,
+  { packageCanonical = packageCanonicalRuntime } = {},
+) {
   assert(isAbsolute(output), 'Output path must be absolute');
   try {
     await lstat(output);
@@ -232,42 +251,77 @@ export async function packagePublicEntries(output) {
   }
 
   await mkdir(dirname(output), { recursive: true });
-  await mkdir(output);
-  const runtime = join(output, 'runtime');
-  await packageCanonicalRuntime(runtime);
-  for (const [source, destination] of publicFiles) {
-    await exclusiveCopy(
-      source,
-      join(output, destination),
-      destination.startsWith('bin/'),
-    );
+  const reservationPath = `${output}.publish-lock`;
+  let reservation;
+  try {
+    reservation = await open(reservationPath, 'wx', 0o600);
+  } catch (error) {
+    if (error.code === 'EEXIST')
+      throw new Error(`Output is already reserved: ${output}`);
+    throw error;
   }
+  let staging;
+  let published = false;
+  try {
+    staging = await mkdtemp(
+      join(dirname(output), `.${basename(output)}.staging-`),
+    );
+    const runtime = join(staging, 'runtime');
+    await packageCanonical(runtime);
+    for (const [source, destination] of publicFiles) {
+      await exclusiveCopy(
+        source,
+        join(staging, destination),
+        destination.startsWith('bin/'),
+      );
+    }
 
-  const canonicalBytes = await readFile(
-    join(runtime, 'canonical-manifest.json'),
-  );
-  const manifest = {
-    schemaVersion: 1,
-    source: {
-      revision: git('rev-parse', 'HEAD'),
-      dirty: git('status', '--porcelain=v1', '--untracked-files=all') !== '',
-      files: sortedRecords(sourceFiles),
-    },
-    build: {
-      node: process.version,
-      tool: record('tools/public-entry-runtime.mjs', await readFile(toolPath)),
-    },
-    entries,
-    runtimeManifestSha256: digest(canonicalBytes),
-    files: [],
-  };
-  const files = await artifactFiles(output);
-  files.delete(manifestName);
-  manifest.files = sortedRecords(files);
-  await writeFile(join(output, manifestName), jsonBytes(manifest), {
-    flag: 'wx',
-  });
-  return checkPublicEntryArtifact(output, manifest);
+    const canonicalBytes = await readFile(
+      join(runtime, 'canonical-manifest.json'),
+    );
+    const manifest = {
+      schemaVersion: 1,
+      source: {
+        revision: git('rev-parse', 'HEAD'),
+        dirty: git('status', '--porcelain=v1', '--untracked-files=all') !== '',
+        files: sortedRecords(sourceFiles),
+      },
+      build: {
+        node: process.version,
+        tool: record(
+          'tools/public-entry-runtime.mjs',
+          await readFile(toolPath),
+        ),
+      },
+      entries,
+      runtimeManifestSha256: digest(canonicalBytes),
+      files: [],
+    };
+    const files = await artifactFiles(staging);
+    files.delete(manifestName);
+    manifest.files = sortedRecords(files);
+    const manifestBytes = jsonBytes(manifest);
+    await writeFile(join(staging, manifestName), manifestBytes, {
+      flag: 'wx',
+    });
+    const expectedManifestSha256 = digest(manifestBytes);
+    await checkPublicEntryArtifact(staging, expectedManifestSha256);
+
+    try {
+      await lstat(output);
+      throw new Error(`Output already exists: ${output}`);
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+    await rename(staging, output);
+    published = true;
+    return checkPublicEntryArtifact(output, expectedManifestSha256);
+  } finally {
+    if (staging && !published)
+      await rm(staging, { recursive: true, force: true });
+    await reservation.close();
+    await rm(reservationPath, { force: true });
+  }
 }
 
 if (
@@ -276,20 +330,34 @@ if (
 ) {
   try {
     const { values, positionals } = parseArgs({
-      options: { output: { type: 'string' }, artifact: { type: 'string' } },
+      options: {
+        output: { type: 'string' },
+        artifact: { type: 'string' },
+        'expected-manifest-sha256': { type: 'string' },
+      },
       allowPositionals: true,
     });
     const [command] = positionals;
+    const expectedManifestSha256 = values['expected-manifest-sha256'];
     assert(
       positionals.length === 1 &&
-        ((command === 'package' && values.output && !values.artifact) ||
-          (command === 'check' && values.artifact && !values.output)),
-      'Usage: public-entry-runtime.mjs package --output ABSOLUTE_NEW_PATH | check --artifact ABSOLUTE_PATH',
+        ((command === 'package' &&
+          values.output &&
+          !values.artifact &&
+          expectedManifestSha256 === undefined) ||
+          (command === 'check' &&
+            values.artifact &&
+            !values.output &&
+            expectedManifestSha256 !== undefined)),
+      'Usage: public-entry-runtime.mjs package --output ABSOLUTE_NEW_PATH | check --artifact ABSOLUTE_PATH --expected-manifest-sha256 HEX',
     );
     const manifest =
       command === 'package'
         ? await packagePublicEntries(values.output)
-        : await checkPublicEntryArtifact(values.artifact);
+        : await checkPublicEntryArtifact(
+            values.artifact,
+            expectedManifestSha256,
+          );
     console.log(JSON.stringify(manifest, null, 2));
   } catch (error) {
     console.error(error.message);

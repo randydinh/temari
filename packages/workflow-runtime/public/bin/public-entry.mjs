@@ -1,10 +1,70 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { lstat, open } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const policy = JSON.parse(await readFile(join(root, 'policy.json'), 'utf8'));
+const POLICY_BYTES = 64 * 1024;
+const REQUEST_BYTES = 64 * 1024;
+const utf8 = new TextDecoder('utf-8', { fatal: true });
+
+async function readBoundedFile(path, limit) {
+  const before = await lstat(path);
+  assert(
+    before.isFile() && !before.isSymbolicLink(),
+    'Expected a regular file.',
+  );
+  assert(before.size <= limit, 'File exceeds the byte limit.');
+  const file = await open(
+    path,
+    constants.O_RDONLY |
+      (constants.O_NOFOLLOW ?? 0) |
+      (constants.O_NONBLOCK ?? 0),
+  );
+  try {
+    const stat = await file.stat();
+    assert(
+      stat.isFile() &&
+        stat.dev === before.dev &&
+        stat.ino === before.ino &&
+        stat.size === before.size &&
+        stat.size <= limit,
+      'File changed before reading.',
+    );
+    const bytes = Buffer.alloc(stat.size + 1);
+    let used = 0;
+    while (used < bytes.length) {
+      const { bytesRead } = await file.read(
+        bytes,
+        used,
+        bytes.length - used,
+        null,
+      );
+      if (!bytesRead) break;
+      used += bytesRead;
+    }
+    const after = await file.stat();
+    assert(
+      used === stat.size &&
+        after.size === stat.size &&
+        after.mtimeMs === stat.mtimeMs,
+      'File changed while reading.',
+    );
+    return bytes.subarray(0, used);
+  } finally {
+    await file.close();
+  }
+}
+
+async function readJson(path, limit) {
+  assert(isAbsolute(path), 'Request path must be absolute.');
+  return JSON.parse(utf8.decode(await readBoundedFile(path, limit)));
+}
+
+const policy = JSON.parse(
+  utf8.decode(await readBoundedFile(join(root, 'policy.json'), POLICY_BYTES)),
+);
 
 function exactFields(value, required, optional = []) {
   assert(
@@ -93,11 +153,6 @@ function admitEngineering(entry, request) {
   };
 }
 
-async function readJson(path) {
-  assert(isAbsolute(path), 'Request path must be absolute.');
-  return JSON.parse(await readFile(path, 'utf8'));
-}
-
 export async function run(entry, argv = process.argv.slice(2)) {
   assert(
     Object.hasOwn(policy.entries, entry),
@@ -129,6 +184,9 @@ export async function run(entry, argv = process.argv.slice(2)) {
   }
 
   if (flag !== '--request') usage();
-  const result = admitEngineering(entry, await readJson(argument));
+  const result = admitEngineering(
+    entry,
+    await readJson(argument, REQUEST_BYTES),
+  );
   finish(result, 1);
 }

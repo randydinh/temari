@@ -512,9 +512,10 @@ This unit is being developed from `bd826463ab35bf2746381437ed33cba295f31c85`
 (`origin/main`) on the isolated branch
 `codex/public-entry-packaging-20260926`. The protected successor checkout and
 main-checkout privacy, lockfile and tsconfig work are not in this branch.
-The implementation commit for this unit is
-`19b5fbc73fb6b47988fe748c21c2cdef14cc34c7`; later documentation-only
-amendments preserve that implementation unchanged.
+The implementation commit for the initial unit is
+`19b5fbc73fb6b47988fe748c21c2cdef14cc34c7`. The pushed branch currently ends
+at `c0cabf5700cc545fc668146c7efa169c2de563fd`. The verified repair is
+committed locally and has not been pushed.
 
 The new outer bundle keeps the exact four-package canonical runtime under a
 nested `runtime/` directory, copies the reviewed experimental bridge under
@@ -534,11 +535,25 @@ host capabilities, a matching feature request returns `blocked` with missing
 The closeout entry returns `blocked` until trusted invocation input and
 independent current-candidate selection are implemented.
 
+Independent review rejected the initial packaging head because the outer
+manifest could be rewritten with its payload, policy and request files could
+follow symlinks, and a failed build could leave a partial destination. The
+repair requires an external SHA-256 for every artifact check, reads policy and
+request JSON through bounded regular-file descriptors, builds in a sibling
+staging directory, and uses an exclusive publication reservation. It keeps
+the existing canonical runtime and preflight lifecycle unchanged.
+
+Use `--expected-manifest-sha256 HEX` with the packager checker. The digest must
+come from a trusted channel outside the artifact. The manifest alone is an
+inventory, not an authenticator.
+
 Actual local evidence for this unit:
 
-- `workflow-runtime:public-entry-test`: 5/5 passed, including relocation,
-  provenance hash matching, unsupported-route refusal, capability blocking,
-  closeout blocking, tamper/symlink refusal and no-overwrite publication.
+- `workflow-runtime:public-entry-test`: 9/9 passed, including relocation,
+  provenance hash matching, external-digest enforcement, unsupported-route
+  refusal, capability blocking, closeout blocking, symlink refusal, failed
+  publication cleanup, concurrent publication ownership, and no-overwrite
+  publication.
 - `workflow-runtime:canonical-test`: 11/11 passed.
 - `workflow-runtime:host-session-test`: 39/39 passed.
 - Five affected-project typechecks passed (`contracts`, `temari-core`,
@@ -553,14 +568,14 @@ Actual local evidence for this unit:
   Node and Ruby.
 
 This is still packaging/preflight evidence, not installed-host acceptance,
-independent product-QA evidence, or distributed/multi-machine proof. The next
-safe action is to open a PR from the pushed branch, obtain independent source
-review and exact-head Linux/Windows CI, then merge this scoped packaging unit if
-those gates pass. PR creation is currently blocked because this host has no
-`gh` executable and its Mac browser surface is unavailable while the Mac is
-locked; no PR or merge is claimed. Afterward, implement trusted installed
-closeout and live host/QA evidence before shared-service workers and real
-multi-machine recovery.
+independent product-QA evidence, or distributed/multi-machine proof. The
+independent repair review passed locally. The next safe action is to push
+the repair branch, open a PR, and obtain exact-head Linux/Windows CI before
+merging this scoped packaging unit. PR creation is
+currently blocked because this host has no `gh` executable and its Mac browser
+surface is unavailable while the Mac is locked. No PR or merge is claimed.
+Afterward, implement trusted installed closeout and live host/QA evidence
+before shared-service workers and real multi-machine recovery.
 
 ## Remaining gates
 
