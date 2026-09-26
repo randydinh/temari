@@ -280,6 +280,7 @@ out of scope until fencing, idempotency, and reconciliation are proven.
 
 **Build.**
 
+- [x] Produce a separate compiled canonical library artifact with concrete ESM dependencies and exact content inventory. `workflow-runtime:canonical-test` verifies relocation, stock-Node checkpoint recovery, and isolated receipt/evidence readback, with dependency-tamper and unsafe-path controls. Source candidate `2407705` passed independent review and Linux/Windows CI in PR #50. This preparatory artifact does not complete the three public-entry installs or live-host gate. See `docs/migrations/canonical-packages.md`.
 - [ ] Keep public packages thin. They call core contracts and the one engine rather than defining a second lifecycle.
 - [ ] Add a static, reviewed overlay manifest contract for optional plugins, host projections, and provider adapters.
 - [ ] Require overlay version, digest, compatibility range, capability requirements, and credential references. An overlay cannot grant authority or add engine stages.
