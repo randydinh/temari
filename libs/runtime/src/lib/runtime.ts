@@ -11,10 +11,16 @@ import {
 } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 
-import type {
-  WorkflowReceipt,
-  WorkflowReceiptStatus,
-  WorkflowStageId,
+import {
+  assertCandidateBinding,
+  assertCandidateIdentity,
+  assertEvidenceProfile,
+  DEFAULT_STAGES,
+  type CandidateBinding,
+  type CandidateIdentity,
+  type WorkflowReceipt,
+  type WorkflowReceiptStatus,
+  type WorkflowStageId,
 } from '@temari/contracts';
 import type { TemariRequestPlan } from '@temari/temari-core';
 import {
@@ -29,8 +35,15 @@ import type { EvidenceStore } from './evidence-store.js';
 import {
   publishStageEvidence,
   verifyStageEvidenceRecord,
+  verifyCandidateEvidenceRecord,
   type StageEvidencePayload,
 } from './stage-evidence.js';
+import {
+  observeCandidate,
+  prepareCandidateRoots,
+  type CandidateRunOptions,
+  type LocalCandidateScope,
+} from './candidate.js';
 
 export interface WorkflowReceiptStore {
   save(receipt: WorkflowReceipt): Promise<string>;
@@ -299,9 +312,9 @@ export class FileWorkflowReceiptStore implements WorkflowReceiptStore {
   }
 }
 
-export interface ExecuteAndPersistRequest extends Omit<
+interface ExecuteAndPersistBase extends Omit<
   ReceiptRunRequest,
-  'handler'
+  'handler' | 'candidateBinding' | 'onInitialCheckpoint' | 'evidenceProfile'
 > {
   readonly stageEvidence?: { readonly store: EvidenceStore };
   readonly handler: (
@@ -323,6 +336,24 @@ export interface ExecuteAndPersistRequest extends Omit<
     stage: WorkflowStageId,
   ) => StageWorkspaceBinding | null | undefined;
 }
+
+export type ExecuteAndPersistRequest = ExecuteAndPersistBase &
+  (
+    | {
+        readonly candidate?: never;
+        readonly evidenceProfile?: 'stage-evidence-v1';
+      }
+    | {
+        readonly candidate: CandidateRunOptions;
+        readonly evidenceProfile?: 'candidate-stage-evidence-v1';
+        readonly checkpointStore: WorkflowCheckpointStore;
+        readonly stageEvidence: { readonly store: EvidenceStore };
+        readonly workspaceManifestStore: WorkspaceManifestStore;
+        readonly workspaceForStage: (
+          stage: WorkflowStageId,
+        ) => StageWorkspaceBinding;
+      }
+  );
 
 /**
  * Workspace bound to a serial stage. For checkpoint resume, callers should
@@ -363,8 +394,11 @@ async function persistStageWorkspaceManifest(
 }
 
 async function verifyCheckpointWorkspaceManifests(
-  request: ExecuteAndPersistRequest,
-  checkpoint: WorkflowCheckpoint | null,
+  request: Pick<
+    ExecuteAndPersistBase,
+    'runId' | 'revision' | 'workspaceManifestStore' | 'workspaceForStage'
+  >,
+  checkpoint: Pick<WorkflowCheckpoint, 'stages'> | null,
 ): Promise<void> {
   const store = request.workspaceManifestStore;
   if (!store || !checkpoint) return;
@@ -386,40 +420,163 @@ async function verifyCheckpointWorkspaceManifests(
         `Checkpoint stage ${stage.stage} is missing its workspace manifest.`,
       );
       assert.equal(manifest.revision, request.revision);
+      assert.equal(manifest.runId, request.runId);
+      assert.equal(manifest.subjectId, id);
       assert.equal(manifest.workspaceId, binding.workspaceId);
       await store.verify(manifest, binding.root);
     }),
   );
 }
 
+function immutableCopy<T>(value: T): T {
+  function freeze(item: unknown): void {
+    if (!item || typeof item !== 'object' || Object.isFrozen(item)) return;
+    for (const child of Object.values(item)) freeze(child);
+    Object.freeze(item);
+  }
+  const copy = structuredClone(value);
+  freeze(copy);
+  return copy;
+}
+
+async function saveCandidateCheckpoint(
+  store: WorkflowCheckpointStore,
+  checkpoint: WorkflowCheckpoint,
+): Promise<void> {
+  const expected = immutableCopy(checkpoint);
+  await store.save(structuredClone(expected));
+  assert.deepEqual(
+    await store.load(expected.runId),
+    expected,
+    'Candidate checkpoint readback changed.',
+  );
+}
+
 export async function executeAndPersist(
   request: ExecuteAndPersistRequest,
 ): Promise<WorkflowReceipt> {
+  assert(
+    request.candidate === undefined ||
+      (request.candidate !== null &&
+        typeof request.candidate === 'object' &&
+        !Array.isArray(request.candidate)),
+    'Candidate options must be an object.',
+  );
+  if (request.candidate) {
+    assert(
+      request.checkpointStore &&
+        request.stageEvidence?.store &&
+        request.workspaceManifestStore &&
+        request.workspaceForStage,
+      'Candidate execution requires checkpoint, evidence, manifest stores and stage bindings.',
+    );
+    request = {
+      ...request,
+      plan: immutableCopy(request.plan),
+      capabilities: immutableCopy(request.capabilities),
+      candidate: immutableCopy(request.candidate),
+      stageEvidence: { store: request.stageEvidence.store },
+      checkpoint: request.checkpoint
+        ? immutableCopy(request.checkpoint)
+        : request.checkpoint,
+    };
+  }
+  const candidate = request.candidate;
+  const binding = candidate
+    ? immutableCopy({
+        scopeId: candidate.scope.scopeId,
+        initial: candidate.expectedInitial,
+      })
+    : undefined;
+  const evidenceProfile = candidate
+    ? 'candidate-stage-evidence-v1'
+    : request.stageEvidence
+      ? 'stage-evidence-v1'
+      : undefined;
+  assertEvidenceProfile(evidenceProfile, binding);
+  assert(
+    request.evidenceProfile === undefined ||
+      request.evidenceProfile === evidenceProfile,
+    'Runtime evidence profile requires matching candidate options and stageEvidence storage.',
+  );
+  assert(
+    !('candidateBinding' in request),
+    'Runtime constructs candidateBinding from candidate options.',
+  );
+  const roots = candidate
+    ? await prepareCandidateRoots(
+        candidate.scope,
+        request.workspaceForStage!,
+        candidate.knownWriteRoots,
+      )
+    : undefined;
+  if (roots && request.candidate)
+    request = { ...request, workspaceForStage: roots.workspaceForStage };
+  const terminal = await request.store.load(request.runId);
+  if (
+    candidate ||
+    terminal?.evidenceProfile === 'candidate-stage-evidence-v1' ||
+    terminal?.candidateBinding !== undefined
+  ) {
+    assert.equal(
+      terminal,
+      null,
+      'Terminal workflow receipt already exists; use the persisted reader or a new run ID.',
+    );
+  }
   if (request.workspaceManifestStore) {
     assert(
       request.workspaceForStage,
       'Workspace manifest storage requires workspaceForStage.',
     );
   }
-  const checkpoint =
-    (await request.checkpointStore?.load(request.runId)) ??
-    request.checkpoint ??
-    null;
-  const evidenceProfile = request.stageEvidence
-    ? 'stage-evidence-v1'
-    : undefined;
-  assert(
-    request.evidenceProfile === undefined ||
-      request.evidenceProfile === evidenceProfile,
-    'Runtime evidence profile requires stageEvidence storage.',
-  );
+  const durable = await request.checkpointStore?.load(request.runId);
+  if (candidate) {
+    assert(
+      durable === null ||
+        (durable && typeof durable === 'object' && !Array.isArray(durable)),
+      'Invalid durable candidate checkpoint.',
+    );
+    assert(
+      request.checkpoint === undefined ||
+        request.checkpoint === null ||
+        (typeof request.checkpoint === 'object' &&
+          !Array.isArray(request.checkpoint)),
+      'Invalid supplied candidate checkpoint.',
+    );
+  }
+  if (
+    candidate &&
+    request.checkpoint !== undefined &&
+    request.checkpoint !== null
+  )
+    assert.deepEqual(
+      durable,
+      request.checkpoint,
+      'Supplied candidate checkpoint differs from durable checkpoint.',
+    );
+  const checkpoint = structuredClone(durable ?? request.checkpoint ?? null);
+  let current = binding?.initial;
   if (checkpoint) {
+    assertEvidenceProfile(
+      checkpoint.evidenceProfile,
+      checkpoint.candidateBinding,
+    );
     assert.equal(
       checkpoint.evidenceProfile,
       evidenceProfile,
       'Checkpoint evidence profile mismatch.',
     );
-    if (request.stageEvidence)
+    if (binding) {
+      current = await verifyCandidateEvidenceRecord(
+        checkpoint,
+        request.runId,
+        request.revision,
+        request.stageEvidence!.store,
+        false,
+        binding,
+      );
+    } else if (request.stageEvidence)
       await verifyStageEvidenceRecord(
         checkpoint,
         request.runId,
@@ -429,12 +586,60 @@ export async function executeAndPersist(
       );
   }
   await verifyCheckpointWorkspaceManifests(request, checkpoint);
+  const observeCurrent = async (
+    expected: CandidateIdentity,
+  ): Promise<CandidateIdentity> => {
+    assert(candidate && roots);
+    await roots.recheck();
+    const observed = await observeCandidate(candidate.scope);
+    assert.deepEqual(
+      observed,
+      expected,
+      'Candidate identity changed from acknowledged observation.',
+    );
+    await roots.recheck();
+    return observed;
+  };
+  if (current) {
+    await observeCurrent(current);
+    const nextStage = DEFAULT_STAGES[checkpoint?.stages.length ?? 0];
+    if (nextStage)
+      assert.equal(
+        await request.workspaceManifestStore!.load(request.runId, nextStage),
+        null,
+        'Unacknowledged stage has an orphan workspace manifest; a new run or explicit recovery is required.',
+      );
+  }
   const receipt = await runPlanWithReceipt({
     ...request,
     ...(evidenceProfile ? { evidenceProfile } : {}),
+    ...(binding ? { candidateBinding: binding } : {}),
     checkpoint,
+    onInitialCheckpoint: binding
+      ? async (initial) => {
+          await saveCandidateCheckpoint(request.checkpointStore!, initial);
+          await observeCurrent(binding.initial);
+        }
+      : undefined,
     handler: async (stage, plan): Promise<StageReceiptResult> => {
-      const result = { ...(await request.handler(stage, plan)) };
+      const before = current ? await observeCurrent(current) : undefined;
+      if (candidate)
+        assert.equal(
+          await request.workspaceManifestStore!.load(request.runId, stage),
+          null,
+          'Unacknowledged stage has an orphan workspace manifest; a new run or explicit recovery is required.',
+        );
+      const result = structuredClone(await request.handler(stage, plan));
+      const after = candidate
+        ? await observeCandidate(candidate.scope)
+        : undefined;
+      if (before && stage !== 'build')
+        assert.deepEqual(
+          after,
+          before,
+          'Only build may change candidate identity.',
+        );
+      await roots?.recheck();
       if (request.stageEvidence)
         assert(
           result.stageEvidence === undefined,
@@ -458,36 +663,166 @@ export async function executeAndPersist(
             stage,
             bound,
             result.evidence,
+            binding && before && after ? { binding, before, after } : undefined,
           ),
         };
       }
       return bound;
     },
     onStageCheckpoint: async (nextCheckpoint) => {
-      await request.checkpointStore?.save(nextCheckpoint);
-      await request.onStageCheckpoint?.(nextCheckpoint);
+      if (binding) {
+        const acknowledged = await verifyCandidateEvidenceRecord(
+          nextCheckpoint,
+          request.runId,
+          request.revision,
+          request.stageEvidence!.store,
+          false,
+          binding,
+        );
+        await verifyCheckpointWorkspaceManifests(request, nextCheckpoint);
+        await observeCurrent(acknowledged);
+        await saveCandidateCheckpoint(request.checkpointStore!, nextCheckpoint);
+        await observeCurrent(acknowledged);
+        current = acknowledged;
+        await request.onStageCheckpoint?.(structuredClone(nextCheckpoint));
+      } else {
+        await request.checkpointStore?.save(nextCheckpoint);
+        await request.onStageCheckpoint?.(nextCheckpoint);
+      }
     },
   });
   if (request.stageEvidence && receipt.status === 'PASS') {
-    await verifyStageEvidenceRecord(
-      receipt,
-      request.runId,
-      request.revision,
-      request.stageEvidence.store,
-      true,
-    );
+    if (binding) {
+      const final = await verifyCandidateEvidenceRecord(
+        receipt,
+        request.runId,
+        request.revision,
+        request.stageEvidence.store,
+        true,
+        binding,
+      );
+      await verifyCheckpointWorkspaceManifests(request, receipt);
+      await observeCurrent(final);
+    } else
+      await verifyStageEvidenceRecord(
+        receipt,
+        request.runId,
+        request.revision,
+        request.stageEvidence.store,
+        true,
+      );
   }
-  await request.store.save(receipt);
+  if (binding) {
+    const expected = immutableCopy(receipt);
+    await request.store.save(structuredClone(expected));
+    assert.deepEqual(
+      await request.store.load(request.runId),
+      expected,
+      'Candidate receipt readback changed.',
+    );
+  } else await request.store.save(receipt);
   return receipt;
 }
 
-export interface ExecuteRequestPlanAndPersistRequest extends Omit<
-  ExecuteAndPersistRequest,
-  'plan'
-> {
-  /** The coordinator has already classified this request and reconciled its plan. */
-  readonly requestPlan: TemariRequestPlan;
+export interface CandidateCloseoutRequest {
+  readonly runId: string;
+  readonly revision: string;
+  readonly store: WorkflowReceiptStore;
+  readonly evidenceStore: EvidenceStore;
+  readonly workspaceManifestStore: WorkspaceManifestStore;
+  readonly workspaceForStage: (stage: WorkflowStageId) => StageWorkspaceBinding;
+  readonly scope: LocalCandidateScope;
+  readonly knownWriteRoots: readonly string[];
+  readonly expectedCurrent: CandidateIdentity;
 }
+
+export interface VerifiedCandidateCloseout {
+  readonly status: 'candidate-verified';
+  readonly scope: 'local-regular-file-candidate-only';
+  readonly runId: string;
+  readonly revision: string;
+  readonly initial: CandidateIdentity;
+  readonly current: CandidateIdentity;
+}
+
+export async function verifyCandidateCloseout(
+  request: CandidateCloseoutRequest,
+): Promise<VerifiedCandidateCloseout> {
+  assert(
+    request.store &&
+      request.evidenceStore &&
+      request.workspaceManifestStore &&
+      typeof request.workspaceForStage === 'function',
+    'Candidate verification requires receipt, evidence, manifest stores and stage bindings.',
+  );
+  const selected = {
+    ...request,
+    scope: immutableCopy(request.scope),
+    knownWriteRoots: immutableCopy(request.knownWriteRoots),
+    expectedCurrent: immutableCopy(request.expectedCurrent),
+  };
+  assertRunId(selected.runId);
+  assert(
+    typeof selected.revision === 'string' &&
+      selected.revision.length > 0 &&
+      selected.revision.length <= 512,
+    'Invalid candidate revision.',
+  );
+  assertCandidateIdentity(selected.expectedCurrent);
+  const roots = await prepareCandidateRoots(
+    selected.scope,
+    selected.workspaceForStage,
+    selected.knownWriteRoots,
+  );
+  const receipt = structuredClone(await selected.store.load(selected.runId));
+  assert(receipt, 'Persisted workflow receipt is missing.');
+  assertCandidateBinding(receipt.candidateBinding);
+  const binding: CandidateBinding = immutableCopy(receipt.candidateBinding);
+  assert.equal(
+    binding.scopeId,
+    selected.scope.scopeId,
+    'Candidate scope ID mismatch.',
+  );
+  const current = await verifyCandidateEvidenceRecord(
+    receipt,
+    selected.runId,
+    selected.revision,
+    selected.evidenceStore,
+    true,
+    binding,
+  );
+  assert.deepEqual(
+    current,
+    selected.expectedCurrent,
+    'Candidate differs from independently expected current identity.',
+  );
+  await verifyCheckpointWorkspaceManifests(
+    { ...selected, workspaceForStage: roots.workspaceForStage },
+    receipt,
+  );
+  await roots.recheck();
+  assert.deepEqual(
+    await observeCandidate(selected.scope),
+    current,
+    'Candidate identity changed after verification.',
+  );
+  await roots.recheck();
+  return {
+    status: 'candidate-verified',
+    scope: 'local-regular-file-candidate-only',
+    runId: selected.runId,
+    revision: selected.revision,
+    initial: { ...binding.initial },
+    current: { ...current },
+  };
+}
+
+type WithoutPlan<T> = T extends unknown ? Omit<T, 'plan'> : never;
+export type ExecuteRequestPlanAndPersistRequest =
+  WithoutPlan<ExecuteAndPersistRequest> & {
+    /** The coordinator has already classified this request and reconciled its plan. */
+    readonly requestPlan: TemariRequestPlan;
+  };
 
 /**
  * Execute a coordinator-produced request plan through the existing persisted
@@ -503,7 +838,7 @@ export async function executeRequestPlanAndPersist(
   });
 }
 
-export interface ExecuteScheduledAndPersistRequest extends ExecuteAndPersistRequest {
+export type ExecuteScheduledAndPersistRequest = ExecuteAndPersistRequest & {
   readonly runStore: WorkflowRunStore;
   readonly owner: string;
   readonly leaseMs: number;
@@ -515,7 +850,7 @@ export interface ExecuteScheduledAndPersistRequest extends ExecuteAndPersistRequ
   readonly cancellation?: {
     readonly onRequested: 'cancel-before-completion';
   };
-}
+};
 
 export interface ScheduledExecutionResult {
   readonly claimed: boolean;

@@ -10,6 +10,7 @@ import {
   readFile,
   realpath,
   rm,
+  stat,
   symlink,
   unlink,
   writeFile,
@@ -285,6 +286,277 @@ test('canonical inventory rejects missing and same-size tampered dependency byte
   );
   await writeFile(dependency, bytes);
   assert.deepEqual(await checkCanonicalArtifact(artifact, manifest), manifest);
+});
+
+async function candidateFixture(t) {
+  const { root, artifact } = await relocated(t);
+  const state = join(root, 'candidate-state');
+  await mkdir(state);
+  const consumer = join(root, 'candidate-consumer.mjs');
+  await copyFile(
+    new URL('./fixtures/canonical-candidate-consumer.mjs', import.meta.url),
+    consumer,
+  );
+  const runId = randomUUID();
+  const revision = 'candidate-changing-fixture-v1';
+  await writeFile(
+    join(state, 'request.json'),
+    JSON.stringify({ runId, revision }),
+  );
+  const blocked = [
+    join(repository, 'libs/runtime/src/index.ts'),
+    join(repository, 'node_modules/typescript/package.json'),
+    join(output, 'canonical-manifest.json'),
+  ];
+  for (const path of blocked) await access(path);
+  const env = { ...process.env };
+  delete env.NODE_OPTIONS;
+  delete env.NODE_PATH;
+  const run = (mode, expectedCode = 0) =>
+    child(
+      [
+        ...(mode === 'inspect'
+          ? [
+              '--permission',
+              `--allow-fs-read=${artifact}`,
+              `--allow-fs-read=${consumer}`,
+              `--allow-fs-read=${state}`,
+              `--allow-fs-write=${state}`,
+            ]
+          : []),
+        consumer,
+        artifact,
+        state,
+        mode,
+        JSON.stringify(blocked),
+      ],
+      { cwd: root, env },
+      expectedCode,
+    );
+  await run('prepare');
+  const product = join(state, 'candidate', 'product.txt');
+  const built = 'APPLE\nPEAR\n';
+  const expected = {
+    scope: 'local-regular-files-v1',
+    sha256: createHash('sha256')
+      .update(
+        JSON.stringify([
+          'local-regular-files-v1',
+          [
+            [
+              'product.txt',
+              (await stat(product)).mode & 0o777,
+              Buffer.byteLength(built),
+              createHash('sha256').update(built).digest('hex'),
+            ],
+          ],
+        ]),
+      )
+      .digest('hex'),
+  };
+  const expectedPath = join(state, 'expected-current.json');
+  await writeFile(expectedPath, JSON.stringify(expected));
+  const history = async () =>
+    readFile(join(state, 'logs', 'handlers.jsonl'), 'utf8');
+  const prefix = async () =>
+    JSON.parse(
+      await readFile(join(state, 'logs', 'acknowledged-prefix.json'), 'utf8'),
+    );
+  const noReceipt = () =>
+    assert.rejects(access(join(state, 'receipts', `${runId}.receipt.json`)), {
+      code: 'ENOENT',
+    });
+  return {
+    state,
+    artifact,
+    runId,
+    revision,
+    run,
+    product,
+    built,
+    expected,
+    expectedPath,
+    history,
+    prefix,
+    noReceipt,
+  };
+}
+
+test('compiled candidate build changes A to B, resumes exact history and refuses stale closeout', async (t) => {
+  const f = await candidateFixture(t);
+  await f.run('interrupt-build', 73);
+  const prefix = await f.prefix();
+  assert.equal(prefix.evidenceProfile, 'candidate-stage-evidence-v1');
+  assert.deepEqual(
+    prefix.stages.map((s) => s.stage),
+    stages.slice(0, 3),
+  );
+  const initial = JSON.parse(
+    await readFile(join(f.state, 'initial.json'), 'utf8'),
+  );
+  assert.deepEqual(prefix.candidateBinding, {
+    scopeId: 'packaged-product',
+    initial,
+  });
+  assert.notDeepEqual(initial, f.expected);
+  assert.equal(await readFile(f.product, 'utf8'), f.built);
+  const history = await f.history();
+  await writeFile(f.product, 'STALE\nPEAR\n');
+  await f.run('resume', 1);
+  assert.equal(await f.history(), history);
+  await f.noReceipt();
+  await writeFile(f.product, f.built);
+  const attestationPath = join(
+    f.state,
+    'evidence',
+    `${prefix.stages[2].stageEvidence.sha256}.artifact`,
+  );
+  const attestationBytes = await readFile(attestationPath);
+  await unlink(attestationPath);
+  await f.run('resume', 1);
+  assert.equal(await f.history(), history);
+  await f.noReceipt();
+  await writeFile(attestationPath, attestationBytes);
+  await f.run('resume');
+  const result = JSON.parse((await f.run('inspect')).stdout);
+  assert.equal(result.receipt.status, 'PASS');
+  assert.equal(result.receipt.revision, f.revision);
+  assert.equal(result.receipt.startedAt, prefix.startedAt);
+  assert.deepEqual(result.receipt.stages.slice(0, 3), prefix.stages);
+  assert.deepEqual(result.checkpoint.stages, result.receipt.stages);
+  assert.equal(result.verified.status, 'candidate-verified');
+  assert.equal(result.verified.scope, 'local-regular-file-candidate-only');
+  assert.deepEqual(result.verified.initial, initial);
+  assert.deepEqual(result.verified.current, f.expected);
+  assert.equal(result.product, f.built);
+  assert.deepEqual(
+    (await f.history()).trim().split('\n').map(JSON.parse),
+    stages,
+  );
+  for (const [index, stage] of result.receipt.stages.entries()) {
+    const record = JSON.parse(
+      await readFile(
+        join(f.state, 'evidence', `${stage.stageEvidence.sha256}.artifact`),
+        'utf8',
+      ),
+    );
+    assert.equal(record.schema, 2);
+    assert.deepEqual(record.candidate.binding, prefix.candidateBinding);
+    assert.deepEqual(
+      record.candidate.before,
+      index <= 2 ? initial : f.expected,
+    );
+    assert.deepEqual(record.candidate.after, index < 2 ? initial : f.expected);
+  }
+  await writeFile(f.expectedPath, JSON.stringify(initial));
+  await f.run('inspect', 1);
+  await writeFile(f.expectedPath, JSON.stringify(f.expected));
+  await writeFile(f.product, 'CHANGED AFTER REVIEW\n');
+  await f.run('inspect', 1);
+  await writeFile(f.product, f.built);
+  const stageArtifact = join(f.state, 'workspaces', 'review', 'result.txt');
+  await writeFile(stageArtifact, 'altered review artifact');
+  await f.run('inspect', 1);
+  await writeFile(stageArtifact, f.built);
+  const attestation = JSON.parse(attestationBytes);
+  const payloadPath = join(
+    f.state,
+    'evidence',
+    `${attestation.payloads[0].reference.sha256}.artifact`,
+  );
+  const payload = await readFile(payloadPath);
+  await unlink(payloadPath);
+  await f.run('inspect', 1);
+  const altered = Buffer.from(payload);
+  altered[0] ^= 1;
+  await writeFile(payloadPath, altered);
+  await f.run('inspect', 1);
+  await writeFile(payloadPath, payload);
+  await f.run('inspect');
+  const completedHistory = await f.history();
+  await f.run('resume', 1);
+  assert.equal(await f.history(), completedHistory);
+  assert.deepEqual(
+    await checkCanonicalArtifact(f.artifact, manifest),
+    manifest,
+  );
+});
+
+test('compiled candidate recovery retains empty initial intent before any handler', async (t) => {
+  const f = await candidateFixture(t);
+  await f.run('interrupt-empty', 73);
+  const prefix = await f.prefix();
+  assert.deepEqual(prefix.stages, []);
+  await assert.rejects(f.history(), { code: 'ENOENT' });
+  await writeFile(f.product, 'unacknowledged change');
+  await f.run('resume', 1);
+  await assert.rejects(f.history(), { code: 'ENOENT' });
+  await f.noReceipt();
+  await writeFile(f.product, 'pear\napple\n');
+  await f.run('resume');
+  const result = JSON.parse((await f.run('inspect')).stdout);
+  assert.equal(result.receipt.startedAt, prefix.startedAt);
+  assert.deepEqual(result.receipt.candidateBinding, prefix.candidateBinding);
+  assert.deepEqual(
+    (await f.history()).trim().split('\n').map(JSON.parse),
+    stages,
+  );
+});
+
+test('compiled complete candidate checkpoint revalidates without replaying handlers', async (t) => {
+  const f = await candidateFixture(t);
+  await f.run('interrupt-complete', 73);
+  const prefix = await f.prefix();
+  assert.equal(prefix.stages.length, 6);
+  const history = await f.history();
+  await f.noReceipt();
+  await writeFile(f.product, 'unacknowledged post-delivery change');
+  await f.run('resume', 1);
+  assert.equal(await f.history(), history);
+  await f.noReceipt();
+  await writeFile(f.product, f.built);
+  await f.run('resume');
+  const result = JSON.parse((await f.run('inspect')).stdout);
+  assert.equal(await f.history(), history);
+  assert.deepEqual(result.receipt.stages, prefix.stages);
+  assert.equal(result.receipt.startedAt, prefix.startedAt);
+});
+
+test('compiled pre-acknowledgment build crash cannot silently adopt changed candidate', async (t) => {
+  const f = await candidateFixture(t);
+  await f.run('interrupt-unacknowledged', 74);
+  assert.equal(await readFile(f.product, 'utf8'), f.built);
+  const history = await f.history();
+  const checkpointPath = join(
+    f.state,
+    'checkpoints',
+    `${f.runId}.checkpoint.json`,
+  );
+  const checkpoint = await readFile(checkpointPath, 'utf8');
+  assert.equal(JSON.parse(checkpoint).checkpoint.stages.length, 2);
+  await f.run('resume', 1);
+  assert.equal(await f.history(), history);
+  assert.equal(await readFile(checkpointPath, 'utf8'), checkpoint);
+  await f.noReceipt();
+});
+
+test('compiled candidate recovery refuses an orphan manifest even when candidate bytes match', async (t) => {
+  const f = await candidateFixture(t);
+  await f.run('interrupt-orphan', 75);
+  assert.equal(await readFile(f.product, 'utf8'), 'pear\napple\n');
+  const history = await f.history();
+  assert.deepEqual(history.trim().split('\n').map(JSON.parse), ['investigate']);
+  const checkpointPath = join(
+    f.state,
+    'checkpoints',
+    `${f.runId}.checkpoint.json`,
+  );
+  const checkpoint = await readFile(checkpointPath, 'utf8');
+  assert.deepEqual(JSON.parse(checkpoint).checkpoint.stages, []);
+  await f.run('resume', 1);
+  assert.equal(await f.history(), history);
+  assert.equal(await readFile(checkpointPath, 'utf8'), checkpoint);
+  await f.noReceipt();
 });
 
 test('canonical inventory rejects unknown files and links', async (t) => {

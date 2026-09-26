@@ -130,8 +130,16 @@ distributed acceptance gates.
   and payload bytes, rejects profile changes on resume, and rechecks evidence
   before final receipt publication. The compiled-package journey includes
   missing/tampered evidence and restoration. Success is explicitly evidence-only;
-  current candidate identity, independent reviewer provenance, and actual host
-  closeout remain open. See [stage evidence](./migrations/stage-evidence.md).
+  it does not establish candidate identity or independent reviewer provenance.
+  See [stage evidence](./migrations/stage-evidence.md).
+- Candidate-bound local execution adds `candidate-stage-evidence-v1`, runtime
+  observations, and `verifyCandidateCloseout`. Initial intent uses the existing
+  empty checkpoint; build may change A to B, while other stages preserve identity.
+  The compiled consumer covers empty/build/complete-prefix recovery, pre-ack build
+  mutation, orphan manifests, and stale expected/current candidates. This is a
+  cooperative local-filesystem boundary, not atomic snapshots or independent QA.
+  Public-entry installation and actual host closeout remain open. See
+  [candidate verification](./migrations/candidate-closeout.md).
 - `9bb0874` imported the portable v4.1 workflow runtime, skills, host
   projections, verification assets, and optional Archon integration under
   `packages/workflow-runtime/assets/v4.1/` with provenance.

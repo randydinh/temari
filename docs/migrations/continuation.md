@@ -124,10 +124,27 @@ The active candidate-aware closeout unit is on
 `codex/candidate-closeout-20260926`, in `.audit/worktrees/candidate-closeout`,
 based on the PR #51 merge. There was no open PR or active previous worker when
 this unit began. The unmodified baseline passed all eight core typecheck/test
-targets and all six compiled-package checks. The implementation is not yet
-verified or merged. The next contract must permit build changes while binding
-review, verification, recovery, and closeout to observed candidate bytes. It
-must retain existing stage workspace checks and reject unacknowledged mutation.
+targets and all six compiled-package checks. The implemented successor profile
+binds initial candidate intent in an empty checkpoint and permits build changes
+while binding subsequent stages to the built bytes. A separate persisted reader
+requires an independently selected expected current identity. It retains stable
+stage-workspace checks and refuses profile relabeling, terminal replay, orphan
+manifests, and unacknowledged mutation. See [the API and limits](./candidate-closeout.md).
+
+Local verification passed all ten workspace typechecks and all six core,
+knowledge, and plan-draft test targets, including 167 runtime tests. The core
+implementation owner also passed the four core typechecks and 257 core tests.
+All eleven compiled-package checks passed, including five candidate crash/recovery
+scenarios and restricted readback. All 34 legacy package tests and the 234-file
+pinned inventory check pass. Independent comment review recommended two redundant
+comment deletions, applied without behavior changes; it found no refactor flags
+or new suppressions. Independent code/trail review and current-head Linux/Windows
+CI remain merge gates; no merge is claimed at this point.
+Final inspection added explicit reader-service admission: a JavaScript caller
+cannot omit the manifest store and silently skip workspace checks. The repaired
+patch passed all eight core typecheck/test targets (168 runtime tests, 258 core
+tests total) and all eleven compiled checks. No new comments or suppressions
+were added by this guard and its regression test.
 
 Data follows the existing types. `TemariPlanRequest` becomes a
 `TemariRequestPlan`, then persisted `WorkflowCheckpoint` and `WorkflowReceipt`
@@ -167,18 +184,22 @@ host integration must support real candidate-changing builds and reconcile
 with those owners; it must not silently add a second lifecycle. Prove compiled
 dependency closure before selecting that interface.
 
-The existing evidence verifier loads actual bytes and validates complete
-persisted stage bindings. Its success says evidence-only, not closeout-ready.
-It throws on refusal, consistent with the existing storage APIs; it does not
-return the blocked-result union considered in the design sketches.
-A separate candidate-aware operation must check the expected current candidate.
-Preserve the existing engine and
-run-store owners. Establish how real builds change candidate identity before
-selecting the installed host transport; freezing the candidate for all six
-stages does not support normal engineering. Keep archive permission separate
-from a verified workflow receipt. Then connect the three public entries in an
-isolated installation and retain actual host/independent-QA evidence before
-moving on to shared-service workers.
+The evidence-only verifier remains distinct from candidate verification. The
+candidate operation reloads the complete stage chain and stable manifests, then
+reobserves the caller's expected current candidate. It throws on refusal and
+returns only local regular-file verification on success, not closeout authority.
+The architecture comparison chose compact observations and existing empty
+checkpoints over full duplicated inventories and a second initial manifest key.
+Initial capability-gap handling precedes the checkpoint hook; no handler runs.
+Root isolation, immutable comparison expectations, and typed service requirements
+are part of the selected boundary. Scans still require a cooperative exclusive
+writer and are not atomic snapshots.
+
+Next, connect the three public entries in an isolated installation using this
+canonical runtime, keeping existing engine and run-store ownership. Retain actual
+host and independent-QA evidence before shared-service workers. Keep archive
+permission separate from a verified receipt. Do not replace the user's installed
+plugin or bring in private overlays without specific authority.
 
 ## Resume safely
 
@@ -211,9 +232,8 @@ user-input gate.
 ## Remaining gates
 
 - Public entry packaging and proof that the installed host uses the new core.
-- A runtime-owned closeout operation that verifies actual bytes, expected
-  candidate identity, and complete stage-evidence bindings. The current pure
-  decision and acceptance fixture do not provide that installed operation.
+- Integrate the locally verified candidate reader into actual host closeout;
+  the library operation and process fixtures are not an installed entry.
 - Independent QA evaluator journey and capability-provenance enforcement.
 - Shared-service selection, artifact access, and real multi-machine evidence.
 - Complete cancellation policy and automatic failover acceptance.

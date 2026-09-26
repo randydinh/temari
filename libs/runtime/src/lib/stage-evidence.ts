@@ -2,6 +2,11 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import {
   DEFAULT_STAGES,
+  assertCandidateBinding,
+  assertCandidateIdentity,
+  assertEvidenceProfile,
+  type CandidateBinding,
+  type CandidateIdentity,
   type EvidenceKind,
   type StageEvidenceReference,
   type WorkerEvidenceReference,
@@ -15,6 +20,33 @@ export interface StageEvidencePayload {
   readonly name: string;
   readonly kind: EvidenceKind;
   readonly content: string | Uint8Array;
+}
+
+export interface CandidateStageObservation {
+  readonly binding: CandidateBinding;
+  readonly before: CandidateIdentity;
+  readonly after: CandidateIdentity;
+}
+
+function candidateObservation(
+  value: unknown,
+  binding: CandidateBinding,
+): CandidateStageObservation {
+  const observation = object(value);
+  keys(observation, ['binding', 'before', 'after']);
+  assertCandidateBinding(observation.binding);
+  assert.deepEqual(
+    observation.binding,
+    binding,
+    'Attestation candidate binding mismatch.',
+  );
+  assertCandidateIdentity(observation.before);
+  assertCandidateIdentity(observation.after);
+  return {
+    binding: observation.binding,
+    before: observation.before,
+    after: observation.after,
+  };
 }
 
 export interface VerifiedStageEvidence {
@@ -97,12 +129,21 @@ async function load(
   store: EvidenceStore,
   ref: WorkerEvidenceReference,
 ): Promise<Uint8Array> {
-  const bytes = await store.loadPortable(ref);
-  assert(bytes instanceof Uint8Array, 'Evidence store returned invalid bytes.');
-  assert.equal(bytes.byteLength, ref.bytes, 'Evidence byte count changed.');
+  const expected = { ...ref };
+  const loaded = await store.loadPortable({ ...expected });
+  assert(
+    loaded instanceof Uint8Array,
+    'Evidence store returned invalid bytes.',
+  );
+  const bytes = Buffer.from(loaded);
+  assert.equal(
+    bytes.byteLength,
+    expected.bytes,
+    'Evidence byte count changed.',
+  );
   assert.equal(
     createHash('sha256').update(bytes).digest('hex'),
-    ref.sha256,
+    expected.sha256,
     'Evidence hash changed.',
   );
   return bytes;
@@ -163,6 +204,7 @@ async function verifyStage(
   runId: string,
   revision: string,
   stage: Record<string, unknown>,
+  binding?: CandidateBinding,
 ) {
   const ref = reference(stage.stageEvidence);
   const bytes = await load(store, { ...ref, runId, revision, kind: 'other' });
@@ -178,8 +220,16 @@ async function verifyStage(
     'summary',
     'workspaceManifestId',
     'payloads',
+    ...(binding ? ['candidate'] : []),
   ]);
-  assert.equal(record.schema, 1, 'Unsupported stage attestation version.');
+  assert.equal(
+    record.schema,
+    binding ? 2 : 1,
+    'Unsupported stage attestation version.',
+  );
+  const candidate = binding
+    ? candidateObservation(record.candidate, binding)
+    : undefined;
   assert.equal(record.runId, runId, 'Attestation run ID mismatch.');
   assert.equal(record.revision, revision, 'Attestation revision mismatch.');
   for (const field of ['stage', 'status', 'summary'])
@@ -232,24 +282,36 @@ async function verifyStage(
       kind: payload.reference.kind,
       content: await load(store, payload.reference),
     });
-  return { stage: stage.stage as WorkflowStageId, payloads };
+  return {
+    stage: stage.stage as WorkflowStageId,
+    payloads,
+    ...(candidate ? { candidate } : {}),
+  };
 }
 
-export async function verifyStageEvidenceRecord(
+async function verifyEvidenceRecord(
   value: unknown,
   runId: string,
   revision: string,
   store: EvidenceStore,
   complete: boolean,
-): Promise<VerifiedStageEvidence> {
+  binding?: CandidateBinding,
+) {
   identity(runId, revision);
   const record = object(value);
+  assertEvidenceProfile(record.evidenceProfile, record.candidateBinding);
   assert.equal(record.schema, 1, 'Unsupported workflow record schema.');
   assert.equal(
     record.evidenceProfile,
-    'stage-evidence-v1',
+    binding ? 'candidate-stage-evidence-v1' : 'stage-evidence-v1',
     'Unsupported or missing stage evidence profile.',
   );
+  if (binding)
+    assert.deepEqual(
+      record.candidateBinding,
+      binding,
+      'Workflow candidate binding mismatch.',
+    );
   assert.equal(record.runId, runId, 'Workflow run ID mismatch.');
   assert.equal(record.revision, revision, 'Workflow revision mismatch.');
   assert.deepEqual(
@@ -286,17 +348,73 @@ export async function verifyStageEvidenceRecord(
     );
   }
   const stages = [];
+  let current = binding?.initial;
   for (let index = 0; index < record.stages.length; index++) {
     const stage = stageContext(record.stages[index], DEFAULT_STAGES[index]);
-    stages.push(await verifyStage(store, runId, revision, stage));
+    const verified = await verifyStage(store, runId, revision, stage, binding);
+    if (binding) {
+      assert(verified.candidate, 'Candidate stage observation missing.');
+      assert.deepEqual(
+        verified.candidate.before,
+        current,
+        'Candidate observation chain changed.',
+      );
+      if (stage.stage !== 'build')
+        assert.deepEqual(
+          verified.candidate.after,
+          current,
+          'Only build may change candidate identity.',
+        );
+      current = verified.candidate.after;
+    }
+    stages.push(verified);
   }
   return {
-    status: 'evidence-verified',
-    scope: 'persisted-stage-evidence-only',
+    status: 'evidence-verified' as const,
+    scope: 'persisted-stage-evidence-only' as const,
     runId,
     revision,
     stages,
+    current,
   };
+}
+
+export async function verifyStageEvidenceRecord(
+  value: unknown,
+  runId: string,
+  revision: string,
+  store: EvidenceStore,
+  complete: boolean,
+): Promise<VerifiedStageEvidence> {
+  const { current: _current, ...verified } = await verifyEvidenceRecord(
+    value,
+    runId,
+    revision,
+    store,
+    complete,
+  );
+  return verified;
+}
+
+export async function verifyCandidateEvidenceRecord(
+  value: unknown,
+  runId: string,
+  revision: string,
+  store: EvidenceStore,
+  complete: boolean,
+  binding: CandidateBinding,
+): Promise<CandidateIdentity> {
+  assertCandidateBinding(binding);
+  const verified = await verifyEvidenceRecord(
+    value,
+    runId,
+    revision,
+    store,
+    complete,
+    binding,
+  );
+  assert(verified.current);
+  return verified.current;
 }
 
 async function publish(
@@ -340,8 +458,12 @@ export async function publishStageEvidence(
   stage: WorkflowStageId,
   result: StageReceiptResult,
   payloads: readonly StageEvidencePayload[] | undefined,
+  candidate?: CandidateStageObservation,
 ): Promise<StageEvidenceReference> {
   identity(runId, revision);
+  const observation = candidate
+    ? structuredClone(candidateObservation(candidate, candidate.binding))
+    : undefined;
   assert(
     Array.isArray(payloads) &&
       payloads.length > 0 &&
@@ -390,7 +512,7 @@ export async function publishStageEvidence(
     revision,
     kind: 'other',
     content: JSON.stringify({
-      schema: 1,
+      schema: observation ? 2 : 1,
       runId,
       revision,
       stage,
@@ -398,6 +520,7 @@ export async function publishStageEvidence(
       summary: result.summary,
       workspaceManifestId: result.workspaceManifestId ?? null,
       payloads: references,
+      ...(observation ? { candidate: observation } : {}),
     }),
   });
   const ref = {
@@ -405,11 +528,17 @@ export async function publishStageEvidence(
     sha256: stored.sha256,
     bytes: stored.bytes,
   };
-  await verifyStage(store, runId, revision, {
-    ...result,
-    stage,
-    stageEvidence: ref,
-  });
+  await verifyStage(
+    store,
+    runId,
+    revision,
+    {
+      ...result,
+      stage,
+      stageEvidence: ref,
+    },
+    observation?.binding,
+  );
   return ref;
 }
 
