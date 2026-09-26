@@ -1,6 +1,6 @@
 # Temari implementation inventory and parallelism roadmap
 
-Status: parent-recovery working baseline `188e73f`; this document records what is actually in
+Status: local parallelism implemented through PR #47; this document records what is actually in
 the canonical Nx repository and separates it from planned behavior.
 
 ## Lossless implementation inventory
@@ -148,8 +148,8 @@ fenced lease-heartbeat renewal for work that exceeds the initial lease.
 Crash-boundary tests prove
 that a repaired terminal child is not rerun and that stale receipts are not
 replayed when expected state is missing. This remains a local child-task proof:
-it deliberately does not claim parent-run lease renewal, automatic failover,
-shared control or artifact storage, cancellation policy, or cross-machine
+it deliberately does not claim automatic failover,
+shared control or artifact storage, a complete cancellation policy, or cross-machine
 execution. Parent lease renewal is available through an explicit scheduler
 heartbeat, but it does not imply automatic failover. Local
 mechanical retry and cancellation gating are implemented for explicitly
@@ -184,8 +184,9 @@ The parent control plane now has the corresponding local recovery boundary.
 Create, claim, route-event append, transition, load, and event observation all
 reconcile a private per-run sidecar before proceeding. The sidecar repairs
 state/event publication gaps only when the base or complete next history is
-proven. This does not imply parent lease renewal, shared control storage, or
-automatic failover.
+proven. Parent lease renewal is separately available through the scheduler
+heartbeat. Neither mechanism proves shared control storage or automatic
+failover.
 
 ## Completion roadmap
 

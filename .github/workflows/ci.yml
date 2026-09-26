@@ -45,6 +45,8 @@ jobs:
           ':!packages/workflow-runtime/provenance.json'
           | pnpm exec nx format:check --stdin
       - run: pnpm exec nx run-many -t typecheck --output-style=static
+      - name: Verify canonical workflow and recovery
+        run: pnpm exec nx run-many -t test -p contracts,temari-core,workflow-engine,runtime --parallel=1 --skipNxCache --skipSync --output-style=static
       - run: pnpm exec nx run knowledge:test --output-style=static
       - run: pnpm exec nx run plan-draft:test --output-style=static
       - run: pnpm exec nx run-many -p workflow-runtime -t test check --skipNxCache --skipSync --output-style=static
