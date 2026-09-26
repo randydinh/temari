@@ -134,8 +134,10 @@ It is not an installed-host, independent-QA, or multi-machine journey.
 
 ## Remaining migration work
 
-Candidate-aware closeout must observe actual candidate transitions during a
-build and reject changes after review. It must preserve existing checkpoint
-and workspace guarantees. Only then can isolated `temari`, `poteto-mode`, and
-`closeout` entry points report the stronger result. Installed-host acceptance,
-independent QA, shared services, worker recovery, and final cutover remain open.
+The separate [candidate-bound verifier](./candidate-closeout.md) observes actual
+build transitions, checks stable stage workspaces and complete evidence, and
+requires an independently selected expected candidate. It uses a successor
+profile; this evidence-only reader does not upgrade older history.
+Isolated `temari`, `poteto-mode`, and `closeout` entry integration, installed-host
+acceptance, independent QA, shared services, worker recovery, and final cutover
+remain open.

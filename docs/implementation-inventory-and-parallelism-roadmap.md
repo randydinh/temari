@@ -130,8 +130,16 @@ distributed acceptance gates.
   and payload bytes, rejects profile changes on resume, and rechecks evidence
   before final receipt publication. The compiled-package journey includes
   missing/tampered evidence and restoration. Success is explicitly evidence-only;
-  current candidate identity, independent reviewer provenance, and actual host
-  closeout remain open. See [stage evidence](./migrations/stage-evidence.md).
+  it does not establish candidate identity or independent reviewer provenance.
+  See [stage evidence](./migrations/stage-evidence.md).
+- Candidate-bound local execution adds `candidate-stage-evidence-v1`, runtime
+  observations, and `verifyCandidateCloseout`. Initial intent uses the existing
+  empty checkpoint; build may change A to B, while other stages preserve identity.
+  The compiled consumer covers empty/build/complete-prefix recovery, pre-ack build
+  mutation, orphan manifests, and stale expected/current candidates. This is a
+  cooperative local-filesystem boundary, not atomic snapshots or independent QA.
+  Public-entry installation and actual host closeout remain open. See
+  [candidate verification](./migrations/candidate-closeout.md).
 - `9bb0874` imported the portable v4.1 workflow runtime, skills, host
   projections, verification assets, and optional Archon integration under
   `packages/workflow-runtime/assets/v4.1/` with provenance.
@@ -244,6 +252,23 @@ failover.
 6. **Automatic failover last.** Automatic takeover is not a prerequisite for
    local parallelism. It becomes eligible only after shared control storage,
    fencing, idempotency, reconciliation, and failure-injection evidence pass.
+
+### Retained local failure-reporting gap
+
+PR #52's CI investigation independently reproduced a pre-existing boundary gap:
+`executeClaimed` forwards arbitrary handler error messages to a child store that
+requires nonempty text of at most 4096 characters. A 4097-character message or
+an empty `Error` message is replaced by the store's validation error; the child
+remains RUNNING with no receipt. This is separate from the takeover fixture's
+premature clock advancement, and the original Windows error payload was not
+retained. The exact Windows causal chain is therefore not established.
+
+Before claiming complete worker-failure recovery, define a bounded diagnostic
+representation, preserve the original diagnostic in retained evidence where
+appropriate, and test empty, whitespace-only, oversized and combined errors.
+Verify FAILED mechanics, semantic refusal, retry bounds and stale-owner fencing
+without weakening the store contract or masking the fixture race. This follow-up
+does not authorize a new service or expand the local proof to multi-machine use.
 
 ## Explicit non-goals
 

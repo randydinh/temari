@@ -15,6 +15,8 @@ import {
   type WorkflowStageId,
   type StageEvidenceProfile,
   type StageEvidenceReference,
+  type CandidateBinding,
+  assertEvidenceProfile,
 } from '@temari/contracts';
 
 export interface CapabilityGap {
@@ -48,6 +50,7 @@ export type StageReceiptHandler = (
  */
 export interface WorkflowCheckpoint {
   readonly evidenceProfile?: StageEvidenceProfile;
+  readonly candidateBinding?: CandidateBinding;
   readonly schema: 1;
   readonly runId: string;
   readonly revision: string;
@@ -129,6 +132,7 @@ export interface ParallelWorkerJoin {
 
 export interface ReceiptRunRequest {
   readonly evidenceProfile?: StageEvidenceProfile;
+  readonly candidateBinding?: CandidateBinding;
   readonly runId: string;
   readonly revision: string;
   readonly plan: ExecutionPlan;
@@ -136,6 +140,9 @@ export interface ReceiptRunRequest {
   readonly handler: StageReceiptHandler;
   readonly now?: () => Date;
   readonly checkpoint?: WorkflowCheckpoint | null;
+  readonly onInitialCheckpoint?: (
+    checkpoint: WorkflowCheckpoint,
+  ) => Promise<void> | void;
   readonly onStageCheckpoint?: (
     checkpoint: WorkflowCheckpoint,
   ) => Promise<void> | void;
@@ -249,13 +256,20 @@ function assertCheckpoint(
   declaredStages: readonly WorkflowStageId[],
 ): readonly WorkflowStageReceipt[] {
   const checkpoint = request.checkpoint;
-  if (
-    request.evidenceProfile !== undefined &&
-    request.evidenceProfile !== 'stage-evidence-v1'
-  ) {
-    throw new Error('Unsupported stage evidence profile.');
-  }
+  assertEvidenceProfile(request.evidenceProfile, request.candidateBinding);
   if (!checkpoint) return [];
+  assertEvidenceProfile(
+    checkpoint.evidenceProfile,
+    checkpoint.candidateBinding,
+  );
+  if (
+    canonical(checkpoint.candidateBinding) !==
+    canonical(request.candidateBinding)
+  ) {
+    throw new Error(
+      'Workflow checkpoint candidate binding does not match the request.',
+    );
+  }
   if (checkpoint.evidenceProfile !== request.evidenceProfile) {
     throw new Error(
       'Workflow checkpoint evidence profile does not match the request.',
@@ -333,7 +347,12 @@ export async function runPlanWithReceipt(
   const profile =
     request.evidenceProfile === undefined
       ? {}
-      : { evidenceProfile: request.evidenceProfile };
+      : {
+          evidenceProfile: request.evidenceProfile,
+          ...(request.candidateBinding
+            ? { candidateBinding: structuredClone(request.candidateBinding) }
+            : {}),
+        };
   const checkpointStages = assertCheckpoint(request, DEFAULT_STAGES);
   const startedAt = request.checkpoint?.startedAt ?? now().toISOString();
   const stages: WorkflowStageReceipt[] = [...checkpointStages];
@@ -362,6 +381,22 @@ export async function runPlanWithReceipt(
         missingCapabilities: missing,
       },
     };
+  }
+
+  if (
+    request.evidenceProfile === 'candidate-stage-evidence-v1' &&
+    !request.checkpoint
+  ) {
+    await request.onInitialCheckpoint?.({
+      schema: 1,
+      ...profile,
+      runId: request.runId,
+      revision: request.revision,
+      plan: request.plan,
+      capabilities: request.capabilities,
+      startedAt,
+      stages: [],
+    });
   }
 
   for (const stage of DEFAULT_STAGES.slice(checkpointStages.length)) {

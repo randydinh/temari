@@ -3,7 +3,69 @@ import type { ExecutionPlan, WorkflowStageId } from './execution-plan.js';
 
 export type WorkflowReceiptStatus = 'PASS' | 'ISSUES' | 'BLOCKED' | 'DROPPED';
 
-export type StageEvidenceProfile = 'stage-evidence-v1';
+export type StageEvidenceProfile =
+  'stage-evidence-v1' | 'candidate-stage-evidence-v1';
+
+export interface CandidateIdentity {
+  readonly scope: 'local-regular-files-v1';
+  readonly sha256: string;
+}
+
+export interface CandidateBinding {
+  readonly scopeId: string;
+  readonly initial: CandidateIdentity;
+}
+
+export function assertCandidateIdentity(
+  value: unknown,
+): asserts value is CandidateIdentity {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    Object.keys(value).sort().join(',') !== 'scope,sha256' ||
+    !('scope' in value) ||
+    value.scope !== 'local-regular-files-v1' ||
+    !('sha256' in value) ||
+    typeof value.sha256 !== 'string' ||
+    !/^[0-9a-f]{64}$/.test(value.sha256)
+  ) {
+    throw new Error('Invalid candidate identity.');
+  }
+}
+
+export function assertCandidateBinding(
+  value: unknown,
+): asserts value is CandidateBinding {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    Object.keys(value).sort().join(',') !== 'initial,scopeId' ||
+    !('scopeId' in value) ||
+    typeof value.scopeId !== 'string' ||
+    !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value.scopeId) ||
+    !('initial' in value)
+  ) {
+    throw new Error('Invalid candidate binding.');
+  }
+  assertCandidateIdentity(value.initial);
+}
+
+export function assertEvidenceProfile(
+  profile: unknown,
+  binding: unknown,
+): void {
+  if (profile === 'candidate-stage-evidence-v1') {
+    assertCandidateBinding(binding);
+  } else {
+    if (profile !== undefined && profile !== 'stage-evidence-v1') {
+      throw new Error('Unsupported stage evidence profile.');
+    }
+    if (binding !== undefined)
+      throw new Error('Candidate binding requires candidate evidence profile.');
+  }
+}
 
 export interface StageEvidenceReference {
   readonly schema: 1;
@@ -42,6 +104,7 @@ export interface WorkflowStageReceipt {
  */
 export interface WorkflowReceipt {
   readonly evidenceProfile?: StageEvidenceProfile;
+  readonly candidateBinding?: CandidateBinding;
   readonly schema: 1;
   readonly runId: string;
   readonly revision: string;

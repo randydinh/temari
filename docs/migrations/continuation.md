@@ -83,7 +83,7 @@ is inferred from that interrupted worker. Keep durable continuation evidence
 inside the checkout or on the forge, not only in an operating-system temporary
 directory. Leave unrelated missing-worktree metadata untouched.
 
-The active unit starts from the PR #50 merge on
+The next completed unit started from the PR #50 merge on
 `codex/stage-evidence-20260926`, in `.audit/worktrees/stage-evidence`.
 It adds persisted per-stage evidence ownership and byte verification before
 candidate-aware closeout. The eight core typecheck/test tasks and six compiled
@@ -111,10 +111,149 @@ reproduced the 214 core tests, four typechecks, and six compiled-package checks,
 and ran twelve additional in-memory adapter probes (ten refusals, two positive
 controls). The scoped decision-trail audit found no blocker. Linux run
 `36221336318` and Windows run `36221334558` passed at that repaired source head.
-This documentation follow-up still requires delta review and current-head CI
-before merge. Candidate-aware closeout is the next implementation unit;
-do not start a competing branch before reconciling this PR.
+The final documentation head `7ecd1381b936a072ee1665c80e2e6db6786b622a`
+received a separate independent delta PASS. Linux run `36221717118` and
+Windows run `36221728823` passed at that exact final head. PR #51 merged as
+`64bd51fa640da5c96910b7ba294de0066cbe5153`. Main was fast-forwarded, with
+the same stable patch ID as the final review,
+`edba8ae1bd531c5fd2713011763a2134fac2330d`. The pre-existing main changes and
+protected file hashes were preserved. No branch, worktree, or task was deleted.
 See [the runtime API and limits](./stage-evidence.md).
+
+The active candidate-aware closeout unit is on
+`codex/candidate-closeout-20260926`, in `.audit/worktrees/candidate-closeout`,
+based on the PR #51 merge. There was no open PR or active previous worker when
+this unit began. The unmodified baseline passed all eight core typecheck/test
+targets and all six compiled-package checks. The implemented successor profile
+binds initial candidate intent in an empty checkpoint and permits build changes
+while binding subsequent stages to the built bytes. A separate persisted reader
+requires an independently selected expected current identity. It retains stable
+stage-workspace checks and refuses profile relabeling, terminal replay, orphan
+manifests, and unacknowledged mutation. See [the API and limits](./candidate-closeout.md).
+
+Local verification passed all ten workspace typechecks and all six core,
+knowledge, and plan-draft test targets, including 167 runtime tests. The core
+implementation owner also passed the four core typechecks and 257 core tests.
+All eleven compiled-package checks passed, including five candidate crash/recovery
+scenarios and restricted readback. All 34 legacy package tests and the 234-file
+pinned inventory check pass. Independent comment review recommended two redundant
+comment deletions, applied without behavior changes; it found no refactor flags
+or new suppressions. Independent code/trail review and current-head Linux/Windows
+CI remain merge gates; no merge is claimed at this point.
+Final inspection added explicit reader-service admission: a JavaScript caller
+cannot omit the manifest store and silently skip workspace checks. The repaired
+patch passed all eight core typecheck/test targets (168 runtime tests, 258 core
+tests total) and all eleven compiled checks. No new comments or suppressions
+were added by this guard and its regression test.
+
+[PR #52](https://github.com/randydinh/temari/pull/52) is open. Independent source
+and decision-trail review of `c93fcdc12116f6f7bb56da7180a29a88a87fb8a8` returned
+FAIL: the scheduled wrapper could accept caller mutations during its run-store
+prelude before the direct entry captured candidate intent, including a silent
+downgrade to legacy execution. The reviewer reproduced four typechecks, 258 core
+tests and eleven compiled checks, then exposed the gap with two failing safety
+probes and three passing controls. Linux run `36224516207` and Windows run
+`36224485760` passed at that source head; neither green run clears this finding.
+That candidate was not merged.
+
+The repair captures and admits the selected execution request before scheduler
+callbacks, preserves stage bindings and scheduler options, and rechecks resolved
+roots before dispatch. Scheduled candidate/legacy controls and clock/create/claim/
+dispatch mutation regressions are added. The packaging guide now distinguishes
+the original evidence-only fixture from the newer candidate scenarios. The repair
+passes the eight core targets (267 tests, including runtime177) and all eleven
+compiled checks. Independent re-review and current-head CI are required before merge.
+The PR is linked here and in the task. The available app tools could queue its
+page but could not save a PR attachment; no saved-attachment claim is made.
+
+Independent re-review passed at repaired head
+`3cf507c61bb783ab10c0545a43cb5e079e762e77`, base-to-head patch ID
+`0b911f0bd8a2cb9344099ce8db93151de9268f57`. The reviewer read all six repair
+files, reproduced four typechecks, 267 core tests and eleven compiled checks,
+and ran five independent probes with fresh state. Both original faults now
+pass their safety assertions; no new findings remain. The original FAIL and
+its probe state are retained separately. Review used an independent context
+with the inherited model, not a cross-model or independent product-QA claim.
+Linux run `36225287151` and Windows run `36225285286` were started for that
+repair head; final documentation review and CI at the eventual merge head
+remain required. Source review does not establish host installation or cutover.
+
+Repair-head Linux CI passed, but Windows CI failed the older local child-takeover
+test: 177 runtime tests, 175 passed, one failed and one skipped. The failing
+path surfaced the child store's error-length assertion; later Windows acceptance
+steps were skipped. This is a failed gate, not a successful candidate run.
+The fixture advanced its fake clock after a handler-return signal and a 100 ms
+delay without waiting for durable child completion. Adding a 250 ms evidence
+publication delay reproduced a local failure (`BLOCKED` instead of `PASS`),
+recorded in test-first commit `ac4ef8c`. The exact Windows interleaving was not
+captured, so this local trigger is not claimed as an identical platform trace.
+Hold merge for a reviewed fix and fresh native Windows/Linux checks.
+
+The fixture fix now signals worker-1 completion only after the genuine store
+has persisted SUCCEEDED and an independently opened store reads that state.
+The delayed publication remains, worker-2 stays blocked until takeover, and
+the replacement-count, evidence, manifest and receipt assertions are unchanged.
+Worker and main runs passed all 177 runtime tests; main also reproduced the
+four core typechecks and all 267 core tests. This changes only the fixture,
+not production timing, leases, fencing or store validation. Final delta review
+and current-head CI remain gates. The separate independently reproduced
+empty/oversized-worker-error persistence gap is retained in the
+[roadmap](../implementation-inventory-and-parallelism-roadmap.md#retained-local-failure-reporting-gap),
+not hidden by this fix or claimed resolved.
+
+Both platforms passed at `7aaef6f83e3eeb7cf748c1b7a608fd5b5eb0115b`
+(Linux `36226124466`, Windows `36226122596`), but final independent review
+returned FAIL for the fixture's success-only barrier: a durably failed child
+could leave it waiting without reaching cleanup. A separate negative probe
+timed out after five seconds instead of surfacing its retained diagnostic.
+That head was not merged. The next fixture-only repair propagates completion
+and readback errors, observes coordinator rejection, bounds readiness inside
+the cleanup path, and drains the held child using the persisted group mapping.
+Five controls cover evidence failure, completion rejection, readback rejection,
+an absent signal, and failure while draining the held child. They assert exact
+diagnostics and completed cleanup; the delayed successful takeover and its
+original assertions remain. Main reproduced four core typechecks and 272 tests
+(runtime182). Production runtime/store code is unchanged from the independently
+reviewed `3cf507c`; this test/docs delta still requires independent re-review
+and fresh exact-head Linux/Windows CI.
+
+Re-review of `407d111` confirmed the original barrier failure paths were fixed,
+but rejected a delayed-start cleanup race: worker-2 was marked in flight only
+after its initial file write, so another child's earlier failure could skip
+the drain. The independent probe and test-first commit `8d55eff` reproduced
+cleanup before settlement (`false !== true`). The narrow fix moves that marker
+to synchronous handler entry while retaining the readiness signal after the
+write. The six failure controls and delayed successful takeover now pass;
+main reproduced four core typechecks and 273 tests (runtime183). No production
+code changed. The rejected head was not merged; this final delta still needs
+independent review and current-head CI.
+
+Independent review passed at `66256008244b70e8b579495c7ba03fc727559b23`,
+patch ID `ea7f83256f0b8a34674ffbf27ecca91e186dc4f6`; it reproduced all
+273 core tests and a fresh delayed-start probe showing settlement before
+cleanup. Linux `36226915057` passed, but Windows `36226913657` failed a
+different existing test: child-lease renewal expected COMPLETE and observed
+RUNNING. Later Windows packaging/Archon steps were skipped, so this is not a
+passing platform gate. The renewal fixture uses a 300 ms wall-clock lease,
+a 50 ms timer and a 650 ms handler delay. The exact missed-renewal interleaving
+was not retained; investigate that timing boundary without weakening production
+expiry or treating another head's green checks as acceptance. The PR remains
+unmerged pending a scoped repair, review and fresh CI.
+
+A bounded local probe with genuine stores reproduced lease starvation: a
+350 ms event-loop pause yielded RUNNING, `lease-lost`, no receipt and no renewal
+event. This confirms a reachable mechanism, not the unobserved Windows schedule.
+The test-only repair retains the runtime's 50 ms interval and store's 300 ms
+lease, using an injected clock advanced only after durable renewal readback.
+It asserts three literal renewed deadlines and successful completion beyond
+the initial expiry. A separate missed-deadline control requires RUNNING,
+`lease-lost`, the original expiry and no receipt or completion event. The bounded
+handler wait settles through the runtime before fixture cleanup. Worker local
+verification passed runtime185 and dependency typechecks. Production behavior
+and all previously reviewed takeover tests remain unchanged; independent delta
+review and fresh platform CI are still required.
+Main independently reproduced the four core typechecks and all 275 core tests
+(including runtime185), then passed formatting and whitespace checks.
 
 Data follows the existing types. `TemariPlanRequest` becomes a
 `TemariRequestPlan`, then persisted `WorkflowCheckpoint` and `WorkflowReceipt`
@@ -154,18 +293,22 @@ host integration must support real candidate-changing builds and reconcile
 with those owners; it must not silently add a second lifecycle. Prove compiled
 dependency closure before selecting that interface.
 
-The active evidence verifier loads actual bytes and validates complete
-persisted stage bindings. Its success says evidence-only, not closeout-ready.
-It throws on refusal, consistent with the existing storage APIs; it does not
-return the blocked-result union considered in the design sketches.
-A separate candidate-aware operation must check the expected current candidate.
-Preserve the existing engine and
-run-store owners. Establish how real builds change candidate identity before
-selecting the installed host transport; freezing the candidate for all six
-stages does not support normal engineering. Keep archive permission separate
-from a verified workflow receipt. Then connect the three public entries in an
-isolated installation and retain actual host/independent-QA evidence before
-moving on to shared-service workers.
+The evidence-only verifier remains distinct from candidate verification. The
+candidate operation reloads the complete stage chain and stable manifests, then
+reobserves the caller's expected current candidate. It throws on refusal and
+returns only local regular-file verification on success, not closeout authority.
+The architecture comparison chose compact observations and existing empty
+checkpoints over full duplicated inventories and a second initial manifest key.
+Initial capability-gap handling precedes the checkpoint hook; no handler runs.
+Root isolation, immutable comparison expectations, and typed service requirements
+are part of the selected boundary. Scans still require a cooperative exclusive
+writer and are not atomic snapshots.
+
+Next, connect the three public entries in an isolated installation using this
+canonical runtime, keeping existing engine and run-store ownership. Retain actual
+host and independent-QA evidence before shared-service workers. Keep archive
+permission separate from a verified receipt. Do not replace the user's installed
+plugin or bring in private overlays without specific authority.
 
 ## Resume safely
 
@@ -198,9 +341,8 @@ user-input gate.
 ## Remaining gates
 
 - Public entry packaging and proof that the installed host uses the new core.
-- A runtime-owned closeout operation that verifies actual bytes, expected
-  candidate identity, and complete stage-evidence bindings. The current pure
-  decision and acceptance fixture do not provide that installed operation.
+- Integrate the locally verified candidate reader into actual host closeout;
+  the library operation and process fixtures are not an installed entry.
 - Independent QA evaluator journey and capability-provenance enforcement.
 - Shared-service selection, artifact access, and real multi-machine evidence.
 - Complete cancellation policy and automatic failover acceptance.

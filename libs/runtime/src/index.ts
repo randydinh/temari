@@ -1,5 +1,10 @@
 export * from './lib/runtime.js';
 export {
+  observeCandidate,
+  type LocalCandidateScope,
+  type CandidateRunOptions,
+} from './lib/candidate.js';
+export {
   verifyPersistedStageEvidence,
   type StageEvidencePayload,
   type VerifiedStageEvidence,

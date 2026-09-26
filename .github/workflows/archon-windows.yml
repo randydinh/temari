@@ -14,6 +14,7 @@ on:
       - 'packages/initializer/**'
       - 'tools/canonical-runtime*'
       - 'tools/fixtures/canonical-consumer.mjs'
+      - 'tools/fixtures/canonical-candidate-consumer.mjs'
       - 'packages/workflow-runtime/package.json'
       - 'packages/workflow-runtime/assets/v4.1/integrations/archon/**'
       - 'package.json'
