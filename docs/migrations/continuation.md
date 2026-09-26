@@ -104,7 +104,16 @@ with payload, kind, attestation, and mutable-input fault tests. The reader also
 rejects invalid expected identity before contacting its receipt store.
 The repair passes the eight core typecheck/test targets, including 124 runtime
 tests and 214 core tests in total, plus all six compiled-package checks.
-Fresh review and current-head CI remain required before merge.
+Independent re-review of repaired source head
+`80f13355ec75d6eac1d0268321419ff6d5fa9798` returned PASS, with base-to-head
+stable patch ID `1f70b928bccbe9a406a0be8a86676e63e5879b9f`. The reviewer
+reproduced the 214 core tests, four typechecks, and six compiled-package checks,
+and ran twelve additional in-memory adapter probes (ten refusals, two positive
+controls). The scoped decision-trail audit found no blocker. Linux run
+`36221336318` and Windows run `36221334558` passed at that repaired source head.
+This documentation follow-up still requires delta review and current-head CI
+before merge. Candidate-aware closeout is the next implementation unit;
+do not start a competing branch before reconciling this PR.
 See [the runtime API and limits](./stage-evidence.md).
 
 Data follows the existing types. `TemariPlanRequest` becomes a
