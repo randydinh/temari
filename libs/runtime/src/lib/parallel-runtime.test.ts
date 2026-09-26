@@ -694,6 +694,7 @@ for (const fault of [
             },
             handler: async (assignment: WorkerAssignment) => {
               firstWorkerCalls += 1;
+              if (assignment.id === 'worker-2') secondStarted = true;
               if (assignment.id === 'worker-2' && fault === 'slow-held-start')
                 await new Promise((resolve) => setTimeout(resolve, 750));
               await writeFile(
@@ -701,7 +702,6 @@ for (const fault of [
                 `${assignment.id}:resumed-output`,
               );
               if (assignment.id === 'worker-2') {
-                secondStarted = true;
                 markStarted();
                 await interrupted;
               }

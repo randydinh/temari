@@ -217,6 +217,17 @@ original assertions remain. Main reproduced four core typechecks and 272 tests
 reviewed `3cf507c`; this test/docs delta still requires independent re-review
 and fresh exact-head Linux/Windows CI.
 
+Re-review of `407d111` confirmed the original barrier failure paths were fixed,
+but rejected a delayed-start cleanup race: worker-2 was marked in flight only
+after its initial file write, so another child's earlier failure could skip
+the drain. The independent probe and test-first commit `8d55eff` reproduced
+cleanup before settlement (`false !== true`). The narrow fix moves that marker
+to synchronous handler entry while retaining the readiness signal after the
+write. The six failure controls and delayed successful takeover now pass;
+main reproduced four core typechecks and 273 tests (runtime183). No production
+code changed. The rejected head was not merged; this final delta still needs
+independent review and current-head CI.
+
 Data follows the existing types. `TemariPlanRequest` becomes a
 `TemariRequestPlan`, then persisted `WorkflowCheckpoint` and `WorkflowReceipt`
 records. Evidence bytes must verify before interpreting a `CloseoutDecision`.
