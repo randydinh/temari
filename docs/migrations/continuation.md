@@ -312,6 +312,19 @@ ledger or shared-library change. Raw Ctrl-C handling applies only to a terminal;
 malformed pipe bytes produce terminal BLOCKED. All 39 focused checks pass after
 the repair. Independent re-review and fresh exact-head CI remain required.
 
+The repair was committed as `9773b23`. A second native terminal probe retained
+the descriptor-bound empty checkpoint through raw Ctrl-C exit130, resumed at
+investigate in a new session, then intentionally returned ISSUES through CRLF
+and persisted that nonpass with exit1. Its evidence is retained separately in
+`.audit/host-dialogue-repaired`; it is not a completed product journey. Main
+also passed all ten workspace typechecks and 557 tests across core, knowledge
+and plan-draft before this narrow repair; shared libraries did not change.
+Independent comment audit recommended two redundant comment removals and one
+shortening, applied without behavior changes or suppressions. The PR is linked
+here and in the task; the app could queue its page but exposed no attachment
+writer, so no saved attachment is claimed. Finish current-head review and CI
+before merge, then proceed to isolated packaging and public policy admission.
+
 Data follows the existing types. `TemariPlanRequest` becomes a
 `TemariRequestPlan`, then persisted `WorkflowCheckpoint` and `WorkflowReceipt`
 records. Evidence bytes must verify before interpreting a `CloseoutDecision`.

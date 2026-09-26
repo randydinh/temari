@@ -288,8 +288,7 @@ async function main(session) {
     };
     checkControlPaths(input, paths, stages);
     session.assertHealthy();
-    // Reserve exclusively only after validation/canonical overlap checks. A
-    // partial start remains diagnosable; it is never adopted by resume.
+    // Preserve partial starts for diagnosis; resume never adopts them.
     await mkdir(runDirectory, { mode: 0o700 });
     assert.equal(
       await directory(runDirectory),

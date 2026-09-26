@@ -8,7 +8,7 @@ const CONTROL_BYTES = 2048; // Includes LF, or both bytes of CRLF.
 const RESULT_BYTES = 32 * 1024;
 const FILE_BYTES = 1024 * 1024;
 const TOTAL_BYTES = 16 * FILE_BYTES;
-const SESSION_MS = 30 * 60 * 1000; // Fixed 30-minute invocation deadline.
+const SESSION_MS = 30 * 60 * 1000;
 const OUTPUT_MS = 5000; // Bounded output flush, including the final record.
 const statuses = ['PASS', 'ISSUES', 'BLOCKED', 'DROPPED'];
 const kinds = ['stdout', 'stderr', 'worker-result', 'verification', 'other'];
@@ -173,7 +173,6 @@ async function readResult(request) {
 
 export function diagnostic(error) {
   const message = error instanceof Error ? error.message : String(error);
-  // No protocol records or logs are written into stage workspaces.
   process.stderr.write(
     `experimental-local-host: ${message.slice(0, 512).replace(/[\x00-\x1f\x7f]/g, ' ')}\n`,
   );
