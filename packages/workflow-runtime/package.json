@@ -43,6 +43,10 @@
       "canonical-test": {
         "command": "node --test tools/canonical-runtime.test.mjs",
         "cache": false
+      },
+      "host-session-test": {
+        "command": "node --test tools/host-session.test.mjs",
+        "cache": false
       }
     }
   },

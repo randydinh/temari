@@ -120,7 +120,7 @@ the same stable patch ID as the final review,
 protected file hashes were preserved. No branch, worktree, or task was deleted.
 See [the runtime API and limits](./stage-evidence.md).
 
-The active candidate-aware closeout unit is on
+The completed candidate-aware closeout unit was developed on
 `codex/candidate-closeout-20260926`, in `.audit/worktrees/candidate-closeout`,
 based on the PR #51 merge. There was no open PR or active previous worker when
 this unit began. The unmodified baseline passed all eight core typecheck/test
@@ -146,7 +146,8 @@ patch passed all eight core typecheck/test targets (168 runtime tests, 258 core
 tests total) and all eleven compiled checks. No new comments or suppressions
 were added by this guard and its regression test.
 
-[PR #52](https://github.com/randydinh/temari/pull/52) is open. Independent source
+[PR #52](https://github.com/randydinh/temari/pull/52) was held open during these
+checks. Independent source
 and decision-trail review of `c93fcdc12116f6f7bb56da7180a29a88a87fb8a8` returned
 FAIL: the scheduled wrapper could accept caller mutations during its run-store
 prelude before the direct entry captured candidate intent, including a silent
@@ -254,6 +255,75 @@ and all previously reviewed takeover tests remain unchanged; independent delta
 review and fresh platform CI are still required.
 Main independently reproduced the four core typechecks and all 275 core tests
 (including runtime185), then passed formatting and whitespace checks.
+
+Final independent review passed at
+`2f54bf8bf4e1662d34156e13146c2b179362e5ff`, reproducing the four core
+typechecks, 275 tests and two additional renewal failure probes. Linux run
+`36227717603` and Windows run `36227715032` both passed at that exact head.
+PR #52 merged as `0d6c7a1e4afa8ade8f1d5496d2194d059fe4356f` on
+2026-09-26 at 07:50 UTC. The reviewed and merged changes share stable patch ID
+`b5ae95d60f4aaa56199d641a3b428c4830307203`. Main was fast-forwarded with
+the original privacy, lockfile and tsconfig changes and their hashes preserved.
+The failed review/CI attempts above remain historical evidence, not active
+gates or passing runs. Independent review used a separate context with the
+inherited model; it was not cross-model review or installed-product QA.
+
+The next unit starts from that merge in `.audit/worktrees/public-entry-host`,
+branch `codex/public-entry-host-20260926`. There was no open PR or active
+previous worker at its start. It will compare and implement a bounded host
+entry boundary using the canonical runtime. No installed discovery root,
+marketplace, private overlay or existing plugin may be changed by this unit.
+Actual host acceptance and independent product QA remain open.
+
+The design comparison selected a private local stdio bridge, rather than a
+direct-only callback facade that cannot reach native Codex tools from stock
+Node. This first increment is explicitly experimental transport, not public
+skill installation or policy migration. It uses the existing runtime's
+candidate observations, evidence, checkpoints and terminal receipts. No shared
+library, pinned asset, installed plugin or capability proof is changed.
+See [the boundary, usage and limits](./host-session.md).
+
+The new focused Nx target passes 37 subprocess checks locally: actual candidate
+changes and persisted verification; fresh-session prefix reuse; empty intent;
+dirty unacknowledged build and orphan refusal; malformed/stale/duplicate/oversized
+input; confined evidence bytes; lost input/output and SIGINT; changed retained
+intent/manifest; and terminal no-replay. A native Codex PTY probe used the real
+entry, actual patch/read/assert tools and bounded regular-file product. It
+acknowledged build, exited 130 on raw Ctrl-C, resumed at review in a new session,
+and persisted PASS with all six stages and the original start time. LF and CRLF
+replies worked. This used source bridge files and a separately built/checked
+canonical artifact, not an installed public capsule. Self-review only was
+requested; no independent product QA or host capability was claimed. Retained
+local evidence is under the ignored `.audit/host-dialogue-native` directory.
+Source/trail review and exact-head Linux/Windows CI remain merge gates.
+
+[PR #53](https://github.com/randydinh/temari/pull/53) was opened at `3c77814`.
+Independent review reproduced a candidate-root substitution: changing only the
+descriptor to a different directory with identical bytes redirected resumed
+work and could still yield PASS. It also found that ETX in an ordinary pipe was
+misclassified as a keyboard interrupt. Test-first commit `cfb2599` reproduced
+both failures (37 passing checks, two failing). That head is not mergeable on
+the strength of its other passing tests or CI.
+
+The scoped repair derives the runtime's candidate scope ID from the canonical
+validated invocation descriptor. Existing empty-checkpoint identity now binds
+the original root, run directory and runtime selection without a new progress
+ledger or shared-library change. Raw Ctrl-C handling applies only to a terminal;
+malformed pipe bytes produce terminal BLOCKED. All 39 focused checks pass after
+the repair. Independent re-review and fresh exact-head CI remain required.
+
+The repair was committed as `9773b23`. A second native terminal probe retained
+the descriptor-bound empty checkpoint through raw Ctrl-C exit130, resumed at
+investigate in a new session, then intentionally returned ISSUES through CRLF
+and persisted that nonpass with exit1. Its evidence is retained separately in
+`.audit/host-dialogue-repaired`; it is not a completed product journey. Main
+also passed all ten workspace typechecks and 557 tests across core, knowledge
+and plan-draft before this narrow repair; shared libraries did not change.
+Independent comment audit recommended two redundant comment removals and one
+shortening, applied without behavior changes or suppressions. The PR is linked
+here and in the task; the app could queue its page but exposed no attachment
+writer, so no saved attachment is claimed. Finish current-head review and CI
+before merge, then proceed to isolated packaging and public policy admission.
 
 Data follows the existing types. `TemariPlanRequest` becomes a
 `TemariRequestPlan`, then persisted `WorkflowCheckpoint` and `WorkflowReceipt`
