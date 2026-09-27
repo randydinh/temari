@@ -506,6 +506,77 @@ The source task's 30-minute continuation named
 thread closeout. It must not resume alongside the successor owner. Any future
 recurring continuation must have one explicit owner and avoid duplicate workers.
 
+## Current unit — public-entry packaging (working)
+
+This unit is being developed from `bd826463ab35bf2746381437ed33cba295f31c85`
+(`origin/main`) on the isolated branch
+`codex/public-entry-packaging-20260926`. The protected successor checkout and
+main-checkout privacy, lockfile and tsconfig work are not in this branch.
+The implementation commit for the initial unit is
+`19b5fbc73fb6b47988fe748c21c2cdef14cc34c7`. The pushed branch currently ends
+at `c0cabf5700cc545fc668146c7efa169c2de563fd`. The verified repair is
+committed locally and has not been pushed.
+
+The new outer bundle keeps the exact four-package canonical runtime under a
+nested `runtime/` directory, copies the reviewed experimental bridge under
+`host/`, and adds a separate outer inventory/provenance manifest. It exposes
+three current public skill wrappers plus executable preflight entries for
+`temari`, `poteto-mode`, and `closeout`. The wrappers do not define a second
+lifecycle: scheduling, checkpoints, receipts, evidence and closeout remain
+owned by the canonical runtime and existing stores.
+
+The public admission policy is intentionally narrow and explicit. It records
+the exact v4.1 feature profile/playbook hashes as provenance, admits only the
+reviewed `full-playbook` / `feature-v1` shape with required delegation,
+independent review, revision-bound evidence and pull-request delivery, and
+refuses lightweight and QA routes. Because the experimental bridge proves no
+host capabilities, a matching feature request returns `blocked` with missing
+`subagents` and `forge`; it never accepts caller-authored capability labels.
+The closeout entry returns `blocked` until trusted invocation input and
+independent current-candidate selection are implemented.
+
+Independent review rejected the initial packaging head because the outer
+manifest could be rewritten with its payload, policy and request files could
+follow symlinks, and a failed build could leave a partial destination. The
+repair requires an external SHA-256 for every artifact check, reads policy and
+request JSON through bounded regular-file descriptors, builds in a sibling
+staging directory, and uses an exclusive publication reservation. It keeps
+the existing canonical runtime and preflight lifecycle unchanged.
+
+Use `--expected-manifest-sha256 HEX` with the packager checker. The digest must
+come from a trusted channel outside the artifact. The manifest alone is an
+inventory, not an authenticator.
+
+Actual local evidence for this unit:
+
+- `workflow-runtime:public-entry-test`: 9/9 passed, including relocation,
+  provenance hash matching, external-digest enforcement, unsupported-route
+  refusal, capability blocking, closeout blocking, symlink refusal, failed
+  publication cleanup, concurrent publication ownership, and no-overwrite
+  publication.
+- `workflow-runtime:canonical-test`: 11/11 passed.
+- `workflow-runtime:host-session-test`: 39/39 passed.
+- Five affected-project typechecks passed (`contracts`, `temari-core`,
+  `workflow-engine`, `runtime`, `workflow-runtime`). Core, engine and runtime
+  test projects passed (24 + 48 + 18 + 185 tests). The legacy
+  `workflow-runtime:test` lane ran 33/34 tests but its pre-existing upstream
+  maintenance test cannot start because this environment has no `bun`
+  executable (`spawnSync bun ENOENT`); no legacy source or tooling was changed.
+- Plugin JSON and all three skill frontmatters passed structural checks. The
+  bundled Python validators could not run because this environment lacks the
+  `yaml` module; the equivalent manifest/frontmatter fields were checked with
+  Node and Ruby.
+
+This is still packaging/preflight evidence, not installed-host acceptance,
+independent product-QA evidence, or distributed/multi-machine proof. The
+independent repair review passed locally. The next safe action is to push
+the repair branch, open a PR, and obtain exact-head Linux/Windows CI before
+merging this scoped packaging unit. PR creation is
+currently blocked because this host has no `gh` executable and its Mac browser
+surface is unavailable while the Mac is locked. No PR or merge is claimed.
+Afterward, implement trusted installed closeout and live host/QA evidence
+before shared-service workers and real multi-machine recovery.
+
 ## Remaining gates
 
 - Public entry packaging and proof that the installed host uses the new core.
