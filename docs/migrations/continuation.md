@@ -25,9 +25,13 @@ launch an evaluator context, so QA remains `BlockedOrIncomplete` with no
 round. The synthetic PASS and REVISE core tests exercise mechanical verdict
 plumbing only. The generic feature exclusion and public policy ID remain
 unchanged, protecting existing lightweight and closeout admissions.
-Independent review, exact-head CI, a real evaluator adapter, and final
-cutover approval remain open. The original dirty checkout and installed
-plugin are untouched. Do not merge this draft before independent review.
+Draft [PR #61](https://github.com/randydinh/temari/pull/61) is open. A fresh
+read-only Codex review attempt was rejected by the workspace approval
+boundary because it could transmit repository contents to another service;
+no workaround was attempted. Independent review, exact-head CI, a real
+evaluator adapter, and final cutover approval remain open. The original dirty
+checkout and installed plugin are untouched. Do not merge this draft before
+independent review.
 
 ## NX-02 installed closeout handoff — 2026-09-28
 
