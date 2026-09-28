@@ -130,3 +130,7 @@ Protocol reference: [Codex App Server](https://learn.chatgpt.com/docs/app-server
 Local verification passed: 31 privacy tests, 67 host-adapter tests, 37 generator tests, 2 relocated adapter/transport tests, and 77 native workflow/lifecycle tests. The existing workflow-runtime tests, all 11 project typechecks, formatting, generated-provenance checks, and `git diff --check` also passed. Tests used synthetic fixtures; no real credentials or model inference were used.
 
 The real credential-free preflight was an expected refusal, not a successful isolation test: `feature-state (unified_exec)`, with `credentialRequests: 0`. CI coverage has been added but has not yet run on GitHub. Live private-data use remains blocked pending a compatible runtime and independent enforcement verification.
+
+## Verification record — 2026-09-28
+
+At code commit `93c3786f049731ddc5a55502cd6c3f03b60000be`, uncached Nx checks passed 31 privacy, 69 host-adapter, 34 workflow-runtime, 37 generator, 2 relocated adapter, 77 synthetic native, and 31 public-entry tests. The Archon package check accepted all 237 inventory entries. The current installed Codex preflight refused `runtime-version`, exit 1, with zero credential requests. The [NX-04 handoff](./migrations/nx-04-privacy-handoff.md) records the exact commands and artifact digest. CI and independent review are still pending for the final PR head. Live private use remains blocked.

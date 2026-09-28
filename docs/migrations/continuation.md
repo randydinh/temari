@@ -4,7 +4,29 @@ This record is for the maintainer who resumes the migration. Read the current
 Git state and pull requests before acting. A checked implementation item does
 not replace acceptance evidence from the installed product.
 
+## NX-04 privacy integration handoff — 2026-09-28
+
+The privacy source is on the isolated branch
+`codex/nx04-privacy-integration-20260928`, based on merged `main` at
+`8cb14df8629b44fca3e12632c6a045adc4bff962`. The code milestone is
+`93c3786f049731ddc5a55502cd6c3f03b60000be`. The dirty
+`/Users/randydinh/source/projects/temari-next` checkout stayed read-only.
+The [NX-04 handoff](./nx-04-privacy-handoff.md) records its complete 34-path
+inventory, deliberate differences, verification commands, and release gate.
+
+The callback now receives the original protected schema property names while
+argument values stay masked. File reads reject replaceable ancestors. The
+generated Archon copies and 237-file inventory have current source hashes.
+The merged `public-entry-test` target and CI invocation remain intact.
+Synthetic checks do not authorize private use. The current installed Codex
+preflight refused `runtime-version` before credentials, and the earlier alpha
+audit refused `unified_exec`. Keep private use blocked pending compatible
+runtime isolation, independent review, and explicit operator cutover approval.
+
 ## NX-01 source channel handoff — 2026-09-28
+
+This historical checkpoint predates the PR #56 merge. The NX-04 section above
+records the current base and privacy integration state.
 
 Branch `codex/nx-installed-journey-20260928` in the exclusive
 `/private/tmp/temari-nx-installed-20260928` worktree starts from
