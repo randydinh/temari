@@ -14,6 +14,11 @@ import {
 import { setImmediate as nextTurn } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import {
+  loadSourceContract,
+  attachSourceClaims,
+  assertSourceEvidence,
+} from './source.mjs';
+import {
   controlLine,
   createStdioSession,
   diagnostic,
@@ -256,14 +261,18 @@ async function main(session) {
       absolute(inputArgument),
       CONFIG_BYTES,
     );
-    exactFields(request, [
-      'schemaVersion',
-      'runId',
-      'revision',
-      'candidate',
-      'runDirectory',
-      'obligations',
-    ]);
+    exactFields(
+      request,
+      [
+        'schemaVersion',
+        'runId',
+        'revision',
+        'candidate',
+        'runDirectory',
+        'obligations',
+      ],
+      ['sourceProfile'],
+    );
     assert(request.schemaVersion === 1, 'Unsupported request schema.');
     identity(request);
     validateObligations(request.obligations, hostCapabilities);
@@ -285,6 +294,9 @@ async function main(session) {
       capabilities,
       expectedInitial: await runtime.observeCandidate(candidate),
       runtimeManifestSha256,
+      ...(request.sourceProfile === undefined
+        ? {}
+        : { sourceProfile: request.sourceProfile }),
     };
     checkControlPaths(input, paths, stages);
     session.assertHealthy();
@@ -308,17 +320,21 @@ async function main(session) {
       join(runDirectory, 'config', 'input.json'),
       CONFIG_BYTES,
     );
-    exactFields(input, [
-      'schemaVersion',
-      'runId',
-      'revision',
-      'candidate',
-      'runDirectory',
-      'plan',
-      'capabilities',
-      'expectedInitial',
-      'runtimeManifestSha256',
-    ]);
+    exactFields(
+      input,
+      [
+        'schemaVersion',
+        'runId',
+        'revision',
+        'candidate',
+        'runDirectory',
+        'plan',
+        'capabilities',
+        'expectedInitial',
+        'runtimeManifestSha256',
+      ],
+      ['sourceProfile'],
+    );
     assert(input.schemaVersion === 1, 'Unsupported run descriptor schema.');
     identity(input);
     assert.equal(
@@ -370,6 +386,16 @@ async function main(session) {
     checkControlPaths(input, paths, stages);
   }
   session.assertHealthy();
+  const sourceContract =
+    input.sourceProfile === undefined
+      ? null
+      : await loadSourceContract(contracts, runtimeRoot, input.sourceProfile);
+  if (sourceContract)
+    assert.deepEqual(
+      input.plan,
+      sourceContract.plan,
+      'Retained execution plan differs from the pinned source plan.',
+    );
   const [receipts, checkpoints, evidenceStore, workspaceManifestStore] =
     await Promise.all([
       runtime.FileWorkflowReceiptStore.create(paths.stores[0]),
@@ -385,24 +411,57 @@ async function main(session) {
         (await checkpoints.load(input.runId)),
       'Resume requires an original checkpoint or terminal receipt.',
     );
+    if (sourceContract) {
+      const retained =
+        (await checkpoints.load(input.runId)) ??
+        (await receipts.load(input.runId));
+      await assertSourceEvidence(
+        retained,
+        evidenceStore,
+        sourceContract,
+        runtime,
+      );
+    }
   }
   const store = {
     load: (id) => receipts.load(id),
     save: async (receipt) => {
       await nextTurn();
       if (receipt.status !== 'BLOCKED') session.assertHealthy();
+      if (sourceContract && receipt.status === 'PASS')
+        await assertSourceEvidence(
+          receipt,
+          evidenceStore,
+          sourceContract,
+          runtime,
+          true,
+        );
       const saved = await receipts.save(receipt);
       if (receipt.status !== 'BLOCKED') session.assertHealthy();
       return saved;
     },
   };
+  const checkpointStore = sourceContract
+    ? {
+        load: (id) => checkpoints.load(id),
+        save: async (checkpoint) => {
+          await assertSourceEvidence(
+            checkpoint,
+            evidenceStore,
+            sourceContract,
+            runtime,
+          );
+          return checkpoints.save(checkpoint);
+        },
+      }
+    : checkpoints;
   const receipt = await runtime.executeAndPersist({
     runId: input.runId,
     revision: input.revision,
     plan: input.plan,
     capabilities: input.capabilities,
     store,
-    checkpointStore: checkpoints,
+    checkpointStore,
     stageEvidence: { store: evidenceStore },
     workspaceManifestStore,
     workspaceForStage: paths.workspaceForStage,
@@ -411,12 +470,16 @@ async function main(session) {
       expectedInitial: input.expectedInitial,
       knownWriteRoots: paths.knownWriteRoots,
     },
-    handler: (stage) =>
-      session.stage(
+    handler: async (stage) => {
+      const result = await session.stage(
         stage,
         paths.workspaceForStage(stage).root,
         input.candidate,
-      ),
+      );
+      return sourceContract && result.status === 'PASS'
+        ? attachSourceClaims(stage, result, input, sourceContract)
+        : result;
+    },
     onStageCheckpoint: async (checkpoint) => {
       await session.emit({
         type: 'checkpoint',

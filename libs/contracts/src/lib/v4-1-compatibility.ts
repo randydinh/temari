@@ -7,6 +7,7 @@ import {
   type WorkType,
   type WorkflowStageId,
 } from './execution-plan.js';
+import type { WorkerEvidenceReference } from './evidence.js';
 
 export type V41Route = 'lightweight-engineering' | 'feature';
 export type V41Boundary = 'final' | 'commit' | 'review' | 'publish';
@@ -69,6 +70,14 @@ export interface V41PlanBoundaryInput {
   readonly boundary: V41Boundary;
   readonly playbookText: string;
   readonly workType: WorkType;
+  readonly sourceEvidence?: readonly V41RetainedRequirementEvidence[];
+}
+
+export interface V41RetainedRequirementEvidence {
+  readonly id: string;
+  readonly stage: WorkflowStageId;
+  readonly sourceKind: V41EvidenceKind;
+  readonly reference: WorkerEvidenceReference;
 }
 
 export interface V41PlanBoundary {
@@ -158,6 +167,32 @@ const SHA256 = /^[a-f0-9]{64}$/;
 const SOURCE_REVISION = /^[a-f0-9]{40}$/;
 
 const FEATURE_PLAYBOOK_PATH = '../../playbooks/feature.md';
+const LIGHTWEIGHT_PROFILE_SHA256 =
+  '94370c4bbbd48666807630abd2866f0727ccf3ab614d23fd4b2d3c3b98d493e7';
+const LIGHTWEIGHT_SOURCE_REVISION = '959c8f7be3d7b684207d9e626263d41540d5ecdc';
+const LIGHTWEIGHT_PLAYBOOK_PATH = '../../playbooks/lightweight-engineering.md';
+const LIGHTWEIGHT_PLAYBOOK_SHA256 =
+  '320f33d095434c5a58fd2adb2abf6a1fcd458fe3a2af431a227d6f51dde6e492';
+const LIGHTWEIGHT_STAGE_MAPPING: Readonly<
+  Record<WorkflowStageId, readonly string[]>
+> = {
+  investigate: ['lightweight.intake.inspect'],
+  plan: ['lightweight.route.qualifies'],
+  build: ['lightweight.build.smallest-complete-change'],
+  review: ['lightweight.verify.direct-check'],
+  verify: ['lightweight.verify.direct-check'],
+  deliver: [
+    'lightweight.intake.inspect',
+    'lightweight.route.qualifies',
+    'lightweight.build.smallest-complete-change',
+    'lightweight.verify.direct-check',
+  ],
+};
+const LIGHTWEIGHT_REQUIRED_EVIDENCE = DEFAULT_STAGES.filter(
+  (stage) => stage !== 'deliver',
+).flatMap((stage) =>
+  LIGHTWEIGHT_STAGE_MAPPING[stage].map((id) => `${stage}:${id}`),
+);
 const FEATURE_SOURCE_STAGE_IDS = [
   'shape',
   'build',
@@ -707,7 +742,9 @@ function boundaryResult(
     stageMapping:
       parsed.profile.route === 'feature'
         ? FEATURE_STAGE_MAPPING
-        : EMPTY_STAGE_MAPPING,
+        : parsed.identity.profileSha256 === LIGHTWEIGHT_PROFILE_SHA256
+          ? LIGHTWEIGHT_STAGE_MAPPING
+          : EMPTY_STAGE_MAPPING,
     requiredGates: parsed.profile.boundaries[input.boundary].resolvedGates,
     plan,
     reason,
@@ -726,6 +763,83 @@ export function assessV41PlanBoundary(
 ): V41PlanBoundary {
   const profile = input.parsed.profile;
   const sourceStageIds = profile.stages.map((stage) => stage.id);
+
+  if (profile.route === 'lightweight-engineering') {
+    if (
+      input.parsed.identity.profileSha256 !== LIGHTWEIGHT_PROFILE_SHA256 ||
+      input.parsed.identity.sourceRevision !== LIGHTWEIGHT_SOURCE_REVISION ||
+      profile.id !== 'lightweight-engineering-v1' ||
+      profile.playbook.path !== LIGHTWEIGHT_PLAYBOOK_PATH ||
+      profile.playbook.sha256 !== LIGHTWEIGHT_PLAYBOOK_SHA256 ||
+      input.workType !== 'feature'
+    )
+      return boundaryResult(
+        input,
+        'incompatible',
+        'Lightweight profile is not the pinned source contract.',
+        null,
+      );
+    if (
+      sha256(canonicalPlaybookText(input.playbookText)) !==
+      LIGHTWEIGHT_PLAYBOOK_SHA256
+    )
+      return boundaryResult(
+        input,
+        'blocked',
+        'Playbook bytes do not match the pinned lightweight playbook.',
+        null,
+      );
+    if (profile.boundaries[input.boundary].resolvedGates.length > 0)
+      return boundaryResult(
+        input,
+        'blocked',
+        'Source boundary requires unresolved gates: operator-approval.',
+        null,
+      );
+    const evidence = input.sourceEvidence ?? [];
+    const expected = LIGHTWEIGHT_REQUIRED_EVIDENCE;
+    const actual = evidence.map((item) => `${item.stage}:${item.id}`);
+    const requirements = new Map(
+      profile.stages.flatMap((stage) =>
+        stage.requirements.map((requirement) => [requirement.id, requirement]),
+      ),
+    );
+    if (
+      !sameSet(actual, expected) ||
+      actual.length !== expected.length ||
+      new Set(actual).size !== expected.length ||
+      evidence.some(
+        (item) =>
+          !requirements
+            .get(item.id)
+            ?.allowedEvidenceKinds.includes(item.sourceKind) ||
+          item.reference.schema !== 1 ||
+          !SHA256.test(item.reference.sha256) ||
+          !Number.isSafeInteger(item.reference.bytes) ||
+          item.reference.bytes <= 0 ||
+          !item.reference.runId ||
+          !item.reference.revision,
+      )
+    )
+      return boundaryResult(
+        input,
+        'blocked',
+        'Verified lightweight source evidence is incomplete or incompatible.',
+        null,
+      );
+    return boundaryResult(
+      input,
+      'supported',
+      null,
+      reconcilePlan({
+        workType: 'feature',
+        delegation: 'none',
+        review: 'self',
+        evidence: 'revision-bound',
+        delivery: 'local',
+      }),
+    );
+  }
 
   if (profile.route !== 'feature') {
     return boundaryResult(

@@ -4,7 +4,63 @@ This record is for the maintainer who resumes the migration. Read the current
 Git state and pull requests before acting. A checked implementation item does
 not replace acceptance evidence from the installed product.
 
-## Current handoff — 2026-09-26
+## NX-01 source channel handoff — 2026-09-28
+
+Branch `codex/nx-installed-journey-20260928` in the exclusive
+`/private/tmp/temari-nx-installed-20260928` worktree starts from
+`709480ad845435811427284663ba939ee0d12f7a`. PR #56 froze the first
+NX-01 implementation at `0c673724484fe2ea7af5a9526a5d3a82459a01a9`.
+Independent review failed that head because generic `verification` payloads
+produced a public PASS without satisfying any pinned lightweight source
+requirements. The first repair was committed at
+`6c300a2ca2e0a23a8586cb7d12453c8679d247c9`. Its Linux `main` and
+`windows-x64` PR checks passed. The independent rereview then reproduced a
+remaining alias: allowed source-kind claims could point at ordinary generic
+`verification` payloads and produce PASS. Commit
+`4bf4713b2a887ad2d43086893c7cad3a36b3dab4` requires a dedicated
+`source` payload with generic kind `other`. Independent code review returned
+PASS+NOTES at that commit. Linux CI run `36410884037` and Windows run
+`36410878158` both passed at that exact head. PR #56 remains draft against
+`709480ad845435811427284663ba939ee0d12f7a`. No installed plugin or
+user-owned checkout was changed.
+
+The [installed lightweight public-entry record](./installed-public-journey.md)
+contains the request contract, pinned v4.1 source mapping, commands, literal
+candidate SHA-256, and open gates. The [repair decision trail](./nx-01-repair-decisions.tsv)
+records both failures and the enforcement choice. The new regression first
+returned exit 1 with 25 of 26 public-entry tests passing at `6c300a2` because
+the bridge acknowledged the generic-payload alias. With the channel repair,
+31 of 31 public-entry tests pass. A source claim must now name the dedicated
+`source` payload with generic kind `other`; `source-requirements` is reserved.
+The bridge checks the same rule against retained records after restart. A
+source-kind label is the host's attestation over those retained bytes, not
+content-type inference or an independent QA judgment.
+
+At `4bf4713`, the independent reviewer packaged and checked a clean 79-file
+outer bundle with manifest SHA-256
+`ae872ce03245b137bb351a7de78709a847627cca42ef1bc6284989c7ede044c3`.
+Its direct synthetic probe resumed after build, retained all four source IDs,
+and blocked the generic-payload alias before an investigate checkpoint. It
+also blocked changed dedicated source bytes on resume. Focused local checks
+passed: public-entry 31/31, canonical 11/11, host-session 39/39, five
+typechecks, and four core test targets. The separate native Codex-host run at
+that commit changed the synthetic product to the expected digest, resumed at
+review, and retained dedicated source claims for all four IDs. Its six-stage
+receipt passed. The [installed journey record](./installed-public-journey.md)
+separates the local synthetic, native-host, and independent review evidence.
+
+Linux CI runs `workflow-runtime:public-entry-test`; the passing Windows
+workflow does not. The Windows run therefore does not establish installed
+public-entry acceptance on Windows. Independent product QA, read-only
+closeout with an independently selected current candidate, shared-service
+coordination, and cutover remain separate gates. Full-feature and QA routes
+still lack their required capabilities; publish still needs operator approval.
+Keep PR #56 draft for operator review. If a documentation commit changes the
+head, obtain fresh checks for that head before integration. Recheck remote
+`main` before integration; neither the code-head checks nor a synthetic
+receipt authorize merge, installed-plugin replacement, or WP3 live acceptance.
+
+## Earlier handoff — 2026-09-26
 
 Continue in [Choose temari build source (3)](codex://threads/01a0dcca-d913-7d52-9f1b-16e47b5bd90a).
 The user requested closure of the completed increment in the source thread and
@@ -506,16 +562,16 @@ The source task's 30-minute continuation named
 thread closeout. It must not resume alongside the successor owner. Any future
 recurring continuation must have one explicit owner and avoid duplicate workers.
 
-## Current unit — public-entry packaging (working)
+## Earlier public-entry packaging checkpoint — 2026-09-26
 
-This unit is being developed from `bd826463ab35bf2746381437ed33cba295f31c85`
+This unit was being developed from `bd826463ab35bf2746381437ed33cba295f31c85`
 (`origin/main`) on the isolated branch
 `codex/public-entry-packaging-20260926`. The protected successor checkout and
 main-checkout privacy, lockfile and tsconfig work are not in this branch.
 The implementation commit for the initial unit is
-`19b5fbc73fb6b47988fe748c21c2cdef14cc34c7`. The pushed branch currently ends
-at `c0cabf5700cc545fc668146c7efa169c2de563fd`. The verified repair is
-committed locally and has not been pushed.
+`19b5fbc73fb6b47988fe748c21c2cdef14cc34c7`. At this checkpoint, the
+pushed branch ended at `c0cabf5700cc545fc668146c7efa169c2de563fd` and
+the verified repair was committed locally but not pushed.
 
 The new outer bundle keeps the exact four-package canonical runtime under a
 nested `runtime/` directory, copies the reviewed experimental bridge under
@@ -567,17 +623,12 @@ Actual local evidence for this unit:
   `yaml` module; the equivalent manifest/frontmatter fields were checked with
   Node and Ruby.
 
-This is still packaging/preflight evidence, not installed-host acceptance,
-independent product-QA evidence, or distributed/multi-machine proof. The
-independent repair review passed locally. The next safe action is to push
-the repair branch, open a PR, and obtain exact-head Linux/Windows CI before
-merging this scoped packaging unit. PR creation is
-currently blocked because this host has no `gh` executable and its Mac browser
-surface is unavailable while the Mac is locked. No PR or merge is claimed.
-Afterward, implement trusted installed closeout and live host/QA evidence
-before shared-service workers and real multi-machine recovery.
+At this checkpoint, the result was packaging and preflight evidence. It did
+not establish installed-host acceptance, independent product QA, or
+distributed recovery. The independent repair review had passed locally.
+The NX-01 handoff above records later evidence and the current PR gate.
 
-## Remaining gates
+## Program gates from the earlier checkpoint
 
 - Public entry packaging and proof that the installed host uses the new core.
 - Integrate the locally verified candidate reader into actual host closeout;

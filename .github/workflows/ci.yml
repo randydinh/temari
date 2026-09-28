@@ -49,4 +49,4 @@ jobs:
         run: pnpm exec nx run-many -t test -p contracts,temari-core,workflow-engine,runtime --parallel=1 --skipNxCache --skipSync --output-style=static
       - run: pnpm exec nx run knowledge:test --output-style=static
       - run: pnpm exec nx run plan-draft:test --output-style=static
-      - run: pnpm exec nx run-many -p workflow-runtime -t test check canonical-test host-session-test --skipNxCache --skipSync --output-style=static
+      - run: pnpm exec nx run-many -p workflow-runtime -t test check canonical-test host-session-test public-entry-test --skipNxCache --skipSync --output-style=static
