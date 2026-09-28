@@ -24,13 +24,14 @@
       "test": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "node --import @swc-node/register/esm-register --test libs/host-adapters/src/lib/host-adapters.test.ts",
+          "command": "node --import @swc-node/register/esm-register --test libs/host-adapters/src/lib/*.test.ts",
           "cwd": "{workspaceRoot}"
         }
       }
     }
   },
   "dependencies": {
+    "@temari/privacy": "workspace:*",
     "@temari/contracts": "workspace:*"
   }
 }

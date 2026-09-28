@@ -28,6 +28,7 @@ integrations/archon/.archon/workflows/temari-pilot.yaml
 integrations/archon/README.md
 integrations/archon/bridge.test.ts
 integrations/archon/bridge.ts
+integrations/archon/codex-model-driver.ts
 integrations/archon/fixtures/pilot.ts
 integrations/archon/fixtures/stage.ts
 integrations/archon/lifecycle.test.ts
@@ -41,6 +42,8 @@ integrations/archon/live-tasks.test.ts
 integrations/archon/live-tasks.ts
 integrations/archon/live.test.ts
 integrations/archon/live.ts
+integrations/archon/model-transport.ts
+integrations/archon/privacy.ts
 integrations/archon/runtime-files.txt
 integrations/archon/smoke.ts
 integrations/archon/tsconfig.json

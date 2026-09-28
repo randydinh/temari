@@ -12,6 +12,7 @@ const compatibility = { version: "0.10.1", commit: "9820785c" };
 export const payload = [
   "integrations/archon/lifecycle.ts", "integrations/archon/README.md", "integrations/archon/bridge.ts", "integrations/archon/smoke.ts",
   "integrations/archon/live.ts", "integrations/archon/live-codex.ts", "integrations/archon/live-routing.ts", "integrations/archon/live-tasks.ts", "integrations/archon/live-permissions.ts", "integrations/archon/.archon/workflows/temari-live-pilot.yaml",
+  "integrations/archon/privacy.ts", "integrations/archon/model-transport.ts", "integrations/archon/codex-model-driver.ts",
   "integrations/archon/fixtures/pilot.ts", "integrations/archon/fixtures/stage.ts", "integrations/archon/.archon/workflows/temari-pilot.yaml",
   "skills/poteto-mode/scripts/package.json", "skills/poteto-mode/scripts/bun.lock",
   ...["profiles", "receipt", "store", "types", "workflow"].map(name => `skills/poteto-mode/scripts/workflow/${name}.ts`),
