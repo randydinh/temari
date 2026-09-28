@@ -24,6 +24,53 @@ Draft [PR #58](https://github.com/randydinh/temari/pull/58) remains open.
 The owner authorized merge only after a new independent review; this repair
 unit does not merge the PR.
 
+## 2026-09-28 Basic authorization repair — review hold
+
+Independent threat review of `4067c113a9887a05ab81b6645b712a01c4750fab`
+failed: a synthetic free-text `Authorization: Basic <base64 credential>` reached
+the model prompt, tool description, and callback result. A structured
+`authorization` field was masked. Red regression commit
+`a4db61fecc6b58ace9270c5374655dc2c2bf17e4` reproduced the source and
+relocated leaks: the uncached Nx `privacy,host-adapters` test run exited 1 and
+`workflow-runtime:privacy-test` exited 1. Green commit
+`1fb4c51be8f6d1b1b106ef170c1a52764b13aa00` recognizes case and whitespace
+variants, masks canonical Basic credentials, and rejects ambiguous syntax.
+The issued-placeholder revocation, ordinary rehydration, earlier bracketed
+credential cases, and integer-index callback cases remain covered. The
+authoritative privacy source was regenerated into the Archon copy and its
+source/artifact hashes in `provenance.json` were updated. All fixtures are
+synthetic.
+
+The prior CI at `4067c11` is historical evidence only. [Windows run
+36435012839 attempt 1](https://github.com/randydinh/temari/actions/runs/36435012839/attempts/1)
+failed at the `v4-1-compatibility.test.ts` file marker after 25 named assertions
+passed. [Attempt 2](https://github.com/randydinh/temari/actions/runs/36435012839/attempts/2)
+succeeded at the same SHA, including installed-host steps. [Linux run
+36435018521](https://github.com/randydinh/temari/actions/runs/36435018521)
+succeeded at the same SHA. The first Windows child exit code was not logged;
+no root cause is established. The ordinary isolated `contracts:test` command
+was preserved.
+
+At the green code commit `1fb4c51`, every command below used
+`PATH=/opt/homebrew/bin:$PATH NX_DAEMON=false` and the
+`--skipNxCache --skipSync --output-style=static` suffix. The table records the
+command body, exit code, and observed result at that candidate SHA.
+
+| `pnpm exec nx` command body                                                                                                                                                                                     | Exit | Observed result                                                                                                                                            |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---: | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `run-many -t typecheck test --projects=privacy,host-adapters,workflow-runtime,contracts --parallel=2`                                                                                                           |    0 | Privacy 35, host adapters 75, workflow runtime 34, contracts 25; all selected typechecks passed. `contracts:test` retained Node's ordinary file isolation. |
+| `run-many -p workflow-runtime -t privacy-test public-entry-test --parallel=2`                                                                                                                                   |    0 | Generator 37, relocated transport 5 including Basic and numeric-key cases, installed public entry 35.                                                      |
+| `run workflow-runtime:privacy-native-test`                                                                                                                                                                      |    0 | Packaged Archon native/lifecycle tests 77.                                                                                                                 |
+| `run-many -p workflow-runtime -t host-session-test canonical-test --parallel=2`                                                                                                                                 |    0 | Host session 39 and canonical artifact 11.                                                                                                                 |
+| `run workflow-runtime:check`                                                                                                                                                                                    |    0 | Source inventory and generated provenance matched 237 files.                                                                                               |
+| `run workflow-runtime:package --args='--lane archon'`                                                                                                                                                           |    0 | Existing 237-file artifact remained at digest `4ca80d10362037d74f781cf4b1acdeed2a01e9b0fb673bc200adbc28425c55c5`.                                          |
+| `run workflow-runtime:check --args='--artifact /private/tmp/temari-nx04-privacy-20260928/packages/workflow-runtime/dist/archon-4ca80d10362037d74f781cf4b1acdeed2a01e9b0fb673bc200adbc28425c55c5 --lane archon'` |    0 | Relocated artifact matched all 237 inventory entries.                                                                                                      |
+| `run workflow-runtime:privacy-preflight --args='/opt/homebrew/bin/codex'`                                                                                                                                       |    1 | Installed Codex refused `runtime-version`; `credentialRequests` was 0. Private use remains blocked.                                                        |
+
+This handoff is a documentation-only commit after those code checks. The pushed
+final head needs new Linux and Windows CI and a fresh independent privacy
+review. PR #58 remains a draft and must not be merged from this worker.
+
 The source checkout `/Users/randydinh/source/projects/temari-next` remained
 read-only. Its baseline and the repair-time read-only check had 14 tracked
 edits and 20 untracked files. Both its

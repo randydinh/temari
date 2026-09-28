@@ -19,6 +19,17 @@ The branch integrated PR 57 at `dd9d197` and PR 59 from main
 The [NX-04 handoff](./nx-04-privacy-handoff.md) records the key-order premise,
 source and installed tests, generated copy, old CI evidence, and release gate.
 
+The review of `4067c11` then found a free-text Basic authorization leak across
+three model channels. Red `a4db61f` reproduced it in source and relocated
+Archon tests; green `1fb4c51` repaired the detector and regenerated provenance.
+The green commit passed uncached source, packaged transport, installed public
+entry, contracts, native Archon, host-session, canonical, and inventory checks.
+Windows run 36435012839 attempt 1 failed at a test-file marker after 25 named
+passes; attempt 2 passed at the same SHA. Linux run 36435018521 passed at that
+older SHA. The Windows failure's cause is unknown. The branch is held for
+fresh exact-head CI and independent review, with no merge or private-use
+approval.
+
 Linux run 36433849656 and Windows run 36433840630 passed for the pre-PR59
 head `79b88adc1e6497f038465427a0b20c8a6d4b060c`. At the PR59 merge
 commit, seven-project typecheck/test, installed public closeout, privacy,
