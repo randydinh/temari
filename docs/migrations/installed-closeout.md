@@ -39,7 +39,7 @@ roots, disjoint layout, retained descriptor, pinned canonical manifest, fixed
 capability report, and source profile. It derives the host scope ID with the
 same canonical descriptor hashing as the bridge. It opens only existing receipt,
 evidence, and workspace-manifest stores. The canonical verifier checks the
-six-stage PASS receipt, candidate bytes and permission bits, stage evidence,
+six-stage PASS receipt, candidate bytes and observed permission bits, stage evidence,
 and workspace manifests. The source verifier additionally checks the dedicated
 `source`/`other` payload claims: mapped IDs and stages, allowed source kinds,
 run/revision-bound references, and retained bytes. A refusal exits nonzero
@@ -56,10 +56,12 @@ engineering entry through all six stages in a fresh Node process, then calls
 the actual packaged `closeout` executable in another process. The expected
 product is the literal `APPLE\nPEAR\n` file with SHA-256
 `a356e1ad77377b48e6090cda3e5ae651809c835b3b9e65aa742d3d031b283fa8`;
-the candidate identity also includes path and nine permission bits. A recursive
+the candidate identity also includes path and the nine permission bits reported
+by the host filesystem. A recursive
 before/after snapshot of run and candidate paths compares entries, sizes,
 modes, modification times, and file hashes. Negative calls cover changed
-candidate bytes or mode, changed selected identity and its digest, tampered
+candidate bytes or a mode change observable through `lstat`, changed selected
+identity and its digest, tampered
 receipt/evidence/manifest, redirected roots, symlinked or missing stores,
 missing receipt, and a genuine `ISSUES` terminal run.
 
@@ -121,3 +123,7 @@ ownership, ACLs, and special mode bits. Filesystem reads may update access
 times under host mount policy; no content, mode, modification time, or directory
 entry is intentionally written. A caller-supplied SHA-256 is an integrity
 input, not a signature or proof that the caller selected the right candidate.
+
+On the Windows CI filesystem, toggling only group/other POSIX read bits left
+the observed mode unchanged. The cross-platform negative now toggles the
+write bit and confirms the mode changed before expecting closeout refusal.
