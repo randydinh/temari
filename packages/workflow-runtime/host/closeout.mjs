@@ -209,6 +209,12 @@ export async function verifyInstalledCloseout({
     expectedCurrent,
   });
   const receipt = await receipts.load(input.runId);
+  assert(receipt, 'Persisted workflow receipt is missing.');
+  assert.deepEqual(
+    receipt.plan,
+    input.plan,
+    'Retained receipt plan differs from admitted policy.',
+  );
   await assertSourceEvidence(
     receipt,
     evidenceStore,
