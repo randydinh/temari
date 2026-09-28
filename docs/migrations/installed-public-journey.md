@@ -37,7 +37,9 @@ node /isolated/bundle/bin/temari.mjs resume --request /isolated/request.json --e
 `admit --request` remains a preflight and reports missing trusted invocation
 proof for the lightweight route. A matching full-feature route remains blocked
 because the bridge cannot prove `subagents` or `forge`. QA remains rejected.
-`closeout` remains blocked pending trusted candidate selection.
+At the NX-01 source head, `closeout` was still blocked. The subsequent
+[installed closeout](./installed-closeout.md) adds the guarded verification
+command and its separate acceptance evidence.
 
 ## Source mapping
 
@@ -155,15 +157,16 @@ and [Windows run 36410878158](https://github.com/randydinh/temari/actions/runs/3
 both passed. `.github/workflows/ci.yml` runs `public-entry-test` on Linux.
 The Windows workflow runs canonical and host-session checks but omits
 `public-entry-test`. Its green result does not establish Windows installed
-public-entry acceptance. PR #56 remains draft, and a later documentation
-head needs fresh exact-head checks before integration.
+public-entry acceptance. These were the source-head results before PR #56 was
+integrated into main at `8cb14df8629b44fca3e12632c6a045adc4bff962`.
 
 The expected digests are trust inputs, not signatures. This local boundary
 assumes the host supplies them independently and the installed files are not
 mutated between checking and use. It does not prove hostile filesystem race
 containment. It does not replace the installed plugin or read the legacy
-checkout. Independent product QA, Windows installed public-entry coverage,
-read-only closeout with an independently selected current candidate,
-shared-service coordination, and operator review for cutover remain open.
+checkout. At this NX-01 head, read-only closeout was still open; its later
+evidence is recorded separately. Independent product QA, Windows installed
+public-entry coverage, shared-service coordination, and operator review for
+cutover remain open.
 Full-feature and QA capabilities remain explicit blocks. No installed plugin
 was replaced, and no merge or publish approval is claimed.

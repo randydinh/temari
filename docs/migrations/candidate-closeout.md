@@ -143,9 +143,12 @@ not be resumed by older executors that ignore additive fields.
 
 ## Migration gates still open
 
-The relocated Node consumer is a local-process proof. It does not prove clean
-installation of `temari`, `poteto-mode`, or `closeout`, actual host execution,
-independent QA, shared-service workers, multi-machine recovery, or cutover.
+The library's relocated Node consumer is a local-process proof. The installed
+lightweight `temari` and `poteto-mode` journey and the packaged `closeout`
+verifier now have separate evidence in
+[installed public entry](./installed-public-journey.md) and
+[installed closeout](./installed-closeout.md). These do not prove independent
+QA, shared-service workers, multi-machine recovery, or cutover.
 A verified candidate does not itself grant merge, archive, deployment, or
 installation authority.
 
