@@ -137,23 +137,74 @@ function expectedPublicPaths(files) {
 
 function assertPolicy(policy) {
   assert.equal(policy.schemaVersion, 1);
-  assert.equal(policy.policyId, 'temari-public-feature-v1');
+  assert.equal(policy.policyId, 'temari-public-lightweight-v1');
   assert.deepEqual(Object.keys(policy.entries).sort(), [...entries].sort());
-  assert.equal(policy.entries.temari.supportedRoute, 'full-playbook');
-  assert.equal(policy.entries['poteto-mode'].supportedProfile, 'feature-v1');
+  for (const entry of ['temari', 'poteto-mode']) {
+    assert.equal(
+      policy.entries[entry].supportedRoute,
+      'lightweight-engineering',
+    );
+    assert.equal(
+      policy.entries[entry].supportedProfile,
+      'lightweight-engineering-v1',
+    );
+  }
   assert.equal(policy.entries.closeout.supportedRoute, null);
+  assert.equal(policy.lightweight.source.family, 'v4.1');
+  assert.equal(
+    policy.lightweight.source.sourceRevision,
+    '959c8f7be3d7b684207d9e626263d41540d5ecdc',
+  );
+  assert.equal(
+    policy.lightweight.source.profilePath,
+    'skills/poteto-mode/playbook-contracts/v1/lightweight-engineering.json',
+  );
+  assert.equal(
+    policy.lightweight.source.profileSha256,
+    '94370c4bbbd48666807630abd2866f0727ccf3ab614d23fd4b2d3c3b98d493e7',
+  );
+  assert.equal(
+    policy.lightweight.source.playbookPath,
+    'skills/poteto-mode/playbooks/lightweight-engineering.md',
+  );
+  assert.equal(
+    policy.lightweight.source.playbookSha256,
+    '320f33d095434c5a58fd2adb2abf6a1fcd458fe3a2af431a227d6f51dde6e492',
+  );
+  assert.deepEqual(policy.lightweight.obligations, {
+    workType: 'feature',
+    delegation: 'none',
+    review: 'self',
+    evidence: 'revision-bound',
+    delivery: 'local',
+  });
+  assert.deepEqual(policy.lightweight.stageMapping, {
+    investigate: ['lightweight.intake.inspect'],
+    plan: ['lightweight.route.qualifies'],
+    build: ['lightweight.build.smallest-complete-change'],
+    review: ['lightweight.verify.direct-check'],
+    verify: ['lightweight.verify.direct-check'],
+    deliver: [
+      'lightweight.intake.inspect',
+      'lightweight.route.qualifies',
+      'lightweight.build.smallest-complete-change',
+      'lightweight.verify.direct-check',
+    ],
+  });
+  assert.equal(policy.lightweight.publishGate, 'operator-approval');
   assert.equal(policy.feature.source.family, 'v4.1');
   assert.match(policy.feature.source.sourceRevision, /^[a-f0-9]{40}$/);
   assert.match(policy.feature.source.profileSha256, /^[a-f0-9]{64}$/);
   assert.match(policy.feature.source.playbookSha256, /^[a-f0-9]{64}$/);
   assert.deepEqual(policy.feature.requiredCapabilities, ['subagents', 'forge']);
-  assert.deepEqual(policy.feature.unsupportedRoutes, [
-    'lightweight-engineering',
-    'qa-review',
-  ]);
+  assert.deepEqual(policy.feature.unsupportedRoutes, ['qa-review']);
   assert.equal(policy.admission.capabilitiesMustBeProvenByHost, true);
   assert.equal(policy.admission.callerDeclaredCapabilitiesAreNotProof, true);
-  assert.equal(policy.admission.publicEntriesStartNoLifecycle, true);
+  assert.equal(policy.admission.publicEntriesStartNoLifecycle, false);
+  assert.equal(
+    policy.admission.externalArtifactAndInvocationDigestsRequired,
+    true,
+  );
   assert.equal(
     policy.admission.closeoutRequiresTrustedInvocationAndCurrentCandidate,
     true,

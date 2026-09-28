@@ -4,6 +4,30 @@ This record is for the maintainer who resumes the migration. Read the current
 Git state and pull requests before acting. A checked implementation item does
 not replace acceptance evidence from the installed product.
 
+## NX-01 local handoff — 2026-09-28
+
+Branch `codex/nx-installed-journey-20260928` in the exclusive
+`/private/tmp/temari-nx-installed-20260928` worktree starts from
+`709480ad845435811427284663ba939ee0d12f7a`. The NX-01 changes are
+uncommitted. No installed plugin or dirty main checkout was changed.
+
+The [installed lightweight public-entry record](./installed-public-journey.md)
+contains the request contract, exact v4.1 source mapping, commands, literal
+candidate SHA-256, and open gates. A relocated outer artifact starts through
+`poteto-mode`, resumes after an acknowledged build, and persists a six-stage
+PASS receipt using a synthetic host. Local `public-entry-test` passed 19 tests,
+`canonical-test` 11, `host-session-test` 39, five focused typechecks and four
+core test targets. This is installed-artifact and process-restart evidence.
+It is not a native host run or independent QA verdict.
+The PR CI workflow now includes `workflow-runtime:public-entry-test`; the
+uncached local target passed after the edit. The full CI job has not run.
+
+Next, obtain independent source review and exact-head Linux and Windows CI.
+Then run the same installed entry with a native host and preserve its product
+evidence. Keep full-feature, QA, and closeout blocked until their separate
+capability, owner, and current-candidate gates are met. Do not claim WP3 live
+acceptance or publish approval from the synthetic receipt.
+
 ## Current handoff — 2026-09-26
 
 Continue in [Choose temari build source (3)](codex://threads/01a0dcca-d913-7d52-9f1b-16e47b5bd90a).

@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   cp,
   lstat,
+  mkdir,
   mkdtemp,
   readFile,
   readdir,
@@ -16,7 +17,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   checkPublicEntryArtifact,
   manifestSha256,
@@ -117,7 +118,7 @@ test('packages an isolated relocated outer bundle with three current public entr
     );
     const policy = await child([join(artifact, 'bin/temari.mjs'), 'policy']);
     assert.equal(policy.status, 'described');
-    assert.equal(policy.supportedProfile, 'feature-v1');
+    assert.equal(policy.supportedProfile, 'lightweight-engineering-v1');
   } finally {
     await rm(relocatedRoot, { recursive: true, force: true });
   }
@@ -150,6 +151,44 @@ test('public policy records the exact reviewed legacy profile and playbook prove
     sha256(playbook.replace(/\r\n?/g, '\n')),
     policy.feature.source.playbookSha256,
   );
+  const lightweightProfile = await readFile(
+    join(
+      repository,
+      'packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbook-contracts/v1/lightweight-engineering.json',
+    ),
+    'utf8',
+  );
+  const lightweightPlaybook = await readFile(
+    join(
+      repository,
+      'packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/lightweight-engineering.md',
+    ),
+    'utf8',
+  );
+  assert.equal(
+    sha256(lightweightProfile.replace(/\r\n?/g, '\n')),
+    policy.lightweight.source.profileSha256,
+  );
+  assert.equal(
+    sha256(lightweightPlaybook.replace(/\r\n?/g, '\n')),
+    policy.lightweight.source.playbookSha256,
+  );
+  const requirementIds = JSON.parse(lightweightProfile).stages.flatMap(
+    (stage) => stage.requirements.map((requirement) => requirement.id),
+  );
+  assert.deepEqual(
+    [...new Set(Object.values(policy.lightweight.stageMapping).flat())].sort(),
+    requirementIds.sort(),
+  );
+  assert.deepEqual(Object.keys(policy.lightweight.stageMapping), [
+    'investigate',
+    'plan',
+    'build',
+    'review',
+    'verify',
+    'deliver',
+  ]);
+  assert.equal(policy.lightweight.publishGate, 'operator-approval');
 });
 
 test('artifact checking requires an external expected manifest', async () => {
@@ -222,7 +261,6 @@ test('public engineering admission refuses unsupported routes and blocks unprove
     1,
   );
   assert.equal(lightweight.status, 'rejected');
-  assert(lightweight.reasons.includes('route-not-admitted'));
   assert(lightweight.reasons.includes('profile-not-admitted'));
 });
 
@@ -357,5 +395,387 @@ test('outer publication is no-overwrite and rejects tampering or symlinks', asyn
   assert.deepEqual(
     await checkPublicEntryArtifact(output, manifestSha256(manifest)),
     manifest,
+  );
+});
+
+function lightweightRequest(entry, candidate, runDirectory) {
+  return {
+    schemaVersion: 1,
+    entry,
+    route: 'lightweight-engineering',
+    profile: 'lightweight-engineering-v1',
+    obligations: {
+      workType: 'feature',
+      delegation: 'none',
+      review: 'self',
+      evidence: 'revision-bound',
+      delivery: 'local',
+    },
+    routeInput: {
+      workType: 'feature',
+      lightweight: {
+        resultIsClearLocalAndReversible: true,
+        changesSharedBoundary: false,
+        isReportedDefect: false,
+        hasUnexplainedSymptom: false,
+        makesPerformanceClaim: false,
+        isDesignChoice: false,
+        isMigration: false,
+        affectedCallersAreKnown: true,
+        crossesArchitecturalBoundary: false,
+        directCheckAvailable: true,
+      },
+    },
+    invocation: {
+      runId: 'installed-lightweight',
+      revision: 'synthetic-candidate-v1',
+      candidate: { scopeId: 'synthetic-product', root: candidate },
+      runDirectory,
+    },
+  };
+}
+
+async function installedFixture(t, entry = 'temari') {
+  const root = await mkdtemp(join(tmpdir(), 'temari installed-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const artifact = join(root, 'artifact');
+  await cp(output, artifact, { recursive: true });
+  const candidate = join(root, 'candidate');
+  await mkdir(candidate);
+  await writeFile(join(candidate, 'product.txt'), 'pear\napple\n');
+  const runDirectory = join(root, 'run');
+  const request = lightweightRequest(entry, candidate, runDirectory);
+  const requestPath = join(root, 'request.json');
+  const requestBytes = Buffer.from(JSON.stringify(request));
+  await writeFile(requestPath, requestBytes);
+  const launch = (
+    mode = 'start',
+    digest = createHash('sha256').update(requestBytes).digest('hex'),
+    loader,
+  ) => {
+    const args = [
+      ...(loader ? ['--experimental-loader', loader] : []),
+      join(artifact, `bin/${entry}.mjs`),
+      mode,
+      '--request',
+      requestPath,
+      '--expected-request-sha256',
+      digest,
+      '--expected-manifest-sha256',
+      manifestSha256(manifest),
+    ];
+    const child = spawn(process.execPath, args, {
+      cwd: root,
+      env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '' },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    let stderr = '';
+    let tail = '';
+    const messages = [];
+    let pending;
+    let closed = false;
+    child.stderr.setEncoding('utf8').on('data', (chunk) => {
+      stderr += chunk;
+    });
+    child.stdout.setEncoding('utf8').on('data', (chunk) => {
+      tail += chunk;
+      let end;
+      while ((end = tail.indexOf('\n')) !== -1) {
+        const message = JSON.parse(tail.slice(0, end));
+        tail = tail.slice(end + 1);
+        if (pending) {
+          clearTimeout(pending.timer);
+          pending.resolve(message);
+          pending = undefined;
+        } else messages.push(message);
+      }
+    });
+    const done = new Promise((resolve, reject) => {
+      child.once('error', reject);
+      child.once('close', (code) => {
+        closed = true;
+        if (pending) {
+          clearTimeout(pending.timer);
+          pending.reject(new Error(`Entry closed: ${code}: ${stderr}`));
+          pending = undefined;
+        }
+        resolve({ code, stderr, messages });
+      });
+    });
+    t.after(async () => {
+      if (!closed) child.kill('SIGKILL');
+      await done;
+    });
+    return {
+      child,
+      done,
+      next: async () => {
+        if (messages.length) return messages.shift();
+        assert(!closed, stderr);
+        return new Promise((resolve, reject) => {
+          pending = {
+            resolve,
+            reject,
+            timer: setTimeout(() => {
+              pending = undefined;
+              reject(new Error(`Stage timeout: ${stderr}`));
+            }, 10_000),
+          };
+        });
+      },
+      reply(message) {
+        child.stdin.write(
+          JSON.stringify({
+            type: 'result',
+            sessionId: message.sessionId,
+            requestId: message.requestId,
+            stage: message.stage,
+          }) + '\n',
+        );
+      },
+    };
+  };
+  return {
+    root,
+    artifact,
+    candidate,
+    runDirectory,
+    request,
+    requestPath,
+    requestBytes,
+    launch,
+  };
+}
+
+async function answerStage(fixture, session, message) {
+  assert.equal(message.type, 'stage');
+  let evidence = `observed ${message.stage}\n`;
+  if (message.stage === 'build') {
+    assert.equal(
+      await readFile(join(fixture.candidate, 'product.txt'), 'utf8'),
+      'pear\napple\n',
+    );
+    await writeFile(join(fixture.candidate, 'product.txt'), 'APPLE\nPEAR\n');
+  }
+  if (message.stage === 'review') {
+    assert.equal(
+      await readFile(join(fixture.candidate, 'product.txt'), 'utf8'),
+      'APPLE\nPEAR\n',
+    );
+    evidence = 'Reviewed product.txt change from pear/apple to APPLE/PEAR.\n';
+  }
+  if (message.stage === 'verify') {
+    const bytes = await readFile(join(fixture.candidate, 'product.txt'));
+    assert.equal(
+      createHash('sha256').update(bytes).digest('hex'),
+      'a356e1ad77377b48e6090cda3e5ae651809c835b3b9e65aa742d3d031b283fa8',
+    );
+    evidence = 'Direct check: product.txt is APPLE\\nPEAR\\n.\n';
+  }
+  if (message.stage === 'deliver') {
+    evidence =
+      'Result: product.txt is APPLE\\nPEAR\\n. Publish approval remains unresolved.\n';
+  }
+  await writeFile(join(message.workspace, 'evidence.txt'), evidence);
+  await writeFile(
+    join(message.workspace, 'host-result.json'),
+    JSON.stringify({
+      schemaVersion: 1,
+      sessionId: message.sessionId,
+      requestId: message.requestId,
+      stage: message.stage,
+      status: 'PASS',
+      summary: `synthetic ${message.stage} complete`,
+      evidence: [
+        { name: 'observation', kind: 'verification', path: 'evidence.txt' },
+      ],
+    }),
+  );
+  session.reply(message);
+}
+
+test('relocated public entry starts, resumes, and persists the six-stage candidate result', async (t) => {
+  const f = await installedFixture(t, 'poteto-mode');
+  assert.deepEqual(
+    await checkPublicEntryArtifact(f.artifact, manifestSha256(manifest)),
+    manifest,
+  );
+  const loader = join(f.root, 'deny-legacy-loader.mjs');
+  await writeFile(
+    loader,
+    `export async function resolve(specifier, context, nextResolve) {
+  const result = await nextResolve(specifier, context);
+  if (result.url.startsWith(${JSON.stringify(pathToFileURL(repository).href)})) throw Error('Legacy checkout import refused');
+  return result;
+}\n`,
+  );
+  const denied = await childResult(
+    [
+      '--experimental-loader',
+      loader,
+      '--input-type=module',
+      '-e',
+      `import(${JSON.stringify(pathToFileURL(packager).href)})`,
+    ],
+    1,
+  );
+  assert.match(denied.stderr, /Legacy checkout import refused/);
+  const first = f.launch('start', undefined, loader);
+  const requested = [];
+  while (true) {
+    const message = await first.next();
+    if (message.type === 'checkpoint' && message.stage === 'build') break;
+    if (message.type === 'checkpoint') continue;
+    requested.push(message.stage);
+    await answerStage(f, first, message);
+  }
+  first.child.stdin.end();
+  assert.notEqual((await first.done).code, 0);
+  assert.deepEqual(requested, ['investigate', 'plan', 'build']);
+  const resumed = f.launch('resume', undefined, loader);
+  while (true) {
+    const message = await resumed.next();
+    if (message.type === 'complete') {
+      assert.equal(message.status, 'PASS');
+      break;
+    }
+    if (message.type === 'checkpoint') continue;
+    requested.push(message.stage);
+    await answerStage(f, resumed, message);
+  }
+  assert.equal((await resumed.done).code, 0);
+  assert.deepEqual(requested, [
+    'investigate',
+    'plan',
+    'build',
+    'review',
+    'verify',
+    'deliver',
+  ]);
+  const bytes = await readFile(join(f.candidate, 'product.txt'));
+  assert.equal(bytes.toString(), 'APPLE\nPEAR\n');
+  assert.equal(
+    createHash('sha256').update(bytes).digest('hex'),
+    'a356e1ad77377b48e6090cda3e5ae651809c835b3b9e65aa742d3d031b283fa8',
+  );
+  const receipt = JSON.parse(
+    await readFile(
+      join(f.runDirectory, 'receipts/installed-lightweight.receipt.json'),
+      'utf8',
+    ),
+  ).receipt;
+  assert.equal(receipt.status, 'PASS');
+  assert.deepEqual(
+    receipt.stages.map((stage) => stage.stage),
+    requested,
+  );
+  assert.deepEqual(receipt.capabilities.available, []);
+  assert.equal(receipt.plan.review, 'self');
+  assert.equal(receipt.plan.delivery, 'local');
+});
+
+test('installed entry refuses altered artifact, request, route, obligations, capability labels, and retained evidence', async (t) => {
+  for (const mode of [
+    'policy',
+    'package',
+    'request',
+    'route',
+    'obligations',
+    'capabilities',
+    'qa',
+    'full',
+  ]) {
+    await t.test(mode, async (t) => {
+      const f = await installedFixture(t);
+      if (mode === 'policy')
+        await writeFile(join(f.artifact, 'policy.json'), '{}');
+      if (mode === 'package')
+        await writeFile(
+          join(f.artifact, 'host/entry.mjs'),
+          'throw Error("altered")',
+        );
+      if (mode === 'request')
+        await writeFile(
+          f.requestPath,
+          JSON.stringify({ ...f.request, profile: 'feature-v1' }),
+        );
+      if (mode === 'route') {
+        f.request.routeInput.lightweight.isMigration = true;
+        await writeFile(f.requestPath, JSON.stringify(f.request));
+      }
+      if (mode === 'obligations') {
+        f.request.obligations.review = 'independent';
+        await writeFile(f.requestPath, JSON.stringify(f.request));
+      }
+      if (mode === 'capabilities') {
+        f.request.capabilities = ['subagents'];
+        await writeFile(f.requestPath, JSON.stringify(f.request));
+      }
+      if (mode === 'qa') {
+        f.request.route = 'qa-review';
+        f.request.profile = 'qa-review-v1';
+        await writeFile(f.requestPath, JSON.stringify(f.request));
+      }
+      if (mode === 'full')
+        await writeFile(f.requestPath, JSON.stringify(request('temari')));
+      const digest = [
+        'route',
+        'obligations',
+        'capabilities',
+        'qa',
+        'full',
+      ].includes(mode)
+        ? createHash('sha256')
+            .update(await readFile(f.requestPath))
+            .digest('hex')
+        : undefined;
+      const result = await f.launch('start', digest).done;
+      assert.notEqual(result.code, 0);
+      assert(!result.messages.some((message) => message.type === 'stage'));
+      await assert.rejects(lstat(f.runDirectory), { code: 'ENOENT' });
+      if (mode === 'policy' || mode === 'package')
+        assert.match(result.stderr, /Artifact (bytes|size) changed/);
+      if (mode === 'request')
+        assert.match(
+          result.stderr,
+          /Request bytes differ from trusted invocation/,
+        );
+      if (mode === 'route')
+        assert.deepEqual(result.messages[0].reasons, [
+          'lightweight-conditions-not-proven',
+        ]);
+      if (mode === 'obligations')
+        assert.deepEqual(result.messages[0].reasons, [
+          'obligations-not-admitted',
+        ]);
+      if (mode === 'capabilities')
+        assert.match(result.stderr, /unknown or missing fields/);
+      if (mode === 'qa')
+        assert(result.messages[0].reasons.includes('route-not-admitted'));
+      if (mode === 'full') {
+        assert.deepEqual(result.messages[0].reasons, [
+          'host-capability-proof-missing',
+        ]);
+        assert.deepEqual(result.messages[0].missingCapabilities, [
+          'subagents',
+          'forge',
+        ]);
+      }
+    });
+  }
+  const f = await installedFixture(t);
+  const first = f.launch();
+  const stage = await first.next();
+  await answerStage(f, first, stage);
+  assert.equal((await first.next()).type, 'checkpoint');
+  first.child.stdin.end();
+  assert.notEqual((await first.done).code, 0);
+  await writeFile(join(stage.workspace, 'evidence.txt'), 'altered evidence\n');
+  const resumed = await f.launch('resume').done;
+  assert.notEqual(resumed.code, 0);
+  assert(!resumed.messages.some((message) => message.type === 'stage'));
+  await assert.rejects(
+    lstat(join(f.runDirectory, 'receipts/installed-lightweight.receipt.json')),
+    { code: 'ENOENT' },
   );
 });
