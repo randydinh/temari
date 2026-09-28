@@ -340,6 +340,7 @@ async function startBridge(mode, request, policy) {
     schemaVersion: 1,
     ...request.invocation,
     obligations: policy.lightweight.obligations,
+    sourceProfile: policy.entries[request.entry].supportedProfile,
   };
   if (mode === 'resume') {
     const path = join(invocation.runDirectory, 'config/input.json');
@@ -377,6 +378,11 @@ async function startBridge(mode, request, policy) {
       saved.plan,
       core.createExecutionPlan(policy.lightweight.obligations),
       'Retained plan differs from admitted obligations.',
+    );
+    assert.equal(
+      saved.sourceProfile,
+      invocation.sourceProfile,
+      'Retained source profile differs from admitted policy.',
     );
   }
   let temporary;

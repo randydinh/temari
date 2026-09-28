@@ -1,0 +1,244 @@
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { dirname, join } from 'node:path';
+import { readBoundedFile } from './stdio.mjs';
+
+const sourceRevision = '959c8f7be3d7b684207d9e626263d41540d5ecdc';
+const stageRequirements = {
+  investigate: ['lightweight.intake.inspect'],
+  plan: ['lightweight.route.qualifies'],
+  build: ['lightweight.build.smallest-complete-change'],
+  review: ['lightweight.verify.direct-check'],
+  verify: ['lightweight.verify.direct-check'],
+  deliver: [],
+};
+const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
+const decode = (bytes) =>
+  new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+
+export async function loadSourceContract(
+  contracts,
+  runtimeRoot,
+  sourceProfile,
+) {
+  assert.equal(
+    sourceProfile,
+    'lightweight-engineering-v1',
+    'Unsupported source profile.',
+  );
+  const root = dirname(runtimeRoot);
+  const profileText = decode(
+    await readBoundedFile(
+      join(root, 'source/lightweight-engineering.json'),
+      64 * 1024,
+    ),
+  );
+  const playbookText = decode(
+    await readBoundedFile(
+      join(root, 'source/lightweight-engineering.md'),
+      64 * 1024,
+    ),
+  );
+  const parsed = contracts.parseV41Profile({ sourceRevision, profileText });
+  assert.equal(parsed.status, 'valid', parsed.reason);
+  const boundaries = ['final', 'commit', 'review', 'publish'].map((boundary) =>
+    contracts.assessV41PlanBoundary({
+      parsed: parsed.value,
+      boundary,
+      playbookText,
+      workType: 'feature',
+    }),
+  );
+  assert.deepEqual(
+    boundaries.map((result) => result.status),
+    ['blocked', 'blocked', 'blocked', 'blocked'],
+    'Pinned source boundary is incompatible.',
+  );
+  assert(
+    boundaries
+      .slice(0, 3)
+      .every(
+        (result) =>
+          result.reason ===
+          'Verified lightweight source evidence is incomplete or incompatible.',
+      ),
+    'Source boundary did not require retained evidence.',
+  );
+  assert.deepEqual(boundaries[3].requiredGates, ['operator-approval']);
+  const profile = parsed.value.profile;
+  const requirements = new Map(
+    profile.stages.flatMap((stage) =>
+      stage.requirements.map((requirement) => [requirement.id, requirement]),
+    ),
+  );
+  assert.deepEqual(
+    [...requirements.keys()],
+    [
+      'lightweight.intake.inspect',
+      'lightweight.route.qualifies',
+      'lightweight.build.smallest-complete-change',
+      'lightweight.verify.direct-check',
+    ],
+  );
+  return {
+    requirements,
+    plan: contracts.reconcilePlan({
+      workType: 'feature',
+      delegation: 'none',
+      review: 'self',
+      evidence: 'revision-bound',
+      delivery: 'local',
+    }),
+    parsed: parsed.value,
+    playbookText,
+    contracts,
+  };
+}
+
+export function attachSourceClaims(stage, result, input, contract) {
+  const expected = stageRequirements[stage];
+  assert(expected, 'Unknown source stage.');
+  const claims = result.sourceRequirements ?? [];
+  assert.deepEqual(
+    claims.map((claim) => claim.id).sort(),
+    [...expected].sort(),
+    `Source requirements missing at ${stage}.`,
+  );
+  const entries = claims.map((claim) => {
+    const requirement = contract.requirements.get(claim.id);
+    assert(
+      requirement.allowedEvidenceKinds.includes(claim.sourceKind),
+      `Unsupported source evidence kind for ${claim.id}.`,
+    );
+    const payload = result.evidence.find(
+      (item) => item.name === claim.evidenceName,
+    );
+    assert(
+      payload && payload.content.byteLength > 0,
+      `Missing source evidence for ${claim.id}.`,
+    );
+    return {
+      id: claim.id,
+      sourceKind: claim.sourceKind,
+      evidenceName: claim.evidenceName,
+      reference: {
+        schema: 1,
+        runId: input.runId,
+        revision: input.revision,
+        kind: payload.kind,
+        sha256: digest(payload.content),
+        bytes: payload.content.byteLength,
+      },
+    };
+  });
+  const { sourceRequirements: _claims, ...stageResult } = result;
+  return {
+    ...stageResult,
+    evidence: [
+      ...result.evidence,
+      {
+        name: 'source-requirements',
+        kind: 'other',
+        content: Buffer.from(
+          JSON.stringify({ schemaVersion: 1, stage, claims: entries }),
+        ),
+      },
+    ],
+  };
+}
+
+export async function assertSourceEvidence(
+  record,
+  store,
+  contract,
+  runtime,
+  complete = false,
+) {
+  assert(record, 'Source evidence record is missing.');
+  await runtime.verifyCandidateEvidenceRecord(
+    record,
+    record.runId,
+    record.revision,
+    store,
+    complete,
+    record.candidateBinding,
+  );
+  const satisfied = new Set();
+  const verifiedEvidence = [];
+  for (const stage of record.stages) {
+    const expected = stageRequirements[stage.stage];
+    assert(expected, 'Unknown source evidence stage.');
+    const attestationBytes = await store.loadPortable({
+      ...stage.stageEvidence,
+      runId: record.runId,
+      revision: record.revision,
+      kind: 'other',
+    });
+    const attestation = JSON.parse(decode(attestationBytes));
+    const sourcePayload = attestation.payloads.find(
+      (payload) => payload.name === 'source-requirements',
+    );
+    assert(
+      sourcePayload,
+      `Missing retained source requirements at ${stage.stage}.`,
+    );
+    const sourceBytes = await store.loadPortable(sourcePayload.reference);
+    const source = JSON.parse(decode(sourceBytes));
+    assert.equal(source.schemaVersion, 1);
+    assert.equal(source.stage, stage.stage);
+    assert.deepEqual(
+      source.claims.map((claim) => claim.id).sort(),
+      [...expected].sort(),
+      `Retained source requirements differ at ${stage.stage}.`,
+    );
+    for (const claim of source.claims) {
+      const requirement = contract.requirements.get(claim.id);
+      assert(
+        requirement?.allowedEvidenceKinds.includes(claim.sourceKind),
+        `Retained source kind is unsupported for ${claim.id}.`,
+      );
+      const payload = attestation.payloads.find(
+        (item) => item.name === claim.evidenceName,
+      );
+      assert(
+        payload && claim.evidenceName !== 'source-requirements',
+        `Retained source reference is missing for ${claim.id}.`,
+      );
+      assert.deepEqual(
+        claim.reference,
+        payload.reference,
+        `Retained source reference differs for ${claim.id}.`,
+      );
+      const content = await store.loadPortable(payload.reference);
+      assert(
+        content.byteLength > 0 && digest(content) === claim.reference.sha256,
+        `Retained source bytes differ for ${claim.id}.`,
+      );
+      satisfied.add(claim.id);
+      verifiedEvidence.push({
+        id: claim.id,
+        stage: stage.stage,
+        sourceKind: claim.sourceKind,
+        reference: payload.reference,
+      });
+    }
+  }
+  if (complete) {
+    assert.deepEqual(
+      [...satisfied].sort(),
+      [...contract.requirements.keys()].sort(),
+      'Final source requirement coverage is incomplete.',
+    );
+    for (const boundary of ['final', 'commit', 'review']) {
+      const result = contract.contracts.assessV41PlanBoundary({
+        parsed: contract.parsed,
+        boundary,
+        playbookText: contract.playbookText,
+        workType: 'feature',
+        sourceEvidence: verifiedEvidence,
+      });
+      assert.equal(result.status, 'supported', result.reason);
+      assert.deepEqual(result.plan, contract.plan);
+    }
+  }
+}

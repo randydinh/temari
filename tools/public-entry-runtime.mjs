@@ -33,6 +33,15 @@ const publicFiles = [
   ],
   ['packages/workflow-runtime/host/entry.mjs', 'host/entry.mjs'],
   ['packages/workflow-runtime/host/stdio.mjs', 'host/stdio.mjs'],
+  ['packages/workflow-runtime/host/source.mjs', 'host/source.mjs'],
+  [
+    'packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbook-contracts/v1/lightweight-engineering.json',
+    'source/lightweight-engineering.json',
+  ],
+  [
+    'packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/lightweight-engineering.md',
+    'source/lightweight-engineering.md',
+  ],
   [
     'packages/workflow-runtime/public/bin/public-entry.mjs',
     'bin/public-entry.mjs',

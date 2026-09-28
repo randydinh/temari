@@ -6,6 +6,7 @@ export {
 } from './lib/candidate.js';
 export {
   verifyPersistedStageEvidence,
+  verifyCandidateEvidenceRecord,
   type StageEvidencePayload,
   type VerifiedStageEvidence,
 } from './lib/stage-evidence.js';

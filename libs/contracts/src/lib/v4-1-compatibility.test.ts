@@ -11,6 +11,7 @@ import {
   parseV41Profile,
   parseV41RouteEvent,
   type V41ProfileInput,
+  type V41RetainedRequirementEvidence,
 } from './v4-1-compatibility.js';
 
 const fixtureRoot = join(
@@ -20,6 +21,10 @@ const fixtureRoot = join(
 const featurePlaybookPath = join(
   fixtureRoot,
   '../../packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/feature.md',
+);
+const lightweightRoot = join(
+  fixtureRoot,
+  '../../packages/workflow-runtime/assets/v4.1/skills/poteto-mode',
 );
 
 async function fixture(name: string): Promise<string> {
@@ -308,6 +313,153 @@ test('maps the verified feature profile to the canonical Nx plan at final', asyn
     deliver: ['delivery'],
   });
   assert.deepEqual(boundary.plan?.requiredCapabilities, ['subagents', 'forge']);
+});
+
+test('maps only the pinned lightweight source at final, commit, and review', async () => {
+  const profileText = await readFile(
+    join(lightweightRoot, 'playbook-contracts/v1/lightweight-engineering.json'),
+    'utf8',
+  );
+  const playbookText = await readFile(
+    join(lightweightRoot, 'playbooks/lightweight-engineering.md'),
+    'utf8',
+  );
+  const parsed = parseV41Profile(profileInput(profileText));
+  if (parsed.status !== 'valid') throw new Error(parsed.reason);
+  const reference = {
+    schema: 1 as const,
+    runId: 'synthetic-run',
+    revision: 'synthetic-revision',
+    kind: 'other' as const,
+    sha256: 'a'.repeat(64),
+    bytes: 12,
+  };
+  const sourceEvidence: V41RetainedRequirementEvidence[] = [
+    {
+      stage: 'investigate',
+      id: 'lightweight.intake.inspect',
+      sourceKind: 'document',
+      reference,
+    },
+    {
+      stage: 'plan',
+      id: 'lightweight.route.qualifies',
+      sourceKind: 'document',
+      reference,
+    },
+    {
+      stage: 'build',
+      id: 'lightweight.build.smallest-complete-change',
+      sourceKind: 'diff',
+      reference,
+    },
+    {
+      stage: 'review',
+      id: 'lightweight.verify.direct-check',
+      sourceKind: 'diff',
+      reference,
+    },
+    {
+      stage: 'verify',
+      id: 'lightweight.verify.direct-check',
+      sourceKind: 'command',
+      reference,
+    },
+  ];
+  assert.equal(
+    assessV41PlanBoundary({
+      parsed: parsed.value,
+      boundary: 'final',
+      playbookText,
+      workType: 'feature',
+    }).status,
+    'blocked',
+  );
+  for (const boundary of ['final', 'commit', 'review'] as const) {
+    const result = assessV41PlanBoundary({
+      parsed: parsed.value,
+      boundary,
+      playbookText,
+      workType: 'feature',
+      sourceEvidence,
+    });
+    assert.equal(result.status, 'supported');
+    assert.deepEqual(result.plan?.stages, [
+      'investigate',
+      'plan',
+      'build',
+      'review',
+      'verify',
+      'deliver',
+    ]);
+    assert.deepEqual(
+      [...new Set(Object.values(result.stageMapping).flat())].sort(),
+      parsed.value.profile.stages
+        .flatMap((stage) =>
+          stage.requirements.map((requirement) => requirement.id),
+        )
+        .sort(),
+    );
+  }
+  const publish = assessV41PlanBoundary({
+    parsed: parsed.value,
+    boundary: 'publish',
+    playbookText,
+    workType: 'feature',
+  });
+  assert.equal(publish.status, 'blocked');
+  assert.deepEqual(publish.requiredGates, ['operator-approval']);
+  assert.equal(publish.plan, null);
+  assert.equal(
+    assessV41PlanBoundary({
+      parsed: parsed.value,
+      boundary: 'final',
+      playbookText,
+      workType: 'feature',
+      sourceEvidence: sourceEvidence.slice(0, -1),
+    }).status,
+    'blocked',
+  );
+  assert.equal(
+    assessV41PlanBoundary({
+      parsed: parsed.value,
+      boundary: 'final',
+      playbookText,
+      workType: 'feature',
+      sourceEvidence: [...sourceEvidence.slice(0, -1), sourceEvidence[0]!],
+    }).status,
+    'blocked',
+  );
+  assert.equal(
+    assessV41PlanBoundary({
+      parsed: parsed.value,
+      boundary: 'final',
+      playbookText,
+      workType: 'feature',
+      sourceEvidence: sourceEvidence.map((item, index) =>
+        index === 0 ? { ...item, reference: { ...reference, bytes: 0 } } : item,
+      ),
+    }).status,
+    'blocked',
+  );
+  assert.equal(
+    assessV41PlanBoundary({
+      parsed: parsed.value,
+      boundary: 'final',
+      playbookText: 'changed',
+      workType: 'feature',
+    }).status,
+    'blocked',
+  );
+  assert.equal(
+    assessV41PlanBoundary({
+      parsed: parsed.value,
+      boundary: 'final',
+      playbookText,
+      workType: 'bug',
+    }).status,
+    'incompatible',
+  );
 });
 
 test('accepts equivalent CRLF playbook text on Windows hosts', async () => {

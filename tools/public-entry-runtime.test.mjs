@@ -547,7 +547,13 @@ async function installedFixture(t, entry = 'temari') {
   };
 }
 
-async function answerStage(fixture, session, message) {
+async function answerStage(
+  fixture,
+  session,
+  message,
+  withSource = true,
+  sourceKindOverride,
+) {
   assert.equal(message.type, 'stage');
   let evidence = `observed ${message.stage}\n`;
   if (message.stage === 'build') {
@@ -556,6 +562,8 @@ async function answerStage(fixture, session, message) {
       'pear\napple\n',
     );
     await writeFile(join(fixture.candidate, 'product.txt'), 'APPLE\nPEAR\n');
+    evidence =
+      'diff --git a/product.txt b/product.txt\n-pear\n-apple\n+APPLE\n+PEAR\n';
   }
   if (message.stage === 'review') {
     assert.equal(
@@ -577,6 +585,18 @@ async function answerStage(fixture, session, message) {
       'Result: product.txt is APPLE\\nPEAR\\n. Publish approval remains unresolved.\n';
   }
   await writeFile(join(message.workspace, 'evidence.txt'), evidence);
+  const claims = {
+    investigate: { id: 'lightweight.intake.inspect', sourceKind: 'document' },
+    plan: { id: 'lightweight.route.qualifies', sourceKind: 'document' },
+    build: {
+      id: 'lightweight.build.smallest-complete-change',
+      sourceKind: 'diff',
+    },
+    review: { id: 'lightweight.verify.direct-check', sourceKind: 'diff' },
+    verify: { id: 'lightweight.verify.direct-check', sourceKind: 'command' },
+  };
+  if (withSource && claims[message.stage])
+    await writeFile(join(message.workspace, 'source.txt'), evidence);
   await writeFile(
     join(message.workspace, 'host-result.json'),
     JSON.stringify({
@@ -588,11 +608,102 @@ async function answerStage(fixture, session, message) {
       summary: `synthetic ${message.stage} complete`,
       evidence: [
         { name: 'observation', kind: 'verification', path: 'evidence.txt' },
+        ...(withSource && claims[message.stage]
+          ? [{ name: 'source', kind: 'other', path: 'source.txt' }]
+          : []),
       ],
+      ...(withSource
+        ? {
+            sourceRequirements: claims[message.stage]
+              ? [
+                  {
+                    ...claims[message.stage],
+                    sourceKind:
+                      sourceKindOverride ?? claims[message.stage].sourceKind,
+                    evidenceName: 'source',
+                  },
+                ]
+              : [],
+          }
+        : {}),
     }),
   );
   session.reply(message);
 }
+
+async function retainedClaims(runDirectory, stage) {
+  const checkpointNames = await readdir(join(runDirectory, 'checkpoints'));
+  const checkpoint = JSON.parse(
+    await readFile(
+      join(runDirectory, 'checkpoints', checkpointNames[0]),
+      'utf8',
+    ),
+  );
+  const record = checkpoint.checkpoint ?? checkpoint;
+  const stageRecord = record.stages.find((item) => item.stage === stage);
+  assert(stageRecord);
+  const evidenceRoot = join(runDirectory, 'evidence');
+  const attestation = JSON.parse(
+    await readFile(
+      join(evidenceRoot, `${stageRecord.stageEvidence.sha256}.artifact`),
+      'utf8',
+    ),
+  );
+  const sourcePayload = attestation.payloads.find(
+    (item) => item.name === 'source-requirements',
+  );
+  assert(sourcePayload);
+  const bytes = await readFile(
+    join(evidenceRoot, `${sourcePayload.reference.sha256}.artifact`),
+  );
+  return {
+    source: JSON.parse(bytes.toString()),
+    path: join(evidenceRoot, `${sourcePayload.reference.sha256}.artifact`),
+    attestation,
+  };
+}
+
+test('installed entry refuses a six-stage PASS without source requirement evidence', async (t) => {
+  const f = await installedFixture(t);
+  const session = f.launch();
+  while (true) {
+    const message = await session.next();
+    if (message.type === 'complete') {
+      assert.notEqual(message.status, 'PASS');
+      break;
+    }
+    if (message.type === 'checkpoint') continue;
+    await answerStage(f, session, message, false);
+  }
+  assert.notEqual((await session.done).code, 0);
+  const receipt = JSON.parse(
+    await readFile(
+      join(f.runDirectory, 'receipts/installed-lightweight.receipt.json'),
+      'utf8',
+    ),
+  ).receipt;
+  assert.notEqual(receipt.status, 'PASS');
+});
+
+test('installed entry rejects a renamed source evidence kind before a PASS checkpoint', async (t) => {
+  const f = await installedFixture(t);
+  const session = f.launch();
+  await answerStage(f, session, await session.next(), true, 'verification');
+  const complete = await session.next();
+  assert.equal(complete.type, 'complete');
+  assert.equal(complete.status, 'BLOCKED');
+  assert.notEqual((await session.done).code, 0);
+  assert.deepEqual(await readdir(join(f.runDirectory, 'checkpoints')), [
+    'installed-lightweight.checkpoint.json',
+  ]);
+  const checkpoint = JSON.parse(
+    await readFile(
+      join(f.runDirectory, 'checkpoints/installed-lightweight.checkpoint.json'),
+      'utf8',
+    ),
+  );
+  assert.equal((checkpoint.checkpoint ?? checkpoint).stages.length, 0);
+});
 
 test('relocated public entry starts, resumes, and persists the six-stage candidate result', async (t) => {
   const f = await installedFixture(t, 'poteto-mode');
@@ -672,12 +783,97 @@ test('relocated public entry starts, resumes, and persists the six-stage candida
   assert.deepEqual(receipt.capabilities.available, []);
   assert.equal(receipt.plan.review, 'self');
   assert.equal(receipt.plan.delivery, 'local');
+  const retained = await Promise.all(
+    ['investigate', 'plan', 'build', 'review', 'verify', 'deliver'].map(
+      (stage) => retainedClaims(f.runDirectory, stage),
+    ),
+  );
+  const expectedIds = [
+    'lightweight.intake.inspect',
+    'lightweight.route.qualifies',
+    'lightweight.build.smallest-complete-change',
+    'lightweight.verify.direct-check',
+  ];
+  assert.deepEqual(
+    [
+      ...new Set(
+        retained.flatMap((item) => item.source.claims.map((claim) => claim.id)),
+      ),
+    ].sort(),
+    expectedIds.sort(),
+  );
+  assert.deepEqual(
+    retained.map((item) => [
+      item.source.stage,
+      item.source.claims.map((claim) => claim.id),
+    ]),
+    [
+      ['investigate', ['lightweight.intake.inspect']],
+      ['plan', ['lightweight.route.qualifies']],
+      ['build', ['lightweight.build.smallest-complete-change']],
+      ['review', ['lightweight.verify.direct-check']],
+      ['verify', ['lightweight.verify.direct-check']],
+      ['deliver', []],
+    ],
+  );
+  for (const item of retained)
+    for (const claim of item.source.claims) {
+      const reference = item.attestation.payloads.find(
+        (payload) => payload.name === claim.evidenceName,
+      )?.reference;
+      assert.deepEqual(claim.reference, reference);
+      assert.equal(reference.kind, 'other');
+      const bytes = await readFile(
+        join(f.runDirectory, 'evidence', `${reference.sha256}.artifact`),
+      );
+      assert.equal(
+        createHash('sha256').update(bytes).digest('hex'),
+        reference.sha256,
+      );
+    }
+});
+
+test('restart refuses changed retained source requirement references', async (t) => {
+  const f = await installedFixture(t);
+  const first = f.launch();
+  await answerStage(f, first, await first.next());
+  assert.equal((await first.next()).type, 'checkpoint');
+  first.child.stdin.end();
+  assert.notEqual((await first.done).code, 0);
+  const retained = await retainedClaims(f.runDirectory, 'investigate');
+  assert.equal(retained.source.claims[0].id, 'lightweight.intake.inspect');
+  const claimed = retained.source.claims[0].reference.sha256;
+  retained.source.claims[0].reference.sha256 = `${claimed.slice(0, -1)}${claimed.endsWith('0') ? '1' : '0'}`;
+  await writeFile(retained.path, JSON.stringify(retained.source));
+  const resumed = await f.launch('resume').done;
+  assert.notEqual(resumed.code, 0);
+  assert(!resumed.messages.some((message) => message.type === 'stage'));
+  assert.match(resumed.stderr, /hash changed|source kind|source reference/i);
+});
+
+test('restart refuses a changed source profile in the retained descriptor', async (t) => {
+  const f = await installedFixture(t);
+  const first = f.launch();
+  await answerStage(f, first, await first.next());
+  assert.equal((await first.next()).type, 'checkpoint');
+  first.child.stdin.end();
+  assert.notEqual((await first.done).code, 0);
+  const descriptorPath = join(f.runDirectory, 'config/input.json');
+  const descriptor = JSON.parse(await readFile(descriptorPath, 'utf8'));
+  descriptor.sourceProfile = 'feature-v1';
+  await writeFile(descriptorPath, JSON.stringify(descriptor));
+  const resumed = await f.launch('resume').done;
+  assert.notEqual(resumed.code, 0);
+  assert(!resumed.messages.some((message) => message.type === 'stage'));
+  assert.match(resumed.stderr, /Retained source profile differs/);
 });
 
 test('installed entry refuses altered artifact, request, route, obligations, capability labels, and retained evidence', async (t) => {
   for (const mode of [
     'policy',
     'package',
+    'profile',
+    'playbook',
     'request',
     'route',
     'obligations',
@@ -693,6 +889,16 @@ test('installed entry refuses altered artifact, request, route, obligations, cap
         await writeFile(
           join(f.artifact, 'host/entry.mjs'),
           'throw Error("altered")',
+        );
+      if (mode === 'profile')
+        await writeFile(
+          join(f.artifact, 'source/lightweight-engineering.json'),
+          '{}',
+        );
+      if (mode === 'playbook')
+        await writeFile(
+          join(f.artifact, 'source/lightweight-engineering.md'),
+          'changed',
         );
       if (mode === 'request')
         await writeFile(
@@ -733,7 +939,7 @@ test('installed entry refuses altered artifact, request, route, obligations, cap
       assert.notEqual(result.code, 0);
       assert(!result.messages.some((message) => message.type === 'stage'));
       await assert.rejects(lstat(f.runDirectory), { code: 'ENOENT' });
-      if (mode === 'policy' || mode === 'package')
+      if (['policy', 'package', 'profile', 'playbook'].includes(mode))
         assert.match(result.stderr, /Artifact (bytes|size) changed/);
       if (mode === 'request')
         assert.match(

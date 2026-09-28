@@ -4,25 +4,36 @@ This record is for the maintainer who resumes the migration. Read the current
 Git state and pull requests before acting. A checked implementation item does
 not replace acceptance evidence from the installed product.
 
-## NX-01 local handoff — 2026-09-28
+## NX-01 source repair handoff — 2026-09-28
 
 Branch `codex/nx-installed-journey-20260928` in the exclusive
 `/private/tmp/temari-nx-installed-20260928` worktree starts from
-`709480ad845435811427284663ba939ee0d12f7a`. The NX-01 changes are
-uncommitted. No installed plugin or dirty main checkout was changed.
+`709480ad845435811427284663ba939ee0d12f7a`. PR #56 froze the first
+NX-01 implementation at `0c673724484fe2ea7af5a9526a5d3a82459a01a9`.
+Independent review failed that head because generic `verification` payloads
+produced a public PASS without satisfying any pinned lightweight source
+requirements. The repair in this worktree is uncommitted at that HEAD.
+PR #56 remains draft. No installed plugin or dirty main checkout was changed.
 
 The [installed lightweight public-entry record](./installed-public-journey.md)
-contains the request contract, exact v4.1 source mapping, commands, literal
-candidate SHA-256, and open gates. A relocated outer artifact starts through
-`poteto-mode`, resumes after an acknowledged build, and persists a six-stage
-PASS receipt using a synthetic host. Local `public-entry-test` passed 19 tests,
-`canonical-test` 11, `host-session-test` 39, five focused typechecks and four
-core test targets. This is installed-artifact and process-restart evidence.
-It is not a native host run or independent QA verdict.
-The PR CI workflow now includes `workflow-runtime:public-entry-test`; the
-uncached local target passed after the edit. The full CI job has not run.
+contains the request contract, pinned v4.1 source mapping, commands, literal
+candidate SHA-256, and open gates. The [repair decision trail](./nx-01-repair-decisions.tsv)
+records the reproduced failure and the enforcement choice. The repair reproduced the bypass with an
+installed negative fixture. The first uncached `public-entry-test` returned
+exit 1, with 19 of 20 tests passing, because the old bridge returned PASS.
+The repaired target returns exit 0 with 25 of 25 tests passing. Its relocated
+bundle restarts after build, retains references for all four source IDs, and
+finishes the synthetic six-stage candidate change. A changed source kind,
+source reference, profile, playbook, request, or descriptor blocks.
+Five focused typechecks, four core test targets with 276 passing tests,
+canonical 11, host-session 39,
+the v4.1 package and inventory check passed locally. These are synthetic
+installed-process checks, not a native-host rerun or independent QA verdict.
+The PR CI workflow includes `workflow-runtime:public-entry-test`, but no
+exact-head Linux or Windows CI result exists for the uncommitted repair.
 
-Next, obtain independent source review and exact-head Linux and Windows CI.
+Next, freeze the repair at a new commit, then obtain independent source review
+and exact-head Linux and Windows CI.
 Then run the same installed entry with a native host and preserve its product
 evidence. Keep full-feature, QA, and closeout blocked until their separate
 capability, owner, and current-candidate gates are met. Do not claim WP3 live

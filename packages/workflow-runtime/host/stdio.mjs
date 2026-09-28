@@ -107,15 +107,19 @@ async function readResult(request) {
     join(request.workspace, 'host-result.json'),
     RESULT_BYTES,
   );
-  exactFields(result, [
-    'schemaVersion',
-    'sessionId',
-    'requestId',
-    'stage',
-    'status',
-    'summary',
-    'evidence',
-  ]);
+  exactFields(
+    result,
+    [
+      'schemaVersion',
+      'sessionId',
+      'requestId',
+      'stage',
+      'status',
+      'summary',
+      'evidence',
+    ],
+    ['sourceRequirements'],
+  );
   assert(
     result.schemaVersion === 1 &&
       result.sessionId === request.sessionId &&
@@ -155,6 +159,25 @@ async function readResult(request) {
       'Evidence path must be a safe direct filename.',
     );
   }
+  if (result.sourceRequirements !== undefined) {
+    assert(
+      Array.isArray(result.sourceRequirements) &&
+        result.sourceRequirements.length <= 4,
+      'Invalid source requirement claims.',
+    );
+    for (const claim of result.sourceRequirements) {
+      exactFields(claim, ['id', 'sourceKind', 'evidenceName']);
+      assert(
+        [claim.id, claim.sourceKind, claim.evidenceName].every(
+          (value) =>
+            typeof value === 'string' &&
+            value.length > 0 &&
+            value.length <= 128,
+        ),
+        'Invalid source requirement claim.',
+      );
+    }
+  }
   const evidence = [];
   let total = 0;
   for (const item of result.evidence) {
@@ -168,7 +191,14 @@ async function readResult(request) {
     evidence.push({ name: item.name, kind: item.kind, content });
   }
   await checkWorkspace(request.workspace);
-  return { status: result.status, summary: result.summary, evidence };
+  return {
+    status: result.status,
+    summary: result.summary,
+    evidence,
+    ...(result.sourceRequirements === undefined
+      ? {}
+      : { sourceRequirements: result.sourceRequirements }),
+  };
 }
 
 export function diagnostic(error) {
