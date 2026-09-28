@@ -13,13 +13,17 @@ on:
       - 'libs/runtime/**'
       - 'packages/initializer/**'
       - 'tools/canonical-runtime*'
+      - 'tools/public-entry-runtime*'
       - 'tools/host-session.test.mjs'
       - 'packages/workflow-runtime/host/**'
+      - 'packages/workflow-runtime/public/**'
+      - 'packages/workflow-runtime/assets/v4.1/skills/poteto-mode/**'
       - 'tools/fixtures/canonical-consumer.mjs'
       - 'tools/fixtures/canonical-candidate-consumer.mjs'
       - 'packages/workflow-runtime/package.json'
       - 'packages/workflow-runtime/assets/v4.1/integrations/archon/**'
       - 'package.json'
+      - 'nx.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'tsconfig*.json'
@@ -58,6 +62,9 @@ jobs:
 
       - name: Verify experimental host dialogue and process recovery
         run: pnpm exec nx run workflow-runtime:host-session-test --skipSync
+
+      - name: Verify relocated installed public entry and process recovery
+        run: pnpm exec nx run workflow-runtime:public-entry-test --skipNxCache --skipSync --output-style=static
 
       - name: Initialize Temari and install pinned Archon
         run: |
