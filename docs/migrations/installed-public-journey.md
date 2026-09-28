@@ -85,61 +85,85 @@ first repair was committed at `6c300a2ca2e0a23a8586cb7d12453c8679d247c9`
 on branch `codex/nx-installed-journey-20260928`. Its Linux `main` and
 `windows-x64` PR checks passed. Independent rereview at that head found a
 remaining generic-payload alias despite the otherwise successful synthetic
-installed journey. The dedicated-channel repair is uncommitted on top of
-`6c300a2`. These uncached local checks returned exit 0 for the new candidate:
+installed journey. The dedicated-channel repair was committed as
+`4bf4713b2a887ad2d43086893c7cad3a36b3dab4`.
+
+The independent reviewer ran these focused checks at that clean head. Each
+command exited 0:
 
 ```sh
-NX_DAEMON=false pnpm exec nx run workflow-runtime:public-entry-test --skipNxCache --skipSync --output-style=static
+NX_DAEMON=false pnpm exec nx run-many -p workflow-runtime -t public-entry-test host-session-test canonical-test --parallel=1 --skipNxCache --skipSync --output-style=static
 NX_DAEMON=false pnpm exec nx run-many -t typecheck -p contracts,temari-core,workflow-engine,runtime,workflow-runtime --parallel=1 --skipNxCache --skipSync --output-style=static
 NX_DAEMON=false pnpm exec nx run-many -t test -p contracts,temari-core,workflow-engine,runtime --parallel=1 --skipNxCache --skipSync --output-style=static
-NX_DAEMON=false pnpm exec nx run workflow-runtime:canonical-test --skipNxCache --skipSync --output-style=static
-NX_DAEMON=false pnpm exec nx run workflow-runtime:host-session-test --skipNxCache --skipSync --output-style=static
-NX_DAEMON=false pnpm exec nx run workflow-runtime:package --skipNxCache --skipSync --output-style=static
-NX_DAEMON=false pnpm exec nx run workflow-runtime:check --skipNxCache --skipSync --output-style=static
-git diff --check
 ```
 
-The new generic-payload regression failed at `6c300a2`: public-entry-test
+The generic-payload regression failed at `6c300a2`: public-entry-test
 returned exit 1 with 25 of 26 tests passing because the ordinary observation
-payload received an investigate checkpoint. After channel enforcement, the
-target passed 31 of 31 tests, canonical 11, and host-session 39. Five
-typechecks and all four affected core test targets passed. The relocated
-entry test denied legacy checkout imports in the public process, interrupted
-after the build checkpoint, resumed at review in a new process, and read a
-PASS receipt with the literal six-stage order, all four source IDs, retained
-references, and candidate bytes. Negative cases now also block claims bound
-to generic verification, wrong generic kind, reserved or duplicate source
-names, changed retained references, and a previously acknowledged generic
-alias during source revalidation. The direct test uses a synthetic host, not
-a native product agent.
+payload received an investigate checkpoint. At `4bf4713`, public-entry passed
+31/31, canonical 11/11, and host-session 39/39. Five typechecks and four core
+test targets passed. The relocated entry test denied legacy checkout imports,
+interrupted after build, resumed at review in a new process, and read a PASS
+receipt with six stages, all four source IDs, retained references, and the
+expected candidate bytes. Negative cases block generic verification claims,
+wrong generic kind, reserved or duplicate source names, changed retained
+references, and acknowledged generic aliases on resume. This test uses a
+synthetic host.
 
 The historical `6c300a2` rereview packaged and checked a clean 79-file outer
 artifact with manifest SHA-256
 `7e1950cb2cd0c46ce30ba2aeddf53740d3a96eeb8ba897a5b4d1b435cf3a3f69`.
-The new uncommitted candidate's Stock Node package and check commands were:
+The later uncommitted channel-repair artifact was also historical. Its Stock
+Node package and check commands were:
 
 ```sh
 node tools/public-entry-runtime.mjs package --output /private/tmp/nx01-source-channel-final.aqd8iE/artifact
 node tools/public-entry-runtime.mjs check --artifact /private/tmp/nx01-source-channel-final.aqd8iE/artifact --expected-manifest-sha256 8ceed138af73c23a3c201ea9d22d7c8b8fed9942d1ecdb64b737e921637e18fe
 ```
 
-The manifest records source HEAD `6c300a2ca2e0a23a8586cb7d12453c8679d247c9`
-with `dirty: true`. The 79-file `package` and `check` commands both returned
-exit 0; this is a local uncommitted candidate, not a new PR head. The
-reviewer's direct synthetic probe against this artifact returned exit 0:
-the positive run resumed to PASS, the generic-payload alias blocked before
-the investigate checkpoint, and changed dedicated source bytes blocked before
-new work. Any later source edit requires a fresh package and check.
+The artifact recorded source HEAD `6c300a2ca2e0a23a8586cb7d12453c8679d247c9`
+with `dirty: true`. Both commands exited 0, but that artifact is not the
+committed head. At `4bf4713`, the independent reviewer ran:
 
-`.github/workflows/ci.yml` includes `public-entry-test` in the
-`workflow-runtime` PR and main job. The passing Linux and Windows checks
-belong to `6c300a2`; new-head CI remains pending until a new head exists and
-those checks are observed. Local checks do not establish that gate.
+```sh
+node tools/public-entry-runtime.mjs package --output /private/tmp/nx01-delta-review.jzPNxv/artifact
+node tools/public-entry-runtime.mjs check --artifact /private/tmp/nx01-delta-review.jzPNxv/artifact --expected-manifest-sha256 ae872ce03245b137bb351a7de78709a847627cca42ef1bc6284989c7ede044c3
+node /private/tmp/nx01-delta-review.jzPNxv/probe.mjs /private/tmp/nx01-delta-review.jzPNxv/artifact
+```
+
+Each command exited 0. The clean 79-file manifest names `4bf4713` with
+`dirty: false`. The direct probe's generic-payload alias blocked before the
+investigate checkpoint. A dedicated `source`/`other` run resumed after build
+and finished PASS with all four IDs retained. Changed dedicated bytes and
+hash-consistent retained generic aliases blocked before new work. The
+[independent review report](/private/tmp/nx01-delta-review.jzPNxv/nx-01-delta-review-4bf4713.md)
+records the refusal cases and returned PASS+NOTES for the code delta.
+
+The separate native Codex-host run used a clean bundle with that same
+manifest digest. Its request SHA-256 was
+`c49d9414097432d451bd86348893748e61e0eb925406fd463e6931c16018ef5c`.
+The actual host supplied stage results and dedicated `source` files. The
+isolated product changed to the expected
+`a356e1ad77377b48e6090cda3e5ae651809c835b3b9e65aa742d3d031b283fa8`
+digest. After a raw Ctrl-C exit 130, a fresh process resumed at review and
+exited 0. The retained receipt passed all six canonical stages and retained
+claims for all four IDs. The [native-host report](/Users/randydinh/source/projects/temari/.temari/runs/nx-build-20260928/orchestrate/temari-nx/reports/nx-01-final-native-probe.md)
+records the run directory and checks. This is local-host evidence, not
+independent product QA or cross-machine recovery.
+
+At `4bf4713`, [Linux CI run 36410884037](https://github.com/randydinh/temari/actions/runs/36410884037)
+and [Windows run 36410878158](https://github.com/randydinh/temari/actions/runs/36410878158)
+both passed. `.github/workflows/ci.yml` runs `public-entry-test` on Linux.
+The Windows workflow runs canonical and host-session checks but omits
+`public-entry-test`. Its green result does not establish Windows installed
+public-entry acceptance. PR #56 remains draft, and a later documentation
+head needs fresh exact-head checks before integration.
 
 The expected digests are trust inputs, not signatures. This local boundary
 assumes the host supplies them independently and the installed files are not
 mutated between checking and use. It does not prove hostile filesystem race
 containment. It does not replace the installed plugin or read the legacy
-checkout. Independent code review, exact-head Linux and Windows CI, a native
-installed-host rerun with source claims, independent QA, and read-only closeout
-with an independently selected current candidate remain the next gates.
+checkout. Independent product QA, Windows installed public-entry coverage,
+read-only closeout with an independently selected current candidate,
+shared-service coordination, and operator review for cutover remain open.
+Full-feature and QA capabilities remain explicit blocks. No installed plugin
+was replaced, and no merge or publish approval is claimed.
