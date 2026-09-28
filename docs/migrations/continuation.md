@@ -30,11 +30,22 @@ run failed only the inherited distribution test because Bun was absent from
 the isolated shell PATH. The implementation code was committed after the
 successful rerun and diff check.
 
+The clean implementation-head bundle had 81 files, source revision
+`81bb284e59c38846f3728adb8c74087677cc2241`, `dirty: false`, and outer
+manifest SHA-256
+`bc96a4580193287c4b0bfd2d1727c206273efeecfdfef1d2d7f072846d2a9a5f`.
+Its direct checker and a stock-Node installed closeout observation both exited 0.
+
+Draft [PR #59](https://github.com/randydinh/temari/pull/59) is open for an
+independent verifier; a later documentation head still needs its own CI result.
+
 The retained native NX-01 run at `/private/tmp/temari-channel-native.GrZvzP`
 remains untouched. Its pinned canonical manifest
 `c58bb6f2e8b01700d31c0d8c2adc01662fafa3182bf6bb87127da6b90be0bb0e`
 identifies earlier runtime bytes. NX-02 pins the installed runtime and must
-not claim that this older run passed under a newer artifact. Independent
+not claim that this older run passed under a newer artifact. A direct call
+against the original run exited 1 at that exact manifest mismatch, with the
+run/candidate file-hash aggregate unchanged before and after. Independent
 review, exact-head CI, Windows installed-entry coverage, independent product
 QA, shared-service recovery, and operator approval for cutover remain open.
 No merge is requested from this worker.

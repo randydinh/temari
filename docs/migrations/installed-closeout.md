@@ -67,8 +67,22 @@ The retained native NX-01 run at `/private/tmp/temari-channel-native.GrZvzP`
 still records real host work and the same product bytes. Its descriptor pins the
 older canonical manifest `c58bb6f2e8b01700d31c0d8c2adc01662fafa3182bf6bb87127da6b90be0bb0e`.
 This closeout package uses a newer canonical artifact with read-only store-open
-methods; it does not claim that an older run was reverified under new runtime
-bytes. The original retained run remains untouched.
+methods. Directly invoking its installed entry against that native run returned
+exit 1 at the canonical-manifest comparison: retained
+`c58bb6f2e8b01700d31c0d8c2adc01662fafa3182bf6bb87127da6b90be0bb0e`
+versus installed
+`d0985a19128f35b42cbd86ad4ed6e0b6f4d46d0cba30e86eec0a57655a3ecd05`.
+The run/candidate file-hash aggregate was
+`0dc765ef6aac117f904b4cd9c0e684661b59039b8eac317535027d54b28d92fb`
+both before and after. This is a pinned-artifact refusal, not a successful
+reverification of the old run. The original retained run remains untouched.
+
+At implementation head `81bb284e59c38846f3728adb8c74087677cc2241`, a
+clean 81-file outer package reported `dirty: false` and manifest SHA-256
+`bc96a4580193287c4b0bfd2d1727c206273efeecfdfef1d2d7f072846d2a9a5f`.
+The direct stock-Node installed closeout observation passed 1/1; the outer
+checker exited 0 with that externally supplied digest. PR #59 is a draft for
+independent review; its exact final head and CI remain separate evidence.
 
 This boundary assumes one cooperative exclusive writer and local regular
 files. The observation excludes empty directories, directory modes,
