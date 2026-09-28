@@ -1165,7 +1165,14 @@ test('packaged closeout refuses changed selection, product, retained records, in
   await writeFile(product, 'ALTERED\n');
   await refuse(args);
   await writeFile(product, 'APPLE\nPEAR\n');
-  await chmod(product, originalMode === 0o600 ? 0o644 : 0o600);
+  const changedMode =
+    originalMode & 0o200 ? originalMode & ~0o222 : originalMode | 0o200;
+  await chmod(product, changedMode);
+  assert.notEqual(
+    (await lstat(product)).mode & 0o777,
+    originalMode,
+    'The file mode did not change.',
+  );
   await refuse(args);
   await chmod(product, originalMode);
 
