@@ -11,6 +11,15 @@ repair. The repair commit is `39971e5dbbcef074c315982770c86eaf92edef6b`.
 After confirming remote `main` at
 `7cf3221c0f8495b96adda4f9344b365262ca588c`, the branch integrated PR 57
 with a normal merge commit `dd9d19710afbf20c772bd397ea0862d3863e9acc`.
+After PR 59 merged, remote `main` was rechecked at
+`c3e3d6b57d3dd085821c400d8c4ec69936ee70fe` and integrated with normal
+merge commit `585ff24136f08420fd73b99736fd334d91779821`. The merge retained
+both NX-02 installed closeout and NX-04 privacy changes. Only
+`docs/migrations/continuation.md` and `migration-decisions.tsv` conflicted;
+their resolution retained both histories. Linux CI run 36433849656 and
+Windows run 36433840630 passed at pre-PR59 head
+`79b88adc1e6497f038465427a0b20c8a6d4b060c`. Those runs do not establish
+the final merged head.
 Draft [PR #58](https://github.com/randydinh/temari/pull/58) remains open.
 The owner authorized merge only after a new independent review; this repair
 unit does not merge the PR.
@@ -177,6 +186,30 @@ The generated Archon sources and provenance were regenerated; the source and
 relocated package checks confirm the resulting copies. New exact-head CI and
 independent review are still required before merge. No current-head review
 verdict is claimed here.
+
+## Verification after the PR 59 merge
+
+At merge commit `585ff24136f08420fd73b99736fd334d91779821`, the following
+local commands used `PATH=/opt/homebrew/bin:$PATH NX_DAEMON=false` and
+`--skipNxCache --skipSync --output-style=static`. They use synthetic fixtures;
+they do not exercise a live private model request.
+
+| Nx command                                                                                                                                                                                                                   | Exit | Observed result                                                                                                    |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---: | ------------------------------------------------------------------------------------------------------------------ |
+| `pnpm exec nx run-many -t typecheck test --projects=privacy,host-adapters,workflow-runtime,runtime,workflow-engine,temari-core,contracts --parallel=2`                                                                       |    0 | Seven project typecheck/test targets passed with dependencies.                                                     |
+| `pnpm exec nx run-many -p workflow-runtime -t privacy-test public-entry-test host-session-test canonical-test --parallel=1`                                                                                                  |    0 | Relocated privacy, installed public closeout, host session, and canonical journeys passed.                         |
+| `pnpm exec nx run workflow-runtime:public-entry-test`                                                                                                                                                                        |    0 | 35 tests, including packaged closeout plan-tamper refusal.                                                         |
+| `pnpm exec nx run workflow-runtime:privacy-native-test`                                                                                                                                                                      |    0 | 77 synthetic installed Archon tests.                                                                               |
+| `pnpm exec nx run workflow-runtime:check`                                                                                                                                                                                    |    0 | Source inventory matched 237 files.                                                                                |
+| `pnpm exec nx run workflow-runtime:package --args='--lane archon'`                                                                                                                                                           |    0 | 237-file artifact unchanged at digest `e82ce8a7efd2a5657f64059eb2344ad85dfc0e867d3fa3ac701f6b5e1d7bcfe8`.          |
+| `pnpm exec nx run workflow-runtime:check --args='--artifact /private/tmp/temari-nx04-privacy-20260928/packages/workflow-runtime/dist/archon-e82ce8a7efd2a5657f64059eb2344ad85dfc0e867d3fa3ac701f6b5e1d7bcfe8 --lane archon'` |    0 | Relocated Archon artifact matched 237 files.                                                                       |
+| `pnpm exec nx run workflow-runtime:package`                                                                                                                                                                                  |    0 | 213-file portable artifact unchanged at digest `38ecaa0078d9f44efe4c1cced5193110348b3f3ea5d6176f426e3df5f92830bc`. |
+| `pnpm exec nx run workflow-runtime:privacy-preflight --args='/opt/homebrew/bin/codex'`                                                                                                                                       |    1 | Installed `codex-cli 0.154.0` refused `runtime-version`, with zero credential requests.                            |
+
+The Nx changed-file formatting check also exited 0. Final-head Linux and
+Windows CI must be checked after the handoff documentation is committed and
+pushed. A new independent review remains required. This record claims no
+final-head CI or review result before those runs finish.
 
 ## Release gate
 

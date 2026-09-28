@@ -12,18 +12,21 @@ The privacy source is on the isolated
 milestone was `93c3786`; independent reviews of `c42956a` then failed on
 schema-key callback swaps and bracketed credential leaks. Repair `39971e5`
 preserves encoded key identity and masks or rejects bracketed credentials.
-The branch integrated PR 57 at `dd9d197` and is integrating PR 59 from main
-`c3e3d6b57d3dd085821c400d8c4ec69936ee70fe` by normal merge. The dirty
+The branch integrated PR 57 at `dd9d197` and PR 59 from main
+`c3e3d6b57d3dd085821c400d8c4ec69936ee70fe` by normal merge
+`585ff24136f08420fd73b99736fd334d91779821`. The dirty
 `/Users/randydinh/source/projects/temari-next` checkout remains read-only.
 The [NX-04 handoff](./nx-04-privacy-handoff.md) records the key-order premise,
 source and installed tests, generated copy, old CI evidence, and release gate.
 
-Linux run 36433849656 and Windows run 36433840630 started for the pre-PR59
-head `79b88adc1e6497f038465427a0b20c8a6d4b060c`; their result must be
-recorded separately from final merged-head CI. No new independent review has
-passed. The real installed Codex preflight refused `runtime-version` before
-credentials. Keep private use blocked pending compatible runtime isolation,
-independent review, and explicit operator cutover approval.
+Linux run 36433849656 and Windows run 36433840630 passed for the pre-PR59
+head `79b88adc1e6497f038465427a0b20c8a6d4b060c`. At the PR59 merge
+commit, seven-project typecheck/test, installed public closeout, privacy,
+host-session and Archon package journeys passed locally. Final-head CI and a
+new independent review remain pending. The real installed Codex preflight
+refused `runtime-version` before credentials. Keep private use blocked pending
+compatible runtime isolation, independent review, and explicit operator
+cutover approval.
 
 ## NX-02 installed closeout handoff — 2026-09-28
 
