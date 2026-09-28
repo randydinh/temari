@@ -552,8 +552,7 @@ async function installedFixture(t, entry = 'temari') {
 const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
 function canonicalReceipt(value) {
-  if (Array.isArray(value))
-    return `[${value.map(canonicalReceipt).join(',')}]`;
+  if (Array.isArray(value)) return `[${value.map(canonicalReceipt).join(',')}]`;
   if (value && typeof value === 'object')
     return `{${Object.entries(value)
       .sort(([left], [right]) => left.localeCompare(right))
@@ -1137,7 +1136,10 @@ test('packaged closeout refuses a rehashed PASS receipt with a different plan', 
   await writeFile(receiptPath, canonicalReceipt(stored));
   const result = await childResult(args, 1);
   assert(!result.stdout.includes('candidate-verified'));
-  assert.match(result.stderr, /Retained receipt plan differs from admitted policy/);
+  assert.match(
+    result.stderr,
+    /Retained receipt plan differs from admitted policy/,
+  );
 });
 
 test('packaged closeout refuses changed selection, product, retained records, invocation, and absent stores', async (t) => {

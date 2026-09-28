@@ -6,6 +6,25 @@ not replace acceptance evidence from the installed product.
 
 ## NX-02 installed closeout handoff — 2026-09-28
 
+Independent review rejected PR #59 at `20b06fc` after a rehashed six-stage
+receipt with a changed review plan returned `candidate-verified`. The branch
+now contains a normal merge of main's PR #57 Windows repair (`d926cfc`), a
+failing packaged-entry regression commit (`2253108`), and the loader repair
+(`d14cf55`). Before the fix, the tamper invocation returned exit 0; after the
+fix the same installed-entry regression passed and the tamper invocation
+returned exit 1. The closeout test uses a file URL for its loader and asserts
+the legacy import is refused. The repaired head passed 35/35 uncached public
+entry tests, the ten-task affected typecheck/test bracket, 11 canonical tests,
+39 host-session tests, and the 234-file package inventory check. The sole
+merge conflict was in this program's installed-public-journey documentation;
+the resolved text retained main's Windows evidence. Exact final-head Windows
+and Linux CI and independent rereview remain pending at this checkpoint.
+
+The paragraphs below preserve the initial implementation evidence and its
+older base SHA. Read the repair record in
+[installed closeout](./installed-closeout.md) before using it as an acceptance
+claim.
+
 Branch `codex/nx02-installed-closeout-20260928` in the exclusive
 `/private/tmp/temari-nx02-closeout-20260928` worktree starts from merged main
 `8cb14df8629b44fca3e12632c6a045adc4bff962`. Implementation milestone

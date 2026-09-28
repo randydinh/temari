@@ -63,6 +63,37 @@ candidate bytes or mode, changed selected identity and its digest, tampered
 receipt/evidence/manifest, redirected roots, symlinked or missing stores,
 missing receipt, and a genuine `ISSUES` terminal run.
 
+## NX-02 receipt-plan repair — 2026-09-28
+
+Independent review of draft PR #59 at `20b06fc71df98fb4a396aaf4b7ce3c7beeb0c99e`
+found that a six-stage PASS receipt could change `plan.review` from `self` to
+`independent`, recompute its stored SHA-256, and still return
+`candidate-verified`. The installed loader already checked the retained run
+descriptor against admitted policy, but did not compare the receipt plan with
+that descriptor. The repaired loader compares the loaded receipt plan exactly
+with the policy-bound descriptor before reporting success.
+
+The packaged-entry regression at `2253108` reproduced the old result: the
+uncached `workflow-runtime:public-entry-test` target exited 1, with 34 of 35
+tests passing; the rehashed-tamper invocation itself exited 0 and returned
+`candidate-verified`. After the loader fix at `d14cf55`, the same uncached
+target exited 0 with 35 of 35 passing. The closeout loader test now uses a
+file URL and directly asserts that its legacy-checkout import guard refuses
+the forbidden import. The valid installed closeout still leaves its run and
+candidate snapshot unchanged.
+
+The branch integrated `origin/main` at `7cf3221c0f8495b96adda4f9344b365262ca588c`
+through normal merge commit `d926cfc`. The sole conflict was in
+`docs/migrations/installed-public-journey.md`; resolution retained main's
+record of the Windows file-URL and executable-mode fixes and pointed to this
+separate closeout record. No product source conflict occurred.
+
+At code head `d14cf5563ca6fa7237415bf097958476416a9718`, the uncached
+five-project `typecheck test` bracket exited 0 for all ten tasks. The
+uncached `workflow-runtime` canonical, host-session, and package inventory
+targets exited 0 with 11, 39, and 234-file checks respectively. Exact final
+head CI and independent rereview are separate gates.
+
 The retained native NX-01 run at `/private/tmp/temari-channel-native.GrZvzP`
 still records real host work and the same product bytes. Its descriptor pins the
 older canonical manifest `c58bb6f2e8b01700d31c0d8c2adc01662fafa3182bf6bb87127da6b90be0bb0e`.
