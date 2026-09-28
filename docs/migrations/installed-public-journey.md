@@ -37,7 +37,9 @@ node /isolated/bundle/bin/temari.mjs resume --request /isolated/request.json --e
 `admit --request` remains a preflight and reports missing trusted invocation
 proof for the lightweight route. A matching full-feature route remains blocked
 because the bridge cannot prove `subagents` or `forge`. QA remains rejected.
-`closeout` remains blocked pending trusted candidate selection.
+At the NX-01 source head, `closeout` was still blocked. The subsequent
+[installed closeout](./installed-closeout.md) adds the guarded verification
+command and its separate acceptance evidence.
 
 ## Source mapping
 
@@ -202,8 +204,8 @@ assumes the host supplies them independently and the installed files are not
 mutated between checking and use. It does not prove hostile filesystem race
 containment. It does not replace the installed plugin or read the legacy
 checkout. Windows has no POSIX executable-bit proof; its entry is launched
-through Node. Independent product QA, read-only closeout with an independently
-selected current candidate,
+through Node. The subsequent read-only closeout work is tracked in
+[installed closeout](./installed-closeout.md). Independent product QA,
 shared-service coordination, and operator review for cutover remain open.
 Full-feature and QA capabilities remain explicit blocks. No installed plugin
 was replaced, and no merge or publish approval is claimed.
