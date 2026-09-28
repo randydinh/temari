@@ -168,15 +168,19 @@ function schemaPropertyNames(
     properties: boolean,
   ): void => {
     if (
-      !Array.isArray(before) || !Array.isArray(after) ||
-      before.length !== 2 || after.length !== 2 || before[0] !== after[0]
+      !Array.isArray(before) ||
+      !Array.isArray(after) ||
+      before.length !== 2 ||
+      after.length !== 2 ||
+      before[0] !== after[0]
     )
       throw new PrivacyError('Privacy policy altered schema structure.');
     const [tag, originalValue] = before;
     const safeValue = after[1];
     if (tag !== 'object' && tag !== 'array') return;
     if (
-      !Array.isArray(originalValue) || !Array.isArray(safeValue) ||
+      !Array.isArray(originalValue) ||
+      !Array.isArray(safeValue) ||
       originalValue.length !== safeValue.length
     )
       throw new PrivacyError('Privacy policy altered schema structure.');
@@ -187,9 +191,12 @@ function schemaPropertyNames(
         return;
       }
       if (
-        !Array.isArray(entry) || !Array.isArray(safeEntry) ||
-        entry.length !== 2 || safeEntry.length !== 2 ||
-        typeof entry[0] !== 'string' || typeof safeEntry[0] !== 'string'
+        !Array.isArray(entry) ||
+        !Array.isArray(safeEntry) ||
+        entry.length !== 2 ||
+        safeEntry.length !== 2 ||
+        typeof entry[0] !== 'string' ||
+        typeof safeEntry[0] !== 'string'
       )
         throw new PrivacyError('Privacy policy altered schema structure.');
       const [key, child] = entry;
@@ -224,7 +231,9 @@ function restoreToolPropertyNames(
   const result: Record<string, JsonValue> = {};
   for (const [key, value] of Object.entries(args)) {
     if (key.includes('[[TM_PRIVACY_') && !names.has(key))
-      throw new PrivacyError('Tool arguments contain an unknown protected property name.');
+      throw new PrivacyError(
+        'Tool arguments contain an unknown protected property name.',
+      );
     const original = names.get(key) ?? key;
     if (Object.hasOwn(result, original))
       throw new PrivacyError(

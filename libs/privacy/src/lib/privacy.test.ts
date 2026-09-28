@@ -158,8 +158,18 @@ test('unquoted credential assignments include bracketed values and suffixes', ()
     ['password=SYNTHETIC[NESTED[VALUE]]94', '[NESTED[VALUE]]94'],
   ]) {
     const result = mask({ text: declaration });
-    assert.equal(JSON.stringify(result.payload).includes(forbidden), false, declaration);
-    assert.equal(JSON.stringify(restoreForDisplay(result.payload, result.session)).includes(forbidden), false, declaration);
+    assert.equal(
+      JSON.stringify(result.payload).includes(forbidden),
+      false,
+      declaration,
+    );
+    assert.equal(
+      JSON.stringify(
+        restoreForDisplay(result.payload, result.session),
+      ).includes(forbidden),
+      false,
+      declaration,
+    );
   }
 });
 

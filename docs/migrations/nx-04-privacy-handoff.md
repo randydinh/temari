@@ -1,14 +1,23 @@
 # NX-04 privacy integration handoff
 
 The integration branch is `codex/nx04-privacy-integration-20260928` in
-`/private/tmp/temari-nx04-privacy-20260928`. It started from merged `main`
-`8cb14df8629b44fca3e12632c6a045adc4bff962`. The code milestone is
-`93c3786f049731ddc5a55502cd6c3f03b60000be`. Remote `main` still pointed
-to the same merge when the code milestone was pushed. Draft
-[PR #58](https://github.com/randydinh/temari/pull/58) awaits independent review.
+`/private/tmp/temari-nx04-privacy-20260928`. The original transfer started at
+`8cb14df8629b44fca3e12632c6a045adc4bff962` and was committed at
+`93c3786f049731ddc5a55502cd6c3f03b60000be`. Independent reviews of
+`c42956a1c521f05a75f3b3f60a6f6d5e752c6244` **failed** on a callback
+argument swap and bracketed credential leaks. Linux CI run 36429003197 and
+Windows run 36429723104 passed at that older head; neither establishes the
+repair. The repair commit is `39971e5dbbcef074c315982770c86eaf92edef6b`.
+After confirming remote `main` at
+`7cf3221c0f8495b96adda4f9344b365262ca588c`, the branch integrated PR 57
+with a normal merge commit `dd9d19710afbf20c772bd397ea0862d3863e9acc`.
+Draft [PR #58](https://github.com/randydinh/temari/pull/58) remains open.
+The owner authorized merge only after a new independent review; this repair
+unit does not merge the PR.
 
 The source checkout `/Users/randydinh/source/projects/temari-next` remained
-read-only. Its baseline had 14 tracked edits and 20 untracked files. Both its
+read-only. Its baseline and the repair-time read-only check had 14 tracked
+edits and 20 untracked files. Both its
 `git diff --check` and the destination's staged `git diff --check` exited 0.
 The destination code commit contains exactly the 34 source paths below.
 Twenty-five transferred files match the source bytes. Nine paths differ for
@@ -76,8 +85,29 @@ for `public-entry-test` from the merged pilot remain present.
 
 The host transport maps protected JSON Schema property names back to the names
 in the trusted schema only when it calls the local tool. Argument values remain
-masked. The full callback regression uses a synthetic credential-class key and
-checks the actual callback argument. The path read rejects symbolic links and
+masked. The original implementation paired decoded `Object.entries` by position.
+That premise failed because JavaScript enumerates integer-index keys before
+other keys. The repair pairs key identities by the stable array indices in the
+encoded schema, then rejects conflicting identities and unknown protected
+callback keys. A global identity conflict is rejected rather than guessed.
+
+| Case                         | Original schema property keys | Protected schema keys and model callback keys  | Trusted callback                                |
+| ---------------------------- | ----------------------------- | ---------------------------------------------- | ----------------------------------------------- |
+| Ordinary                     | `plain`, `Synthetic Key`      | `plain`, placeholder                           | `plain`, `Synthetic Key`; values stay masked    |
+| Integer-index                | `3`, `12`                     | `12`, placeholder                              | `3`, `12`; values stay with their original keys |
+| Nested                       | `group` → `3`, `12`           | `group` → `12`, placeholder                    | `group` → `3`, `12`                             |
+| Duplicate/ambiguous callback | `3`, `12`                     | `12`, placeholder; callback also sends raw `3` | Rejected before tool execution                  |
+
+The full callback-path tests enumerate these keys. The decoded-object position
+approach swapped the integer-index values in the red test. An explicit identity
+mapping preserves the valid cases; rejecting every changed key would break the
+supported single-key callback without improving this boundary. Bracketed
+unquoted credential values are masked as complete tokens. Values with an
+unbalanced or truncated bracket span fail closed; a serialized empty `[]`
+remains structural. Synthetic prompt, tool-description, and callback-result
+tests cover source and relocated Archon packages.
+
+The path read rejects symbolic links and
 directories that another local UID can replace. A root-owned sticky directory
 is accepted only for an entry owned by the process UID. The host must exclude
 same-UID writers and ACL grants from its trusted file area. `O_NOFOLLOW` alone
@@ -88,12 +118,14 @@ The generated Archon copies come from the three authoritative Nx sources.
 transformation notes, and exact 237-file package inventory. The public entry
 and one-engine lifecycle retain their existing target and tests.
 
-## Verification at the code milestone
+## Historical verification at the original code milestone
 
 The commands below ran from the isolated worktree at
 `93c3786f049731ddc5a55502cd6c3f03b60000be`. Each Nx command used the
 prefix `PATH=/opt/homebrew/bin:$PATH NX_DAEMON=false`. The later handoff-only
-documentation edits do not change the tested sources or artifact inventory.
+documentation edits did not change the tested sources or artifact inventory.
+The failed independent review supersedes any acceptance inference from these
+older checks.
 
 | Command after the prefix                                                                                                                                                                                                                                                    | Exit | Observed result                                                                                                      |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---: | -------------------------------------------------------------------------------------------------------------------- |
@@ -115,6 +147,37 @@ ancestor regressions first failed on the transferred source and then passed
 after the fixes. These checks use synthetic fixtures. No credential, customer
 record, or OpConnect source was added.
 
+## Repair verification before the final handoff commit
+
+The first full verification ran at merge head
+`dd9d19710afbf20c772bd397ea0862d3863e9acc`, after PR 57 integration.
+The workspace formatter then changed source layout and regenerated the Archon
+copy. Focused source typecheck/test, privacy-test, package and artifact check
+were repeated on the final working tree. Other results below are from the
+merge head and are not claimed for the later formatting edit. Each Nx command
+used `PATH=/opt/homebrew/bin:$PATH NX_DAEMON=false` and
+`--skipNxCache --skipSync --output-style=static`. The new callback test was red
+before the schema repair. The bracketed-value test was red before the grammar
+repair.
+
+| Nx command                                                                                                                                                                                                                                    | Exit | Observed result                                                                                                                  |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---: | -------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm exec nx run-many -t typecheck test --projects=privacy,host-adapters,workflow-runtime --parallel=1`                                                                                                                                      |    0 | Privacy 33, host-adapters 74, workflow-runtime 34 tests; dependent typechecks passed at merge head.                              |
+| `pnpm exec nx run-many -t typecheck test --projects=privacy,host-adapters --parallel=1` after formatting                                                                                                                                      |    0 | Privacy 33 and host-adapters 74 tests; dependent typechecks passed.                                                              |
+| `pnpm exec nx run workflow-runtime:privacy-test`                                                                                                                                                                                              |    0 | 37 generator and 4 relocated adapter tests, including packaged callback and three credential channels; rerun after formatting.   |
+| `pnpm exec nx run workflow-runtime:privacy-native-test`                                                                                                                                                                                       |    0 | 77 synthetic installed Archon tests at merge head.                                                                               |
+| `pnpm exec nx run workflow-runtime:public-entry-test`                                                                                                                                                                                         |    0 | 31 installed public-entry tests, including PR 57's Windows-compatible entry, at merge head.                                      |
+| `pnpm exec nx run workflow-runtime:check`                                                                                                                                                                                                     |    0 | Source inventory: 237 files at merge head.                                                                                       |
+| `pnpm exec nx run workflow-runtime:package --args='--lane archon'` after formatting                                                                                                                                                           |    0 | Archon artifact: 237 files; digest `e82ce8a7efd2a5657f64059eb2344ad85dfc0e867d3fa3ac701f6b5e1d7bcfe8`.                           |
+| `pnpm exec nx run workflow-runtime:check --args='--artifact /private/tmp/temari-nx04-privacy-20260928/packages/workflow-runtime/dist/archon-e82ce8a7efd2a5657f64059eb2344ad85dfc0e867d3fa3ac701f6b5e1d7bcfe8 --lane archon'` after formatting |    0 | Relocated Archon artifact matched all 237 entries.                                                                               |
+| `pnpm exec nx run workflow-runtime:package`                                                                                                                                                                                                   |    0 | Portable artifact: 213 files, unchanged digest `38ecaa0078d9f44efe4c1cced5193110348b3f3ea5d6176f426e3df5f92830bc` at merge head. |
+| `pnpm exec nx run workflow-runtime:privacy-preflight --args='/opt/homebrew/bin/codex'`                                                                                                                                                        |    1 | Real installed `codex-cli 0.154.0` refused `runtime-version`; zero credential requests at merge head.                            |
+
+The generated Archon sources and provenance were regenerated; the source and
+relocated package checks confirm the resulting copies. New exact-head CI and
+independent review are still required before merge. No current-head review
+verdict is claimed here.
+
 ## Release gate
 
 The Archon native pilot reports `explicit-request-only`. Its masking does not
@@ -128,8 +191,8 @@ exit 1 and zero credential requests. The earlier audit on
 `0.155.0-alpha.16.4` refused `feature-state (unified_exec)` with exit 1 and
 zero credential requests.
 
-Independent code review, current-head CI, and final cutover approval remain
-outside NX-04. Do not merge this branch or replace an installed plugin on this
-handoff. The next engineer should review the draft PR, reproduce the privacy
-and installed-artifact checks at its final SHA, and keep private use blocked
-until the separate runtime gate closes.
+The owner authorized a merge after a new independent review, but this repair
+unit stops with a draft PR. Final cutover and installed-plugin replacement
+remain separate operator decisions. New reviewers must inspect the final PR
+head and its Linux and Windows CI results. Private use remains blocked until
+the separate runtime gate closes.

@@ -64,7 +64,8 @@ test('relocated Archon transport masks bracketed credentials on all model channe
   roots.push(root);
   const artifact = await packageRuntime('archon', join(root, 'installed'));
   const { createProtectedModelTransport } = await import(
-    pathToFileURL(join(artifact.root, 'integrations/archon/model-transport.ts')).href
+    pathToFileURL(join(artifact.root, 'integrations/archon/model-transport.ts'))
+      .href
   );
   const sent = [];
   const transport = createProtectedModelTransport(
@@ -76,14 +77,20 @@ test('relocated Archon transport masks bracketed credentials on all model channe
       },
     },
     {
-      tools: [{
-        description: 'Use client_secret=SYNTHETIC[DESCRIPTION]94',
-        inputSchema: { type: 'object' },
-        async execute() { return [{ kind: 'text', text: 'password=[SYNTHETIC_RESULT_94]' }]; },
-      }],
+      tools: [
+        {
+          description: 'Use client_secret=SYNTHETIC[DESCRIPTION]94',
+          inputSchema: { type: 'object' },
+          async execute() {
+            return [{ kind: 'text', text: 'password=[SYNTHETIC_RESULT_94]' }];
+          },
+        },
+      ],
     },
   );
-  const reply = await transport.complete({ prompt: 'password=[SYNTHETIC_PROMPT_94]' });
+  const reply = await transport.complete({
+    prompt: 'password=[SYNTHETIC_PROMPT_94]',
+  });
   reply.dispose();
   assert.equal(sent.length, 3);
   for (const [channel, forbidden] of [
@@ -91,7 +98,13 @@ test('relocated Archon transport masks bracketed credentials on all model channe
     ['description', '[DESCRIPTION]94'],
     ['callback result', 'SYNTHETIC_RESULT_94'],
   ])
-    assert.equal(sent[['prompt', 'description', 'callback result'].indexOf(channel)].includes(forbidden), false, channel);
+    assert.equal(
+      sent[
+        ['prompt', 'description', 'callback result'].indexOf(channel)
+      ].includes(forbidden),
+      false,
+      channel,
+    );
 });
 
 test('relocated Archon callback preserves numeric schema key identity', async () => {
@@ -99,7 +112,8 @@ test('relocated Archon callback preserves numeric schema key identity', async ()
   roots.push(root);
   const artifact = await packageRuntime('archon', join(root, 'installed'));
   const { createProtectedModelTransport } = await import(
-    pathToFileURL(join(artifact.root, 'integrations/archon/model-transport.ts')).href
+    pathToFileURL(join(artifact.root, 'integrations/archon/model-transport.ts'))
+      .href
   );
   let callback;
   const transport = createProtectedModelTransport(
@@ -108,10 +122,12 @@ test('relocated Archon callback preserves numeric schema key identity', async ()
         const properties = request.tools[0].inputSchema.properties;
         const originalKeys = ['3', '12'];
         const protectedKeys = Object.keys(properties);
-        const protectedName = protectedKeys.find((key) => !originalKeys.includes(key));
+        const protectedName = protectedKeys.find(
+          (key) => !originalKeys.includes(key),
+        );
         assert(protectedName);
         assert.deepEqual(protectedKeys, ['12', protectedName]);
-        const args = { '12': 'plain-value', [protectedName]: 'protected-value' };
+        const args = { 12: 'plain-value', [protectedName]: 'protected-value' };
         assert.deepEqual(Object.keys(args), protectedKeys);
         await callTool(request.tools[0].name, args);
         return 'done';
@@ -119,11 +135,19 @@ test('relocated Archon callback preserves numeric schema key identity', async ()
     },
     {
       policy: { literals: [{ value: '3', kind: 'CREDENTIAL' }] },
-      tools: [{
-        description: 'Synthetic numeric fields',
-        inputSchema: { type: 'object', properties: { '3': { type: 'string' }, '12': { type: 'string' } } },
-        async execute(args) { callback = args; return []; },
-      }],
+      tools: [
+        {
+          description: 'Synthetic numeric fields',
+          inputSchema: {
+            type: 'object',
+            properties: { 3: { type: 'string' }, 12: { type: 'string' } },
+          },
+          async execute(args) {
+            callback = args;
+            return [];
+          },
+        },
+      ],
     },
   );
   const reply = await transport.complete({ prompt: 'Use the synthetic tool.' });
