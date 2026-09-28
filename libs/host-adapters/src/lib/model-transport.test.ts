@@ -153,7 +153,9 @@ test('bracketed unquoted credential values stay out of prompt, tool description 
 });
 
 test('Basic authorization text stays out of all three model channels', async () => {
-  const credential = Buffer.from('synthetic_user:synthetic_pass').toString('base64');
+  const credential = Buffer.from('synthetic_user:synthetic_pass').toString(
+    'base64',
+  );
   const sent: string[] = [];
   const transport = createProtectedModelTransport(
     {
@@ -164,19 +166,26 @@ test('Basic authorization text stays out of all three model channels', async () 
       },
     },
     {
-      tools: [{
-        description: `authorization : BASIC\t${credential}`,
-        inputSchema: { type: 'object' },
-        async execute() {
-          return [{ kind: 'text', text: `Authorization: Basic ${credential}` }];
+      tools: [
+        {
+          description: `authorization : BASIC\t${credential}`,
+          inputSchema: { type: 'object' },
+          async execute() {
+            return [
+              { kind: 'text', text: `Authorization: Basic ${credential}` },
+            ];
+          },
         },
-      }],
+      ],
     },
   );
-  const reply = await transport.complete({ prompt: `Authorization: Basic ${credential}` });
+  const reply = await transport.complete({
+    prompt: `Authorization: Basic ${credential}`,
+  });
   try {
     assert.equal(sent.length, 3);
-    for (const channel of sent) assert.equal(channel.includes(credential), false);
+    for (const channel of sent)
+      assert.equal(channel.includes(credential), false);
     assert.equal(reply.displayText().includes(credential), false);
   } finally {
     reply.dispose();

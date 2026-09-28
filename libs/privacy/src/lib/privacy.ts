@@ -144,6 +144,11 @@ const ssnPattern =
   /(?<!\d)(?!000|666|9\d\d)\d{3}-(?!00)\d{2}-(?!0000)\d{4}(?!\d)/g;
 const ipPattern = /(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])/g;
 const bearerPattern = /\bBearer\s+([^\s,;"'\]}]+)/dgi;
+const basicHeaderPattern = /\bauthorization\s*:\s*basic/gi;
+const basicPlaceholderPattern =
+  /^\[\[TM_PRIVACY_[a-f0-9-]{36}_[A-Z][A-Z0-9_]*_[0-9]+\]\]/;
+const canonicalBasicPattern =
+  /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 const assignmentPattern =
   /\b(?:password|passwd|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|secret|token)\b["']?\s*[:=]\s*(?:"((?:\\.|[^"\\\r\n])*)"|'((?:\\.|[^'\\\r\n])*)'|((?:\[\[TM_PRIVACY_[^\]]+\]\]|[^\s,;{}"'])+))/dgi;
 const apiTokenPattern =
@@ -417,6 +422,34 @@ function detectorMatches(
   add(apiTokenPattern, 'CREDENTIAL', false);
   add(jwtPattern, 'CREDENTIAL', false);
   add(bearerPattern, 'CREDENTIAL', false, [1]);
+  for (const header of text.matchAll(basicHeaderPattern)) {
+    let start = header.index + header[0].length;
+    if (start < text.length && !/\s/.test(text[start]!))
+      throw new PrivacyError('Ambiguous Basic authorization value.');
+    while (start < text.length && /\s/.test(text[start]!)) start++;
+    if (start === text.length) continue;
+    const remainder = text.slice(start);
+    const placeholder = remainder.match(basicPlaceholderPattern)?.[0];
+    const value = placeholder ?? remainder.match(/^[A-Za-z0-9+/=]+/)?.[0];
+    const decoded =
+      value && !placeholder ? Buffer.from(value, 'base64') : undefined;
+    if (
+      !value ||
+      (text[start + value.length] !== undefined &&
+        !/[\s,;}]/.test(text[start + value.length]!)) ||
+      (!placeholder &&
+        (!canonicalBasicPattern.test(value) ||
+          !decoded?.includes(0x3a) ||
+          decoded.toString('base64') !== value))
+    )
+      throw new PrivacyError('Ambiguous Basic authorization value.');
+    matches.push({
+      start,
+      end: start + value.length,
+      kind: 'CREDENTIAL',
+      restore: false,
+    });
+  }
   add(assignmentPattern, 'CREDENTIAL', false, [1, 2, 3]);
   return matches;
 }

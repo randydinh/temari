@@ -174,7 +174,9 @@ test('unquoted credential assignments include bracketed values and suffixes', ()
 });
 
 test('Basic authorization headers mask synthetic credentials across case and whitespace', () => {
-  const credential = Buffer.from('synthetic_user:synthetic_pass').toString('base64');
+  const credential = Buffer.from('synthetic_user:synthetic_pass').toString(
+    'base64',
+  );
   for (const declaration of [
     `Authorization: Basic ${credential}`,
     `aUtHoRiZaTiOn : bAsIc\t${credential}`,
@@ -193,6 +195,7 @@ test('ambiguous Basic authorization syntax fails closed', () => {
     'Authorization: Basic "synthetic-token"',
     'Authorization: Basic [synthetic-token]',
     'Authorization: Basic synthetic-token',
+    'Authorization: Basicsynthetic-token',
   ])
     assert.throws(() => mask({ text: declaration }), PrivacyError, declaration);
 });
@@ -681,7 +684,13 @@ test('trusted placeholders pass through unchanged even under single-digit litera
 });
 
 test('trusted scope credential revocation is monotonic across old handles and aliases', () => {
-  for (const context of ['field', 'bearer', 'assignment', 'raw'] as const) {
+  for (const context of [
+    'field',
+    'bearer',
+    'basic',
+    'assignment',
+    'raw',
+  ] as const) {
     const secret = 'CANARY_revocation_91';
     const policy: PrivacyPolicy = {
       literals: [{ value: secret, kind: 'PERSON' }],
@@ -695,9 +704,11 @@ test('trusted scope credential revocation is monotonic across old handles and al
         ? { password: first.payload }
         : context === 'bearer'
           ? { message: `Bearer ${first.payload}` }
-          : context === 'assignment'
-            ? { message: `password=${first.payload}` }
-            : { password: secret, echo: first.payload };
+          : context === 'basic'
+            ? { message: `Authorization: Basic ${first.payload}` }
+            : context === 'assignment'
+              ? { message: `password=${first.payload}` }
+              : { password: secret, echo: first.payload };
     const later = mask(
       { payload, alias: alias.payload, rawEcho: secret },
       policy,
