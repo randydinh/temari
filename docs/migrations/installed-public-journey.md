@@ -153,17 +153,55 @@ independent product QA or cross-machine recovery.
 At `4bf4713`, [Linux CI run 36410884037](https://github.com/randydinh/temari/actions/runs/36410884037)
 and [Windows run 36410878158](https://github.com/randydinh/temari/actions/runs/36410878158)
 both passed. `.github/workflows/ci.yml` runs `public-entry-test` on Linux.
-The Windows workflow runs canonical and host-session checks but omits
-`public-entry-test`. Its green result does not establish Windows installed
-public-entry acceptance. PR #56 remains draft, and a later documentation
-head needs fresh exact-head checks before integration.
+The Windows workflow at that head omitted `public-entry-test`, so its green
+result did not establish Windows installed public-entry acceptance. PR #56
+later merged into main at `8cb14df8629b44fca3e12632c6a045adc4bff962`.
+
+## NX-06A Windows installed-entry decision — 2026-09-28
+
+The Windows harness now runs `workflow-runtime:public-entry-test` after its
+canonical and host-session targets. Its push filters include the public-entry
+test and packager, public wrappers, host bridge, pinned playbook assets, and Nx
+target configuration. The existing Windows harness and Archon smoke remain.
+
+The first Windows run at `821fdfde12e05aba6f90a5f3b4a784d826bae349`
+failed in artifact setup: Windows reported no POSIX executable bit for the
+regular Node entry files. [Run 36426687893](https://github.com/randydinh/temari/actions/runs/36426687893)
+returned 18 shared-setup failures before the installed journey ran. Commit
+`d08560149b13a75ad59520cfc40b756240b43e2a` limited the executable-bit
+check to platforms that expose it; artifact inventory and actual Node entry
+execution remain checked. Its [Windows run 36427275402](https://github.com/randydinh/temari/actions/runs/36427275402)
+passed 30/31 public-entry tests. The remaining test passed an absolute drive
+path to Node's ESM loader and failed with `ERR_UNSUPPORTED_ESM_URL_SCHEME` before
+the legacy-import refusal assertion. Commit
+`e9147766c31bfb6c17d84e4fac3af9815a2293d2` passes a file URL to both
+loader launches and retains that refusal assertion.
+
+At `e9147766c31bfb6c17d84e4fac3af9815a2293d2`, this uncached local
+command exited 0: `NX_DAEMON=false pnpm exec nx run-many -p workflow-runtime -t canonical-test host-session-test public-entry-test --parallel=1 --skipNxCache --skipSync --output-style=static`.
+It passed 11 canonical, 39 host-session, and 31 public-entry tests. Exact-head
+[Windows run 36427769912](https://github.com/randydinh/temari/actions/runs/36427769912)
+and [Linux run 36427776685](https://github.com/randydinh/temari/actions/runs/36427776685)
+both passed. The Windows log reports 31/31 public-entry tests, including the
+relocated start, fresh-process resume, and six-stage PASS test. That test
+asserts literal `APPLE\nPEAR\n` candidate bytes and SHA-256, retained source
+references, and negative refusal paths. Independent code review at this head
+found no actionable regressions. These run IDs prove the code head named here;
+any later documentation commit needs its own exact-head CI record.
+
+An older [Windows run 36412419554](https://github.com/randydinh/temari/actions/runs/36412419554)
+at `c83e750` had a file-level `v4-1-route-replay.test.ts` failure without an
+assertion trace; its [same-head rerun 36412832198](https://github.com/randydinh/temari/actions/runs/36412832198)
+passed. That unexplained one-off remains historical and is not attributed to
+NX-06A or counted as a current regression.
 
 The expected digests are trust inputs, not signatures. This local boundary
 assumes the host supplies them independently and the installed files are not
 mutated between checking and use. It does not prove hostile filesystem race
 containment. It does not replace the installed plugin or read the legacy
-checkout. Independent product QA, Windows installed public-entry coverage,
-read-only closeout with an independently selected current candidate,
+checkout. Windows has no POSIX executable-bit proof; its entry is launched
+through Node. Independent product QA, read-only closeout with an independently
+selected current candidate,
 shared-service coordination, and operator review for cutover remain open.
 Full-feature and QA capabilities remain explicit blocks. No installed plugin
 was replaced, and no merge or publish approval is claimed.
