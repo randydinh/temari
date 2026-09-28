@@ -118,6 +118,7 @@ export interface QaEvaluationAttempt {
   readonly endedAt: string;
   readonly inputSha256: string;
   readonly allowedInputSha256: string;
+  readonly outputSha256: null;
   readonly findings: readonly [];
 }
 
@@ -523,6 +524,9 @@ function validateEvaluationRounds(
     for (const key of ['inputSha256', 'allowedInputSha256'] as const) {
       if (!/^[0-9a-f]{64}$/.test(attempt[key]))
         issues.push(`${field}.${key} must be SHA-256.`);
+    }
+    if (attempt.outputSha256 !== null) {
+      issues.push(`${field}.outputSha256 must be null without an evaluator.`);
     }
     if (attempt.findings.length !== 0)
       issues.push(`${field}.findings must be empty without an evaluator.`);

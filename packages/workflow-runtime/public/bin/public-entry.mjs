@@ -691,6 +691,7 @@ async function startQa(request, requestSha256, policy) {
     endedAt,
     inputSha256: requestSha256,
     allowedInputSha256,
+    outputSha256: null,
     findings: [],
   };
   const record = core.createQaReviewRecord({

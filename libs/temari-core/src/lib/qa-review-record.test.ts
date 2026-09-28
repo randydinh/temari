@@ -139,6 +139,7 @@ test('retains a blocked host attempt without inventing an evaluator round', () =
         endedAt: '2026-09-28T00:00:01.000Z',
         inputSha256: 'a'.repeat(64),
         allowedInputSha256: 'b'.repeat(64),
+        outputSha256: null,
         findings: [],
       },
     ],
