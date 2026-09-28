@@ -551,6 +551,17 @@ async function installedFixture(t, entry = 'temari') {
 
 const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
+function canonicalReceipt(value) {
+  if (Array.isArray(value))
+    return `[${value.map(canonicalReceipt).join(',')}]`;
+  if (value && typeof value === 'object')
+    return `{${Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalReceipt(item)}`)
+      .join(',')}}`;
+  return JSON.stringify(value);
+}
+
 async function completeInstalledFixture(t) {
   const fixture = await installedFixture(t);
   const session = fixture.launch();
@@ -1078,11 +1089,26 @@ test('packaged closeout verifies an independently selected current candidate wit
   return result;
 }\n`,
   );
+  const denied = await childResult(
+    [
+      '--experimental-loader',
+      pathToFileURL(loader).href,
+      '--input-type=module',
+      '-e',
+      `import(${JSON.stringify(pathToFileURL(packager).href)})`,
+    ],
+    1,
+  );
+  assert.match(denied.stderr, /Legacy checkout import refused/);
   const before = await filesystemSnapshot(
     fixture.runDirectory,
     fixture.candidate,
   );
-  const result = await childResult(['--experimental-loader', loader, ...args]);
+  const result = await childResult([
+    '--experimental-loader',
+    pathToFileURL(loader).href,
+    ...args,
+  ]);
   const verified = JSON.parse(result.stdout);
   assert.equal(verified.entry, 'closeout');
   assert.equal(verified.status, 'candidate-verified');
@@ -1093,6 +1119,25 @@ test('packaged closeout verifies an independently selected current candidate wit
     await filesystemSnapshot(fixture.runDirectory, fixture.candidate),
     before,
   );
+});
+
+test('packaged closeout refuses a rehashed PASS receipt with a different plan', async (t) => {
+  const fixture = await completeInstalledFixture(t);
+  const args = await closeoutArgs(fixture, await selectedCurrent(fixture));
+  const receiptPath = join(
+    fixture.runDirectory,
+    'receipts/installed-lightweight.receipt.json',
+  );
+  const stored = JSON.parse(await readFile(receiptPath, 'utf8'));
+  assert.equal(stored.receipt.status, 'PASS');
+  assert.equal(stored.receipt.stages.length, 6);
+  assert.equal(stored.receipt.plan.review, 'self');
+  stored.receipt.plan.review = 'independent';
+  stored.sha256 = digest(canonicalReceipt(stored.receipt));
+  await writeFile(receiptPath, canonicalReceipt(stored));
+  const result = await childResult(args, 1);
+  assert(!result.stdout.includes('candidate-verified'));
+  assert.match(result.stderr, /Retained receipt plan differs from admitted policy/);
 });
 
 test('packaged closeout refuses changed selection, product, retained records, invocation, and absent stores', async (t) => {
