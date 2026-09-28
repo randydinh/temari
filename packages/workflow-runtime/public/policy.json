@@ -67,7 +67,7 @@
   },
   "qa": {
     "profile": "qa-review-v1",
-    "owner": "@temari/temari-core/qa-review",
+    "owner": "./qa-review",
     "obligations": {
       "workType": "qa",
       "delegation": "required",

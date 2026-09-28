@@ -210,6 +210,7 @@ function assertPolicy(policy) {
   assert.deepEqual(policy.feature.requiredCapabilities, ['subagents', 'forge']);
   assert.deepEqual(policy.feature.unsupportedRoutes, ['qa-review']);
   assert.equal(policy.qa.profile, 'qa-review-v1');
+  assert.equal(policy.qa.owner, './qa-review');
   assert.deepEqual(policy.qa.requiredCapabilities, ['subagents']);
   assert.deepEqual(policy.qa.stageMapping, [
     'investigate',

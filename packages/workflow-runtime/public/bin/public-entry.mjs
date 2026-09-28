@@ -593,6 +593,7 @@ async function startQa(request, requestSha256, policy) {
     obligations: policy.qa.obligations,
   });
   assert.equal(route.route.route, 'qa-review');
+  assert.equal(route.route.owner, policy.qa.owner);
   assert.deepEqual(route.obligations, policy.qa.obligations);
   assert.deepEqual(route.plan.stages, policy.qa.stageMapping);
   const allowedInputs = {
