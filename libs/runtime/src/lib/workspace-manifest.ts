@@ -291,6 +291,12 @@ export class FileWorkspaceManifestStore implements WorkspaceManifestStore {
     return new FileWorkspaceManifestStore(await realpath(root));
   }
 
+  static async openExisting(root: string): Promise<FileWorkspaceManifestStore> {
+    assert(isAbsolute(root), 'Manifest store root must be absolute.');
+    assert((await lstat(root)).isDirectory(), 'Manifest store must exist.');
+    return new FileWorkspaceManifestStore(await realpath(root));
+  }
+
   capture(
     request: CaptureWorkspaceManifestRequest,
   ): Promise<WorkspaceManifest> {

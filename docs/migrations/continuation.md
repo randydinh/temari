@@ -4,6 +4,71 @@ This record is for the maintainer who resumes the migration. Read the current
 Git state and pull requests before acting. A checked implementation item does
 not replace acceptance evidence from the installed product.
 
+## NX-02 installed closeout handoff — 2026-09-28
+
+Independent review rejected PR #59 at `20b06fc` after a rehashed six-stage
+receipt with a changed review plan returned `candidate-verified`. The branch
+now contains a normal merge of main's PR #57 Windows repair (`d926cfc`), a
+failing packaged-entry regression commit (`2253108`), and the loader repair
+(`d14cf55`). Before the fix, the tamper invocation returned exit 0; after the
+fix the same installed-entry regression passed and the tamper invocation
+returned exit 1. The closeout test uses a file URL for its loader and asserts
+the legacy import is refused. The repaired head passed 35/35 uncached public
+entry tests, the ten-task affected typecheck/test bracket, 11 canonical tests,
+39 host-session tests, and the 234-file package inventory check. The sole
+merge conflict was in this program's installed-public-journey documentation;
+the resolved text retained main's Windows evidence. Exact final-head Windows
+and Linux CI and independent rereview remain pending at this checkpoint.
+
+The paragraphs below preserve the initial implementation evidence and its
+older base SHA. Read the repair record in
+[installed closeout](./installed-closeout.md) before using it as an acceptance
+claim.
+
+Branch `codex/nx02-installed-closeout-20260928` in the exclusive
+`/private/tmp/temari-nx02-closeout-20260928` worktree starts from merged main
+`8cb14df8629b44fca3e12632c6a045adc4bff962`. Implementation milestone
+`0d74b7457db4aa49603c05c1be4be7ed4f863d72` adds an installed
+`closeout verify` command, read-only open-existing store methods, shared
+bridge scope canonicalization, source-claim verification, and relocated
+installed-entry refusal tests. It does not change the active plugin or any
+user-owned checkout. The [installed closeout record](./installed-closeout.md)
+contains the bounded invocation and evidence limits.
+
+The relocated public-entry target passed 34/34 tests on the implementation
+milestone. Its stock Node closeout process consumed a six-stage PASS run from
+the installed engineering entry, selected the expected current identity from
+literal `APPLE\nPEAR\n` bytes and file mode, returned only
+`candidate-verified`, and left a recursive run/candidate snapshot unchanged.
+The same target refused changed bytes or mode, changed expectation, tampered
+receipt/evidence/manifest, redirected paths, missing stores or receipt, and a
+genuine non-PASS terminal run. `host-session-test`, `canonical-test`, and the
+distribution inventory check passed uncached. The five-project affected
+typecheck/test bracket passed all ten tasks with Bun 1.4.2 on PATH; its first
+run failed only the inherited distribution test because Bun was absent from
+the isolated shell PATH. The implementation code was committed after the
+successful rerun and diff check.
+
+The clean implementation-head bundle had 81 files, source revision
+`81bb284e59c38846f3728adb8c74087677cc2241`, `dirty: false`, and outer
+manifest SHA-256
+`bc96a4580193287c4b0bfd2d1727c206273efeecfdfef1d2d7f072846d2a9a5f`.
+Its direct checker and a stock-Node installed closeout observation both exited 0.
+
+Draft [PR #59](https://github.com/randydinh/temari/pull/59) is open for an
+independent verifier; a later documentation head still needs its own CI result.
+
+The retained native NX-01 run at `/private/tmp/temari-channel-native.GrZvzP`
+remains untouched. Its pinned canonical manifest
+`c58bb6f2e8b01700d31c0d8c2adc01662fafa3182bf6bb87127da6b90be0bb0e`
+identifies earlier runtime bytes. NX-02 pins the installed runtime and must
+not claim that this older run passed under a newer artifact. A direct call
+against the original run exited 1 at that exact manifest mismatch, with the
+run/candidate file-hash aggregate unchanged before and after. Independent
+review, exact-head CI, Windows installed-entry coverage, independent product
+QA, shared-service recovery, and operator approval for cutover remain open.
+No merge is requested from this worker.
+
 ## NX-01 source channel handoff — 2026-09-28
 
 Branch `codex/nx-installed-journey-20260928` in the exclusive
@@ -20,9 +85,10 @@ remaining alias: allowed source-kind claims could point at ordinary generic
 `4bf4713b2a887ad2d43086893c7cad3a36b3dab4` requires a dedicated
 `source` payload with generic kind `other`. Independent code review returned
 PASS+NOTES at that commit. Linux CI run `36410884037` and Windows run
-`36410878158` both passed at that exact head. PR #56 remains draft against
-`709480ad845435811427284663ba939ee0d12f7a`. No installed plugin or
-user-owned checkout was changed.
+`36410878158` both passed at that exact head. PR #56 was draft against
+`709480ad845435811427284663ba939ee0d12f7a` at that checkpoint and later
+merged into main at `8cb14df8629b44fca3e12632c6a045adc4bff962`. No
+installed plugin or user-owned checkout was changed.
 
 The [installed lightweight public-entry record](./installed-public-journey.md)
 contains the request contract, pinned v4.1 source mapping, commands, literal
@@ -49,14 +115,15 @@ review, and retained dedicated source claims for all four IDs. Its six-stage
 receipt passed. The [installed journey record](./installed-public-journey.md)
 separates the local synthetic, native-host, and independent review evidence.
 
-Linux CI runs `workflow-runtime:public-entry-test`; the passing Windows
-workflow does not. The Windows run therefore does not establish installed
-public-entry acceptance on Windows. Independent product QA, read-only
-closeout with an independently selected current candidate, shared-service
-coordination, and cutover remain separate gates. Full-feature and QA routes
-still lack their required capabilities; publish still needs operator approval.
-Keep PR #56 draft for operator review. If a documentation commit changes the
-head, obtain fresh checks for that head before integration. Recheck remote
+At the NX-01 source head, Linux CI ran `workflow-runtime:public-entry-test`;
+the passing Windows workflow did not. The Windows run therefore did not
+establish installed public-entry acceptance on Windows. Independent product
+QA, read-only closeout with an independently selected current candidate,
+shared-service coordination, and cutover were separate gates. Full-feature
+and QA routes still lack their required capabilities; publish still needs
+operator approval.
+At the NX-01 source-head checkpoint, PR #56 remained draft for operator
+review. Recheck remote
 `main` before integration; neither the code-head checks nor a synthetic
 receipt authorize merge, installed-plugin replacement, or WP3 live acceptance.
 

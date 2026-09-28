@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
+  chmod,
   cp,
   lstat,
   mkdir,
@@ -15,7 +16,7 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { after, before, test } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
@@ -265,7 +266,7 @@ test('public engineering admission refuses unsupported routes and blocks unprove
   assert(lightweight.reasons.includes('profile-not-admitted'));
 });
 
-test('closeout public entry remains explicitly blocked until trusted candidate selection exists', async () => {
+test('closeout preflight blocks without trusted candidate selection', async () => {
   const closeout = await child(
     [
       join(output, 'bin/closeout.mjs'),
@@ -277,7 +278,7 @@ test('closeout public entry remains explicitly blocked until trusted candidate s
   );
   assert.equal(closeout.status, 'blocked');
   assert.deepEqual(closeout.reasons, [
-    'trusted-invocation-and-current-candidate-selection-unimplemented',
+    'trusted-invocation-and-current-candidate-selection-required',
   ]);
 });
 
@@ -546,6 +547,97 @@ async function installedFixture(t, entry = 'temari') {
     requestBytes,
     launch,
   };
+}
+
+const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
+
+function canonicalReceipt(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalReceipt).join(',')}]`;
+  if (value && typeof value === 'object')
+    return `{${Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalReceipt(item)}`)
+      .join(',')}}`;
+  return JSON.stringify(value);
+}
+
+async function completeInstalledFixture(t) {
+  const fixture = await installedFixture(t);
+  const session = fixture.launch();
+  while (true) {
+    const message = await session.next();
+    if (message.type === 'complete') {
+      assert.equal(message.status, 'PASS');
+      break;
+    }
+    if (message.type === 'stage') await answerStage(fixture, session, message);
+  }
+  assert.equal((await session.done).code, 0);
+  return fixture;
+}
+
+async function selectedCurrent(fixture) {
+  const bytes = Buffer.from('APPLE\nPEAR\n');
+  const mode = Number(
+    (await lstat(join(fixture.candidate, 'product.txt'))).mode & 0o777,
+  );
+  return {
+    scope: 'local-regular-files-v1',
+    sha256: digest(
+      JSON.stringify([
+        'local-regular-files-v1',
+        [['product.txt', mode, bytes.length, digest(bytes)]],
+      ]),
+    ),
+  };
+}
+
+async function filesystemSnapshot(...roots) {
+  const entries = [];
+  async function walk(root, path) {
+    const stat = await lstat(path, { bigint: true });
+    entries.push([
+      relative(root, path),
+      stat.mode.toString(),
+      stat.size.toString(),
+      stat.mtimeNs.toString(),
+      stat.isFile() ? digest(await readFile(path)) : null,
+    ]);
+    if (stat.isDirectory())
+      for (const name of (await readdir(path)).sort())
+        await walk(root, join(path, name));
+  }
+  for (const root of roots) await walk(root, root);
+  return entries;
+}
+
+let closeoutSequence = 0;
+async function closeoutArgs(
+  fixture,
+  expectedCurrent,
+  request = fixture.request,
+) {
+  const sequence = ++closeoutSequence;
+  const currentPath = join(fixture.root, `selected-current-${sequence}.json`);
+  const currentBytes = Buffer.from(JSON.stringify(expectedCurrent));
+  await writeFile(currentPath, currentBytes);
+  const requestPath = join(fixture.root, `closeout-request-${sequence}.json`);
+  const requestBytes = Buffer.from(JSON.stringify(request));
+  await writeFile(requestPath, requestBytes);
+  return [
+    join(fixture.artifact, 'bin/closeout.mjs'),
+    'verify',
+    '--request',
+    requestPath,
+    '--expected-request-sha256',
+    digest(requestBytes),
+    '--expected-manifest-sha256',
+    manifestSha256(manifest),
+    '--expected-current',
+    currentPath,
+    '--expected-current-sha256',
+    digest(currentBytes),
+  ];
 }
 
 async function answerStage(
@@ -981,6 +1073,202 @@ test('relocated public entry starts, resumes, and persists the six-stage candida
         reference.sha256,
       );
     }
+});
+
+test('packaged closeout verifies an independently selected current candidate without mutating the run', async (t) => {
+  const fixture = await completeInstalledFixture(t);
+  const current = await selectedCurrent(fixture);
+  const args = await closeoutArgs(fixture, current);
+  const loader = join(fixture.root, 'deny-legacy-loader.mjs');
+  await writeFile(
+    loader,
+    `export async function resolve(specifier, context, nextResolve) {
+  const result = await nextResolve(specifier, context);
+  if (result.url.startsWith(${JSON.stringify(pathToFileURL(repository).href)})) throw Error('Legacy checkout import refused');
+  return result;
+}\n`,
+  );
+  const denied = await childResult(
+    [
+      '--experimental-loader',
+      pathToFileURL(loader).href,
+      '--input-type=module',
+      '-e',
+      `import(${JSON.stringify(pathToFileURL(packager).href)})`,
+    ],
+    1,
+  );
+  assert.match(denied.stderr, /Legacy checkout import refused/);
+  const before = await filesystemSnapshot(
+    fixture.runDirectory,
+    fixture.candidate,
+  );
+  const result = await childResult([
+    '--experimental-loader',
+    pathToFileURL(loader).href,
+    ...args,
+  ]);
+  const verified = JSON.parse(result.stdout);
+  assert.equal(verified.entry, 'closeout');
+  assert.equal(verified.status, 'candidate-verified');
+  assert.equal(verified.scope, 'local-regular-file-candidate-only');
+  assert.deepEqual(verified.current, current);
+  assert.equal(verified.runId, fixture.request.invocation.runId);
+  assert.deepEqual(
+    await filesystemSnapshot(fixture.runDirectory, fixture.candidate),
+    before,
+  );
+});
+
+test('packaged closeout refuses a rehashed PASS receipt with a different plan', async (t) => {
+  const fixture = await completeInstalledFixture(t);
+  const args = await closeoutArgs(fixture, await selectedCurrent(fixture));
+  const receiptPath = join(
+    fixture.runDirectory,
+    'receipts/installed-lightweight.receipt.json',
+  );
+  const stored = JSON.parse(await readFile(receiptPath, 'utf8'));
+  assert.equal(stored.receipt.status, 'PASS');
+  assert.equal(stored.receipt.stages.length, 6);
+  assert.equal(stored.receipt.plan.review, 'self');
+  stored.receipt.plan.review = 'independent';
+  stored.sha256 = digest(canonicalReceipt(stored.receipt));
+  await writeFile(receiptPath, canonicalReceipt(stored));
+  const result = await childResult(args, 1);
+  assert(!result.stdout.includes('candidate-verified'));
+  assert.match(
+    result.stderr,
+    /Retained receipt plan differs from admitted policy/,
+  );
+});
+
+test('packaged closeout refuses changed selection, product, retained records, invocation, and absent stores', async (t) => {
+  const fixture = await completeInstalledFixture(t);
+  const current = await selectedCurrent(fixture);
+  const args = await closeoutArgs(fixture, current);
+  const refuse = async (selected = args) => {
+    const result = await childResult(selected, 1);
+    assert(!result.stdout.includes('candidate-verified'));
+    return result;
+  };
+  await refuse(
+    await closeoutArgs(fixture, { ...current, sha256: '0'.repeat(64) }),
+  );
+  await refuse([...args.slice(0, -1), '0'.repeat(64)]);
+  const retainedSelection = join(fixture.runDirectory, 'config/selected.json');
+  await writeFile(retainedSelection, JSON.stringify(current));
+  const insideRun = [...args];
+  insideRun[insideRun.indexOf('--expected-current') + 1] = retainedSelection;
+  await refuse(insideRun);
+  const product = join(fixture.candidate, 'product.txt');
+  const originalMode = (await lstat(product)).mode & 0o777;
+  await writeFile(product, 'ALTERED\n');
+  await refuse(args);
+  await writeFile(product, 'APPLE\nPEAR\n');
+  const changedMode =
+    originalMode & 0o200 ? originalMode & ~0o222 : originalMode | 0o200;
+  await chmod(product, changedMode);
+  assert.notEqual(
+    (await lstat(product)).mode & 0o777,
+    originalMode,
+    'The file mode did not change.',
+  );
+  await refuse(args);
+  await chmod(product, originalMode);
+
+  const receipt = join(
+    fixture.runDirectory,
+    'receipts/installed-lightweight.receipt.json',
+  );
+  const manifestFile = join(
+    fixture.runDirectory,
+    'manifests/installed-lightweight.build.workspace.json',
+  );
+  const source = (await retainedClaims(fixture.runDirectory, 'investigate'))
+    .path;
+  for (const path of [receipt, manifestFile, source]) {
+    const original = await readFile(path);
+    await writeFile(path, Buffer.concat([original, Buffer.from('x')]));
+    await refuse(args);
+    await writeFile(path, original);
+  }
+  const movedReceipt = join(fixture.root, 'redirected-receipt.json');
+  await rename(receipt, movedReceipt);
+  await symlink(movedReceipt, receipt);
+  await refuse(args);
+  await unlink(receipt);
+  await rename(movedReceipt, receipt);
+
+  const redirected = join(fixture.root, 'redirected-candidate');
+  await cp(fixture.candidate, redirected, { recursive: true });
+  await refuse(
+    await closeoutArgs(fixture, current, {
+      ...fixture.request,
+      invocation: {
+        ...fixture.request.invocation,
+        candidate: {
+          ...fixture.request.invocation.candidate,
+          root: redirected,
+        },
+      },
+    }),
+  );
+  const otherRun = join(fixture.root, 'other-run');
+  await mkdir(otherRun);
+  await refuse(
+    await closeoutArgs(fixture, current, {
+      ...fixture.request,
+      invocation: { ...fixture.request.invocation, runDirectory: otherRun },
+    }),
+  );
+  for (const name of ['receipts', 'evidence', 'manifests', 'checkpoints']) {
+    const path = join(fixture.runDirectory, name);
+    const moved = join(fixture.root, `missing-${name}`);
+    await rename(path, moved);
+    await refuse(args);
+    await assert.rejects(lstat(path), { code: 'ENOENT' });
+    await rename(moved, path);
+  }
+  const evidenceRoot = join(fixture.runDirectory, 'evidence');
+  const movedEvidence = join(fixture.root, 'redirected-evidence');
+  await rename(evidenceRoot, movedEvidence);
+  await symlink(movedEvidence, evidenceRoot);
+  await refuse(args);
+  await unlink(evidenceRoot);
+  await rename(movedEvidence, evidenceRoot);
+  await rename(receipt, join(fixture.root, 'missing-receipt.json'));
+  await refuse(args);
+  await assert.rejects(lstat(receipt), { code: 'ENOENT' });
+});
+
+test('packaged closeout refuses a genuine non-PASS terminal run', async (t) => {
+  const fixture = await installedFixture(t);
+  const session = fixture.launch();
+  const stage = await session.next();
+  assert.equal(stage.type, 'stage');
+  await writeFile(
+    join(stage.workspace, 'host-result.json'),
+    JSON.stringify({
+      schemaVersion: 1,
+      sessionId: stage.sessionId,
+      requestId: stage.requestId,
+      stage: stage.stage,
+      status: 'ISSUES',
+      summary: 'Synthetic issue stops the run.',
+      evidence: [],
+    }),
+  );
+  session.reply(stage);
+  const completed = await session.next();
+  assert.equal(completed.type, 'complete');
+  assert.equal(completed.status, 'ISSUES');
+  assert.notEqual((await session.done).code, 0);
+  const args = await closeoutArgs(fixture, {
+    scope: 'local-regular-files-v1',
+    sha256: '0'.repeat(64),
+  });
+  const result = await childResult(args, 1);
+  assert(!result.stdout.includes('candidate-verified'));
 });
 
 test('restart refuses changed retained source requirement references', async (t) => {

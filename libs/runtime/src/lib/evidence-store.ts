@@ -69,6 +69,12 @@ export class FileEvidenceStore implements EvidenceStore {
     return new FileEvidenceStore(await realpath(root));
   }
 
+  static async openExisting(root: string): Promise<FileEvidenceStore> {
+    assert(isAbsolute(root), 'Evidence store root must be absolute.');
+    assert((await lstat(root)).isDirectory(), 'Evidence store must exist.');
+    return new FileEvidenceStore(await realpath(root));
+  }
+
   async put(request: PutEvidenceRequest): Promise<EvidenceReference> {
     assertRunId(request.runId);
     assertRevision(request.revision);

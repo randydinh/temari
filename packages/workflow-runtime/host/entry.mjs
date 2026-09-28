@@ -18,6 +18,7 @@ import {
   attachSourceClaims,
   assertSourceEvidence,
 } from './source.mjs';
+import { invocationScope } from './invocation.mjs';
 import {
   controlLine,
   createStdioSession,
@@ -184,25 +185,6 @@ async function writeDescriptor(path, descriptor) {
   } finally {
     await file.close();
   }
-}
-
-function invocationScope(input) {
-  const canonical = (value) => {
-    if (Array.isArray(value)) return value.map(canonical);
-    if (value && typeof value === 'object')
-      return Object.fromEntries(
-        Object.keys(value)
-          .sort()
-          .map((key) => [key, canonical(value[key])]),
-      );
-    return value;
-  };
-  return {
-    scopeId: `host-${createHash('sha256')
-      .update(JSON.stringify(canonical(input)))
-      .digest('hex')}`,
-    root: input.candidate.root,
-  };
 }
 
 async function main(session) {

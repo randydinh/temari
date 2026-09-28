@@ -102,7 +102,7 @@ function finish(value, code = 0) {
 
 function usage() {
   throw new Error(
-    'Usage: entry policy | admit --request ABS_JSON | start|resume --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX',
+    'Usage: entry policy | admit --request ABS_JSON | start|resume --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX | closeout verify --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX --expected-current ABS_JSON --expected-current-sha256 HEX',
   );
 }
 
@@ -426,7 +426,10 @@ export async function run(entry, argv = process.argv.slice(2)) {
   const extra = argv.slice(3);
   const digestIndex = extra.indexOf('--expected-manifest-sha256');
   const requestDigestIndex = extra.indexOf('--expected-request-sha256');
-  const trusted = command === 'start' || command === 'resume';
+  const trusted =
+    command === 'start' ||
+    command === 'resume' ||
+    (entry === 'closeout' && command === 'verify');
   const policy = trusted
     ? await verifyBundle(extra[digestIndex + 1])
     : await readJson(join(root, 'policy.json'), POLICY_BYTES);
@@ -436,6 +439,78 @@ export async function run(entry, argv = process.argv.slice(2)) {
   );
   if (command === 'policy' && argv.length === 1) {
     finish(policyDescription(entry, policy));
+    return;
+  }
+  if (entry === 'closeout' && command === 'verify') {
+    if (flag !== '--request' || !isAbsolute(argument ?? '')) usage();
+    assert(
+      extra.length === 8 &&
+        new Set([extra[0], extra[2], extra[4], extra[6]]).size === 4 &&
+        [
+          '--expected-request-sha256',
+          '--expected-manifest-sha256',
+          '--expected-current',
+          '--expected-current-sha256',
+        ].every((name) =>
+          [extra[0], extra[2], extra[4], extra[6]].includes(name),
+        ),
+      'Trusted request, artifact, and current candidate selection are required.',
+    );
+    const flags = Object.fromEntries([
+      [extra[0], extra[1]],
+      [extra[2], extra[3]],
+      [extra[4], extra[5]],
+      [extra[6], extra[7]],
+    ]);
+    const request = trustedRequest(
+      await readBoundedFile(argument, REQUEST_BYTES),
+      flags['--expected-request-sha256'],
+    );
+    assert(
+      ['temari', 'poteto-mode'].includes(request.entry),
+      'Closeout requires an admitted public engineering entry.',
+    );
+    const admission = await admitEngineering(
+      request.entry,
+      request,
+      policy,
+      true,
+    );
+    if (admission.status !== 'admitted') return finish(admission, 1);
+    assert(
+      isAbsolute(flags['--expected-current']),
+      'Current candidate selection path must be absolute.',
+    );
+    const currentBytes = await readBoundedFile(
+      flags['--expected-current'],
+      REQUEST_BYTES,
+    );
+    assert.match(
+      flags['--expected-current-sha256'] ?? '',
+      /^[a-f0-9]{64}$/,
+      'External current candidate digest required.',
+    );
+    assert.equal(
+      sha256(currentBytes),
+      flags['--expected-current-sha256'],
+      'Current candidate selection differs from trusted value.',
+    );
+    const expectedCurrent = JSON.parse(utf8.decode(currentBytes));
+    const { verifyInstalledCloseout } = await import(
+      pathToFileURL(join(root, 'host/closeout.mjs')).href
+    );
+    finish({
+      schemaVersion: 1,
+      entry,
+      ...(await verifyInstalledCloseout({
+        bundleRoot: root,
+        policy,
+        request,
+        expectedCurrent,
+        selectionPath: flags['--expected-current'],
+      })),
+      policyId: policy.policyId,
+    });
     return;
   }
   if (!['admit', 'start', 'resume'].includes(command) || argument === undefined)
@@ -455,7 +530,7 @@ export async function run(entry, argv = process.argv.slice(2)) {
         entry,
         status: 'blocked',
         reasons: [
-          'trusted-invocation-and-current-candidate-selection-unimplemented',
+          'trusted-invocation-and-current-candidate-selection-required',
         ],
         policyId: policy.policyId,
       },

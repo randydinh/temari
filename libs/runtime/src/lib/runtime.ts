@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   link,
+  lstat,
   mkdir,
   open,
   readFile,
@@ -264,6 +265,12 @@ export class FileWorkflowReceiptStore implements WorkflowReceiptStore {
     await mkdir(root, { recursive: true, mode: 0o700 });
     const canonicalRoot = await realpath(root);
     return new FileWorkflowReceiptStore(canonicalRoot);
+  }
+
+  static async openExisting(root: string): Promise<FileWorkflowReceiptStore> {
+    assert(isAbsolute(root), 'Receipt store root must be absolute.');
+    assert((await lstat(root)).isDirectory(), 'Receipt store must exist.');
+    return new FileWorkflowReceiptStore(await realpath(root));
   }
 
   async save(receipt: WorkflowReceipt): Promise<string> {
