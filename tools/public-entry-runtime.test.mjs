@@ -455,7 +455,7 @@ async function installedFixture(t, entry = 'temari') {
     loader,
   ) => {
     const args = [
-      ...(loader ? ['--experimental-loader', loader] : []),
+      ...(loader ? ['--experimental-loader', pathToFileURL(loader).href] : []),
       join(artifact, `bin/${entry}.mjs`),
       mode,
       '--request',
@@ -873,7 +873,7 @@ test('relocated public entry starts, resumes, and persists the six-stage candida
   const denied = await childResult(
     [
       '--experimental-loader',
-      loader,
+      pathToFileURL(loader).href,
       '--input-type=module',
       '-e',
       `import(${JSON.stringify(pathToFileURL(packager).href)})`,
