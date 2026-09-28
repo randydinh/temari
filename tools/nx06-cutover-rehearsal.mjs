@@ -21,6 +21,17 @@ const productBefore = 'pear\napple\n';
 const productAfter = 'APPLE\nPEAR\n';
 const productAfterSha =
   'a356e1ad77377b48e6090cda3e5ae651809c835b3b9e65aa742d3d031b283fa8';
+let childEnvironment;
+
+async function assertAbsent(path) {
+  try {
+    await lstat(path);
+  } catch (error) {
+    if (error.code === 'ENOENT') return;
+    throw error;
+  }
+  throw new Error(`Refusing existing output target: ${path}`);
+}
 
 async function inventory(root) {
   const entries = [];
@@ -174,11 +185,10 @@ function request(entry, candidate, runDirectory, runId) {
 }
 
 async function runCommand(report, name, command, args, cwd, expectedExit = 0) {
-  const env = { ...process.env, NODE_OPTIONS: '', NODE_PATH: '' };
   const output = await new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd,
-      env,
+      env: childEnvironment,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';
@@ -289,7 +299,7 @@ async function installedRun(report, slot, root, entry, publicSha) {
   ];
   const child = spawn(process.execPath, args, {
     cwd: root,
-    env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '' },
+    env: childEnvironment,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   let stdout = '';
@@ -406,7 +416,21 @@ async function main() {
   const output = resolve(values.output);
   assert(!within(publicRoot, output) && !within(previousRoot, output));
   assert(!within(output, publicRoot) && !within(output, previousRoot));
+  await assertAbsent(output);
   await mkdir(output);
+  const nx06Temporary = join(output, 'nx06-temporary');
+  await mkdir(nx06Temporary);
+  childEnvironment = {
+    PATH: process.env.PATH ?? '/usr/bin:/bin',
+    TMPDIR: nx06Temporary,
+    TMP: nx06Temporary,
+    TEMP: nx06Temporary,
+    LANG: 'C',
+    LC_ALL: 'C',
+    NODE_OPTIONS: '',
+    NODE_PATH: '',
+    ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
+  };
   const report = {
     schemaVersion: 1,
     candidateSha: values['candidate-sha'],
@@ -416,6 +440,7 @@ async function main() {
       arch: arch(),
       release: release(),
       tmpdir: tmpdir(),
+      childEnvironmentKeys: Object.keys(childEnvironment),
     },
     input: {
       publicArtifact: publicRoot,
@@ -453,6 +478,7 @@ async function main() {
     report.environment.pnpm = pnpm.stdout.trim();
 
     const slot = join(output, 'slot');
+    await assertAbsent(slot);
     await cp(publicRoot, slot, {
       recursive: true,
       errorOnExist: true,
@@ -581,6 +607,7 @@ async function main() {
     };
 
     const previous = join(output, 'previous-projection');
+    await assertAbsent(previous);
     await runCommand(
       report,
       'install-prior-v4.1',
@@ -594,8 +621,12 @@ async function main() {
       ],
       output,
     );
+    await assertAbsent(join(previous, '.temari-backups'));
     const previousProjectionSha256 = inventorySha(await inventory(previous));
-    await rename(slot, join(output, 'quarantined-successor'));
+    const quarantined = join(output, 'quarantined-successor');
+    await assertAbsent(quarantined);
+    await rename(slot, quarantined);
+    await assertAbsent(slot);
     await cp(previous, slot, {
       recursive: true,
       errorOnExist: true,
@@ -624,9 +655,7 @@ async function main() {
       ...report.rollback,
       previousProjectionSha256,
       afterSha256: afterRollbackSha256,
-      quarantinedSuccessorSha256: inventorySha(
-        await inventory(join(output, 'quarantined-successor')),
-      ),
+      quarantinedSuccessorSha256: inventorySha(await inventory(quarantined)),
       restoredInvocation: 'routing_ok=yes',
     };
     assert.equal(
