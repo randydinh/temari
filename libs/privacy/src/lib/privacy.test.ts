@@ -151,6 +151,27 @@ test('credential syntax masks bare repeats before and after declarations, includ
   }
 });
 
+test('unquoted credential assignments include bracketed values and suffixes', () => {
+  for (const [declaration, forbidden] of [
+    ['password=[SYNTHETIC_PASSWORD_94]', 'SYNTHETIC_PASSWORD_94'],
+    ['client_secret=SYNTHETIC[TAIL]94', '[TAIL]94'],
+    ['password=SYNTHETIC[NESTED[VALUE]]94', '[NESTED[VALUE]]94'],
+  ]) {
+    const result = mask({ text: declaration });
+    assert.equal(JSON.stringify(result.payload).includes(forbidden), false, declaration);
+    assert.equal(JSON.stringify(restoreForDisplay(result.payload, result.session)).includes(forbidden), false, declaration);
+  }
+});
+
+test('ambiguous bracketed credential assignments fail closed', () => {
+  for (const declaration of [
+    'password=[SYNTHETIC WITH SPACE]94',
+    'client_secret=SYNTHETIC[WITH,COMMA]94',
+    'password=SYNTHETIC]UNMATCHED94',
+  ])
+    assert.throws(() => mask({ text: declaration }), PrivacyError, declaration);
+});
+
 test('credential fields extract bearer secrets even with automatic detection disabled', () => {
   const secret = 'CANARY_field_bearer_73';
   const result = mask(

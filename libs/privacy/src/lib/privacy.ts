@@ -145,7 +145,7 @@ const ssnPattern =
 const ipPattern = /(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])/g;
 const bearerPattern = /\bBearer\s+([^\s,;"'\]}]+)/dgi;
 const assignmentPattern =
-  /\b(?:password|passwd|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|secret|token)\b["']?\s*[:=]\s*(?:"((?:\\.|[^"\\\r\n])*)"|'((?:\\.|[^'\\\r\n])*)'|((?:\[\[TM_PRIVACY_[^\]]+\]\]|[^\s,;{}"'\[\]])+))/dgi;
+  /\b(?:password|passwd|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|secret|token)\b["']?\s*[:=]\s*(?:"((?:\\.|[^"\\\r\n])*)"|'((?:\\.|[^'\\\r\n])*)'|((?:\[\[TM_PRIVACY_[^\]]+\]\]|[^\s,;{}"'])+))/dgi;
 const apiTokenPattern =
   /(?<!\w)(?:sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{16})(?!\w)/g;
 const jwtPattern =
@@ -388,6 +388,17 @@ function detectorMatches(
       const start =
         group === undefined ? match.index : match.indices![group]![0];
       const value = match[group ?? 0]!;
+      if (pattern === assignmentPattern && group === 3) {
+        if (value === '[]') continue;
+        let depth = 0;
+        for (const char of value) {
+          if (char === '[') depth++;
+          if (char === ']' && --depth < 0)
+            throw new PrivacyError('Ambiguous bracketed credential value.');
+        }
+        if (depth !== 0)
+          throw new PrivacyError('Ambiguous bracketed credential value.');
+      }
       if (start !== undefined && value !== '')
         matches.push({
           start,

@@ -114,6 +114,40 @@ test('masks prompt, file, screenshot text, schema descriptions and dynamic tool 
   assert.throws(() => reply.displayText(), /closed/);
 });
 
+test('bracketed unquoted credential values stay out of prompt, tool description and callback result', async () => {
+  const promptSecret = 'SYNTHETIC_PROMPT_94';
+  const descriptionTail = '[DESCRIPTION]94';
+  const resultSecret = 'SYNTHETIC_RESULT_94';
+  const sent: string[] = [];
+  const transport = createProtectedModelTransport(
+    {
+      async complete(request, callTool) {
+        sent.push(request.prompt, request.tools[0].description);
+        sent.push(await callTool(request.tools[0].name, {}));
+        return 'done';
+      },
+    },
+    {
+      tools: [{
+        description: `Use client_secret=SYNTHETIC${descriptionTail}`,
+        inputSchema: { type: 'object' },
+        async execute() {
+          return [{ kind: 'text', text: `password=[${resultSecret}]` }];
+        },
+      }],
+    },
+  );
+  const reply = await transport.complete({ prompt: `password=[${promptSecret}]` });
+  reply.dispose();
+  assert.equal(sent.length, 3);
+  for (const [channel, text, forbidden] of [
+    ['prompt', sent[0], promptSecret],
+    ['description', sent[1], descriptionTail],
+    ['callback result', sent[2], resultSecret],
+  ])
+    assert.equal(text.includes(forbidden), false, channel);
+});
+
 test('blocks unauthorized file references, symlinks and screenshots without an extractor before dispatch', async (t) => {
   const root = await realpath(
     await mkdtemp(join(tmpdir(), 'temari-host-deny-')),
@@ -349,6 +383,94 @@ test('restores protected tool property names only for the trusted callback', asy
   } finally {
     reply.dispose();
   }
+});
+
+for (const [label, originalProperties, nested] of [
+  ['ordinary', { plain: { type: 'string' }, 'Synthetic Key': { type: 'string' } }, false],
+  ['integer-index', { '3': { type: 'string' }, '12': { type: 'string' } }, false],
+  ['nested integer-index', { '3': { type: 'string' }, '12': { type: 'string' } }, true],
+] as readonly [string, Record<string, JsonValue>, boolean][]) {
+  test(`schema key identity survives the full ${label} callback path`, async () => {
+    const protectedKey = nested || label === 'integer-index' ? '3' : 'Synthetic Key';
+    const originalKeys = Object.keys(originalProperties);
+    const schema: JsonValue = nested
+      ? { type: 'object', properties: { group: { type: 'object', properties: originalProperties } } }
+      : { type: 'object', properties: originalProperties };
+    const received: JsonValue[] = [];
+    const transport = createProtectedModelTransport(
+      {
+        async complete(request, callTool) {
+          const root = (request.tools[0].inputSchema as { properties: Record<string, unknown> }).properties;
+          const protectedProperties = nested
+            ? (root.group as { properties: Record<string, unknown> }).properties
+            : root;
+          const protectedKeys = Object.keys(protectedProperties);
+          const maskedKey = protectedKeys.find((key) => !originalKeys.includes(key));
+          assert(maskedKey, JSON.stringify({ label, originalKeys, protectedKeys }));
+          const args = Object.fromEntries(
+            protectedKeys.map((key) => [key, key === maskedKey ? 'masked-field-value' : 'plain-field-value']),
+          );
+          const callbackKeys = Object.keys(args);
+          assert.deepEqual(callbackKeys, protectedKeys, JSON.stringify({ label, originalKeys, protectedKeys, callbackKeys }));
+          assert.equal(protectedKeys.includes(protectedKey), false);
+          assert.deepEqual(
+            protectedKeys.filter((key) => key !== maskedKey),
+            originalKeys.filter((key) => key !== protectedKey),
+            JSON.stringify({ label, originalKeys, protectedKeys, callbackKeys }),
+          );
+          await callTool(request.tools[0].name, nested ? { group: args } : args);
+          return 'done';
+        },
+      },
+      {
+        policy: { literals: [{ value: protectedKey, kind: 'CREDENTIAL' }] },
+        tools: [{
+          description: 'Synthetic key identity',
+          inputSchema: schema,
+          async execute(args) { received.push(args); return []; },
+        }],
+      },
+    );
+    const reply = await transport.complete({ prompt: 'Use the synthetic tool.' });
+    reply.dispose();
+    const callback = nested
+      ? (received[0] as { group: Record<string, JsonValue> }).group
+      : received[0] as Record<string, JsonValue>;
+    assert.equal(received.length, 1);
+    assert.deepEqual(Object.keys(callback), originalKeys);
+    assert.notEqual(callback[protectedKey], 'plain-field-value');
+    assert.notEqual(callback[protectedKey], 'masked-field-value');
+    for (const key of originalKeys.filter((key) => key !== protectedKey))
+      assert.equal(callback[key], 'plain-field-value');
+  });
+}
+
+test('ambiguous callback keys fail closed before the trusted tool runs', async () => {
+  const originalKeys = ['3', '12'];
+  let calls = 0;
+  const transport = createProtectedModelTransport(
+    {
+      async complete(request, callTool) {
+        const protectedKeys = Object.keys((request.tools[0].inputSchema as { properties: Record<string, unknown> }).properties);
+        const maskedKey = protectedKeys.find((key) => !originalKeys.includes(key));
+        assert(maskedKey, JSON.stringify({ originalKeys, protectedKeys }));
+        const callbackKeys = Object.keys({ [maskedKey]: 'first', '3': 'second' });
+        assert.deepEqual(callbackKeys, ['3', maskedKey], JSON.stringify({ originalKeys, protectedKeys, callbackKeys }));
+        await callTool(request.tools[0].name, { [maskedKey]: 'first', '3': 'second' });
+        return 'done';
+      },
+    },
+    {
+      policy: { literals: [{ value: '3', kind: 'CREDENTIAL' }] },
+      tools: [{
+        description: 'Synthetic collision',
+        inputSchema: { type: 'object', properties: { '3': { type: 'string' }, '12': { type: 'string' } } },
+        async execute() { calls++; return []; },
+      }],
+    },
+  );
+  await assert.rejects(transport.complete({ prompt: 'Use the synthetic tool.' }), /privacy boundary|Protected model request failed/);
+  assert.equal(calls, 0);
 });
 
 for (const [label, literal] of [

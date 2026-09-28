@@ -157,39 +157,60 @@ export function decodeSchemaForPrivacy(encoded: JsonValue): JsonValue {
 }
 
 function schemaPropertyNames(
-  original: JsonValue,
-  protectedSchema: JsonValue,
+  originalEncoding: JsonValue,
+  protectedEncoding: JsonValue,
 ): ReadonlyMap<string, string> {
   const names = new Map<string, string>();
+  const identities = new Map<string, string>();
   const visit = (
     before: JsonValue,
     after: JsonValue,
     properties: boolean,
   ): void => {
-    if (Array.isArray(before)) {
-      if (!Array.isArray(after) || before.length !== after.length)
+    if (
+      !Array.isArray(before) || !Array.isArray(after) ||
+      before.length !== 2 || after.length !== 2 || before[0] !== after[0]
+    )
+      throw new PrivacyError('Privacy policy altered schema structure.');
+    const [tag, originalValue] = before;
+    const safeValue = after[1];
+    if (tag !== 'object' && tag !== 'array') return;
+    if (
+      !Array.isArray(originalValue) || !Array.isArray(safeValue) ||
+      originalValue.length !== safeValue.length
+    )
+      throw new PrivacyError('Privacy policy altered schema structure.');
+    originalValue.forEach((entry, index) => {
+      const safeEntry = safeValue[index];
+      if (tag === 'array') {
+        visit(entry, safeEntry, false);
+        return;
+      }
+      if (
+        !Array.isArray(entry) || !Array.isArray(safeEntry) ||
+        entry.length !== 2 || safeEntry.length !== 2 ||
+        typeof entry[0] !== 'string' || typeof safeEntry[0] !== 'string'
+      )
         throw new PrivacyError('Privacy policy altered schema structure.');
-      before.forEach((child, index) => visit(child, after[index], false));
-      return;
-    }
-    if (!jsonRecord(before)) return;
-    if (!jsonRecord(after))
-      throw new PrivacyError('Privacy policy altered schema structure.');
-    const originalEntries = Object.entries(before);
-    const protectedEntries = Object.entries(after);
-    if (originalEntries.length !== protectedEntries.length)
-      throw new PrivacyError('Privacy policy altered schema structure.');
-    originalEntries.forEach(([key, child], index) => {
-      const [safeKey, safeChild] = protectedEntries[index];
+      const [key, child] = entry;
+      const [safeKey, safeChild] = safeEntry;
+      if (properties) {
+        const prior = identities.get(safeKey);
+        if (prior !== undefined && prior !== key)
+          throw new PrivacyError('Ambiguous protected schema key.');
+        identities.set(safeKey, key);
+      }
       if (key !== safeKey) {
-        if (!properties || (names.has(safeKey) && names.get(safeKey) !== key))
+        if (!properties)
           throw new PrivacyError('Privacy policy altered schema keys.');
         names.set(safeKey, key);
       }
       visit(child, safeChild, !properties && key === 'properties');
     });
   };
-  visit(original, protectedSchema, false);
+  // Encoded object entries are arrays. Their indices remain stable even when
+  // decoding an integer-index property name changes JavaScript key order.
+  visit(originalEncoding, protectedEncoding, false);
   return names;
 }
 
@@ -202,6 +223,8 @@ function restoreToolPropertyNames(
   if (!jsonRecord(args)) return args;
   const result: Record<string, JsonValue> = {};
   for (const [key, value] of Object.entries(args)) {
+    if (key.includes('[[TM_PRIVACY_') && !names.has(key))
+      throw new PrivacyError('Tool arguments contain an unknown protected property name.');
     const original = names.get(key) ?? key;
     if (Object.hasOwn(result, original))
       throw new PrivacyError(
@@ -393,7 +416,10 @@ export function createProtectedModelTransport(
             const inputSchema = decodeSchemaForPrivacy(tool.schema);
             propertyNames.set(
               tool.name,
-              schemaPropertyNames(tools[index].inputSchema, inputSchema),
+              schemaPropertyNames(
+                encodeSchemaForPrivacy(tools[index].inputSchema),
+                tool.schema,
+              ),
             );
             return {
               name: tools[index].name,
