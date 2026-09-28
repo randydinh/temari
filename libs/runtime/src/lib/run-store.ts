@@ -95,6 +95,7 @@ export interface CancelRunRequest {
 export interface AppendRunEventRequest {
   readonly runId: string;
   readonly actor: string;
+  readonly leaseToken?: string;
   readonly type?: RunEventType;
   readonly idempotencyKey: string;
   readonly payload?: RunEventPayload;
@@ -738,17 +739,24 @@ export class FileWorkflowRunStore implements WorkflowRunStore {
       ).find((event) => event.idempotencyKey === request.idempotencyKey);
       if (existing) {
         assert.equal(
-          existing.payload.to,
-          request.status,
-          'Idempotency key target changed.',
+          existing.type,
+          'run-status-changed',
+          'Idempotency key was used for another run event.',
         );
-        for (const [key, value] of Object.entries(request.payload ?? {})) {
-          assert.equal(
-            existing.payload[key],
-            value,
-            'Idempotency key payload changed.',
-          );
-        }
+        assert.equal(
+          existing.actor,
+          request.owner,
+          'Idempotency key actor changed.',
+        );
+        assert.equal(
+          canonical(existing.payload),
+          canonical({
+            from: 'RUNNING',
+            to: request.status,
+            ...(request.payload ?? {}),
+          }),
+          'Idempotency key payload changed.',
+        );
         return record;
       }
       const now = request.now ?? new Date();
@@ -1062,11 +1070,46 @@ export class FileWorkflowRunStore implements WorkflowRunStore {
     );
     if (existing) {
       assert.equal(
+        existing.actor,
+        input.actor,
+        'Idempotency key actor changed.',
+      );
+      assert.equal(
+        existing.type,
+        input.type ?? 'run-event',
+        'Idempotency key event type changed.',
+      );
+      assert.equal(
         canonical(existing.payload),
         canonical(input.payload ?? {}),
         'Idempotency key payload changed.',
       );
       return existing;
+    }
+    const now = input.now ?? new Date();
+    assertDate(now);
+    if (record.status === 'RUNNING') {
+      assert(record.lease, 'Run lease is missing.');
+      assert.equal(
+        record.lease.owner,
+        input.actor,
+        'Run lease owner mismatch.',
+      );
+      assert.equal(
+        record.lease.token,
+        input.leaseToken,
+        'Run lease token mismatch.',
+      );
+      assert(
+        Date.parse(record.lease.expiresAt) > now.getTime(),
+        'Run lease has expired.',
+      );
+    } else {
+      assert.equal(
+        record.status,
+        'QUEUED',
+        'Only queued or leased runs can append an event.',
+      );
     }
     const event = this.createEvent({
       sequence: events.length + 1,
@@ -1076,7 +1119,7 @@ export class FileWorkflowRunStore implements WorkflowRunStore {
       idempotencyKey: input.idempotencyKey,
       actor: input.actor,
       payload: input.payload ?? {},
-      now: input.now ?? new Date(),
+      now,
     });
     await this.commitTransitionLocked({
       runId: input.runId,
