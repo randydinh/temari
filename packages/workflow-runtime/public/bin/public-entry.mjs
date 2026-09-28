@@ -102,7 +102,7 @@ function finish(value, code = 0) {
 
 function usage() {
   throw new Error(
-    'Usage: entry policy | admit --request ABS_JSON | start|resume --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX | closeout verify --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX --expected-current ABS_JSON --expected-current-sha256 HEX',
+    'Usage: entry policy | admit --request ABS_JSON | start|resume --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX | temari qa --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX | closeout verify --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX --expected-current ABS_JSON --expected-current-sha256 HEX',
   );
 }
 
@@ -114,6 +114,13 @@ function policyDescription(entry, policy) {
     status: 'described',
     supportedRoute: selected.supportedRoute,
     supportedProfile: selected.supportedProfile,
+    ...(entry === 'temari'
+      ? {
+          qaRoute: 'qa-review',
+          qaProfile: policy.qa.profile,
+          qaHostStatus: 'separate-evaluator-unavailable',
+        }
+      : {}),
     policyId: policy.policyId,
   };
 }
@@ -335,12 +342,12 @@ function trustedRequest(bytes, expectedDigest) {
   return JSON.parse(utf8.decode(bytes));
 }
 
-async function startBridge(mode, request, policy) {
+async function startBridge(mode, request, obligations, sourceProfile = null) {
   const invocation = {
     schemaVersion: 1,
     ...request.invocation,
-    obligations: policy.lightweight.obligations,
-    sourceProfile: policy.entries[request.entry].supportedProfile,
+    obligations,
+    ...(sourceProfile ? { sourceProfile } : {}),
   };
   if (mode === 'resume') {
     const path = join(invocation.runDirectory, 'config/input.json');
@@ -376,7 +383,7 @@ async function startBridge(mode, request, policy) {
     );
     assert.deepEqual(
       saved.plan,
-      core.createExecutionPlan(policy.lightweight.obligations),
+      core.createExecutionPlan(obligations),
       'Retained plan differs from admitted obligations.',
     );
     assert.equal(
@@ -414,9 +421,329 @@ async function startBridge(mode, request, policy) {
       child.once('close', (value) => resolve(value ?? 1));
     });
     process.exitCode = code;
+    return { code, pid: child.pid };
   } finally {
     if (temporary) await rm(temporary, { recursive: true, force: true });
   }
+}
+
+async function startQa(request, requestSha256, policy) {
+  exactFields(request, [
+    'schemaVersion',
+    'entry',
+    'route',
+    'profile',
+    'assignment',
+    'review',
+    'invocation',
+  ]);
+  assert.equal(request.schemaVersion, 1, 'Unsupported QA request schema.');
+  assert.equal(request.entry, 'temari', 'QA requires the Temari domain entry.');
+  assert.equal(request.route, 'qa-review', 'QA requires its domain route.');
+  assert.equal(request.profile, policy.qa.profile, 'Unsupported QA profile.');
+  exactFields(request.invocation, [
+    'runId',
+    'revision',
+    'candidate',
+    'runDirectory',
+  ]);
+  exactFields(request.invocation.candidate, ['scopeId', 'root']);
+  exactFields(request.review, [
+    'reviewRevision',
+    'authorId',
+    'plan',
+    'areaDecisions',
+    'scenarios',
+    'residualRisks',
+  ]);
+  exactFields(
+    request.assignment,
+    [
+      'assignmentId',
+      'requestKind',
+      'tier',
+      'requestedScope',
+      'excludedScope',
+      'ticketRef',
+      'ticketRevision',
+      'requirementRefs',
+      'requirementRevisions',
+      'candidateRef',
+      'authority',
+      'knownConstraints',
+    ],
+    ['environmentRef', 'missingEnvironmentBlocker'],
+  );
+  exactFields(request.assignment.authority, [
+    'allowedActions',
+    'deniedActions',
+  ]);
+  exactFields(request.review.plan, ['tier', 'objectives']);
+  assert(
+    Array.isArray(request.review.areaDecisions),
+    'QA area decisions must be an array.',
+  );
+  request.review.areaDecisions.forEach((area) =>
+    exactFields(area, ['area', 'status', 'basis']),
+  );
+  assert(
+    Array.isArray(request.review.scenarios),
+    'QA scenarios must be an array.',
+  );
+  request.review.scenarios.forEach((scenario) => {
+    exactFields(scenario, [
+      'scenarioId',
+      'requirementRefs',
+      'conditions',
+      'expectedBehavior',
+      'sourceRevision',
+      'behavioralReason',
+      'areaMappings',
+      'obligation',
+      'obligationRationale',
+      'coverageBindings',
+      'executions',
+      'result',
+      'nextAction',
+    ]);
+    assert(
+      Array.isArray(scenario.coverageBindings),
+      'QA coverage bindings must be an array.',
+    );
+    scenario.coverageBindings.forEach((binding) =>
+      exactFields(binding, [
+        'bindingId',
+        'kind',
+        'canonicalRef',
+        'repositoryRevision',
+        'assertionSummary',
+        'designState',
+        'implementationState',
+        'writeReceiptRef',
+      ]),
+    );
+  });
+  assert.equal(
+    request.assignment.requestKind,
+    'full',
+    'Installed QA requires a full assignment.',
+  );
+  assert.equal(
+    request.assignment.candidateRef,
+    request.invocation.revision,
+    'QA candidate must match the invocation revision.',
+  );
+  assert(
+    Array.isArray(request.assignment.authority.allowedActions) &&
+      request.assignment.authority.allowedActions.every((action) =>
+        policy.qa.allowedActions.includes(action),
+      ),
+    'Installed QA does not permit external writes.',
+  );
+  assert(
+    request.review.scenarios.every(
+      (scenario) =>
+        scenario.requirementRefs.every((ref) =>
+          request.assignment.requirementRefs.includes(ref),
+        ) &&
+        request.assignment.requirementRevisions.includes(
+          scenario.sourceRevision,
+        ) &&
+        scenario.coverageBindings.every(
+          (binding) => binding.writeReceiptRef === null,
+        ),
+    ),
+    'QA source references and write controls differ from the assignment.',
+  );
+  assert.equal(
+    request.review.scenarios.every(
+      (scenario) =>
+        scenario.result === 'NotRun' &&
+        Array.isArray(scenario.executions) &&
+        scenario.executions.length === 0,
+    ),
+    true,
+    'Installed QA accepts only unexecuted scenarios.',
+  );
+  const require = createRequire(
+    pathToFileURL(join(root, 'runtime/consumer.mjs')),
+  );
+  const core = await import(
+    pathToFileURL(require.resolve('@temari/temari-core')).href
+  );
+  const contracts = await import(
+    pathToFileURL(require.resolve('@temari/contracts')).href
+  );
+  core.assertQaAssignment(request.assignment);
+  const route = core.createRequestPlan({
+    workType: 'qa',
+    qaResponsibility: 'validation-disposition',
+    lightweight: {
+      resultIsClearLocalAndReversible: false,
+      changesSharedBoundary: true,
+      isReportedDefect: false,
+      hasUnexplainedSymptom: false,
+      makesPerformanceClaim: false,
+      isDesignChoice: false,
+      isMigration: false,
+      affectedCallersAreKnown: true,
+      crossesArchitecturalBoundary: true,
+      directCheckAvailable: false,
+    },
+    obligations: policy.qa.obligations,
+  });
+  assert.equal(route.route.route, 'qa-review');
+  assert.deepEqual(route.obligations, policy.qa.obligations);
+  assert.deepEqual(route.plan.stages, policy.qa.stageMapping);
+  const allowedInputs = {
+    frozenReview: {
+      reviewRevision: request.review.reviewRevision,
+      assignment: {
+        assignmentId: request.assignment.assignmentId,
+        requestKind: request.assignment.requestKind,
+        tier: request.assignment.tier,
+        requestedScope: request.assignment.requestedScope,
+        excludedScope: request.assignment.excludedScope,
+        ticketRef: request.assignment.ticketRef,
+        ticketRevision: request.assignment.ticketRevision,
+        requirementRefs: request.assignment.requirementRefs,
+        requirementRevisions: request.assignment.requirementRevisions,
+        candidateRef: request.assignment.candidateRef,
+        environmentRef: request.assignment.environmentRef ?? null,
+        missingEnvironmentBlocker:
+          request.assignment.missingEnvironmentBlocker ?? null,
+      },
+      plan: request.review.plan,
+      areaDecisions: request.review.areaDecisions,
+      scenarios: request.review.scenarios,
+      residualRisks: request.review.residualRisks,
+    },
+    canonicalEvidenceRefs: [],
+    declaredConstraints: request.assignment.knownConstraints,
+    priorRounds: [],
+  };
+  const allowedInputSha256 = sha256(Buffer.from(JSON.stringify(allowedInputs)));
+  const startedAt = new Date().toISOString();
+  const { code, pid } = await startBridge(
+    'start',
+    request,
+    policy.qa.obligations,
+  );
+  const endedAt = new Date().toISOString();
+  assert(
+    Number.isSafeInteger(pid) && pid > 0,
+    'Host process identity is missing.',
+  );
+  const invocationId = `node-pid-${pid}`;
+  const runtime = await import(
+    pathToFileURL(require.resolve('@temari/runtime')).href
+  );
+  const receipts = await runtime.FileWorkflowReceiptStore.openExisting(
+    join(request.invocation.runDirectory, 'receipts'),
+  );
+  const receipt = await receipts.load(request.invocation.runId);
+  assert(receipt, 'QA bridge did not retain a workflow receipt.');
+  assert.equal(
+    receipt.status,
+    'BLOCKED',
+    'QA without a separate evaluator cannot complete the workflow.',
+  );
+  assert.equal(
+    receipt.failure?.kind,
+    'capability-gap',
+    'QA must block on the missing host capability.',
+  );
+  assert.deepEqual(
+    receipt.plan,
+    route.plan,
+    'QA bridge plan differs from the domain route.',
+  );
+  const retained = await readJson(
+    join(request.invocation.runDirectory, 'config', 'input.json'),
+    REQUEST_BYTES,
+  );
+  const report = retained.capabilities;
+  assert.equal(
+    report.host,
+    'experimental-local-host',
+    'Unexpected installed host.',
+  );
+  assert.deepEqual(
+    report.available,
+    [],
+    'QA host claimed an unobserved capability.',
+  );
+  assert.deepEqual(report.missing, [...contracts.HOST_CAPABILITIES]);
+  const missing = contracts.missingOrUnprovenCapabilities(
+    policy.qa.requiredCapabilities,
+    report,
+  );
+  assert.deepEqual(missing, policy.qa.requiredCapabilities);
+  const attempt = {
+    status: 'BLOCKED',
+    reason: request.assignment.missingEnvironmentBlocker
+      ? 'environment-unavailable'
+      : 'separate-evaluator-unavailable',
+    host: report.host,
+    tool: 'host/entry.mjs',
+    invocationId,
+    startedAt,
+    endedAt,
+    inputSha256: requestSha256,
+    allowedInputSha256,
+    findings: [],
+  };
+  const record = core.createQaReviewRecord({
+    schemaVersion: 1,
+    reviewRevision: request.review.reviewRevision,
+    parentRevision: null,
+    authorId: request.review.authorId,
+    assignment: request.assignment,
+    plan: request.review.plan,
+    areaDecisions: request.review.areaDecisions,
+    scenarios: request.review.scenarios,
+    evaluationRounds: [],
+    evaluationAttempts: [attempt],
+    qaDisposition: 'BlockedOrIncomplete',
+    dispositionBasis: attempt.reason,
+    externalWriteReceipts: [],
+    residualRisks: request.review.residualRisks,
+  });
+  core.assertQaReviewRecord(record);
+  const result = {
+    schemaVersion: 1,
+    route: route.route,
+    plan: route.plan,
+    workflowReceipt: {
+      status: receipt.status,
+      failure: receipt.failure,
+      stages: receipt.stages,
+    },
+    qaDisposition: core.deriveQaDisposition({
+      scope: 'full',
+      evaluatorVerdict: 'BLOCKED',
+      behaviorResult: 'blocked',
+    }),
+    record,
+    allowedInputs,
+    capabilityObservation: {
+      host: report.host,
+      tool: 'host/entry.mjs',
+      invocationId,
+      startedAt,
+      endedAt,
+      exitCode: code,
+      report,
+      missing,
+      evaluatorLaunch: 'unavailable',
+    },
+  };
+  await writeFile(
+    join(request.invocation.runDirectory, 'config', 'qa-result.json'),
+    `${JSON.stringify(result)}\n`,
+    { flag: 'wx', mode: 0o600 },
+  );
+  finish(result, 1);
 }
 
 export async function run(entry, argv = process.argv.slice(2)) {
@@ -429,6 +756,7 @@ export async function run(entry, argv = process.argv.slice(2)) {
   const trusted =
     command === 'start' ||
     command === 'resume' ||
+    (entry === 'temari' && command === 'qa') ||
     (entry === 'closeout' && command === 'verify');
   const policy = trusted
     ? await verifyBundle(extra[digestIndex + 1])
@@ -439,6 +767,20 @@ export async function run(entry, argv = process.argv.slice(2)) {
   );
   if (command === 'policy' && argv.length === 1) {
     finish(policyDescription(entry, policy));
+    return;
+  }
+  if (entry === 'temari' && command === 'qa') {
+    if (flag !== '--request' || !isAbsolute(argument ?? '')) usage();
+    assert(
+      extra.length === 4 &&
+        digestIndex >= 0 &&
+        requestDigestIndex >= 0 &&
+        digestIndex !== requestDigestIndex,
+      'Trusted QA request and artifact digests are required.',
+    );
+    const bytes = await readBoundedFile(argument, REQUEST_BYTES);
+    const request = trustedRequest(bytes, extra[requestDigestIndex + 1]);
+    await startQa(request, sha256(bytes), policy);
     return;
   }
   if (entry === 'closeout' && command === 'verify') {
@@ -557,7 +899,12 @@ export async function run(entry, argv = process.argv.slice(2)) {
     );
     const result = await admitEngineering(entry, request, policy, true);
     if (result.status !== 'admitted') return finish(result, 1);
-    await startBridge(command, request, policy);
+    await startBridge(
+      command,
+      request,
+      policy.lightweight.obligations,
+      policy.entries[entry].supportedProfile,
+    );
     return;
   }
   if (extra.length) usage();

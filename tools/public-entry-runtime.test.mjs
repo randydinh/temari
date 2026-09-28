@@ -126,6 +126,192 @@ test('packages an isolated relocated outer bundle with three current public entr
   }
 });
 
+test('relocated QA entry retains a blocked attempt and no evaluator round', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari qa-relocated-'));
+  try {
+    const artifact = join(root, 'artifact');
+    const candidate = join(root, 'candidate');
+    await cp(output, artifact, { recursive: true });
+    await mkdir(candidate);
+    await writeFile(join(candidate, 'product.txt'), 'synthetic fixture\n');
+    const scenario = {
+      scenarioId: 'synthetic-scenario',
+      requirementRefs: ['synthetic-requirement'],
+      conditions: 'candidate is available',
+      expectedBehavior: 'candidate is reviewed',
+      sourceRevision: 'synthetic-revision',
+      behavioralReason: 'review covers the requirement',
+      areaMappings: ['happy-paths'],
+      obligation: 'Required',
+      obligationRationale: 'synthetic requirement',
+      coverageBindings: [
+        {
+          bindingId: 'synthetic-binding',
+          kind: 'Gap',
+          canonicalRef: null,
+          repositoryRevision: null,
+          assertionSummary: null,
+          designState: 'Proposed',
+          implementationState: 'Missing',
+          writeReceiptRef: null,
+        },
+      ],
+      executions: [],
+      result: 'NotRun',
+      nextAction: 'run an authorized evaluation',
+    };
+    const base = {
+      schemaVersion: 1,
+      entry: 'temari',
+      route: 'qa-review',
+      profile: 'qa-review-v1',
+      assignment: {
+        assignmentId: 'synthetic-assignment',
+        requestKind: 'full',
+        tier: 'standard',
+        requestedScope: 'synthetic product behavior',
+        excludedScope: ['external writes'],
+        ticketRef: 'synthetic-ticket',
+        ticketRevision: 'synthetic-revision',
+        requirementRefs: ['synthetic-requirement'],
+        requirementRevisions: ['synthetic-revision'],
+        candidateRef: 'synthetic-revision',
+        environmentRef: 'synthetic-environment',
+        authority: {
+          allowedActions: ['read-candidate'],
+          deniedActions: ['write external system'],
+        },
+        knownConstraints: ['no external writes'],
+      },
+      review: {
+        reviewRevision: 'synthetic-review',
+        authorId: 'synthetic-author',
+        plan: { tier: 'standard', objectives: ['review synthetic behavior'] },
+        areaDecisions: [
+          'happy-paths',
+          'negative-cases',
+          'boundaries',
+          'state-transitions',
+          'integration',
+          'data-verification',
+          'security-and-isolation',
+          'concurrency-and-retries',
+          'failure-and-recovery',
+          'compatibility-and-regression',
+          'other-applicable-checks',
+        ].map((area) => ({
+          area,
+          status: 'NeedsInvestigation',
+          basis: 'synthetic fixture has not run',
+        })),
+        scenarios: [scenario],
+        residualRisks: [],
+      },
+      invocation: {
+        runId: 'synthetic-qa',
+        revision: 'synthetic-revision',
+        candidate: { scopeId: 'synthetic-scope', root: candidate },
+        runDirectory: join(root, 'run'),
+      },
+    };
+    const invoke = async (input, name, expectedCode = 1) => {
+      const path = join(root, `${name}.json`);
+      const bytes = Buffer.from(`${JSON.stringify(input)}\n`);
+      await writeFile(path, bytes);
+      return childResult(
+        [
+          join(artifact, 'bin/temari.mjs'),
+          'qa',
+          '--request',
+          path,
+          '--expected-request-sha256',
+          createHash('sha256').update(bytes).digest('hex'),
+          '--expected-manifest-sha256',
+          manifestSha256(manifest),
+        ],
+        expectedCode,
+      );
+    };
+    const result = await invoke(base, 'valid');
+    const qaOutput = JSON.parse(result.stdout.trim().split('\n').at(-1));
+    assert.equal(qaOutput.route.route, 'qa-review');
+    assert.equal(qaOutput.workflowReceipt.status, 'BLOCKED');
+    assert.equal(qaOutput.workflowReceipt.failure.kind, 'capability-gap');
+    assert.deepEqual(qaOutput.workflowReceipt.stages, []);
+    assert.equal(qaOutput.qaDisposition.disposition, 'BlockedOrIncomplete');
+    assert.deepEqual(qaOutput.record.evaluationRounds, []);
+    assert.equal(qaOutput.record.evaluationAttempts.length, 1);
+    assert.equal(
+      qaOutput.record.evaluationAttempts[0].reason,
+      'separate-evaluator-unavailable',
+    );
+    assert.deepEqual(qaOutput.record.externalWriteReceipts, []);
+    assert.deepEqual(qaOutput.allowedInputs.canonicalEvidenceRefs, []);
+    assert.equal(qaOutput.capabilityObservation.exitCode, 1);
+    assert.deepEqual(qaOutput.capabilityObservation.missing, ['subagents']);
+    assert.equal(qaOutput.capabilityObservation.evaluatorLaunch, 'unavailable');
+    assert.deepEqual(
+      JSON.parse(await readFile(join(root, 'run/config/qa-result.json'))),
+      qaOutput,
+    );
+
+    for (const [name, change] of [
+      [
+        'forged-round',
+        {
+          review: {
+            ...base.review,
+            evaluationRounds: [
+              {
+                verdict: 'PASS',
+                evaluatorId: 'caller',
+                freshContext: 'proven',
+              },
+            ],
+          },
+        },
+      ],
+      ['forged-context', { freshContext: 'proven' }],
+      ['forged-capabilities', { capabilities: ['subagents'] }],
+      [
+        'external-write',
+        {
+          assignment: {
+            ...base.assignment,
+            authority: {
+              ...base.assignment.authority,
+              allowedActions: ['write ticket'],
+            },
+          },
+        },
+      ],
+    ]) {
+      const forged = {
+        ...base,
+        ...change,
+        invocation: {
+          ...base.invocation,
+          runId: name,
+          runDirectory: join(root, name),
+        },
+      };
+      const refused = await invoke(forged, name);
+      assert.match(
+        refused.stderr,
+        /unknown or missing fields|external writes/i,
+      );
+      await assert.rejects(lstat(join(root, name)), /ENOENT/);
+    }
+    const generic = await invoke(
+      { ...request('temari'), route: 'qa-review' },
+      'generic',
+    );
+    assert.match(generic.stderr, /unknown or missing fields|QA requires/i);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('public policy records the exact reviewed legacy profile and playbook provenance', async () => {
   const policy = JSON.parse(
     await readFile(join(output, 'policy.json'), 'utf8'),

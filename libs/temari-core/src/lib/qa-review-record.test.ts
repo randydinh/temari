@@ -124,6 +124,36 @@ test('creates and validates a digest-bound full review record', () => {
   assert.doesNotThrow(() => assertQaReviewRecord(record));
 });
 
+test('retains a blocked host attempt without inventing an evaluator round', () => {
+  const record = createQaReviewRecord({
+    ...BASE_INPUT,
+    evaluationRounds: [],
+    evaluationAttempts: [
+      {
+        status: 'BLOCKED',
+        reason: 'separate-evaluator-unavailable',
+        host: 'synthetic-host',
+        tool: 'synthetic-adapter',
+        invocationId: 'invocation-1',
+        startedAt: '2026-09-28T00:00:00.000Z',
+        endedAt: '2026-09-28T00:00:01.000Z',
+        inputSha256: 'a'.repeat(64),
+        allowedInputSha256: 'b'.repeat(64),
+        findings: [],
+      },
+    ],
+    qaDisposition: 'BlockedOrIncomplete',
+    dispositionBasis: 'separate evaluator unavailable',
+  });
+  assert.deepEqual(validateQaReviewRecord(record), []);
+  const { digest: _digest, ...recordInput } = record;
+  const fakePass = createQaReviewRecord({
+    ...recordInput,
+    qaDisposition: 'Passed',
+  });
+  assert.match(validateQaReviewRecord(fakePass).join(' '), /blocked attempt/);
+});
+
 test('requires a first revision to have no parent', () => {
   const record = createQaReviewRecord({
     ...BASE_INPUT,
