@@ -152,6 +152,37 @@ test('bracketed unquoted credential values stay out of prompt, tool description 
     assert.equal(text.includes(forbidden), false, channel);
 });
 
+test('Basic authorization text stays out of all three model channels', async () => {
+  const credential = Buffer.from('synthetic_user:synthetic_pass').toString('base64');
+  const sent: string[] = [];
+  const transport = createProtectedModelTransport(
+    {
+      async complete(request, callTool) {
+        sent.push(request.prompt, request.tools[0].description);
+        sent.push(await callTool(request.tools[0].name, {}));
+        return 'done';
+      },
+    },
+    {
+      tools: [{
+        description: `authorization : BASIC\t${credential}`,
+        inputSchema: { type: 'object' },
+        async execute() {
+          return [{ kind: 'text', text: `Authorization: Basic ${credential}` }];
+        },
+      }],
+    },
+  );
+  const reply = await transport.complete({ prompt: `Authorization: Basic ${credential}` });
+  try {
+    assert.equal(sent.length, 3);
+    for (const channel of sent) assert.equal(channel.includes(credential), false);
+    assert.equal(reply.displayText().includes(credential), false);
+  } finally {
+    reply.dispose();
+  }
+});
+
 test('blocks unauthorized file references, symlinks and screenshots without an extractor before dispatch', async (t) => {
   const root = await realpath(
     await mkdtemp(join(tmpdir(), 'temari-host-deny-')),

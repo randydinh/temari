@@ -107,6 +107,43 @@ test('relocated Archon transport masks bracketed credentials on all model channe
     );
 });
 
+test('relocated Archon transport masks Basic authorization on all model channels', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-basic-privacy-'));
+  roots.push(root);
+  const artifact = await packageRuntime('archon', join(root, 'installed'));
+  const { createProtectedModelTransport } = await import(
+    pathToFileURL(join(artifact.root, 'integrations/archon/model-transport.ts')).href
+  );
+  const credential = Buffer.from('synthetic_user:synthetic_pass').toString('base64');
+  const sent = [];
+  const transport = createProtectedModelTransport(
+    {
+      async complete(request, callTool) {
+        sent.push(request.prompt, request.tools[0].description);
+        sent.push(await callTool(request.tools[0].name, {}));
+        return 'done';
+      },
+    },
+    {
+      tools: [{
+        description: `authorization : BASIC\t${credential}`,
+        inputSchema: { type: 'object' },
+        async execute() {
+          return [{ kind: 'text', text: `Authorization: Basic ${credential}` }];
+        },
+      }],
+    },
+  );
+  const reply = await transport.complete({ prompt: `Authorization: Basic ${credential}` });
+  try {
+    assert.equal(sent.length, 3);
+    for (const channel of sent) assert.equal(channel.includes(credential), false);
+    assert.equal(reply.displayText().includes(credential), false);
+  } finally {
+    reply.dispose();
+  }
+});
+
 test('relocated Archon callback preserves numeric schema key identity', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-key-privacy-'));
   roots.push(root);

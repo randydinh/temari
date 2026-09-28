@@ -173,6 +173,30 @@ test('unquoted credential assignments include bracketed values and suffixes', ()
   }
 });
 
+test('Basic authorization headers mask synthetic credentials across case and whitespace', () => {
+  const credential = Buffer.from('synthetic_user:synthetic_pass').toString('base64');
+  for (const declaration of [
+    `Authorization: Basic ${credential}`,
+    `aUtHoRiZaTiOn : bAsIc\t${credential}`,
+    `AUTHORIZATION:\tBASIC  ${credential}`,
+  ]) {
+    const result = mask({ before: credential, declaration, after: credential });
+    assertAbsent(result.payload, credential);
+    assertAbsent(restoreForDisplay(result.payload, result.session), credential);
+  }
+  const structured = mask({ authorization: `Basic ${credential}` });
+  assertAbsent(structured.payload, credential);
+});
+
+test('ambiguous Basic authorization syntax fails closed', () => {
+  for (const declaration of [
+    'Authorization: Basic "synthetic-token"',
+    'Authorization: Basic [synthetic-token]',
+    'Authorization: Basic synthetic-token',
+  ])
+    assert.throws(() => mask({ text: declaration }), PrivacyError, declaration);
+});
+
 test('ambiguous bracketed credential assignments fail closed', () => {
   for (const declaration of [
     'password=[SYNTHETIC WITH SPACE]94',
