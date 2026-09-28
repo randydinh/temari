@@ -4,6 +4,8 @@ import { dirname, join } from 'node:path';
 import { readBoundedFile } from './stdio.mjs';
 
 const sourceRevision = '959c8f7be3d7b684207d9e626263d41540d5ecdc';
+const sourceEvidenceName = 'source';
+const sourceClaimsName = 'source-requirements';
 const stageRequirements = {
   investigate: ['lightweight.intake.inspect'],
   plan: ['lightweight.route.qualifies'],
@@ -98,6 +100,23 @@ export async function loadSourceContract(
 export function attachSourceClaims(stage, result, input, contract) {
   const expected = stageRequirements[stage];
   assert(expected, 'Unknown source stage.');
+  assert(
+    !result.evidence.some((item) => item.name === sourceClaimsName),
+    'Source requirement attestation name is reserved.',
+  );
+  const sourcePayloads = result.evidence.filter(
+    (item) => item.name === sourceEvidenceName,
+  );
+  assert(
+    expected.length === 0
+      ? sourcePayloads.length <= 1
+      : sourcePayloads.length === 1,
+    `Dedicated source evidence differs at ${stage}.`,
+  );
+  assert(
+    sourcePayloads.every((item) => item.kind === 'other'),
+    `Dedicated source evidence must have generic kind other at ${stage}.`,
+  );
   const claims = result.sourceRequirements ?? [];
   assert.deepEqual(
     claims.map((claim) => claim.id).sort(),
@@ -110,9 +129,12 @@ export function attachSourceClaims(stage, result, input, contract) {
       requirement.allowedEvidenceKinds.includes(claim.sourceKind),
       `Unsupported source evidence kind for ${claim.id}.`,
     );
-    const payload = result.evidence.find(
-      (item) => item.name === claim.evidenceName,
+    assert.equal(
+      claim.evidenceName,
+      sourceEvidenceName,
+      `Source claim must use dedicated evidence for ${claim.id}.`,
     );
+    const payload = sourcePayloads[0];
     assert(
       payload && payload.content.byteLength > 0,
       `Missing source evidence for ${claim.id}.`,
@@ -137,7 +159,7 @@ export function attachSourceClaims(stage, result, input, contract) {
     evidence: [
       ...result.evidence,
       {
-        name: 'source-requirements',
+        name: sourceClaimsName,
         kind: 'other',
         content: Buffer.from(
           JSON.stringify({ schemaVersion: 1, stage, claims: entries }),
@@ -175,13 +197,16 @@ export async function assertSourceEvidence(
       kind: 'other',
     });
     const attestation = JSON.parse(decode(attestationBytes));
-    const sourcePayload = attestation.payloads.find(
-      (payload) => payload.name === 'source-requirements',
+    const sourcePayloads = attestation.payloads.filter(
+      (payload) => payload.name === sourceClaimsName,
     );
-    assert(
-      sourcePayload,
+    assert.equal(
+      sourcePayloads.length,
+      1,
       `Missing retained source requirements at ${stage.stage}.`,
     );
+    const sourcePayload = sourcePayloads[0];
+    assert.equal(sourcePayload.reference.kind, 'other');
     const sourceBytes = await store.loadPortable(sourcePayload.reference);
     const source = JSON.parse(decode(sourceBytes));
     assert.equal(source.schemaVersion, 1);
@@ -191,19 +216,31 @@ export async function assertSourceEvidence(
       [...expected].sort(),
       `Retained source requirements differ at ${stage.stage}.`,
     );
+    const dedicatedPayloads = attestation.payloads.filter(
+      (payload) => payload.name === sourceEvidenceName,
+    );
+    assert(
+      expected.length === 0
+        ? dedicatedPayloads.length <= 1
+        : dedicatedPayloads.length === 1,
+      `Retained dedicated source evidence differs at ${stage.stage}.`,
+    );
+    assert(
+      dedicatedPayloads.every((payload) => payload.reference.kind === 'other'),
+      `Retained dedicated source kind differs at ${stage.stage}.`,
+    );
     for (const claim of source.claims) {
       const requirement = contract.requirements.get(claim.id);
       assert(
         requirement?.allowedEvidenceKinds.includes(claim.sourceKind),
         `Retained source kind is unsupported for ${claim.id}.`,
       );
-      const payload = attestation.payloads.find(
-        (item) => item.name === claim.evidenceName,
+      assert.equal(
+        claim.evidenceName,
+        sourceEvidenceName,
+        `Retained source claim must use dedicated evidence for ${claim.id}.`,
       );
-      assert(
-        payload && claim.evidenceName !== 'source-requirements',
-        `Retained source reference is missing for ${claim.id}.`,
-      );
+      const payload = dedicatedPayloads[0];
       assert.deepEqual(
         claim.reference,
         payload.reference,

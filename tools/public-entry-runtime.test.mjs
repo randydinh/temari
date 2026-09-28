@@ -23,6 +23,7 @@ import {
   manifestSha256,
   packagePublicEntries,
 } from './public-entry-runtime.mjs';
+import { assertSourceEvidence } from '../packages/workflow-runtime/host/source.mjs';
 
 const repository = fileURLToPath(new URL('../', import.meta.url));
 const packager = fileURLToPath(
@@ -553,6 +554,7 @@ async function answerStage(
   message,
   withSource = true,
   sourceKindOverride,
+  sourceMode = 'dedicated',
 ) {
   assert.equal(message.type, 'stage');
   let evidence = `observed ${message.stage}\n`;
@@ -585,6 +587,7 @@ async function answerStage(
       'Result: product.txt is APPLE\\nPEAR\\n. Publish approval remains unresolved.\n';
   }
   await writeFile(join(message.workspace, 'evidence.txt'), evidence);
+  const genericSourceAlias = sourceMode === 'generic-alias';
   const claims = {
     investigate: { id: 'lightweight.intake.inspect', sourceKind: 'document' },
     plan: { id: 'lightweight.route.qualifies', sourceKind: 'document' },
@@ -595,7 +598,7 @@ async function answerStage(
     review: { id: 'lightweight.verify.direct-check', sourceKind: 'diff' },
     verify: { id: 'lightweight.verify.direct-check', sourceKind: 'command' },
   };
-  if (withSource && claims[message.stage])
+  if (withSource)
     await writeFile(join(message.workspace, 'source.txt'), evidence);
   await writeFile(
     join(message.workspace, 'host-result.json'),
@@ -608,7 +611,19 @@ async function answerStage(
       summary: `synthetic ${message.stage} complete`,
       evidence: [
         { name: 'observation', kind: 'verification', path: 'evidence.txt' },
-        ...(withSource && claims[message.stage]
+        ...(withSource && !genericSourceAlias
+          ? [
+              {
+                name: 'source',
+                kind: sourceMode === 'wrong-kind' ? 'verification' : 'other',
+                path: 'source.txt',
+              },
+            ]
+          : []),
+        ...(sourceMode === 'reserved-name'
+          ? [{ name: 'source-requirements', kind: 'other', path: 'source.txt' }]
+          : []),
+        ...(sourceMode === 'duplicate-name'
           ? [{ name: 'source', kind: 'other', path: 'source.txt' }]
           : []),
       ],
@@ -620,7 +635,7 @@ async function answerStage(
                     ...claims[message.stage],
                     sourceKind:
                       sourceKindOverride ?? claims[message.stage].sourceKind,
-                    evidenceName: 'source',
+                    evidenceName: genericSourceAlias ? 'observation' : 'source',
                   },
                 ]
               : [],
@@ -703,6 +718,141 @@ test('installed entry rejects a renamed source evidence kind before a PASS check
     ),
   );
   assert.equal((checkpoint.checkpoint ?? checkpoint).stages.length, 0);
+});
+
+test('installed entry rejects allowed source kinds bound to generic verification payloads', async (t) => {
+  const f = await installedFixture(t);
+  const session = f.launch();
+  await answerStage(
+    f,
+    session,
+    await session.next(),
+    true,
+    undefined,
+    'generic-alias',
+  );
+  const complete = await session.next();
+  assert.equal(complete.type, 'complete');
+  assert.equal(complete.status, 'BLOCKED');
+  assert.notEqual((await session.done).code, 0);
+  const checkpoint = JSON.parse(
+    await readFile(
+      join(f.runDirectory, 'checkpoints/installed-lightweight.checkpoint.json'),
+      'utf8',
+    ),
+  );
+  assert.equal((checkpoint.checkpoint ?? checkpoint).stages.length, 0);
+});
+
+test('installed entry rejects wrong generic kind and reserved or duplicate source names', async (t) => {
+  for (const sourceMode of ['wrong-kind', 'reserved-name', 'duplicate-name']) {
+    await t.test(sourceMode, async (t) => {
+      const f = await installedFixture(t);
+      const session = f.launch();
+      await answerStage(
+        f,
+        session,
+        await session.next(),
+        true,
+        undefined,
+        sourceMode,
+      );
+      const complete = await session.next();
+      assert.equal(complete.type, 'complete');
+      assert.equal(complete.status, 'BLOCKED');
+      assert.notEqual((await session.done).code, 0);
+      const checkpoint = JSON.parse(
+        await readFile(
+          join(
+            f.runDirectory,
+            'checkpoints/installed-lightweight.checkpoint.json',
+          ),
+          'utf8',
+        ),
+      );
+      assert.equal((checkpoint.checkpoint ?? checkpoint).stages.length, 0);
+    });
+  }
+});
+
+test('retained validation rejects a previously acknowledged generic payload alias', async () => {
+  const runId = 'retained-alias';
+  const revision = 'synthetic-v1';
+  const payload = Buffer.from('generic verification for investigate\n');
+  const reference = {
+    schema: 1,
+    runId,
+    revision,
+    kind: 'verification',
+    sha256: createHash('sha256').update(payload).digest('hex'),
+    bytes: payload.byteLength,
+  };
+  const claims = Buffer.from(
+    JSON.stringify({
+      schemaVersion: 1,
+      stage: 'investigate',
+      claims: [
+        {
+          id: 'lightweight.intake.inspect',
+          sourceKind: 'document',
+          evidenceName: 'observation',
+          reference,
+        },
+      ],
+    }),
+  );
+  const claimReference = {
+    ...reference,
+    kind: 'other',
+    sha256: createHash('sha256').update(claims).digest('hex'),
+    bytes: claims.byteLength,
+  };
+  const attestation = Buffer.from(
+    JSON.stringify({
+      payloads: [
+        { name: 'observation', reference },
+        { name: 'source-requirements', reference: claimReference },
+      ],
+    }),
+  );
+  const attestationReference = {
+    ...reference,
+    kind: 'other',
+    sha256: createHash('sha256').update(attestation).digest('hex'),
+    bytes: attestation.byteLength,
+  };
+  const artifacts = new Map([
+    [attestationReference.sha256, attestation],
+    [claimReference.sha256, claims],
+    [reference.sha256, payload],
+  ]);
+  const record = {
+    runId,
+    revision,
+    stages: [{ stage: 'investigate', stageEvidence: attestationReference }],
+  };
+  const store = {
+    loadPortable: async (item) => {
+      const bytes = artifacts.get(item.sha256);
+      assert(bytes);
+      assert.equal(bytes.byteLength, item.bytes);
+      assert.equal(
+        createHash('sha256').update(bytes).digest('hex'),
+        item.sha256,
+      );
+      return bytes;
+    },
+  };
+  const contract = {
+    requirements: new Map([
+      ['lightweight.intake.inspect', { allowedEvidenceKinds: ['document'] }],
+    ]),
+  };
+  const runtime = { verifyCandidateEvidenceRecord: async () => undefined };
+  await assert.rejects(
+    assertSourceEvidence(record, store, contract, runtime),
+    /Retained dedicated source evidence differs/,
+  );
 });
 
 test('relocated public entry starts, resumes, and persists the six-stage candidate result', async (t) => {

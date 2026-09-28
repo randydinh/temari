@@ -4,7 +4,7 @@ This record is for the maintainer who resumes the migration. Read the current
 Git state and pull requests before acting. A checked implementation item does
 not replace acceptance evidence from the installed product.
 
-## NX-01 source repair handoff — 2026-09-28
+## NX-01 source channel handoff — 2026-09-28
 
 Branch `codex/nx-installed-journey-20260928` in the exclusive
 `/private/tmp/temari-nx-installed-20260928` worktree starts from
@@ -12,28 +12,38 @@ Branch `codex/nx-installed-journey-20260928` in the exclusive
 NX-01 implementation at `0c673724484fe2ea7af5a9526a5d3a82459a01a9`.
 Independent review failed that head because generic `verification` payloads
 produced a public PASS without satisfying any pinned lightweight source
-requirements. The repair in this worktree is uncommitted at that HEAD.
-PR #56 remains draft. No installed plugin or dirty main checkout was changed.
+requirements. The first repair was committed at
+`6c300a2ca2e0a23a8586cb7d12453c8679d247c9`. Its Linux `main` and
+`windows-x64` PR checks passed. The independent rereview then reproduced a
+remaining alias: allowed source-kind claims could point at ordinary generic
+`verification` payloads and produce PASS. The dedicated-channel repair is
+currently uncommitted on top of `6c300a2`. PR #56 remains draft. The green
+CI results belong to `6c300a2`; new-head CI is pending until observed. No
+installed plugin or dirty main checkout was changed.
 
 The [installed lightweight public-entry record](./installed-public-journey.md)
 contains the request contract, pinned v4.1 source mapping, commands, literal
 candidate SHA-256, and open gates. The [repair decision trail](./nx-01-repair-decisions.tsv)
-records the reproduced failure and the enforcement choice. The repair reproduced the bypass with an
-installed negative fixture. The first uncached `public-entry-test` returned
-exit 1, with 19 of 20 tests passing, because the old bridge returned PASS.
-The repaired target returns exit 0 with 25 of 25 tests passing. Its relocated
-bundle restarts after build, retains references for all four source IDs, and
-finishes the synthetic six-stage candidate change. A changed source kind,
-source reference, profile, playbook, request, or descriptor blocks.
-Five focused typechecks, four core test targets with 276 passing tests,
-canonical 11, host-session 39,
-the v4.1 package and inventory check passed locally. These are synthetic
-installed-process checks, not a native-host rerun or independent QA verdict.
-The PR CI workflow includes `workflow-runtime:public-entry-test`, but no
-exact-head Linux or Windows CI result exists for the uncommitted repair.
+records both failures and the enforcement choice. The new regression first
+returned exit 1 with 25 of 26 public-entry tests passing at `6c300a2` because
+the bridge acknowledged the generic-payload alias. With the channel repair,
+31 of 31 public-entry tests pass. A source claim must now name the dedicated
+`source` payload with generic kind `other`; `source-requirements` is reserved.
+The bridge checks the same rule against retained records after restart. A
+source-kind label is the host's attestation over those retained bytes, not
+content-type inference or an independent QA judgment.
 
-Next, freeze the repair at a new commit, then obtain independent source review
-and exact-head Linux and Windows CI.
+The relocated synthetic bundle restarts after build, retains references for
+all four source IDs, and finishes the six-stage candidate change. The direct
+reviewer probe now blocks the generic-payload alias before an investigate
+checkpoint and blocks changed dedicated source bytes on resume. Five focused
+typechecks, four core test targets, canonical 11, and host-session 39 passed
+locally. These checks do not establish a new native-host run or independent QA
+verdict. The PR CI workflow includes `workflow-runtime:public-entry-test`;
+Linux and Windows CI for a future committed channel-repair head are pending.
+
+Next, freeze the channel repair at a new commit, then obtain independent
+source review and exact-head Linux and Windows CI.
 Then run the same installed entry with a native host and preserve its product
 evidence. Keep full-feature, QA, and closeout blocked until their separate
 capability, owner, and current-candidate gates are met. Do not claim WP3 live

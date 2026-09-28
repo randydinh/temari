@@ -60,26 +60,33 @@ requires a source claim for each mapped stage before acknowledging PASS.
 | verify          | `lightweight.verify.direct-check`            | Run the direct product check.                                  |
 | deliver         | All four requirement IDs                     | Report the result after the earlier claims are retained.       |
 
-Each source claim names one retained payload and an allowed source kind from
-the pinned profile. The bridge stores the claim beside the canonical stage
-attestation, with the payload's run ID, revision, generic kind, byte count,
-and SHA-256. Before saving a checkpoint, before reusing it after restart,
-and before saving a terminal PASS, the bridge verifies the source claim and
-the referenced bytes. A generic `verification` payload or a PASS label alone
-does not satisfy a requirement. The source final, commit, and review
+Each source claim names the dedicated `source` payload, whose generic evidence
+kind is `other`, and supplies an allowed source kind from the pinned profile.
+The `source-requirements` name is reserved for bridge-produced claims. The
+bridge stores each claim beside the canonical stage attestation, with the
+payload's run ID, revision, generic kind, byte count, and SHA-256. Before
+saving a checkpoint, before reusing it after restart, and before saving a
+terminal PASS, the bridge verifies that the claim references those exact
+retained dedicated bytes. A generic `verification` payload or a PASS label
+alone does not satisfy a requirement. The source final, commit, and review
 boundaries require all four IDs. The publish boundary still requires separate
 operator approval. The installed route offers local delivery only. A
 six-stage PASS does not authorize publication, merge, or archive. The retained
-claims establish source evidence provenance; they do not independently judge
-the quality of the host's work.
+claims establish source evidence provenance. `sourceKind` is a host
+attestation over that payload; the bridge does not infer content type from
+the bytes or supply an independent QA judgment about the host's work.
 
 ## Verification and limits
 
 PR #56 froze the first implementation at
 `0c673724484fe2ea7af5a9526a5d3a82459a01a9`. Independent review failed
 that head because its public PASS omitted all four source requirements. The
-source repair is uncommitted on branch `codex/nx-installed-journey-20260928`
-at that HEAD. These uncached checks returned exit 0 locally:
+first repair was committed at `6c300a2ca2e0a23a8586cb7d12453c8679d247c9`
+on branch `codex/nx-installed-journey-20260928`. Its Linux `main` and
+`windows-x64` PR checks passed. Independent rereview at that head found a
+remaining generic-payload alias despite the otherwise successful synthetic
+installed journey. The dedicated-channel repair is uncommitted on top of
+`6c300a2`. These uncached local checks returned exit 0 for the new candidate:
 
 ```sh
 NX_DAEMON=false pnpm exec nx run workflow-runtime:public-entry-test --skipNxCache --skipSync --output-style=static
@@ -92,38 +99,42 @@ NX_DAEMON=false pnpm exec nx run workflow-runtime:check --skipNxCache --skipSync
 git diff --check
 ```
 
-The first bypass regression failed on the old code. The target returned exit
-1 with 19 of 20 tests passing because the six-stage generic-evidence fixture
-returned PASS. After the repair, the public-entry target passed 25 tests,
-canonical 11, and host-session 39. Five typechecks and four core test targets
-passed 276 tests. The v4.1 package created a 213-file portable distribution; the
-inventory check passed all 234 source files. The relocated entry test denied
-legacy checkout imports in the public process, interrupted after the build
-checkpoint, resumed at review in a new process, and read a PASS receipt with
-the literal six-stage order, all four source IDs, retained references, and
-candidate bytes. Negative cases block missing source claims, an unsupported
-source kind, changed retained source references, profile, playbook, policy,
-host package, request, route, obligations, capability labels, QA and full
-feature routes, changed descriptor, and altered retained evidence. The direct
-test uses a synthetic host, not a native product agent.
+The new generic-payload regression failed at `6c300a2`: public-entry-test
+returned exit 1 with 25 of 26 tests passing because the ordinary observation
+payload received an investigate checkpoint. After channel enforcement, the
+target passed 31 of 31 tests, canonical 11, and host-session 39. Five
+typechecks and all four affected core test targets passed. The relocated
+entry test denied legacy checkout imports in the public process, interrupted
+after the build checkpoint, resumed at review in a new process, and read a
+PASS receipt with the literal six-stage order, all four source IDs, retained
+references, and candidate bytes. Negative cases now also block claims bound
+to generic verification, wrong generic kind, reserved or duplicate source
+names, changed retained references, and a previously acknowledged generic
+alias during source revalidation. The direct test uses a synthetic host, not
+a native product agent.
 
-Stock Node also packaged and checked a separate 79-file outer artifact at
-`/private/tmp/nx01-repair-final-CyXxLV/artifact`. Its manifest SHA-256 is
-`0952a04ae7c30fb99b08d3ff8633765ccf91e699eca715ef6e239d76a0da277b`.
-The direct commands were:
+The historical `6c300a2` rereview packaged and checked a clean 79-file outer
+artifact with manifest SHA-256
+`7e1950cb2cd0c46ce30ba2aeddf53740d3a96eeb8ba897a5b4d1b435cf3a3f69`.
+The new uncommitted candidate's Stock Node package and check commands were:
 
 ```sh
-node tools/public-entry-runtime.mjs package --output /private/tmp/nx01-repair-final-CyXxLV/artifact
-node tools/public-entry-runtime.mjs check --artifact /private/tmp/nx01-repair-final-CyXxLV/artifact --expected-manifest-sha256 0952a04ae7c30fb99b08d3ff8633765ccf91e699eca715ef6e239d76a0da277b
+node tools/public-entry-runtime.mjs package --output /private/tmp/nx01-source-channel-final.aqd8iE/artifact
+node tools/public-entry-runtime.mjs check --artifact /private/tmp/nx01-source-channel-final.aqd8iE/artifact --expected-manifest-sha256 8ceed138af73c23a3c201ea9d22d7c8b8fed9942d1ecdb64b737e921637e18fe
 ```
 
-The manifest records source HEAD `0c673724484fe2ea7af5a9526a5d3a82459a01a9`
-with `dirty: true`. The `package` and `check` commands both returned exit 0;
-this is a local uncommitted candidate, not a new PR head.
+The manifest records source HEAD `6c300a2ca2e0a23a8586cb7d12453c8679d247c9`
+with `dirty: true`. The 79-file `package` and `check` commands both returned
+exit 0; this is a local uncommitted candidate, not a new PR head. The
+reviewer's direct synthetic probe against this artifact returned exit 0:
+the positive run resumed to PASS, the generic-payload alias blocked before
+the investigate checkpoint, and changed dedicated source bytes blocked before
+new work. Any later source edit requires a fresh package and check.
 
-`.github/workflows/ci.yml` now includes `public-entry-test` in the
-`workflow-runtime` PR and main job. The full CI job has not run at a new
-repair head. Local checks do not establish exact-head Linux or Windows CI.
+`.github/workflows/ci.yml` includes `public-entry-test` in the
+`workflow-runtime` PR and main job. The passing Linux and Windows checks
+belong to `6c300a2`; new-head CI remains pending until a new head exists and
+those checks are observed. Local checks do not establish that gate.
 
 The expected digests are trust inputs, not signatures. This local boundary
 assumes the host supplies them independently and the installed files are not
