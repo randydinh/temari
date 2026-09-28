@@ -4,6 +4,31 @@ This record is for the maintainer who resumes the migration. Read the current
 Git state and pull requests before acting. A checked implementation item does
 not replace acceptance evidence from the installed product.
 
+## NX-03 installed QA handoff — 2026-09-28
+
+Branch `codex/nx03-installed-qa-20260928` in the exclusive
+`/private/tmp/temari-nx03-qa-20260928` worktree starts at merged main
+`c3e3d6b57d3dd085821c400d8c4ec69936ee70fe`. Milestone
+`70efc63b690bf9155e329f6f79ba2cb98e1f9257` adds the explicit QA
+public route, strict read-only draft boundary, and a host-observed blocked
+attempt separate from the six-stage workflow receipt. Milestone
+`15e147174cc4f6e7bc7cc6c7a1f045adda980634` adds the relocated direct
+journey and Linux and Windows CI targets. Milestone
+`c83c316117a9efe36a37a03ad04ab1f1a7710d0a` binds the installed policy
+owner to the exported QA domain entry; its focused public-entry and relocated
+journey targets exited 0. The [installed QA record](./installed-qa.md)
+contains the exact SHA, commands and exits, host invocation lifetime,
+artifact digest, negative cases, and retained local evidence path.
+
+The selected installed bridge reports zero available capabilities. It cannot
+launch an evaluator context, so QA remains `BlockedOrIncomplete` with no
+round. The synthetic PASS and REVISE core tests exercise mechanical verdict
+plumbing only. The generic feature exclusion and public policy ID remain
+unchanged, protecting existing lightweight and closeout admissions.
+Independent review, exact-head CI, a real evaluator adapter, and final
+cutover approval remain open. The original dirty checkout and installed
+plugin are untouched. Do not merge this draft before independent review.
+
 ## NX-02 installed closeout handoff — 2026-09-28
 
 Independent review rejected PR #59 at `20b06fc` after a rehashed six-stage
