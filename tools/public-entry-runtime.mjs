@@ -272,7 +272,9 @@ export async function checkPublicEntryArtifact(root, expectedManifestSha256) {
     const path = `bin/${entry}.mjs`;
     assert(files.has(path), `Missing public entry: ${entry}`);
     const stat = await lstat(join(root, path));
-    assert(stat.mode & 0o111, `Entry is not executable: ${path}`);
+    // Windows does not expose POSIX execute bits for these Node entry files.
+    if (process.platform !== 'win32')
+      assert(stat.mode & 0o111, `Entry is not executable: ${path}`);
   }
   for (const [path, content] of files) {
     assert(
