@@ -359,3 +359,119 @@ test('a new process reconciles each interrupted parent and child commit boundary
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test('a stale parent cannot append an event after another process takes its lease', async () => {
+  const root = await rootForTest();
+  try {
+    await worker(root, 'create-parent', { id: 'fenced-events', now: base });
+    const first = await worker(root, 'claim-parent', {
+      id: 'fenced-events',
+      owner: 'old',
+      now: base,
+    });
+    const second = await worker(root, 'claim-parent', {
+      id: 'fenced-events',
+      owner: 'new',
+      now: afterLease,
+    });
+    assert.equal(second.value.record.attempt, 2);
+    await assert.rejects(
+      worker(root, 'append-parent-event', {
+        id: 'fenced-events',
+        owner: 'old',
+        token: first.value.record.lease.token,
+        key: 'stale-dispatch',
+        payload: { marker: 'stale' },
+        now: afterLease,
+      }),
+      /lease (owner|token) mismatch/,
+    );
+    const events = await worker(root, 'parent-events', { id: 'fenced-events' });
+    assert.deepEqual(
+      events.value.map((event: { type: string }) => event.type),
+      ['run-created', 'run-claimed', 'run-claimed'],
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('a parent idempotency key rejects a replay that omits the committed marker', async () => {
+  const root = await rootForTest();
+  try {
+    await worker(root, 'create-parent', { id: 'payload-replay', now: base });
+    const claim = await worker(root, 'claim-parent', {
+      id: 'payload-replay',
+      owner: 'owner',
+      now: base,
+    });
+    const completion = {
+      id: 'payload-replay',
+      owner: 'owner',
+      token: claim.value.record.lease.token,
+      key: 'complete-payload',
+      now: base,
+    };
+    const first = await worker(root, 'complete-parent', {
+      ...completion,
+      payload: { marker: 'original' },
+    });
+    assert.equal(first.value.status, 'SUCCEEDED');
+    await assert.rejects(
+      worker(root, 'complete-parent', { ...completion, payload: {} }),
+      /Idempotency key payload changed/,
+    );
+    const events = await worker(root, 'parent-events', {
+      id: 'payload-replay',
+    });
+    assert.equal(events.value.length, 3);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('file child completion admits a missing artifact, so shared publication remains blocked', async () => {
+  const root = await rootForTest();
+  try {
+    await worker(root, 'create-child', {
+      id: 'missing-publication',
+      now: base,
+    });
+    const claim = await worker(root, 'claim-child', {
+      id: 'missing-publication',
+      owner: 'owner',
+      now: base,
+    });
+    const reference = {
+      schema: 1 as const,
+      runId: 'synthetic-parent',
+      revision: 'synthetic-revision',
+      kind: 'worker-result' as const,
+      sha256: createHash('sha256').update('never-written').digest('hex'),
+      bytes: Buffer.byteLength('never-written'),
+    };
+    const publication = await worker(root, 'complete-child-result', {
+      id: 'missing-publication',
+      owner: 'owner',
+      token: claim.value.record.lease.token,
+      epoch: claim.value.record.lease.fencingEpoch,
+      key: 'missing-artifact',
+      now: base,
+      result: {
+        status: 'PASS',
+        summary: 'synthetic result',
+        evidencePaths: ['synthetic.txt'],
+        rawLogPath: null,
+        evidenceReferences: [reference],
+      },
+    });
+    assert.equal(publication.value.status, 'SUCCEEDED');
+    assert.deepEqual(publication.value.result.evidenceReferences, [reference]);
+    await assert.rejects(
+      worker(root, 'load-artifact', { reference }),
+      /ENOENT/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

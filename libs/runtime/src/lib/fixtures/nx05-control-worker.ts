@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 
+import type { WorkerResult } from '@temari/contracts';
+
 import { FileChildTaskStore } from '../child-task-store.js';
 import type { EvidenceReference } from '../evidence-store.js';
 import { openNx05FileConformanceAdapters } from '../nx05-control-contract.js';
-import { FileWorkflowRunStore } from '../run-store.js';
+import { FileWorkflowRunStore, type RunEventPayload } from '../run-store.js';
 
 type Stage =
   | 'after-sidecar-fsync'
@@ -22,6 +24,8 @@ interface Input {
   readonly content?: string;
   readonly reference?: EvidenceReference;
   readonly taskIds?: readonly string[];
+  readonly payload?: RunEventPayload;
+  readonly result?: WorkerResult;
 }
 
 const [root, operation, rawInput] = process.argv.slice(2);
@@ -48,6 +52,9 @@ switch (operation) {
   case 'load-parent':
     value = await parent.load(id);
     break;
+  case 'parent-events':
+    value = await parent.events(id);
+    break;
   case 'claim-parent':
   case 'crash-parent-claim':
     if (operation === 'crash-parent-claim') {
@@ -69,8 +76,20 @@ switch (operation) {
       leaseToken: input.token ?? '',
       status: 'SUCCEEDED',
       idempotencyKey: input.key ?? '',
+      payload: input.payload,
       now,
     });
+    break;
+  case 'append-parent-event':
+    const eventRequest = {
+      runId: id,
+      actor: input.owner ?? '',
+      leaseToken: input.token,
+      idempotencyKey: input.key ?? '',
+      payload: input.payload,
+      now,
+    };
+    value = await parent.appendEvent(eventRequest);
     break;
   case 'cancel-parent':
     value = await parent.cancel({
@@ -143,6 +162,18 @@ switch (operation) {
       status: 'FAILED',
       idempotencyKey: input.key ?? '',
       error: 'synthetic failure',
+      now,
+    });
+    break;
+  case 'complete-child-result':
+    value = await child.complete({
+      taskId: id,
+      owner: input.owner ?? '',
+      leaseToken: input.token ?? '',
+      fencingEpoch: input.epoch ?? 0,
+      status: 'SUCCEEDED',
+      idempotencyKey: input.key ?? '',
+      result: input.result,
       now,
     });
     break;
