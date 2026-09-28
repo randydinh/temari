@@ -185,9 +185,11 @@ and [Linux run 36427776685](https://github.com/randydinh/temari/actions/runs/364
 both passed. The Windows log reports 31/31 public-entry tests, including the
 relocated start, fresh-process resume, and six-stage PASS test. That test
 asserts literal `APPLE\nPEAR\n` candidate bytes and SHA-256, retained source
-references, and negative refusal paths. Independent code review at this head
-found no actionable regressions. These run IDs prove the code head named here;
-any later documentation commit needs its own exact-head CI record.
+references, and negative refusal paths. The assigned independent reviewer for
+`e9147766c31bfb6c17d84e4fac3af9815a2293d2` stopped without a verdict
+when the PR head moved to `27783574f8b708f80708078540a7bc77e2486bb7`.
+These run IDs prove the code head named here; any later documentation commit
+needs its own exact-head CI record.
 
 An older [Windows run 36412419554](https://github.com/randydinh/temari/actions/runs/36412419554)
 at `c83e750` had a file-level `v4-1-route-replay.test.ts` failure without an
