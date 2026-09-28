@@ -1,0 +1,6 @@
+ts	phase	decision	why	evidence	result
+2026-09-28T14:30:34Z	boundary	Kept the file adapter explicitly scoped to one host	The current locks and clock use the local filesystem and client time	libs/runtime/src/lib/nx05-control-contract.ts	Shared-service gate open
+2026-09-28T14:30:34Z	red	Committed the process conformance tests before the fixture	A reviewer can see the failing behavior contract before implementation	d2c4a654bce4c17de1be67e923c9d802b3e2df75	Focused Nx target exited 1 before implementation
+2026-09-28T14:30:34Z	green	Added the shared-provider interface and local process adapter	The provider boundary names fenced publication and atomic dispatch without claiming file storage is shared	15a8b6e0e0afa515490e23106fc2cab9ed694e3e	Focused Nx target exited 0 with four tests
+2026-09-28T14:30:34Z	verification	Observed claim takeover and crash reconciliation in new processes	Separate PIDs and reopened stores test process recovery directly	docs/migrations/nx05-control-handoff.md	189 runtime tests passed; multi-machine gate open
+2026-09-28T14:30:34Z	sync	Kept the unrelated workflow-runtime sync change outside this branch	The missing project reference is outside the assigned files	docs/migrations/nx05-control-handoff.md	Runtime typecheck passed with --skipSync
