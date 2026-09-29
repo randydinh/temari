@@ -161,6 +161,24 @@ test('a full Passed record rejects unexecuted required work and unresolved evalu
   );
 });
 
+test('a case definition or gap cannot stand in for executable coverage', () => {
+  for (const kind of ['TestmoCase', 'Gap'] as const) {
+    const record = createQaReviewRecord({
+      ...BASE_INPUT,
+      scenarios: [
+        {
+          ...SCENARIO,
+          coverageBindings: [{ ...SCENARIO.coverageBindings[0], kind }],
+        },
+      ],
+    });
+    assert.match(
+      validateQaReviewRecord(record).join(' '),
+      /cannot be Passed without selected implemented coverage and Executed evidence/,
+    );
+  }
+});
+
 test('retains a blocked host attempt without inventing an evaluator round', () => {
   const record = createQaReviewRecord({
     ...BASE_INPUT,

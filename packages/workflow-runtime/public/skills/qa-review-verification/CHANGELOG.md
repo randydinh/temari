@@ -1,5 +1,35 @@
 # QA verification changes
 
+## 0.6.0 — 2026-09-29
+
+- Carry the full-review scenario inventory and all eleven area decisions without
+  turning scenario count into a quota or a writing-only note into completion.
+- Prefer user-facing functional checks where suitable, with a nonproduction
+  integration or controlled failure check for behavior a UI flow cannot prove;
+  provide a runnable manual handoff when execution remains external.
+- Preserve Testmo case before-images, corrected associations, readbacks and prior
+  run history when an expected result or automation mapping was wrong.
+- Verify a baseline actually contains the behavior before claiming a regression,
+  and capture actionable Registrar/graph corrections when context is stale.
+- Preserve target-profile identity, permission and safe evidence boundaries for
+  browser checks; distinguish proposed scenarios, generated tests and observed
+  attempts, and triage ambiguous failures before calling them product defects.
+
+## 0.5.0 — 2026-09-29
+
+- Establish specification examples and resolve conflicting product rules before
+  changing cases or automation.
+- Put ticket, case revision, automation identity, and actual run/result in the
+  scenario matrix; verify authorized case writes by readback.
+- Check the oracle, fixture realism, observation boundary and normal control before
+  presenting a finding as a confirmed bug; keep blocked prerequisites distinct.
+- Check authorized QA fixture creation before labeling a required scenario blocked.
+- Preserve the user's note-review gate and the separate comment and Done transition.
+- Identify repository, source and target branch, pull request and test ownership for
+  cross-repository QA changes.
+- Require actual automated or manual coverage for a Passed QA record; a case
+  definition or gap binding alone cannot supply executable coverage.
+
 ## 0.4.0 — 2026-09-29
 
 - Make the product or business outcome and its authoritative source explicit for each

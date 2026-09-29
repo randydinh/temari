@@ -400,6 +400,8 @@ function validateScenario(
     }
     bindingIds.add(binding.bindingId);
     if (
+      (binding.kind === 'AutomatedTest' ||
+        binding.kind === 'ManualProcedure') &&
       binding.designState === 'Selected' &&
       ['Existing', 'Added', 'Updated'].includes(binding.implementationState)
     ) {

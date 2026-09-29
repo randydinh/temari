@@ -31,3 +31,12 @@ node --import @swc-node/register/esm-register tools/run-codex-parallel.mts /abso
 ```
 
 Give write implementers disjoint typed scopes, a clean pinned base, and combined verification. The router selects by assignment structure, rejects mixed batches, and returns the selected route and receipt. Review the receipt and integration checkout before accepting work. The installed public plugin also bundles `bin/codex-parallel.mjs`; follow its Poteto Mode parallel worker guide for the installed invocation. A local worker receipt does not prove host `subagents` or `forge` capabilities for full-feature admission.
+
+## Private QA preferences
+
+For Temari QA workflow changes, read `docs/decisions/2026-09-29-qa-review.md`.
+For OpConnect QA work in this checkout, read
+`$HOME/.temari/overlays/opconnect-qa-preferences.md` when present after policy and
+source-scope admission. It is a private host preference record, not an execution
+permission or a product-behavior oracle. If it is absent, use the public QA
+contract and record the missing project context.
