@@ -50,6 +50,10 @@ const publicFiles = [
     'packages/workflow-runtime/public/bin/public-entry.mjs',
     'bin/public-entry.mjs',
   ],
+  [
+    'packages/workflow-runtime/public/bin/overlay-check.mjs',
+    'bin/overlay-check.mjs',
+  ],
   ['packages/workflow-runtime/public/bin/temari.mjs', 'bin/temari.mjs'],
   [
     'packages/workflow-runtime/public/bin/poteto-mode.mjs',

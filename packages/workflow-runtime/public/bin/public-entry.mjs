@@ -24,7 +24,7 @@ const FILE_BYTES = 16 * 1024 * 1024;
 const utf8 = new TextDecoder('utf-8', { fatal: true });
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
 
-async function readBoundedFile(path, limit) {
+export async function readBoundedFile(path, limit) {
   const before = await lstat(path);
   assert(
     before.isFile() && !before.isSymbolicLink(),
@@ -240,7 +240,7 @@ async function admitEngineering(entry, request, policy, trusted = false) {
   };
 }
 
-async function verifyBundle(expectedDigest) {
+export async function verifyBundle(expectedDigest) {
   assert.match(
     expectedDigest ?? '',
     /^[a-f0-9]{64}$/,

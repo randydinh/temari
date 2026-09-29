@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import {
   DEFAULT_STAGES,
   missingCapabilities,
@@ -570,9 +571,9 @@ function firstWorkerFailure(
     };
   }
 
-  const nonPass = required.find(
-    (outcome) => outcome.result && outcome.result.status !== 'PASS',
-  );
+  const status = aggregateWorkerStatus(required);
+  if (status === 'PASS') return null;
+  const nonPass = required.find((outcome) => outcome.result?.status === status);
   if (!nonPass?.result) return null;
   return {
     kind: 'worker-status',
@@ -598,15 +599,23 @@ export function joinParallelWorkers(
     );
   }
 
-  const expected = new Set(preflight.assignmentIds);
+  const expected = new Map(
+    assignments.map((assignment) => [assignment.id, assignment]),
+  );
   const byId = new Map<string, ParallelWorkerOutcome>();
   for (const outcome of outcomes) {
     const workerId = outcome.assignment.id;
-    if (!expected.has(workerId)) {
+    const declaredAssignment = expected.get(workerId);
+    if (!declaredAssignment) {
       throw new Error(`Parallel worker outcome is not declared: ${workerId}.`);
     }
     if (byId.has(workerId)) {
       throw new Error(`Parallel worker outcome is duplicated: ${workerId}.`);
+    }
+    if (!isDeepStrictEqual(outcome.assignment, declaredAssignment)) {
+      throw new Error(
+        `Parallel worker outcome assignment changed: ${workerId}.`,
+      );
     }
     if (outcome.error === null) {
       if (outcome.result === null) {
@@ -620,7 +629,7 @@ export function joinParallelWorkers(
         `Parallel worker ${workerId} cannot retain a result with an error.`,
       );
     }
-    byId.set(workerId, outcome);
+    byId.set(workerId, { ...outcome, assignment: declaredAssignment });
   }
 
   const stableOutcomes = preflight.assignmentIds.map((workerId) => {
