@@ -4,6 +4,7 @@ export * from './lib/model-transport.js';
 export * from './lib/codex-model-driver.js';
 export * from './lib/openai-responses-driver.js';
 export * from './lib/ollama-model-driver.js';
+export * from './lib/qa-local-category-search.js';
 
 import {
   createCodexModelDriver,

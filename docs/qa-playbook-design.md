@@ -184,6 +184,64 @@ The future flow is **intake adapter → QA triage/reproduction playbook → boun
 
 **Benny decision:** adapt its defect-handling playbooks inside the QA domain, with the expected-behavior baseline established before classification and reproduction. Preserve Benny as the source of these patterns; do not create a competing QA owner. Adopt a standalone Benny-branded event automation only if a later intake requirement needs it. The feature map is navigation and execution guidance; it must link to product intent without becoming the source of truth merely because it describes the current app.
 
+### Concrete connection to implement
+
+Make the Benny-derived triage, reproduction, and existing-fix workflows callable capabilities within the QA domain. Start with an explicit local assignment from Temari or Poteto; an event transport can call the same boundary later. The proposed interface is a mapping to canonical artifacts, not a new workflow store or a claim that an upstream Benny API exists.
+
+```mermaid
+flowchart TD
+    I[Product intent and requirements] --> D[QA test design and coverage]
+    R[Issue report] --> D
+    D -->|Pinned assignment and scenarios| B[Benny-derived triage and reproduction]
+    B -->|Attempts and findings| E[Temari QA record and evaluation]
+    E -->|Authorized bounded repair| P[Poteto]
+    P -->|New candidate| V[Benny-derived fix verification]
+    V --> E
+    D -->|Other QA tasks| O[API, automation or specialist playbook]
+    O --> E
+```
+
+| Boundary                                 | Input/output and ownership                                                                                                                                                                                                                                                                                                                     |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **QA → Benny-derived capability**        | Assignment/parent identity; requirement IDs and revisions; expected behavior and its authority; chosen scenario IDs; candidate/environment/fixture references; feature-map section; permitted actions; operation and effort limit; existing report/patch identity when present. QA owns intent and scope.                                      |
+| **Capability → project control adapter** | The relevant app/API/system action and observation contract, capability proof and cleanup. Use the surface needed to establish the claim. Version and test any departure from upstream UI-only behavior explicitly.                                                                                                                            |
+| **Capability → QA**                      | Attempt identity; actual candidate/environment; assertions and observations; sanitized evidence; symptom reproduced, not observed, blocked or inconclusive; suspected failure classification; existing-fix/ownership findings; remaining questions. Execution observations do not silently rewrite expected behavior or decide full readiness. |
+| **QA → Poteto → QA**                     | A bounded repair with the same expected outcome; returned patch/new candidate and checks; subsequent verification against the pinned requirement. Preserve `parentReviewId` routing and separate record authorship from required evaluation.                                                                                                   |
+
+Map the returned observations into existing coverage bindings and execution records. Preserve the requirement-to-scenario-to-attempt-to-defect relationship in both directions. “Could not reproduce” is a reproduction outcome; it cannot automatically become a passed acceptance scenario. A reproduced symptom with unresolved intent remains a supported observation and an unresolved product judgment.
+
+Before an admitted run, the implementation owner should deliver one narrow slice:
+
+1. Pin the upstream Benny source revision and record the adapted rules/dependencies.
+2. Connect one reproduction playbook to the canonical QA assignment and one proven project control adapter.
+3. Exercise a controlled category-search defect with independently specified expected results, plus a passing candidate and an unavailable-environment case.
+4. Show that existing ownership/patch gates prevent competing work, stale requirement revisions prevent reuse of affected conclusions, and unchanged bad baseline behavior cannot pass solely because it is unchanged.
+5. Return the evidence to the existing independent QA evaluation and completion path.
+
+This is the proposed integration work to perform in the linked implementation chat. It does not configure Slack, create a recurring automation, or establish that the new route is already supported.
+
+**Current source proof:** `libs/temari-core/src/lib/qa-benny-reproduction.ts` defines a bounded local category-search reproduction call. `libs/host-adapters/src/lib/qa-local-category-search.ts` provides a loopback-only read adapter; `tools/run-qa-benny-local.mjs` invokes it with a JSON assignment and the canonical `FileEvidenceStore`. The integration test exercises a broken category filter, a repaired candidate, a not-observed reproduction, a missing environment, denied read authority, existing patch ownership, stale requirement revision and candidate mismatch. The output contains an execution attempt and a suggested scenario result, with `qaDisposition: null`. The proof uses synthetic fixtures. It does not verify a live product, independently authenticate the supplied product decision, admit the public QA route, or implement Slack/tracker writes.
+
+### Comparison with the Jama article
+
+[Jama's May 6, 2026 article](https://www.jamasoftware.com/requirements-management-guide/ai-in-product-development/ai-test-case-generation/) recommends requirement-based drafting, traceability, review, and revision-aware maintenance. It proposes measures of draft acceptance, duplication and criteria coverage. Its regulated-product focus and vendor framing require judgment when applying it here.
+
+Our source comparison:
+
+| Concern                                | Benny at the reviewed revision                                                                                                                                                | Temari integration decision                                                                                                             |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Expected behavior and business context | Captures expected/observed behavior and user-visible purpose. No complete requirement-authority or conflict-resolution mechanism was found in the reviewed operational files. | Supply the QA-owned intent baseline and unresolved decisions before classification.                                                     |
+| What to test                           | Primarily follows a report and a feature map's states.                                                                                                                        | QA derives required scenarios from outcomes and risks, including absent features. Benny handles the selected reproduction work.         |
+| How to test                            | Detailed app-control, setup/reset, discriminating observation, capture, and before/after instructions.                                                                        | Reuse the mechanics; scope repetition and evidence to the actual surface and risk.                                                      |
+| Requirements and coverage traceability | Links reports, tracker issues, evidence and patches. These links do not constitute requirement-level coverage.                                                                | Bind requirements, scenarios, attempts and defects through canonical records and retain uncovered obligations.                          |
+| Review                                 | Uses evidence/media checks and a bounded repair process.                                                                                                                      | Review the test's expected outcome and assertions separately from evidence presentation; retain required independent evaluation.        |
+| Changed product intent                 | Checks concrete code artifacts and build versions; no complete requirement-change invalidation mechanism was found.                                                           | Mark dependent cases and conclusions for review when requirement revisions change. Preserve history and revalidate affected assertions. |
+| Effectiveness                          | No local comparative run has been performed.                                                                                                                                  | Measure confirmed versus withdrawn findings, missed seeded defects, review changes, cost and flakiness on a controlled pilot.           |
+
+Do not interpret draft acceptance as demonstrated correctness, the existence of a linked case as successful execution, or a coverage gap as proof that a requirement must be rewritten. Investigate whether the gap is in the requirement, generation, implementation or execution. Review historical defects before using them to guide future scenarios so repeated examples do not dominate the coverage plan. These are integration judgments, not claims that Benny or the article already implements them.
+
+Do not import a universal per-step human approval requirement or buy a new requirements platform from this comparison. Preserve accountable product decisions and apply the project's actual review obligations. Where intent is unambiguous and execution is authorized, the agent can proceed within its scope.
+
 ## Evaluation before admission
 
 Compare the proposed playbooks against current practice on the same pinned tasks. Record quality, context/tool use, latency, human corrections, and maintenance cost. Fewer loaded instructions are a hypothesis for efficiency, not a measured improvement yet.
