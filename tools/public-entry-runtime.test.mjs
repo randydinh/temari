@@ -129,7 +129,7 @@ test('packages an isolated relocated outer bundle with three current public entr
   }
 });
 
-test('relocated QA entry retains a blocked attempt and no evaluator round', async () => {
+test('relocated QA entry runs the packaged evaluator without source-checkout access', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari qa-relocated-'));
   try {
     const artifact = join(root, 'artifact');
@@ -158,6 +158,7 @@ test('relocated QA entry retains a blocked attempt and no evaluator round', asyn
     await mkdir(candidate);
     await writeFile(join(candidate, 'product.txt'), 'synthetic fixture\n');
     const base = syntheticQaRequest(candidate, join(root, 'run'));
+    await mkdir(base.invocation.evidenceRoot, { recursive: true });
     const invoke = async (input, name, expectedCode = 1) => {
       const path = join(root, `${name}.json`);
       const bytes = Buffer.from(`${JSON.stringify(input)}\n`);
@@ -189,50 +190,22 @@ test('relocated QA entry retains a blocked attempt and no evaluator round', asyn
       'verify',
       'deliver',
     ]);
-    assert.equal(qaOutput.workflowReceipt.status, 'BLOCKED');
-    assert.equal(qaOutput.workflowReceipt.failure.kind, 'capability-gap');
-    assert.deepEqual(qaOutput.workflowReceipt.stages, []);
     assert.equal(qaOutput.qaDisposition.disposition, 'BlockedOrIncomplete');
-    assert.deepEqual(qaOutput.record.evaluationRounds, []);
-    assert.equal(qaOutput.record.evaluationAttempts.length, 1);
-    assert.equal(qaOutput.record.evaluationAttempts[0].outputSha256, null);
+    assert.equal(qaOutput.evaluator.decision.verdict, 'REVISE');
+    assert.equal(qaOutput.record.evaluationRounds.length, 1);
     assert.equal(
-      qaOutput.record.evaluationAttempts[0].reason,
-      'separate-evaluator-unavailable',
+      qaOutput.record.evaluationRounds[0].evaluatorId,
+      'local-fresh-qa-evaluator-v1',
     );
+    assert.equal(qaOutput.record.evaluationRounds[0].verdict, 'REVISE');
     assert.deepEqual(qaOutput.record.externalWriteReceipts, []);
-    assert.deepEqual(qaOutput.allowedInputs.canonicalEvidenceRefs, []);
-    assert.equal(qaOutput.capabilityObservation.exitCode, 1);
-    assert.deepEqual(qaOutput.capabilityObservation.missing, ['subagents']);
-    assert.equal(qaOutput.capabilityObservation.evaluatorLaunch, 'unavailable');
+    assert.equal(qaOutput.delivery.mode, 'local');
+    assert.equal(qaOutput.delivery.externalWrites, 'denied');
+    assert.equal(qaOutput.delivery.evaluatorLaunch, 'packaged-local-process');
     assert.deepEqual(
       JSON.parse(await readFile(join(root, 'run/config/qa-result.json'))),
       qaOutput,
     );
-
-    const missingEnvironment = {
-      ...base,
-      assignment: {
-        ...base.assignment,
-        environmentRef: undefined,
-        missingEnvironmentBlocker: 'synthetic environment is unavailable',
-      },
-      invocation: {
-        ...base.invocation,
-        runId: 'missing-environment',
-        runDirectory: join(root, 'missing-environment'),
-      },
-    };
-    delete missingEnvironment.assignment.environmentRef;
-    const unavailable = await invoke(missingEnvironment, 'missing-environment');
-    const unavailableOutput = JSON.parse(
-      unavailable.stdout.trim().split('\n').at(-1),
-    );
-    assert.equal(
-      unavailableOutput.record.evaluationAttempts[0].reason,
-      'environment-unavailable',
-    );
-    assert.deepEqual(unavailableOutput.record.evaluationRounds, []);
 
     for (const [name, change] of [
       [
@@ -310,7 +283,7 @@ test('relocated QA entry retains a blocked attempt and no evaluator round', asyn
       const refused = await invoke(forged, name);
       assert.match(
         refused.stderr,
-        /unknown or missing fields|external writes|source references|unexecuted scenarios/i,
+        /unknown or missing fields|external writes|source references|Invalid QaReviewRecord/i,
       );
       await assert.rejects(lstat(join(root, name)), /ENOENT/);
     }

@@ -25,7 +25,9 @@ and NarrowReviewOnly limits in the prose. A narrow review cannot establish full 
 For evidence-only drafting, write the local document from the supplied or authorized
 evidence. Drafting does not admit a runtime route, create PASS receipts, change a review
 disposition, or satisfy an independent-evaluator requirement. Full QA execution remains
-subject to the installed policy and host capabilities. Report a blocked route as blocked
+subject to the installed policy, a full versioned assignment, and canonical local evidence.
+The installed Temari route launches its packaged evaluator in a separate process and denies
+external writes. Report a blocked route as blocked
 even when a useful draft can be produced.
 When the user requested full QA Review, do not present the resulting evidence-only note
 as completed verification; identify the exact unexecuted acceptance work and the route

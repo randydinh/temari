@@ -38,6 +38,7 @@ const candidate = join(relocation, 'candidate');
 await mkdir(candidate);
 await writeFile(join(candidate, 'product.txt'), 'synthetic fixture\n');
 const request = syntheticQaRequest(candidate, join(relocation, 'run'));
+await mkdir(request.invocation.evidenceRoot, { recursive: true });
 const requestPath = join(relocation, 'request.json');
 const requestBytes = Buffer.from(`${JSON.stringify(request)}\n`);
 await writeFile(requestPath, requestBytes);
@@ -75,14 +76,12 @@ const invocation = await new Promise((resolve, reject) => {
 assert.equal(invocation.code, 1, invocation.stderr);
 const result = JSON.parse(invocation.stdout.trim().split('\n').at(-1));
 assert.equal(result.route.route, 'qa-review');
-assert.equal(result.workflowReceipt.status, 'BLOCKED');
-assert.equal(result.workflowReceipt.failure.kind, 'capability-gap');
-assert.deepEqual(result.record.evaluationRounds, []);
+assert.equal(result.evaluator.decision.verdict, 'REVISE');
+assert.equal(result.record.evaluationRounds.length, 1);
 assert.deepEqual(result.record.externalWriteReceipts, []);
 assert.equal(result.qaDisposition.disposition, 'BlockedOrIncomplete');
-assert.equal(result.record.evaluationAttempts[0].inputSha256, requestDigest);
-assert.deepEqual(result.capabilityObservation.report.available, []);
-assert.deepEqual(result.capabilityObservation.missing, ['subagents']);
+assert.equal(result.delivery.requestSha256, requestDigest);
+assert.equal(result.delivery.evaluatorLaunch, 'packaged-local-process');
 assert.deepEqual(
   JSON.parse(await readFile(join(relocation, 'run/config/qa-result.json'))),
   result,
@@ -96,11 +95,10 @@ const evidence = {
   requestSha256: requestDigest,
   command: [process.execPath, ...args],
   exitCode: invocation.code,
-  workflowStatus: result.workflowReceipt.status,
+  evaluatorVerdict: result.evaluator.decision.verdict,
   qaDisposition: result.qaDisposition.disposition,
   evaluatorRounds: result.record.evaluationRounds.length,
-  attempt: result.record.evaluationAttempts[0],
-  capabilityObservation: result.capabilityObservation,
+  evaluator: result.evaluator,
   retainedResult: join(relocation, 'run/config/qa-result.json'),
 };
 await writeFile(

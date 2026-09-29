@@ -25,7 +25,11 @@ const toolPath = fileURLToPath(import.meta.url);
 const workspace = resolve(dirname(toolPath), '..');
 const manifestName = 'public-entry-manifest.json';
 const entries = ['temari', 'poteto-mode', 'closeout'];
-const generatedFiles = ['bin/codex-parallel.mjs'];
+const generatedFiles = [
+  'bin/codex-parallel.mjs',
+  'bin/qa-evaluator.mjs',
+  'bin/qa-evaluator-worker.mjs',
+];
 const publicFiles = [
   ['packages/workflow-runtime/public/policy.json', 'policy.json'],
   [
@@ -253,7 +257,8 @@ function assertPolicy(policy) {
   assert.deepEqual(policy.feature.unsupportedRoutes, ['qa-review']);
   assert.equal(policy.qa.profile, 'qa-review-v1');
   assert.equal(policy.qa.owner, './qa-review');
-  assert.deepEqual(policy.qa.requiredCapabilities, ['subagents']);
+  assert.deepEqual(policy.qa.requiredCapabilities, []);
+  assert.equal(policy.qa.evaluator, 'packaged-local-process');
   assert.deepEqual(policy.qa.stageMapping, [
     'investigate',
     'plan',
@@ -331,7 +336,7 @@ export async function checkPublicEntryArtifact(root, expectedManifestSha256) {
   assert.equal(plugin.skills, './skills/');
   assert.equal(manifest.build.parallelBundler.name, 'bun');
   assert.match(manifest.build.parallelBundler.version, /^\d+\.\d+\.\d+/);
-  assert(files.has('bin/codex-parallel.mjs'));
+  for (const path of generatedFiles) assert(files.has(path));
   for (const entry of entries) {
     const path = `bin/${entry}.mjs`;
     assert(files.has(path), `Missing public entry: ${entry}`);
@@ -403,31 +408,38 @@ export async function packagePublicEntries(
         destination.startsWith('bin/'),
       );
     }
-    const parallelBundle = join(staging, generatedFiles[0]);
-    const parallelMetafile = join(staging, 'parallel-metafile.json');
-    execFileSync(
-      'bun',
-      [
-        'build',
-        '--target=node',
-        '--format=esm',
-        '--reject-unresolved',
-        `--metafile=${parallelMetafile}`,
-        `--outfile=${parallelBundle}`,
-        'tools/run-codex-parallel.mts',
-      ],
-      { cwd: workspace, encoding: 'utf8' },
-    );
-    const parallelInputs = Object.keys(
-      JSON.parse(await readFile(parallelMetafile, 'utf8')).inputs,
-    );
-    assert(parallelInputs.includes('tools/run-codex-parallel.mts'));
-    for (const source of parallelInputs) {
-      safePath(source);
-      sourceFiles.set(source, await readFile(join(workspace, source)));
+    const bundles = [
+      ['tools/run-codex-parallel.mts', generatedFiles[0]],
+      ['tools/run-qa-evaluator-local.mjs', generatedFiles[1]],
+      ['tools/qa-evaluator-worker.mjs', generatedFiles[2]],
+    ];
+    for (const [source, destination] of bundles) {
+      const bundle = join(staging, destination);
+      const metafile = join(staging, `${basename(destination)}.metafile.json`);
+      execFileSync(
+        'bun',
+        [
+          'build',
+          '--target=node',
+          '--format=esm',
+          '--reject-unresolved',
+          `--metafile=${metafile}`,
+          `--outfile=${bundle}`,
+          source,
+        ],
+        { cwd: workspace, encoding: 'utf8' },
+      );
+      const inputs = Object.keys(
+        JSON.parse(await readFile(metafile, 'utf8')).inputs,
+      );
+      assert(inputs.includes(source));
+      for (const input of inputs) {
+        safePath(input);
+        sourceFiles.set(input, await readFile(join(workspace, input)));
+      }
+      await rm(metafile);
+      await chmod(bundle, 0o755);
     }
-    await rm(parallelMetafile);
-    await chmod(parallelBundle, 0o755);
 
     const canonicalBytes = await readFile(
       join(runtime, 'canonical-manifest.json'),
