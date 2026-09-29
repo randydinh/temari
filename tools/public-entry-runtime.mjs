@@ -66,6 +66,17 @@ const publicFiles = [
     'packages/workflow-runtime/public/skills/closeout/SKILL.md',
     'skills/closeout/SKILL.md',
   ],
+  ...[
+    'SKILL.md',
+    'CHANGELOG.md',
+    'references/maintenance.md',
+    'assets/ticket-comment.md',
+    'assets/ticket-verification.md',
+    'assets/release-qa-report.md',
+  ].map((path) => [
+    `packages/workflow-runtime/public/skills/qa-review-verification/${path}`,
+    `skills/qa-review-verification/${path}`,
+  ]),
 ];
 
 function digest(content) {

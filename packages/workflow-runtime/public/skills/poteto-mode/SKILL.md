@@ -7,6 +7,16 @@ description: Use the current Nx P-stack engineering workflow with pinned lightwe
 
 Poteto mode supplies the engineering workflow selected by Temari.
 
+For ticket verification notes, QA evidence audits, and release QA reports requested
+during verification or handoff, load the bundled
+[QA verification skill](../qa-review-verification/SKILL.md). Default ordinary ticket
+comments to its compact template, preserve the user's reviewer-label filter, and
+derive conclusions from the candidate-bound evidence. Keep canonical QA records,
+independent review requirements, and blocked or narrow dispositions intact.
+This supporting writer also handles evidence-only local drafts; it does not admit
+QA execution or convert a document into a runtime receipt. Test-case authoring
+alone, code review, and defect repair retain their existing owners.
+
 1. Read `policy.json` from the installed bundle root and announce the selected route briefly.
 2. Admit the pinned `lightweight-engineering-v1` mapping only when every source route condition is true. Preserve its fixed serial obligations and all six canonical stages.
 3. The source final, commit, and review boundaries include every lightweight requirement. Publish requires separate operator approval. A PASS receipt does not grant it.

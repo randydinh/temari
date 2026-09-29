@@ -126,6 +126,67 @@ test('packages an isolated relocated outer bundle with three current public entr
   }
 });
 
+test('both engineering skills reach the complete versioned QA writer inside the artifact', async () => {
+  for (const entry of ['temari', 'poteto-mode']) {
+    const visited = new Set();
+    const visit = async (path) => {
+      if (visited.has(path)) return;
+      visited.add(path);
+      const bytes = await readFile(join(output, path));
+      const artifactRecord = manifest.files.find((file) => file.path === path);
+      assert(artifactRecord, `Unmanifested skill resource: ${path}`);
+      assert.equal(
+        artifactRecord.sha256,
+        createHash('sha256').update(bytes).digest('hex'),
+      );
+      for (const [, link] of bytes.toString().matchAll(/\]\(([^)]+)\)/g)) {
+        if (/^[a-z][a-z\d+.-]*:|^#/i.test(link)) continue;
+        const target = fileURLToPath(
+          new URL(link, pathToFileURL(join(output, path))),
+        );
+        const resource = relative(output, target).split('\\').join('/');
+        assert(
+          resource.startsWith('skills/'),
+          `Link escapes bundled skills: ${link}`,
+        );
+        await visit(resource);
+      }
+    };
+    await visit(`skills/${entry}/SKILL.md`);
+    for (const resource of [
+      'SKILL.md',
+      'CHANGELOG.md',
+      'references/maintenance.md',
+      'assets/ticket-comment.md',
+      'assets/ticket-verification.md',
+      'assets/release-qa-report.md',
+    ]) {
+      const path = `skills/qa-review-verification/${resource}`;
+      assert(
+        visited.has(path),
+        `Unreachable QA resource from ${entry}: ${resource}`,
+      );
+      assert(
+        manifest.source.files.some(
+          (file) => file.path === `packages/workflow-runtime/public/${path}`,
+        ),
+      );
+    }
+    const skill = await readFile(
+      join(output, 'skills/qa-review-verification/SKILL.md'),
+      'utf8',
+    );
+    const frontmatter = skill.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    assert(frontmatter, 'Missing QA skill frontmatter');
+    assert.match(frontmatter[1], /^name: qa-review-verification$/m);
+    assert.match(frontmatter[1], /^description: .+$/m);
+    assert.match(
+      frontmatter[1],
+      /^metadata:\r?\n  version: (['"]?)\d+\.\d+\.\d+\1$/m,
+    );
+  }
+});
+
 test('public policy records the exact reviewed legacy profile and playbook provenance', async () => {
   const policy = JSON.parse(
     await readFile(join(output, 'policy.json'), 'utf8'),
@@ -1318,6 +1379,7 @@ test('installed entry refuses altered artifact, request, route, obligations, cap
     'capabilities',
     'qa',
     'full',
+    'qa-template',
   ]) {
     await t.test(mode, async (t) => {
       const f = await installedFixture(t);
@@ -1327,6 +1389,14 @@ test('installed entry refuses altered artifact, request, route, obligations, cap
         await writeFile(
           join(f.artifact, 'host/entry.mjs'),
           'throw Error("altered")',
+        );
+      if (mode === 'qa-template')
+        await writeFile(
+          join(
+            f.artifact,
+            'skills/qa-review-verification/assets/ticket-comment.md',
+          ),
+          'altered template',
         );
       if (mode === 'profile')
         await writeFile(
@@ -1377,7 +1447,11 @@ test('installed entry refuses altered artifact, request, route, obligations, cap
       assert.notEqual(result.code, 0);
       assert(!result.messages.some((message) => message.type === 'stage'));
       await assert.rejects(lstat(f.runDirectory), { code: 'ENOENT' });
-      if (['policy', 'package', 'profile', 'playbook'].includes(mode))
+      if (
+        ['policy', 'package', 'profile', 'playbook', 'qa-template'].includes(
+          mode,
+        )
+      )
         assert.match(result.stderr, /Artifact (bytes|size) changed/);
       if (mode === 'request')
         assert.match(
