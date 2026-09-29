@@ -65,5 +65,13 @@ Do not connect Nx Cloud yet. Do not cache live host journeys.
 One engine. Classification builds an `ExecutionPlan`; it does not fork
 the lifecycle. Chart: [docs/workflow.md](docs/workflow.md).
 
+Temari and Poteto use the bundled [QA verification writer](packages/workflow-runtime/public/skills/qa-review-verification/SKILL.md)
+for ticket notes, evidence audits, and release QA reports. It provides compact and
+detailed templates, preserves reviewer filters and evidence provenance, and retains
+canonical QA dispositions. A draft does not admit a full QA execution route or
+satisfy its independent review requirements. Changes to the writer have a versioned
+[changelog](packages/workflow-runtime/public/skills/qa-review-verification/CHANGELOG.md)
+and retained [trial records](evaluations/qa-review-verification/README.md).
+
 The [facilities uptime walkthrough](docs/demos/facilities-uptime.md) shows the
 same engine applied to a synthetic hospital site-operations incident.

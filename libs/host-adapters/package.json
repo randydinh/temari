@@ -24,7 +24,7 @@
       "test": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "node --import @swc-node/register/esm-register --test libs/host-adapters/src/lib/host-adapters.test.ts",
+          "command": "node --import @swc-node/register/esm-register --test libs/host-adapters/src/lib/host-adapters.test.ts libs/host-adapters/src/lib/codex-exec-worker.test.ts tools/run-codex-workers.test.mts tools/run-codex-write-workers.test.mts tools/run-codex-parallel.test.mts",
           "cwd": "{workspaceRoot}"
         }
       }

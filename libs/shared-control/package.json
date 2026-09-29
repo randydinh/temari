@@ -1,0 +1,59 @@
+{
+  "name": "@temari/shared-control",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "nx": {
+    "name": "shared-control",
+    "tags": [
+      "scope:platform",
+      "type:adapter"
+    ],
+    "targets": {
+      "test": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test libs/shared-control/src/lib/temporal-control-proof.test.ts libs/shared-control/src/lib/sqlite-artifact-provider.test.ts libs/shared-control/src/lib/sqlite-control-test-provider.test.ts",
+          "cwd": "{workspaceRoot}"
+        }
+      },
+      "artifact-test": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test libs/shared-control/src/lib/sqlite-artifact-provider.test.ts",
+          "cwd": "{workspaceRoot}"
+        }
+      },
+      "control-test": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test libs/shared-control/src/lib/sqlite-control-test-provider.test.ts",
+          "cwd": "{workspaceRoot}"
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "@temari/contracts": "workspace:^",
+    "@temari/runtime": "workspace:^",
+    "@temari/workflow-engine": "workspace:^",
+    "@temporalio/worker": "1.24.0",
+    "@temporalio/workflow": "1.24.0"
+  },
+  "devDependencies": {
+    "@temporalio/testing": "1.24.0"
+  }
+}

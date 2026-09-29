@@ -4,6 +4,14 @@ This record is for the maintainer who resumes the migration. Read the current
 Git state and pull requests before acting. A checked implementation item does
 not replace acceptance evidence from the installed product.
 
+## Deferred evaluation
+
+- [ ] Run the [independent QA output comparison](./qa-output-comparison.md)
+      with separate agent sessions, pinned versions, and blind scoring. The
+      first pilot used one agent and showed only that both workflows accepted
+      an identical test. It did not establish comparative output quality or a
+      v4.1 retirement gate.
+
 ## NX-02 installed closeout handoff — 2026-09-28
 
 Independent review rejected PR #59 at `20b06fc` after a rehashed six-stage

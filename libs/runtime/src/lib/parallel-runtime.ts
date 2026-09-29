@@ -26,11 +26,12 @@ import {
   type ParallelWorkerFailure,
   type ParallelWorkerReceipt,
 } from '@temari/workflow-engine';
-import type {
-  ChildTaskGroupRecord,
-  ChildTaskRecord,
-  ChildTaskStatus,
-  ChildTaskStore,
+import {
+  MAX_CHILD_TASK_ERROR_LENGTH,
+  type ChildTaskGroupRecord,
+  type ChildTaskRecord,
+  type ChildTaskStatus,
+  type ChildTaskStore,
 } from './child-task-store.js';
 import type { EvidenceReference, EvidenceStore } from './evidence-store.js';
 import type { WorkspaceManifestStore } from './workspace-manifest.js';
@@ -423,6 +424,24 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function boundedFailureMessage(error: unknown): string {
+  let original: string;
+  try {
+    original = errorMessage(error);
+  } catch {
+    original = '';
+  }
+  const message =
+    original.trim().length > 0
+      ? original
+      : 'Worker failed without a diagnostic message.';
+  if (message.length <= MAX_CHILD_TASK_ERROR_LENGTH) return message;
+
+  const digest = createHash('sha256').update(message).digest('hex');
+  const suffix = `... [truncated; sha256=${digest}]`;
+  return `${message.slice(0, MAX_CHILD_TASK_ERROR_LENGTH - suffix.length)}${suffix}`;
+}
+
 function isLeaseLoss(error: unknown): boolean {
   return /lease|fencing|owner mismatch|token mismatch|only a running/i.test(
     errorMessage(error),
@@ -806,7 +825,7 @@ async function executeClaimed(
         status: 'FAILED',
         idempotencyKey,
         result: null,
-        error: errorMessage(error),
+        error: boundedFailureMessage(error),
         now: now(),
       });
       return false;
