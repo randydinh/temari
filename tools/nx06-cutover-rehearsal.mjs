@@ -75,6 +75,15 @@ function within(root, path) {
   );
 }
 
+function bashPath(path) {
+  const absolute = resolve(path);
+  if (platform() !== 'win32') return absolute;
+  const unix = absolute.replaceAll('\\', '/');
+  const drive = /^([a-z]):(\/.*)$/i.exec(unix);
+  assert(drive, `Git Bash requires a drive-backed absolute path: ${absolute}`);
+  return `/${drive[1].toLowerCase()}${drive[2]}`;
+}
+
 function requireInventory(actual, expected, manifestName) {
   const files = new Map(actual.map((file) => [file.path, file]));
   assert.equal(files.size, expected.length + 1);
@@ -488,8 +497,12 @@ async function main() {
     const pnpm = await runCommand(
       report,
       'pnpm-version',
-      'pnpm',
-      ['--version'],
+      platform() === 'win32'
+        ? join(process.env.SystemRoot, 'System32', 'cmd.exe')
+        : 'pnpm',
+      platform() === 'win32'
+        ? ['/d', '/s', '/c', 'pnpm.cmd --version']
+        : ['--version'],
       output,
     );
     report.environment.pnpm = pnpm.stdout.trim();
@@ -630,10 +643,10 @@ async function main() {
       'install-prior-v4.1',
       'bash',
       [
-        join(previousRoot, 'scripts/install-host.sh'),
+        bashPath(join(previousRoot, 'scripts/install-host.sh')),
         '--host=generic',
         '--mode=copy',
-        `--dest=${previous}`,
+        `--dest=${bashPath(previous)}`,
         '--include-verification',
       ],
       output,
@@ -656,13 +669,15 @@ async function main() {
       'restored-v4.1-routing',
       'bash',
       [
-        join(
-          slot,
-          '.temari-package/verification/verify-temari/scripts/control-temari',
+        bashPath(
+          join(
+            slot,
+            '.temari-package/verification/verify-temari/scripts/control-temari',
+          ),
         ),
         'routing',
         '--dest',
-        slot,
+        bashPath(slot),
       ],
       output,
     );

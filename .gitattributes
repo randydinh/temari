@@ -1,0 +1,6 @@
+# The v4.1 projection verifies these files byte for byte on every host.
+packages/workflow-runtime/** -text
+libs/privacy/src/lib/privacy.ts -text
+libs/host-adapters/src/lib/model-transport.ts -text
+libs/host-adapters/src/lib/codex-model-driver.ts -text
+libs/host-adapters/src/lib/openai-responses-driver.ts -text
