@@ -491,8 +491,14 @@ test('installed Temari and Poteto skills expose the bundled worker guide', async
     join(output, 'skills/poteto-mode/references/codex-parallel-workers.md'),
     'utf8',
   );
-  assert.match(temariSkill, /parallel worker guide.*codex-parallel-workers\.md/);
-  assert.match(potetoSkill, /parallel worker guide.*codex-parallel-workers\.md/);
+  assert.match(
+    temariSkill,
+    /parallel worker guide.*codex-parallel-workers\.md/,
+  );
+  assert.match(
+    potetoSkill,
+    /parallel worker guide.*codex-parallel-workers\.md/,
+  );
   assert.match(guide, /bin\/codex-parallel\.mjs/);
   assert((await lstat(join(output, 'bin/codex-parallel.mjs'))).isFile());
 });
