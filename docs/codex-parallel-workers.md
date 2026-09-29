@@ -96,3 +96,15 @@ The request validates all assignments and resolves the executable before launchi
 ```
 
 Run `node --import @swc-node/register/esm-register tools/run-codex-write-workers.mts /absolute/path/to/request.json`. The JSON response contains the status, receipt path, integration checkout path, and integrated commit ID when successful. The integration checkout and per-worker clones remain under `<evidenceRoot>/<runId>` for review. A required worker failure blocks integration; an optional worker failure is recorded as a degradation and its patch is omitted. Failed verification leaves the integration checkout for inspection and produces no integration commit. The command rejects submodules, symlink edits, dirty or moved bases, overlapping ownership, and paths that target Git metadata. It does not resume interrupted external processes, apply changes back to the source checkout, or claim a real Codex smoke from fake-process tests.
+
+## Repo-local batch routing
+
+When a Temari/poteto throughput checkpoint identifies independent workers, prepare either of the existing JSON shapes above and run:
+
+```sh
+node --import @swc-node/register/esm-register tools/run-codex-parallel.mts /absolute/path/to/request.json
+```
+
+The router selects `read-only` for a homogeneous investigator/reviewer batch and `write` for a homogeneous implementer batch with typed `owns` scopes. It validates with the selected runner's parser before launching Codex and rejects mixed or ambiguous batches. A caller-provided `mode` label is rejected before any worker launches; omit it and use the existing request shape. The command prints JSON with `route`, `status`, and `receiptPath`; write results also include `integrationPath` and `integratedCommit`. Nonpassing receipts make the command exit nonzero. Inspect the receipt and, for writes, the verified integration checkout before accepting or applying the result.
+
+This router and its runners live in the source workspace. The separately installed public Temari plugin bundle does not include this command closure or its host proof, so the bundle must not advertise automatic parallel routing yet. A successful local receipt proves only that particular run.
