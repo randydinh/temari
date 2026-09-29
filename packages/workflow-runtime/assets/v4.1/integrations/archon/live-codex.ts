@@ -5,9 +5,17 @@ import { actorPermissionArguments, actorConfiguration, configurationFacts, asser
 
 import { taskBudget, type TaskId } from "./live-tasks.ts";
 import { ModelCatalog, observeRoute, type RoleSelection, type RolePlan, type ObservedRoute } from "./live-routing.ts";
+import { mask, disposePrivacySession, type PrivacyPolicy, type PrivacySession } from "./privacy.ts";
+import { createProtectedModelTransport, encodeSchemaForPrivacy, decodeSchemaForPrivacy, type PrivacyHost } from "./model-transport.ts";
+import { createCodexModelDriver, type CodexModelDriverOptions } from "./codex-model-driver.ts";
 
-export type CodexResult = { threadId: string; turnId: string; observed: ObservedRoute; final: unknown; finalText: string };
-type Request = { launch: AuthorizedLaunch; executable: string; cwd: string; model: string; reasoning: string; role: "build" | "review"; prompt: string; schema: string; lastMessage: string };
+export function createCodexModelTransport(options: CodexModelDriverOptions, host: PrivacyHost = {}) {
+  const driver = createCodexModelDriver(options);
+  return { ...createProtectedModelTransport(driver, host), preflight: driver.preflight };
+}
+
+export type CodexResult = { threadId: string; turnId: string; observed: ObservedRoute; final: unknown; finalText: string; privacyCoverage: "explicit-request-only" };
+type Request = { launch: AuthorizedLaunch; executable: string; cwd: string; model: string; reasoning: string; role: "build" | "review"; prompt: string; schema: string; lastMessage: string; promptArtifact?: string; privacyPolicy?: PrivacyPolicy };
 const outputLimits = { stdout: 8 * 1024 * 1024, stderr: 1024 * 1024, event: 512 * 1024, final: 64 * 1024 };
 
 export function codexLimits(task: TaskId) { return { ...outputLimits, timeoutMs: taskBudget(task).actorMs }; }
@@ -18,13 +26,24 @@ export function codexArguments(request: Request): string[] {
 }
 
 export async function executeCodex(request: Request, testLimits?: Partial<ReturnType<typeof codexLimits>>): Promise<CodexResult> {
+  const privacySessions: PrivacySession[] = [];
+  try {
   const limits = codexLimits(request.launch.task);
   const bound = { ...limits, ...testLimits, timeoutMs: Math.min(limits.timeoutMs, testLimits?.timeoutMs ?? limits.timeoutMs) };
   const args = codexArguments(request);
   const sessionConfiguration = actorConfiguration(request.launch);
-  const outputSchema = JSON.parse(await readFile(request.schema, "utf8"));
+  const schemaText = await readFile(request.schema, "utf8").catch(() => { throw new Error("Codex output schema could not be read"); });
+  let schema: ReturnType<typeof encodeSchemaForPrivacy>;
+  try { schema = encodeSchemaForPrivacy(JSON.parse(schemaText)); } catch { throw new Error("Invalid Codex output schema"); }
+  const prepared = mask({ prompt: request.prompt, schema }, request.privacyPolicy);
+  privacySessions.push(prepared.session);
+  if (!prepared.payload || Array.isArray(prepared.payload) || typeof prepared.payload !== "object" || !("prompt" in prepared.payload) || !("schema" in prepared.payload) || typeof prepared.payload.prompt !== "string") throw new Error("Invalid protected Codex request");
+  const protectedPrompt = prepared.payload.prompt;
+  let outputSchema: unknown;
+  try { outputSchema = decodeSchemaForPrivacy(prepared.payload.schema); } catch { throw new Error("Invalid Codex output schema"); }
+  if (request.promptArtifact) await writeFile(request.promptArtifact, protectedPrompt, { flag: "wx", mode: 0o600 }).catch(() => { throw new Error("Protected Codex prompt could not be saved"); });
   const profile = request.launch.profileArguments[1]!;
-  process.stderr.write(`${JSON.stringify({ kind: "codex-invocation", executable: request.executable, args, role: request.role, task: request.launch.task, timeoutMs: bound.timeoutMs, permissions: profile })}\n`);
+  process.stderr.write(`${JSON.stringify({ kind: "codex-invocation", role: request.role, task: request.launch.task, timeoutMs: bound.timeoutMs, privacyCoverage: "explicit-request-only" })}\n`);
   const result = await new Promise<CodexResult>((resolve, reject) => {
     const child = spawn(request.executable, args, { cwd: request.cwd, stdio: ["pipe", "pipe", "pipe"], detached: false, env: process.env });
     let finished = false; let buffer = ""; let stdoutBytes = 0; let stderrBytes = 0;
@@ -67,11 +86,11 @@ export async function executeCodex(request: Request, testLimits?: Partial<Return
           if (response.activePermissionProfile?.id !== profile || response.activePermissionProfile?.extends !== null || response.approvalPolicy !== "never" || response.cwd !== request.cwd || response.model !== request.model || response.modelProvider !== "openai" || typeof response.thread?.id !== "string" || !/^[a-zA-Z0-9-]{1,128}$/.test(response.thread.id)) throw new Error("Codex did not activate the exact actor profile/model");
           observed = observeRoute(response, request);
           threadId = response.thread.id;
-          process.stdout.write(`${JSON.stringify({ kind: "actor-started", threadId, observed, permissions: response.activePermissionProfile, instructionSources: response.instructionSources ?? [] })}\n`);
+          process.stdout.write(`${JSON.stringify({ kind: "actor-started", privacyCoverage: "explicit-request-only" })}\n`);
           send(5, "mcpServerStatus/list", { threadId, detail: "full", limit: 100 });
         } else if (message.id === 5) {
           assertDisabledMcpInventory(response, configuredMcpServers);
-          send(6, "turn/start", { threadId, model: request.model, effort: request.reasoning, permissions: profile, approvalPolicy: "never", input: [{ type: "text", text: request.prompt }], outputSchema });
+          send(6, "turn/start", { threadId, model: request.model, effort: request.reasoning, permissions: profile, approvalPolicy: "never", input: [{ type: "text", text: protectedPrompt }], outputSchema });
         } else if (message.id === 6) {
           if (!response.turn || typeof response.turn.id !== "string" || (turnId && turnId !== response.turn.id)) throw new Error("Codex returned an invalid turn identity");
           turnId = response.turn.id;
@@ -88,12 +107,17 @@ export async function executeCodex(request: Request, testLimits?: Partial<Return
       if (message.method === "error") throw new Error("Codex reported failure");
       if (["item/commandExecution/outputDelta", "item/fileChange/outputDelta"].includes(message.method)) {
         if (!started || completed || params.threadId !== threadId || params.turnId !== turnId) throw new Error("Codex output belongs to another actor turn");
-        process.stdout.write(`${JSON.stringify(message)}\n`);
+        process.stdout.write(`${JSON.stringify({ kind: "codex-progress", method: message.method })}\n`);
       }
       if (["turn/started", "turn/completed", "item/started", "item/completed"].includes(message.method)) {
         if (params.threadId !== threadId || (params.turnId && turnId && params.turnId !== turnId)) throw new Error("Codex event belongs to another actor turn");
         if (completed) throw new Error("Codex event after completed turn");
-        process.stdout.write(`${JSON.stringify(message)}\n`);
+        const item = params.item?.type === "commandExecution" ? {
+          type: "commandExecution",
+          status: ["inProgress", "completed", "failed"].includes(params.item.status) ? params.item.status : "unknown",
+          exitCode: Number.isInteger(params.item.exitCode) && params.item.exitCode >= 0 && params.item.exitCode <= 255 ? params.item.exitCode : null,
+        } : undefined;
+        process.stdout.write(`${JSON.stringify({ kind: "codex-progress", method: message.method, item })}\n`);
       }
       if (message.method === "item/started") {
         if (!started || typeof params.item?.id !== "string" || pendingItems.has(params.item.id)) throw new Error("Codex returned an invalid or duplicate pending item");
@@ -113,8 +137,11 @@ export async function executeCodex(request: Request, testLimits?: Partial<Return
         if (!started || pendingItems.size || params.turn?.id !== turnId || params.turn.status !== "completed" || params.turn.error || !Array.isArray(params.turn.items)) throw new Error("Codex turn did not complete successfully");
         const terminal = params.turn.items.at(-1);
         if (terminal?.type !== "agentMessage" || typeof terminal.text !== "string" || !terminal.text.trim() || (finalText && terminal.text !== finalText) || Buffer.byteLength(terminal.text) > bound.final) throw new Error("Codex completed without its terminal structured reply");
-        completed = true; finalText = terminal.text;
-        finalResult = { threadId, turnId, observed, finalText, final: JSON.parse(finalText) };
+        completed = true;
+        const reply = mask(JSON.parse(terminal.text), request.privacyPolicy, privacySessions);
+        privacySessions.push(reply.session);
+        finalText = JSON.stringify(reply.payload);
+        finalResult = { threadId, turnId, observed, finalText, final: reply.payload, privacyCoverage: "explicit-request-only" };
         send(7, "config/read", { cwd: request.cwd, includeLayers: true });
       }
     };
@@ -129,19 +156,22 @@ export async function executeCodex(request: Request, testLimits?: Partial<Return
           let message: unknown;
           try { message = JSON.parse(line); } catch { throw new Error("invalid Codex protocol JSON"); }
           await handle(message);
-        }).catch(error => finish(error instanceof Error ? error : new Error("invalid Codex protocol")));
+        }).catch(() => finish(new Error("Codex protocol or privacy validation failed")));
       }
       if (Buffer.byteLength(buffer) > bound.event) finish(new Error("Codex event overflow"));
     });
-    child.stderr.on("data", (chunk: Buffer) => { process.stderr.write(chunk.subarray(0, Math.max(0, bound.stderr - stderrBytes))); stderrBytes += chunk.length; if (stderrBytes > bound.stderr) finish(new Error("Codex stderr overflow")); });
-    child.on("error", error => finish(error));
+    child.stderr.on("data", (chunk: Buffer) => { stderrBytes += chunk.length; if (stderrBytes > bound.stderr) finish(new Error("Codex stderr overflow")); });
+    child.on("error", () => finish(new Error("Codex process failed")));
     child.on("exit", (code, signal) => { if (!finished) finish(new Error(`Codex exited ${code}, signal ${signal} before terminal confirmation`)); });
     child.stdin.on("error", () => finish(new Error("Codex request pipe failed")));
     send(1, "initialize", { clientInfo: { name: "temari_actor", version: "1" }, capabilities: { experimentalApi: true } });
   });
-  await writeFile(request.lastMessage, result.finalText, { flag: "wx" });
-  process.stderr.write(`${JSON.stringify({ kind: "codex-last-message", text: result.finalText })}\n`);
+  await writeFile(request.lastMessage, result.finalText, { flag: "wx", mode: 0o600 }).catch(() => { throw new Error("Protected Codex reply could not be saved"); });
+  process.stderr.write(`${JSON.stringify({ kind: "codex-last-message", privacyCoverage: result.privacyCoverage })}\n`);
   return result;
+  } finally {
+    privacySessions.forEach(disposePrivacySession);
+  }
 }
 
 export async function inspectRolePlan(executable: string, cwd: string, selection: RoleSelection): Promise<RolePlan> {

@@ -6,6 +6,10 @@ bridge.test.ts
 smoke.ts
 live.ts
 live-codex.ts
+privacy.ts
+model-transport.ts
+codex-model-driver.ts
+openai-responses-driver.ts
 live-routing.ts
 live-routing.test.ts
 live-tasks.ts

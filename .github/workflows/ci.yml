@@ -51,4 +51,8 @@ jobs:
         run: pnpm exec nx run shared-control:test --skipNxCache --skipSync --output-style=static
       - run: pnpm exec nx run knowledge:test --output-style=static
       - run: pnpm exec nx run plan-draft:test --output-style=static
+      - name: Verify model privacy boundary with synthetic data
+        run: pnpm exec nx run-many -t test -p privacy,host-adapters --parallel=1 --skipNxCache --skipSync --output-style=static
+      - name: Verify generated adapter and native compatibility without model calls
+        run: pnpm exec nx run-many -p workflow-runtime -t privacy-test privacy-native-test --parallel=1 --skipNxCache --skipSync --output-style=static
       - run: pnpm exec nx run-many -p workflow-runtime -t test check canonical-test host-session-test public-entry-test --skipNxCache --skipSync --output-style=static
