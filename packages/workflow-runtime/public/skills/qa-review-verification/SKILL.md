@@ -2,7 +2,7 @@
 name: qa-review-verification
 description: Draft or review per-ticket QA verification notes and release QA reports from requirements, source reviews, and actual execution evidence. Use for QA Review closeout, verification handoffs, and evidence audits; not for authoring reusable test cases alone or generic code review.
 metadata:
-  version: '0.5.0'
+  version: '0.6.0'
 ---
 
 # QA Review verification
@@ -67,6 +67,9 @@ QA disposition. If a context source is missing, stale, partial, or outside the
 admitted scope, name that gap and use scoped direct inspection. An indexed prior
 review cannot prove a current runtime result or resolve contradictory acceptance
 criteria.
+When a selected Registrar record or graph path is missing, stale, or misleading,
+record the source and correction needed for an authorized knowledge-maintenance
+follow-up. Do not silently keep using the bad context.
 
 For related applications, retain one small context packet per ticket or feature group:
 selected requirement and decision revisions, Registrar query and read receipts, graph
@@ -172,6 +175,10 @@ attempt or **Not run** reason, observed result, evidence, and separate Testmo ca
 run/result links. Identify passing controls and failed variants without counting a shared
 failure twice. A narrative audit, test plan, case definition, source concern, or passing
 subset does not by itself establish ticket acceptance or support moving to Done.
+Carry one stable inventory of distinct required scenarios and assess each of the eleven
+canonical QA review areas for applicability; a large scenario count is not a quota.
+If the current route or host cannot execute the full review and independent challenge,
+retain the inventory and exact blocked obligations, then report partial work honestly.
 
 When the project requires test-management records, reconcile each settled example with
 its case definition before running or revising automation. Create or update cases only
@@ -181,6 +188,10 @@ and actual run/result columns. Then select automation that asserts the promised 
 and run it on the named candidate. Record skipped tests, failed parameter rows, and
 unmapped cases. Case creation, source mapping, and a green badge never substitute for a
 current asserted result. Keep missing case or automation work visible.
+For a case correction, retain the before-image, the governing expected-result source,
+the authorized saved-field change, the readback, and any native automation association
+that needs correction. Preserve prior failed run rows as historical results; do not
+relabel them as a current product defect or erase them to make coverage look green.
 
 Check the test oracle and fixture before reporting a defect. Compare the assertion with
 the authoritative example, the real input path, candidate source, and a normal control.
@@ -192,6 +203,14 @@ a product failure. For state changes or cross-service effects, choose the smalle
 integration or deployed test that distinguishes a product defect from a bad oracle;
 retain candidate, fixture ownership, independent readback and cleanup. Repeating an
 unchanged fake does not increase confidence in its realism.
+Prefer a functional user-facing flow when it can observe the promised outcome. Use a
+service, persistence, queue, simulator, or controlled failure check when the user flow
+cannot expose the material risk. A suitable nonproduction environment can establish
+the relevant boundary; production is not automatically required. If the remaining
+check is manual, give the tester a concise run sheet with setup, actions, expected and
+failing observations, independent readback, and cleanup. Before describing a finding
+as a regression from a base branch, verify the behavior existed there; new paths on a
+release branch are not proven regressions from a base that lacks them.
 
 Label the verification boundary on every result:
 

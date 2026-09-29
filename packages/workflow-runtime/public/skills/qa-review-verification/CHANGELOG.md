@@ -1,5 +1,17 @@
 # QA verification changes
 
+## 0.6.0 — 2026-09-29
+
+- Carry the full-review scenario inventory and all eleven area decisions without
+  turning scenario count into a quota or a writing-only note into completion.
+- Prefer user-facing functional checks where suitable, with a nonproduction
+  integration or controlled failure check for behavior a UI flow cannot prove;
+  provide a runnable manual handoff when execution remains external.
+- Preserve Testmo case before-images, corrected associations, readbacks and prior
+  run history when an expected result or automation mapping was wrong.
+- Verify a baseline actually contains the behavior before claiming a regression,
+  and capture actionable Registrar/graph corrections when context is stale.
+
 ## 0.5.0 — 2026-09-29
 
 - Establish specification examples and resolve conflicting product rules before
