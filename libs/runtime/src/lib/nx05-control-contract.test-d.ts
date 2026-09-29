@@ -2,6 +2,8 @@ import type { WorkerResult } from '@temari/contracts';
 
 import type {
   Nx05ChildPublication,
+  Nx05DispatchGroup,
+  Nx05DispatchIntent,
   Nx05FileProcessAdapters,
   Nx05LeaseWitness,
   Nx05ParentCommit,
@@ -25,6 +27,18 @@ export type SharedProviderHasNoRawStores = Reject<
 
 export type ParentCommitRequiresStatus = Reject<
   Omit<Nx05ParentCommit, 'status'> extends Nx05ParentCommit ? true : false
+>;
+
+export type DispatchRequiresAssignment = Reject<
+  Omit<Nx05DispatchIntent, 'assignment'> extends Nx05DispatchIntent
+    ? true
+    : false
+>;
+
+export type DispatchGroupRequiresBound = Reject<
+  Omit<Nx05DispatchGroup, 'maxConcurrency'> extends Nx05DispatchGroup
+    ? true
+    : false
 >;
 
 type SuccessWithoutArtifactReferences = {
