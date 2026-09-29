@@ -15,6 +15,30 @@ import {
   type WorkerResult,
 } from '@temari/contracts';
 
+const GIT_ROUTING_VARIABLES = new Set([
+  'GIT_DIR',
+  'GIT_WORK_TREE',
+  'GIT_INDEX_FILE',
+  'GIT_OBJECT_DIRECTORY',
+  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+  'GIT_COMMON_DIR',
+  'GIT_NAMESPACE',
+  'GIT_CEILING_DIRECTORIES',
+  'GIT_DISCOVERY_ACROSS_FILESYSTEM',
+  'GIT_GRAFT_FILE',
+  'GIT_SHALLOW_FILE',
+  'GIT_PREFIX',
+]);
+
+function writeWorkerEnvironment(): NodeJS.ProcessEnv {
+  return Object.fromEntries(
+    Object.entries(process.env).filter(
+      ([name]) =>
+        !GIT_ROUTING_VARIABLES.has(name) && !name.startsWith('GIT_CONFIG_'),
+    ),
+  );
+}
+
 const OUTPUT_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -74,7 +98,7 @@ export async function resolveCodexExecutable(
   );
 }
 
-function promptFor(assignment: WorkerAssignment): string {
+function readOnlyPromptFor(assignment: WorkerAssignment): string {
   const { brief } = assignment;
   return [
     'You are a read-only Temari worker. Inspect the workspace and report findings. Do not edit files, run mutating commands, or send messages.',
@@ -99,9 +123,11 @@ function terminateProcess(pid: number | undefined): void {
   }
 }
 
-export async function runCodexExecWorker(
+async function executeCodexExecWorker(
   assignment: WorkerAssignment,
   options: CodexExecWorkerOptions,
+  sandbox: 'read-only' | 'workspace-write',
+  prompt: string,
 ): Promise<WorkerResult> {
   if (
     !isAbsolute(options.workspaceRoot) ||
@@ -132,7 +158,7 @@ export async function runCodexExecWorker(
     '--ignore-user-config',
     '--ephemeral',
     '--sandbox',
-    'read-only',
+    sandbox,
     '--cd',
     options.workspaceRoot,
     '--output-schema',
@@ -188,6 +214,7 @@ export async function runCodexExecWorker(
     shell: false,
     detached: process.platform !== 'win32',
     stdio: ['pipe', 'pipe', 'pipe'],
+    env: sandbox === 'workspace-write' ? writeWorkerEnvironment() : process.env,
   });
   const pid = child.pid ?? null;
   const onAbort = (): void => {
@@ -223,7 +250,7 @@ export async function runCodexExecWorker(
   child.stdin.on('error', () => {
     /* Process may exit before consuming input. */
   });
-  child.stdin.end(promptFor(assignment));
+  child.stdin.end(prompt);
   const exit = await new Promise<{
     code: number | null;
     signal: NodeJS.Signals | null;
@@ -310,4 +337,48 @@ export async function runCodexExecWorker(
   };
   assertWorkerResult(result);
   return result;
+}
+
+export interface CodexWriteOwnedPath {
+  readonly kind: 'file' | 'directory';
+  readonly path: string;
+}
+
+export interface CodexExecWriteWorkerOptions extends CodexExecWorkerOptions {
+  readonly baseCommit: string;
+  readonly owns: readonly CodexWriteOwnedPath[];
+}
+
+export function runCodexExecWorker(
+  assignment: WorkerAssignment,
+  options: CodexExecWorkerOptions,
+): Promise<WorkerResult> {
+  return executeCodexExecWorker(
+    assignment,
+    options,
+    'read-only',
+    readOnlyPromptFor(assignment),
+  );
+}
+
+export function runCodexExecWriteWorker(
+  assignment: WorkerAssignment,
+  options: CodexExecWriteWorkerOptions,
+): Promise<WorkerResult> {
+  const { brief } = assignment;
+  const ownership = options.owns
+    .map((entry) => `${entry.kind}: ${entry.path}`)
+    .join('\n');
+  const prompt = [
+    'You are a Temari implementer working in an isolated Git clone. Edit only your owned paths. Do not commit, switch branches, modify Git metadata, or send messages.',
+    `Pinned base commit: ${options.baseCommit}`,
+    `Owned paths:\n${ownership}`,
+    `Goal: ${brief.goal}`,
+    `Context: ${brief.context}`,
+    `Scope: ${brief.scope}`,
+    `Acceptance criteria:\n${brief.acceptanceCriteria.map((item) => `- ${item}`).join('\n')}`,
+    `Forbidden actions:\n${brief.forbiddenActions.map((item) => `- ${item}`).join('\n')}`,
+    'Return only JSON matching the output schema. The controller will validate your Git changes and verify the integrated result before accepting them.',
+  ].join('\n\n');
+  return executeCodexExecWorker(assignment, options, 'workspace-write', prompt);
 }
