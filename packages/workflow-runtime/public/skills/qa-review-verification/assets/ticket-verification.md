@@ -54,8 +54,8 @@ for other change types. Preserve missing evidence explicitly; proposed checks ar
 
 ## Test cases and execution links
 
-| Ticket and scenario | Case and revision | Automation and asserted subset | Actual run/result | Remaining coverage |
-| ------------------- | ----------------- | ------------------------------ | ----------------- | ------------------ |
+| Ticket and scenario                    | Case and revision                                                               | Automation and asserted subset                                                  | Actual run/result                                                                  | Remaining coverage                         |
+| -------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------ |
 | {{ticket link + required scenario ID}} | {{Testmo project/repository + case link/revision + saved readback, or missing}} | {{test identity/revision, native link status and exact assertions, or missing}} | {{run/result link + candidate/date, including skipped or failed rows; or not run}} | {{manual/integration paths and ownership}} |
 
 Case existence, approval, automation mapping and execution status are separate facts.
