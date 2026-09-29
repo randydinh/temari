@@ -1,5 +1,14 @@
 # QA verification changes
 
+## 0.3.3 — 2026-09-29
+
+- Ask for source-backed Content Registrar records and an available codebase graph
+  before deriving ticket or implementation context. Preserve their provenance and
+  gaps, and check material behavior against the selected candidate and authoritative
+  product requirement.
+- Keep indexed QA summaries and graph relationships as navigation, not acceptance
+  or runtime proof.
+
 ## 0.3.2 — 2026-09-29
 
 - Write Verified Behavior as concise, observable outcomes, grouped by area where useful;

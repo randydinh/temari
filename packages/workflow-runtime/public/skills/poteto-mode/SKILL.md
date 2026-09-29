@@ -17,6 +17,11 @@ This supporting writer also handles evidence-only local drafts; it does not admi
 QA execution or convert a document into a runtime receipt. Test-case authoring
 alone, code review, and defect repair retain their existing owners.
 
+For work on an existing codebase, apply the [Temari codebase-context intake](../temari/SKILL.md)
+before broad investigation. Registrar and graph results guide source selection; current
+candidate code and requirements establish behavior. Retain an explicit gap when a
+configured context source is unavailable or stale.
+
 1. Read `policy.json` from the installed bundle root and announce the selected route briefly.
 2. Admit the pinned `lightweight-engineering-v1` mapping only when every source route condition is true. A trusted `full-playbook`/`feature-v1` start requires host proof from a read-only architect, scoped builder, independent reviewer, and forge access. Preserve all six canonical stages.
 3. The source final, commit, and review boundaries include every requirement for the selected profile. Feature delivery requires an open pull request at the verified integration commit. Publish requires separate operator approval. A PASS receipt does not grant it.

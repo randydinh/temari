@@ -2,7 +2,7 @@
 name: qa-review-verification
 description: Draft or review per-ticket QA verification notes and release QA reports from requirements, source reviews, and actual execution evidence. Use for QA Review closeout, verification handoffs, and evidence audits; not for authoring reusable test cases alone or generic code review.
 metadata:
-  version: '0.3.2'
+  version: '0.3.3'
 ---
 
 # QA Review verification
@@ -46,6 +46,20 @@ even when a useful draft can be produced.
 A reusable test case defines future verification; a run result records an attempt;
 a ticket note interprets evidence. Keep these identities distinct. Use an existing
 case-authoring skill when actual case drafting is requested.
+
+## Establish the product and codebase context
+
+Before deriving an expected result, search the configured Content Registrar for the
+ticket's requirements, product behavior, and prior decisions; read the relevant
+source-backed records rather than relying on a search snippet or an indexed QA
+summary. Query an available knowledge graph for the affected code paths and related
+applications, then follow its source locations into the selected candidate. Record
+the Registrar source/revision and graph snapshot or freshness limit beside the
+requirements they informed. The ticket and authoritative product decision define
+the expected business behavior; source and graph explain implementation, not the
+oracle. If a context source is missing, stale, partial, or outside the admitted
+scope, name that gap and use scoped direct inspection. An indexed prior review
+cannot prove a current runtime result or resolve contradictory acceptance criteria.
 
 ## Present behavior clearly
 
