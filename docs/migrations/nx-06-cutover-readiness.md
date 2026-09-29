@@ -26,6 +26,8 @@ The runner refuses an existing output path. It rejects symlinks and unexpected a
 
 The packaged v4.1 `install-host.sh --mode=copy` creates only the fresh `previous-projection` destination and copies package files there. It can move existing entries into `.temari-backups`, so the runner asserts that the destination does not exist and that no backup directory appears. The later `control-temari routing --dest` reads the restored package and projection; its `routing` path writes no files. The runner checks that all swap targets are absent before copying or renaming. These claims come from inspection of the packaged scripts at the two manifest digests above and the retained command output. They are not a general audit of other commands in the v4.1 verifier.
 
+The current runner resolves the output parent before creating scratch files and rejects an output redirected into either artifact through a symlink. The matrix checker verifies structure and local artifact consistency only. It always refuses `--release` because this report cannot independently verify row proofs or external gates.
+
 ## Observed evidence
 
 The local host was macOS `darwin` `arm64`, release `25.5.0`, with Node `v26.9.0` and pnpm `11.25.0`. The public outer manifest SHA-256 was `9f66bbea01cfb5a11307afadcf2cd1787992c900be58571bd2bebd4e43170bed`. Its source revision was `b13068842976a1996da5a65480e3e2843b65a29f`, `dirty: false`, with 81 packaged files and the `temari`, `poteto-mode`, and `closeout` entries. The v4.1 distribution manifest SHA-256 was `209155eb2ca2280cd2494936a0c9dcfb4d534b1dc145085e14517410b0caabde`; it declares portable source revision `959c8f7be3d7b684207d9e626263d41540d5ecdc`.

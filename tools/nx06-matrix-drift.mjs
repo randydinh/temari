@@ -93,27 +93,21 @@ assert.equal(
   report.rollback.previousProjectionSha256,
 );
 assert.equal(report.gates.localPreparatoryRehearsal, 'PASS');
-const missingProof = expectedIds.filter((id) => {
-  const proof = report.rowProofs?.[id];
-  return proof?.status !== 'PASS' || !proof.evidence;
-});
-const openGates = [
-  'qa',
-  'privacy',
-  'sharedService',
-  'secondHost',
-  'cutover',
-].filter((name) => report.gates[name] !== 'PASS');
-const releaseReady = missingProof.length === 0 && openGates.length === 0;
+// This checker validates structure and local artifact consistency only. The
+// rehearsal report is writable JSON, so its row and external-gate claims cannot
+// establish independent release evidence.
+const missingProof = expectedIds;
+const openGates = ['qa', 'privacy', 'sharedService', 'secondHost', 'cutover'];
 console.log(
   JSON.stringify({
     candidateSha: report.candidateSha,
     matrixRows: rows.length,
     inventory: 'PASS',
     structure: 'PASS',
-    release: releaseReady ? 'READY_FOR_OPERATOR_REVIEW' : 'BLOCKED',
+    release: 'BLOCKED',
+    reason: 'external-proof-not-verified',
     missingProof,
     openGates,
   }),
 );
-if (values.release && !releaseReady) process.exitCode = 2;
+if (values.release) process.exitCode = 2;

@@ -7,11 +7,20 @@ import {
   mkdir,
   readFile,
   readdir,
+  realpath,
   rename,
   writeFile,
 } from 'node:fs/promises';
 import { arch, platform, release, tmpdir } from 'node:os';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from 'node:path';
 import { createInterface } from 'node:readline';
 import { parseArgs } from 'node:util';
 
@@ -413,9 +422,17 @@ async function main() {
   assert(/^[a-f0-9]{40}$/.test(values['candidate-sha'] ?? ''));
   const publicRoot = resolve(values['public-artifact']);
   const previousRoot = resolve(values['previous-artifact']);
-  const output = resolve(values.output);
-  assert(!within(publicRoot, output) && !within(previousRoot, output));
-  assert(!within(output, publicRoot) && !within(output, previousRoot));
+  const requestedOutput = resolve(values.output);
+  const output = resolve(
+    await realpath(dirname(requestedOutput)),
+    basename(requestedOutput),
+  );
+  const [publicRealRoot, previousRealRoot] = await Promise.all([
+    realpath(publicRoot),
+    realpath(previousRoot),
+  ]);
+  assert(!within(publicRealRoot, output) && !within(previousRealRoot, output));
+  assert(!within(output, publicRealRoot) && !within(output, previousRealRoot));
   await assertAbsent(output);
   await mkdir(output);
   const nx06Temporary = join(output, 'nx06-temporary');
