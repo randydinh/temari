@@ -4,6 +4,52 @@ This record is for the maintainer who resumes the migration. Read the current
 Git state and pull requests before acting. A checked implementation item does
 not replace acceptance evidence from the installed product.
 
+## NX-04 continuation — 2026-09-29
+
+The isolated privacy branch has integrated current main through merged PR #78.
+It retains the provider-neutral protected transport and adds an optional direct
+Responses driver. The direct driver has synthetic HTTP, host-boundary, and
+relocated Archon evidence; it has not made a credentialed model request. The
+Codex CLI driver still refuses its installed runtime preflight. Keep live
+private use blocked until the selected provider/model path has a credentialed
+canary, independent egress review, and operator approval. PR #58 remains draft
+while these gates are open. The original dirty source checkout is unchanged.
+
+## NX-04 privacy integration handoff — 2026-09-28
+
+The privacy source is on the isolated
+`codex/nx04-privacy-integration-20260928` branch and draft
+[PR #58](https://github.com/randydinh/temari/pull/58). The original transfer
+milestone was `93c3786`; independent reviews of `c42956a` then failed on
+schema-key callback swaps and bracketed credential leaks. Repair `39971e5`
+preserves encoded key identity and masks or rejects bracketed credentials.
+The branch integrated PR 57 at `dd9d197` and PR 59 from main
+`c3e3d6b57d3dd085821c400d8c4ec69936ee70fe` by normal merge
+`585ff24136f08420fd73b99736fd334d91779821`. The dirty
+`/Users/randydinh/source/projects/temari-next` checkout remains read-only.
+The [NX-04 handoff](./nx-04-privacy-handoff.md) records the key-order premise,
+source and installed tests, generated copy, old CI evidence, and release gate.
+
+The review of `4067c11` then found a free-text Basic authorization leak across
+three model channels. Red `a4db61f` reproduced it in source and relocated
+Archon tests; green `1fb4c51` repaired the detector and regenerated provenance.
+The green commit passed uncached source, packaged transport, installed public
+entry, contracts, native Archon, host-session, canonical, and inventory checks.
+Windows run 36435012839 attempt 1 failed at a test-file marker after 25 named
+passes; attempt 2 passed at the same SHA. Linux run 36435018521 passed at that
+older SHA. The Windows failure's cause is unknown. The branch is held for
+fresh exact-head CI and independent review, with no merge or private-use
+approval.
+
+Linux run 36433849656 and Windows run 36433840630 passed for the pre-PR59
+head `79b88adc1e6497f038465427a0b20c8a6d4b060c`. At the PR59 merge
+commit, seven-project typecheck/test, installed public closeout, privacy,
+host-session and Archon package journeys passed locally. Final-head CI and a
+new independent review remain pending. The real installed Codex preflight
+refused `runtime-version` before credentials. Keep private use blocked pending
+compatible runtime isolation, independent review, and explicit operator
+cutover approval.
+
 ## Deferred evaluation
 
 - [ ] Run the [independent QA output comparison](./qa-output-comparison.md)
@@ -13,6 +59,10 @@ not replace acceptance evidence from the installed product.
       v4.1 retirement gate.
 
 ## NX-02 installed closeout handoff — 2026-09-28
+
+PR #59 merged into main at
+`c3e3d6b57d3dd085821c400d8c4ec69936ee70fe`, carrying head `c47f637`.
+The following account records its earlier review and repair checkpoints.
 
 Independent review rejected PR #59 at `20b06fc` after a rehashed six-stage
 receipt with a changed review plan returned `candidate-verified`. The branch
@@ -63,8 +113,9 @@ manifest SHA-256
 `bc96a4580193287c4b0bfd2d1727c206273efeecfdfef1d2d7f072846d2a9a5f`.
 Its direct checker and a stock-Node installed closeout observation both exited 0.
 
-Draft [PR #59](https://github.com/randydinh/temari/pull/59) is open for an
-independent verifier; a later documentation head still needs its own CI result.
+At the implementation checkpoint, draft
+[PR #59](https://github.com/randydinh/temari/pull/59) awaited independent
+verification. Its later merge is recorded above.
 
 The retained native NX-01 run at `/private/tmp/temari-channel-native.GrZvzP`
 remains untouched. Its pinned canonical manifest
@@ -75,9 +126,12 @@ against the original run exited 1 at that exact manifest mismatch, with the
 run/candidate file-hash aggregate unchanged before and after. Independent
 review, exact-head CI, Windows installed-entry coverage, independent product
 QA, shared-service recovery, and operator approval for cutover remain open.
-No merge is requested from this worker.
+No merge was requested from the NX-02 implementation worker at that checkpoint.
 
 ## NX-01 source channel handoff — 2026-09-28
+
+This historical checkpoint predates the PR #56 merge. The NX-04 section above
+points to the current privacy integration handoff.
 
 Branch `codex/nx-installed-journey-20260928` in the exclusive
 `/private/tmp/temari-nx-installed-20260928` worktree starts from

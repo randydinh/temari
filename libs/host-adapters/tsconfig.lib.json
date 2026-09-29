@@ -9,5 +9,8 @@
     "types": ["node"]
   },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../contracts/tsconfig.lib.json" }]
+  "references": [
+    { "path": "../contracts/tsconfig.lib.json" },
+    { "path": "../privacy/tsconfig.lib.json" }
+  ]
 }
