@@ -21,3 +21,13 @@
 - The `nx-generate` skill handles generator discovery internally - don't call nx_docs just to look up generator syntax
 
 <!-- nx configuration end-->
+
+## Local Codex parallel batches
+
+At the Temari/poteto throughput checkpoint, prepare an existing read-only or write request JSON for an independent, homogeneous batch. From the workspace root, invoke the router with one positional request path:
+
+```sh
+node --import @swc-node/register/esm-register tools/run-codex-parallel.mts /absolute/path/to/request.json
+```
+
+Give write implementers disjoint typed scopes, a clean pinned base, and combined verification. The router selects by assignment structure, rejects mixed batches, and returns the selected route and receipt. Review the receipt and integration checkout before accepting work. This is a source-workspace command; do not claim it is available in the installed public plugin bundle.
