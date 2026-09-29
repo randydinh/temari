@@ -37,6 +37,11 @@ const publicFiles = [
   ['packages/workflow-runtime/host/source.mjs', 'host/source.mjs'],
   ['packages/workflow-runtime/host/invocation.mjs', 'host/invocation.mjs'],
   ['packages/workflow-runtime/host/closeout.mjs', 'host/closeout.mjs'],
+  ['packages/workflow-runtime/host/forge.mjs', 'host/forge.mjs'],
+  [
+    'packages/workflow-runtime/host/feature-proof.mjs',
+    'host/feature-proof.mjs',
+  ],
   ['packages/workflow-runtime/host/local-worker.mjs', 'host/local-worker.mjs'],
   [
     'packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbook-contracts/v1/lightweight-engineering.json',
@@ -45,6 +50,14 @@ const publicFiles = [
   [
     'packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/lightweight-engineering.md',
     'source/lightweight-engineering.md',
+  ],
+  [
+    'packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbook-contracts/v1/feature.json',
+    'source/feature.json',
+  ],
+  [
+    'packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/feature.md',
+    'source/feature.md',
   ],
   [
     'packages/workflow-runtime/public/bin/public-entry.mjs',
@@ -169,7 +182,7 @@ function expectedPublicPaths(files) {
 
 function assertPolicy(policy) {
   assert.equal(policy.schemaVersion, 1);
-  assert.equal(policy.policyId, 'temari-public-lightweight-v1');
+  assert.equal(policy.policyId, 'temari-public-feature-v2');
   assert.deepEqual(Object.keys(policy.entries).sort(), [...entries].sort());
   for (const entry of ['temari', 'poteto-mode']) {
     assert.equal(
@@ -180,6 +193,14 @@ function assertPolicy(policy) {
       policy.entries[entry].supportedProfile,
       'lightweight-engineering-v1',
     );
+    assert.deepEqual(policy.entries[entry].supportedRoutes, [
+      'lightweight-engineering',
+      'full-playbook',
+    ]);
+    assert.deepEqual(policy.entries[entry].supportedProfiles, [
+      'lightweight-engineering-v1',
+      'feature-v1',
+    ]);
   }
   assert.equal(policy.entries.closeout.supportedRoute, null);
   assert.equal(policy.lightweight.source.family, 'v4.1');

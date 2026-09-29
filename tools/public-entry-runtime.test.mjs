@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFile, execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
 import {
   chmod,
   cp,
@@ -361,6 +362,7 @@ process.stdin.on('end', () => {
     fs.writeFileSync(final, JSON.stringify({status:'PASS',summary:id}));
   }, 150);
 });
+
 `,
     );
     await chmod(executable, 0o755);
@@ -470,7 +472,11 @@ process.stdin.on('end', () => {
     assert.equal(receipt.workerReceipt.peakConcurrency, 2);
     assert.equal(receipt.verification[0].code, 0);
 
-    const { runLocalHostWorker, runLocalFeatureWorkerPair } = await import(
+    const {
+      runLocalHostWorker,
+      runLocalFeatureWorkerPair,
+      verifyLocalFeatureWorkerPair,
+    } = await import(
       pathToFileURL(join(artifact, 'host/local-worker.mjs')).href
     );
     const hostInput = {
@@ -480,7 +486,7 @@ process.stdin.on('end', () => {
       evidenceRoot: join(root, 'evidence'),
       baseCommit,
       executable,
-      timeoutMs: 5000,
+      timeoutMs: 15000,
       assignment: {
         id: 'host-reviewer',
         role: 'reviewer',
@@ -668,7 +674,7 @@ process.stdin.on('end', () => {
     assert.equal(publicResult.status, 'PASS');
     assert.deepEqual(publicResult.hostBinding, {
       entry: 'temari',
-      policyId: 'temari-public-lightweight-v1',
+      policyId: 'temari-public-feature-v2',
       requestSha256: createHash('sha256')
         .update(publicWorkerBytes)
         .digest('hex'),
@@ -677,6 +683,19 @@ process.stdin.on('end', () => {
     assert.notEqual(publicResult.builder.pid, publicResult.reviewer.pid);
     assert.equal(
       publicResult.reviewer.candidate.baseCommit,
+      publicResult.integratedCommit,
+    );
+    const retainedPair = {
+      runId: publicWorkerRequest.runId,
+      revision: publicWorkerRequest.revision,
+      candidateRoot: repo,
+      evidenceRoot: join(root, 'evidence'),
+      baseCommit,
+      hostBinding: publicResult.hostBinding,
+      reportSha256: publicResult.reportSha256,
+    };
+    assert.equal(
+      (await verifyLocalFeatureWorkerPair(retainedPair)).integratedCommit,
       publicResult.integratedCommit,
     );
     const wrongDigest = [...publicWorkerArgs];
@@ -710,9 +729,539 @@ process.stdin.on('end', () => {
       /Request has unknown or missing fields/,
     );
     await assert.rejects(lstat(join(root, 'evidence', 'public-spoofed-pair')));
+    const retainedBuilder = JSON.parse(
+      await readFile(publicResult.builder.observationPath, 'utf8'),
+    );
+    await writeFile(retainedBuilder.process.path, 'tampered');
+    await assert.rejects(
+      verifyLocalFeatureWorkerPair(retainedPair),
+      /Expected values to be strictly equal/,
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('host forge gate observes repository access and exact pull-request head', async (t) => {
+  if (process.platform === 'win32')
+    return t.skip('The fake gh fixture is a POSIX executable script.');
+  const root = await mkdtemp(join(tmpdir(), 'temari-forge-'));
+  try {
+    const artifact = join(root, 'artifact');
+    await cp(output, artifact, { recursive: true });
+    const repo = join(root, 'repo');
+    execFileSync('git', ['init', '-q', repo]);
+    execFileSync('git', [
+      '-C',
+      repo,
+      'remote',
+      'add',
+      'origin',
+      'git@github.com:test/repo.git',
+    ]);
+    const fakeGh = join(root, 'gh');
+    await writeFile(
+      fakeGh,
+      `#!/usr/bin/env node
+const args = process.argv.slice(2).join(' ');
+if (args === 'api user --jq .login') console.log('test-user');
+else if (args === 'api repos/test/repo') console.log(JSON.stringify({full_name:'test/repo',html_url:'https://github.com/test/repo',permissions:{push:true}}));
+else if (args === 'api repos/test/repo/pulls/7') console.log(JSON.stringify({html_url:'https://github.com/test/repo/pull/7',base:{repo:{full_name:'test/repo'}},head:{sha:'${'a'.repeat(40)}'},state:'open'}));
+else process.exit(3);
+`,
+    );
+    await chmod(fakeGh, 0o755);
+    const moduleUrl = pathToFileURL(join(artifact, 'host/forge.mjs')).href;
+    const runForge = (commit, expectedCode = 0) =>
+      childResult(
+        [
+          '--input-type=module',
+          '-e',
+          `import {observeLocalForge,verifyLocalPullRequest} from '${moduleUrl}'; const proof=observeLocalForge(process.argv[1]); console.log(JSON.stringify(verifyLocalPullRequest(proof,process.argv[2],'https://github.com/test/repo/pull/7')));`,
+          repo,
+          commit,
+        ],
+        expectedCode,
+        { PATH: `${root}:${process.env.PATH}` },
+      );
+    const result = JSON.parse((await runForge('a'.repeat(40))).stdout);
+    assert.equal(result.status, 'proven');
+    assert.equal(result.integratedCommit, 'a'.repeat(40));
+    assert.match(
+      (await runForge('b'.repeat(40), 1)).stderr,
+      /Pull request head differs from the integrated commit/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('feature host proof requires architect, builder, reviewer, and forge evidence', async (t) => {
+  if (process.platform === 'win32')
+    return t.skip('The fake host tools are POSIX executable scripts.');
+  const root = await mkdtemp(join(tmpdir(), 'temari-feature-proof-'));
+  try {
+    const artifact = join(root, 'artifact');
+    await cp(output, artifact, { recursive: true });
+    const repo = join(root, 'repo');
+    execFileSync('git', ['init', '-q', repo]);
+    execFileSync('git', ['config', 'user.name', 'Test'], { cwd: repo });
+    execFileSync('git', ['config', 'user.email', 'test@localhost'], {
+      cwd: repo,
+    });
+    await writeFile(join(repo, 'README.md'), 'base\n');
+    execFileSync('git', ['add', 'README.md'], { cwd: repo });
+    execFileSync('git', ['commit', '-qm', 'base'], { cwd: repo });
+    execFileSync('git', [
+      '-C',
+      repo,
+      'remote',
+      'add',
+      'origin',
+      'git@github.com:test/repo.git',
+    ]);
+    const baseCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: repo,
+      encoding: 'utf8',
+    }).trim();
+    const evidenceRoot = join(root, 'evidence');
+    await mkdir(evidenceRoot);
+    const fakeGh = join(root, 'gh');
+    await writeFile(
+      fakeGh,
+      `#!/usr/bin/env node
+const args = process.argv.slice(2).join(' ');
+if (args === 'api user --jq .login') console.log('test-user');
+else if (args === 'api repos/test/repo') console.log(JSON.stringify({full_name:'test/repo',html_url:'https://github.com/test/repo',permissions:{push:true}}));
+else process.exit(3);
+`,
+    );
+    await chmod(fakeGh, 0o755);
+    const executable = join(root, 'fake-codex');
+    await writeFile(
+      executable,
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+const final = args[args.indexOf('--output-last-message') + 1];
+const sandbox = args[args.indexOf('--sandbox') + 1];
+let prompt = '';
+process.stdin.on('data', chunk => prompt += chunk);
+process.stdin.on('end', () => {
+  const id = prompt.match(/Goal: ([A-Za-z]+)/)?.[1] ?? 'unknown';
+  if (sandbox === 'workspace-write') fs.writeFileSync(id + '.txt', id + '\\n');
+  fs.writeFileSync(final, JSON.stringify({status:'PASS',summary:id}));
+});
+`,
+    );
+    await chmod(executable, 0o755);
+    const brief = (id) => ({
+      goal: id,
+      context: 'feature proof test',
+      scope: id,
+      acceptanceCriteria: ['produce result'],
+      verificationCommand: null,
+      reportFormat: 'json',
+      forbiddenActions: ['stay in scope'],
+    });
+    const hostBinding = {
+      entry: 'temari',
+      policyId: 'temari-public-feature-v2',
+      requestSha256: 'a'.repeat(64),
+      manifestSha256: manifestSha256(manifest),
+    };
+    const input = {
+      runId: 'feature-proof',
+      revision: 'selected-revision',
+      candidateRoot: repo,
+      evidenceRoot,
+      baseCommit,
+      executable,
+      timeoutMs: 5000,
+      hostBinding,
+      architect: {
+        id: 'architect',
+        role: 'investigator',
+        required: true,
+        brief: brief('design'),
+      },
+      builder: {
+        id: 'builder',
+        role: 'implementer',
+        required: true,
+        brief: brief('delta'),
+      },
+      owns: [{ kind: 'file', path: 'delta.txt' }],
+      verify: [
+        {
+          program: process.execPath,
+          args: [
+            '-e',
+            "if(!require('fs').existsSync('delta.txt'))process.exit(5)",
+          ],
+        },
+      ],
+      reviewer: {
+        id: 'reviewer',
+        role: 'reviewer',
+        required: true,
+        brief: brief('review'),
+      },
+    };
+    const moduleUrl = pathToFileURL(
+      join(artifact, 'host/feature-proof.mjs'),
+    ).href;
+    const requestPath = join(root, 'feature-input.json');
+    await writeFile(requestPath, JSON.stringify(input));
+    const script = `import {readFileSync} from 'node:fs'; import {runLocalFeatureHostProof,verifyLocalFeatureHostProof} from '${moduleUrl}'; const input=JSON.parse(readFileSync(process.argv[1],'utf8')); const result=process.argv[2]==='run' ? await runLocalFeatureHostProof(input) : await verifyLocalFeatureHostProof(input); console.log(JSON.stringify(result));`;
+    const call = (mode, path, code = 0) =>
+      childResult(['--input-type=module', '-e', script, path, mode], code, {
+        PATH: `${root}:${process.env.PATH}`,
+      });
+    const proof = JSON.parse((await call('run', requestPath)).stdout);
+    assert.equal(proof.status, 'proven');
+    assert.equal(
+      new Set([proof.architect.pid, proof.integratedCommit]).size,
+      2,
+    );
+    const verifyInput = {
+      runId: input.runId,
+      revision: input.revision,
+      candidateRoot: repo,
+      evidenceRoot,
+      baseCommit,
+      hostBinding,
+      proofSha256: proof.proofSha256,
+    };
+    const verifyPath = join(root, 'verify-input.json');
+    await writeFile(verifyPath, JSON.stringify(verifyInput));
+    assert.equal(
+      JSON.parse((await call('verify', verifyPath)).stdout).integratedCommit,
+      proof.integratedCommit,
+    );
+    await writeFile(proof.architect.observationPath, 'tampered');
+    assert.match(
+      (await call('verify', verifyPath, 1)).stderr,
+      /Expected values to be strictly equal/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('full feature start binds local host proof to six persisted stages', async (t) => {
+  if (process.platform === 'win32')
+    return t.skip('The fake host tools are POSIX executable scripts.');
+  const root = await mkdtemp(join(tmpdir(), 'temari-feature-start-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const artifact = join(root, 'artifact');
+  await cp(output, artifact, { recursive: true });
+  const candidate = join(root, 'candidate');
+  execFileSync('git', ['init', '-q', candidate]);
+  execFileSync('git', ['config', 'user.name', 'Test'], { cwd: candidate });
+  execFileSync('git', ['config', 'user.email', 'test@localhost'], {
+    cwd: candidate,
+  });
+  await writeFile(join(candidate, 'README.md'), 'base\n');
+  execFileSync('git', ['add', 'README.md'], { cwd: candidate });
+  execFileSync('git', ['commit', '-qm', 'base'], { cwd: candidate });
+  execFileSync('git', [
+    '-C',
+    candidate,
+    'remote',
+    'add',
+    'origin',
+    'git@github.com:test/repo.git',
+  ]);
+  const baseCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
+    cwd: candidate,
+    encoding: 'utf8',
+  }).trim();
+  const evidenceRoot = join(root, 'worker-evidence');
+  await mkdir(evidenceRoot);
+  const integrationPath = join(
+    evidenceRoot,
+    'feature-start-workers',
+    'build',
+    'feature-start-workers-build',
+    'integration',
+  );
+  const fakeGh = join(root, 'gh');
+  await writeFile(
+    fakeGh,
+    `#!/usr/bin/env node
+const {execFileSync} = require('node:child_process');
+const args = process.argv.slice(2).join(' ');
+if (args === 'api user --jq .login') console.log('test-user');
+else if (args === 'api repos/test/repo') console.log(JSON.stringify({full_name:'test/repo',html_url:'https://github.com/test/repo',permissions:{push:true}}));
+else if (args === 'api repos/test/repo/pulls/7') console.log(JSON.stringify({html_url:'https://github.com/test/repo/pull/7',base:{repo:{full_name:'test/repo'}},head:{sha:execFileSync('git',['-C',process.env.FAKE_INTEGRATION_PATH,'rev-parse','HEAD'],{encoding:'utf8'}).trim()},state:'open'}));
+else process.exit(3);
+`,
+  );
+  await chmod(fakeGh, 0o755);
+  const fakeCodex = join(root, 'codex');
+  await writeFile(
+    fakeCodex,
+    `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+const final = args[args.indexOf('--output-last-message') + 1];
+const sandbox = args[args.indexOf('--sandbox') + 1];
+let prompt = '';
+process.stdin.on('data', chunk => prompt += chunk);
+process.stdin.on('end', () => {
+  const id = prompt.match(/Goal: ([A-Za-z]+)/)?.[1] ?? 'unknown';
+  if (sandbox === 'workspace-write') fs.writeFileSync(id + '.txt', id + '\\n');
+  fs.writeFileSync(final, JSON.stringify({status:'PASS',summary:id}));
+});
+`,
+  );
+  await chmod(fakeCodex, 0o755);
+  const brief = (id) => ({
+    goal: id,
+    context: 'feature lifecycle test',
+    scope: id,
+    acceptanceCriteria: ['produce result'],
+    verificationCommand: null,
+    reportFormat: 'json',
+    forbiddenActions: ['stay in scope'],
+  });
+  const runDirectory = join(root, 'run');
+  const featureRequest = {
+    ...request('temari'),
+    invocation: {
+      runId: 'feature-start',
+      revision: 'selected-feature',
+      candidate: { scopeId: 'feature-candidate', root: candidate },
+      runDirectory,
+    },
+    featureWorkers: {
+      evidenceRoot,
+      baseCommit,
+      timeoutMs: 5000,
+      architect: {
+        id: 'architect',
+        role: 'investigator',
+        required: true,
+        brief: brief('design'),
+      },
+      builder: {
+        id: 'builder',
+        role: 'implementer',
+        required: true,
+        brief: brief('delta'),
+      },
+      owns: [{ kind: 'file', path: 'delta.txt' }],
+      verify: [
+        {
+          program: process.execPath,
+          args: [
+            '-e',
+            "if(!require('fs').existsSync('delta.txt'))process.exit(5)",
+          ],
+        },
+      ],
+      reviewer: {
+        id: 'reviewer',
+        role: 'reviewer',
+        required: true,
+        brief: brief('review'),
+      },
+    },
+  };
+  const requestBytes = Buffer.from(JSON.stringify(featureRequest));
+  const requestPath = join(root, 'request.json');
+  await writeFile(requestPath, requestBytes);
+  const launch = (mode) => {
+    const child = spawn(
+      process.execPath,
+      [
+        join(artifact, 'bin/temari.mjs'),
+        mode,
+        '--request',
+        requestPath,
+        '--expected-request-sha256',
+        digest(requestBytes),
+        '--expected-manifest-sha256',
+        manifestSha256(manifest),
+      ],
+      {
+        cwd: root,
+        env: {
+          ...process.env,
+          PATH: `${root}:${process.env.PATH}`,
+          FAKE_INTEGRATION_PATH: integrationPath,
+          NODE_OPTIONS: '',
+          NODE_PATH: '',
+        },
+        stdio: ['pipe', 'pipe', 'pipe'],
+      },
+    );
+    let buffer = '';
+    let stderr = '';
+    const messages = [];
+    let waiter;
+    child.stderr.setEncoding('utf8').on('data', (part) => (stderr += part));
+    child.stdout.setEncoding('utf8').on('data', (part) => {
+      buffer += part;
+      let end;
+      while ((end = buffer.indexOf('\n')) >= 0) {
+        const message = JSON.parse(buffer.slice(0, end));
+        buffer = buffer.slice(end + 1);
+        if (waiter) {
+          clearTimeout(waiter.timer);
+          waiter.resolve(message);
+          waiter = undefined;
+        } else messages.push(message);
+      }
+    });
+    const done = new Promise((resolve, reject) => {
+      child.once('error', reject);
+      child.once('close', (code) => resolve(code));
+    });
+    t.after(async () => {
+      if (child.exitCode === null) child.kill('SIGKILL');
+      await done;
+    });
+    return {
+      child,
+      done,
+      stderr: () => stderr,
+      next: async () => {
+        if (messages.length) return messages.shift();
+        return new Promise((resolve, reject) => {
+          waiter = {
+            resolve,
+            reject,
+            timer: setTimeout(
+              () => reject(new Error(`Feature stage timeout: ${stderr}`)),
+              15000,
+            ),
+          };
+        });
+      },
+    };
+  };
+  let session = launch('start');
+  let resumed = false;
+  const seen = [];
+  while (true) {
+    const message = await session.next();
+    if (message.type === 'complete') {
+      assert.equal(message.status, 'PASS', session.stderr());
+      break;
+    }
+    if (message.type !== 'stage') continue;
+    if (message.stage === 'plan' && !resumed) {
+      session.child.kill('SIGKILL');
+      await session.done;
+      session = launch('resume');
+      resumed = true;
+      continue;
+    }
+    seen.push(message.stage);
+    const sourceRequired = ['investigate', 'plan', 'deliver'].includes(
+      message.stage,
+    );
+    await writeFile(
+      join(message.workspace, 'observation.txt'),
+      `stage ${message.stage}\n`,
+    );
+    if (sourceRequired)
+      await writeFile(
+        join(message.workspace, 'source.txt'),
+        message.stage === 'deliver'
+          ? JSON.stringify({
+              pullRequestUrl: 'https://github.com/test/repo/pull/7',
+            })
+          : `documented ${message.stage}\n`,
+      );
+    await writeFile(
+      join(message.workspace, 'host-result.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        sessionId: message.sessionId,
+        requestId: message.requestId,
+        stage: message.stage,
+        status: 'PASS',
+        summary: `feature ${message.stage} complete`,
+        evidence: [
+          {
+            name: 'observation',
+            kind: 'verification',
+            path: 'observation.txt',
+          },
+          ...(sourceRequired
+            ? [{ name: 'source', kind: 'other', path: 'source.txt' }]
+            : []),
+        ],
+      }),
+    );
+    session.child.stdin.write(
+      JSON.stringify({
+        type: 'result',
+        sessionId: message.sessionId,
+        requestId: message.requestId,
+        stage: message.stage,
+      }) + '\n',
+    );
+  }
+  assert.equal(await session.done, 0, session.stderr());
+  assert(resumed, 'Feature lifecycle did not resume.');
+  assert.deepEqual(seen, [
+    'investigate',
+    'plan',
+    'build',
+    'review',
+    'verify',
+    'deliver',
+  ]);
+  assert.equal(
+    execFileSync('git', ['-C', candidate, 'rev-parse', 'HEAD'], {
+      encoding: 'utf8',
+    }).trim(),
+    baseCommit,
+  );
+  const descriptor = JSON.parse(
+    await readFile(join(runDirectory, 'config/input.json'), 'utf8'),
+  );
+  assert.deepEqual(descriptor.plan.requiredCapabilities, [
+    'subagents',
+    'forge',
+  ]);
+  assert.equal(descriptor.candidate.root, await realpath(integrationPath));
+  const artifactRequire = createRequire(
+    pathToFileURL(join(artifact, 'runtime/consumer.mjs')),
+  );
+  const runtime = await import(
+    pathToFileURL(artifactRequire.resolve('@temari/runtime')).href
+  );
+  const current = await runtime.observeCandidate(descriptor.candidate);
+  const currentBytes = Buffer.from(JSON.stringify(current));
+  const currentPath = join(root, 'current.json');
+  await writeFile(currentPath, currentBytes);
+  const closeout = await childResult(
+    [
+      join(artifact, 'bin/closeout.mjs'),
+      'verify',
+      '--request',
+      requestPath,
+      '--expected-request-sha256',
+      digest(requestBytes),
+      '--expected-manifest-sha256',
+      manifestSha256(manifest),
+      '--expected-current',
+      currentPath,
+      '--expected-current-sha256',
+      digest(currentBytes),
+    ],
+    0,
+    {
+      PATH: `${root}:${process.env.PATH}`,
+      FAKE_INTEGRATION_PATH: integrationPath,
+    },
+  );
+  assert.equal(JSON.parse(closeout.stdout).status, 'candidate-verified');
 });
 
 test('both engineering skills reach the complete versioned QA writer inside the artifact', async () => {
@@ -893,7 +1442,7 @@ test('public policy records the exact reviewed legacy profile and playbook prove
   const policy = JSON.parse(
     await readFile(join(output, 'policy.json'), 'utf8'),
   );
-  assert.equal(policy.policyId, 'temari-public-lightweight-v1');
+  assert.equal(policy.policyId, 'temari-public-feature-v2');
   assert.deepEqual(policy.feature.unsupportedRoutes, ['qa-review']);
   const sha256 = (text) => createHash('sha256').update(text).digest('hex');
   const profile = await readFile(
@@ -1729,6 +2278,7 @@ test('retained validation rejects a previously acknowledged generic payload alia
     requirements: new Map([
       ['lightweight.intake.inspect', { allowedEvidenceKinds: ['document'] }],
     ]),
+    stageRequirements: { investigate: ['lightweight.intake.inspect'] },
   };
   const runtime = { verifyCandidateEvidenceRecord: async () => undefined };
   await assert.rejects(

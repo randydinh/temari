@@ -1,14 +1,18 @@
 {
   "schemaVersion": 1,
-  "policyId": "temari-public-lightweight-v1",
+  "policyId": "temari-public-feature-v2",
   "entries": {
     "temari": {
       "supportedRoute": "lightweight-engineering",
-      "supportedProfile": "lightweight-engineering-v1"
+      "supportedProfile": "lightweight-engineering-v1",
+      "supportedRoutes": ["lightweight-engineering", "full-playbook"],
+      "supportedProfiles": ["lightweight-engineering-v1", "feature-v1"]
     },
     "poteto-mode": {
       "supportedRoute": "lightweight-engineering",
-      "supportedProfile": "lightweight-engineering-v1"
+      "supportedProfile": "lightweight-engineering-v1",
+      "supportedRoutes": ["lightweight-engineering", "full-playbook"],
+      "supportedProfiles": ["lightweight-engineering-v1", "feature-v1"]
     },
     "closeout": {
       "supportedRoute": null,

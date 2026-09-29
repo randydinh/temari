@@ -114,6 +114,12 @@ function policyDescription(entry, policy) {
     status: 'described',
     supportedRoute: selected.supportedRoute,
     supportedProfile: selected.supportedProfile,
+    ...(selected.supportedRoutes === undefined
+      ? {}
+      : {
+          supportedRoutes: selected.supportedRoutes,
+          supportedProfiles: selected.supportedProfiles,
+        }),
     ...(entry === 'temari'
       ? {
           qaRoute: 'qa-review',
@@ -185,7 +191,7 @@ async function admitEngineering(entry, request, policy, trusted = false) {
   exactFields(
     request,
     ['schemaVersion', 'entry', 'route', 'profile', 'obligations'],
-    ['routeInput', 'invocation'],
+    ['routeInput', 'invocation', 'featureWorkers'],
   );
   const reasons = [];
   if (request.schemaVersion !== 1) reasons.push('unsupported-request-schema');
@@ -194,8 +200,7 @@ async function admitEngineering(entry, request, policy, trusted = false) {
     if (request.profile !== 'feature-v1') reasons.push('profile-not-admitted');
     if (!compareObligations(request.obligations, policy.feature.obligations))
       reasons.push('obligations-not-admitted');
-    if (request.routeInput || request.invocation)
-      reasons.push('unexpected-route-input');
+    if (request.routeInput) reasons.push('unexpected-route-input');
     if (reasons.length > 0)
       return {
         schemaVersion: 1,
@@ -204,14 +209,44 @@ async function admitEngineering(entry, request, policy, trusted = false) {
         reasons,
         policyId: policy.policyId,
       };
+    if (!trusted || !request.invocation || !request.featureWorkers)
+      return {
+        schemaVersion: 1,
+        entry,
+        status: 'blocked',
+        route: request.route,
+        profile: request.profile,
+        reasons: ['host-capability-proof-missing'],
+        missingCapabilities: policy.feature.requiredCapabilities,
+        policyId: policy.policyId,
+      };
+    exactFields(request.invocation, [
+      'runId',
+      'revision',
+      'candidate',
+      'runDirectory',
+    ]);
+    exactFields(request.invocation.candidate, ['scopeId', 'root']);
+    exactFields(
+      request.featureWorkers,
+      [
+        'evidenceRoot',
+        'baseCommit',
+        'timeoutMs',
+        'architect',
+        'builder',
+        'owns',
+        'verify',
+        'reviewer',
+      ],
+      ['prepare'],
+    );
     return {
       schemaVersion: 1,
       entry,
-      status: 'blocked',
+      status: 'pending-host-proof',
       route: request.route,
       profile: request.profile,
-      reasons: ['host-capability-proof-missing'],
-      missingCapabilities: policy.feature.requiredCapabilities,
       policyId: policy.policyId,
     };
   }
@@ -342,13 +377,94 @@ function trustedRequest(bytes, expectedDigest) {
   return JSON.parse(utf8.decode(bytes));
 }
 
-async function startBridge(mode, request, obligations, sourceProfile = null) {
-  const invocation = {
-    schemaVersion: 1,
-    ...request.invocation,
-    obligations,
-    ...(sourceProfile ? { sourceProfile } : {}),
-  };
+async function startBridge(mode, request, policy, digests) {
+  const feature = request.route === 'full-playbook';
+  let invocation;
+  if (feature) {
+    const { runLocalFeatureHostProof, verifyLocalFeatureHostProof } =
+      await import(pathToFileURL(join(root, 'host/feature-proof.mjs')).href);
+    const hostBinding = {
+      entry: request.entry,
+      policyId: policy.policyId,
+      requestSha256: digests.requestSha256,
+      manifestSha256: digests.manifestSha256,
+    };
+    const workerInput = {
+      runId: request.invocation.runId,
+      revision: request.invocation.revision,
+      candidateRoot: request.invocation.candidate.root,
+      evidenceRoot: request.featureWorkers.evidenceRoot,
+      baseCommit: request.featureWorkers.baseCommit,
+      hostBinding,
+    };
+    let proof;
+    if (mode === 'start') {
+      proof = await runLocalFeatureHostProof({
+        ...workerInput,
+        ...Object.fromEntries(
+          Object.entries(request.featureWorkers).filter(
+            ([name]) => !['evidenceRoot', 'baseCommit'].includes(name),
+          ),
+        ),
+        executable: 'codex',
+      });
+    } else {
+      const saved = await readJson(
+        join(request.invocation.runDirectory, 'config/input.json'),
+        REQUEST_BYTES,
+      );
+      assert.deepEqual(saved.featureHost?.sourceCandidate, {
+        ...request.invocation.candidate,
+        root: await realpath(request.invocation.candidate.root),
+      });
+      assert.equal(
+        saved.featureHost?.evidenceRoot,
+        await realpath(workerInput.evidenceRoot),
+      );
+      assert.equal(saved.featureHost?.baseCommit, workerInput.baseCommit);
+      assert.deepEqual(saved.featureHost?.hostBinding, hostBinding);
+      proof = await verifyLocalFeatureHostProof({
+        ...workerInput,
+        proofSha256: saved.featureHost.proofSha256,
+      });
+    }
+    invocation = {
+      schemaVersion: 1,
+      ...request.invocation,
+      candidate: {
+        ...request.invocation.candidate,
+        root: proof.integrationPath,
+      },
+      obligations: policy.feature.obligations,
+      sourceProfile: 'feature-v1',
+      featureHost: {
+        sourceCandidate: {
+          ...request.invocation.candidate,
+          root: await realpath(request.invocation.candidate.root),
+        },
+        evidenceRoot: await realpath(request.featureWorkers.evidenceRoot),
+        baseCommit: request.featureWorkers.baseCommit,
+        hostBinding,
+        proofSha256: proof.proofSha256,
+      },
+    };
+  } else
+    invocation = {
+      schemaVersion: 1,
+      ...request.invocation,
+      obligations:
+        request.route === 'qa-review'
+          ? policy.qa.obligations
+          : policy.lightweight.obligations,
+      ...(request.route === 'qa-review'
+        ? {}
+        : { sourceProfile: policy.entries[request.entry].supportedProfile }),
+    };
+  assert.deepEqual(
+    Object.keys(invocation.candidate).sort(),
+    ['root', 'scopeId'],
+    `Invocation candidate fields differ: ${Object.keys(invocation.candidate).join(',')}`,
+  );
   if (mode === 'resume') {
     const path = join(invocation.runDirectory, 'config/input.json');
     const saved = await readJson(path, REQUEST_BYTES);
@@ -383,7 +499,9 @@ async function startBridge(mode, request, obligations, sourceProfile = null) {
     );
     assert.deepEqual(
       saved.plan,
-      core.createExecutionPlan(obligations),
+      core.createExecutionPlan(
+        feature ? policy.feature.obligations : policy.lightweight.obligations,
+      ),
       'Retained plan differs from admitted obligations.',
     );
     assert.equal(
@@ -391,6 +509,12 @@ async function startBridge(mode, request, obligations, sourceProfile = null) {
       invocation.sourceProfile,
       'Retained source profile differs from admitted policy.',
     );
+    if (feature)
+      assert.deepEqual(
+        saved.featureHost,
+        invocation.featureHost,
+        'Retained feature host proof differs from trusted invocation.',
+      );
   }
   let temporary;
   try {
@@ -625,11 +749,7 @@ async function startQa(request, requestSha256, policy) {
   };
   const allowedInputSha256 = sha256(Buffer.from(JSON.stringify(allowedInputs)));
   const startedAt = new Date().toISOString();
-  const { code, pid } = await startBridge(
-    'start',
-    request,
-    policy.qa.obligations,
-  );
+  const { code, pid } = await startBridge('start', request, policy);
   const endedAt = new Date().toISOString();
   assert(
     Number.isSafeInteger(pid) && pid > 0,
@@ -778,6 +898,8 @@ export async function run(entry, argv = process.argv.slice(2)) {
       extra.length === 4 &&
         digestIndex >= 0 &&
         requestDigestIndex >= 0 &&
+        digestIndex % 2 === 0 &&
+        requestDigestIndex % 2 === 0 &&
         digestIndex !== requestDigestIndex,
       'Trusted QA request and artifact digests are required.',
     );
@@ -886,7 +1008,11 @@ export async function run(entry, argv = process.argv.slice(2)) {
       policy,
       true,
     );
-    if (admission.status !== 'admitted') return finish(admission, 1);
+    if (
+      admission.status !== 'admitted' &&
+      admission.status !== 'pending-host-proof'
+    )
+      return finish(admission, 1);
     assert(
       isAbsolute(flags['--expected-current']),
       'Current candidate selection path must be absolute.',
@@ -918,6 +1044,8 @@ export async function run(entry, argv = process.argv.slice(2)) {
         request,
         expectedCurrent,
         selectionPath: flags['--expected-current'],
+        requestSha256: flags['--expected-request-sha256'],
+        manifestSha256: flags['--expected-manifest-sha256'],
       })),
       policyId: policy.policyId,
     });
@@ -966,13 +1094,12 @@ export async function run(entry, argv = process.argv.slice(2)) {
       extra[requestDigestIndex + 1],
     );
     const result = await admitEngineering(entry, request, policy, true);
-    if (result.status !== 'admitted') return finish(result, 1);
-    await startBridge(
-      command,
-      request,
-      policy.lightweight.obligations,
-      policy.entries[entry].supportedProfile,
-    );
+    if (result.status !== 'admitted' && result.status !== 'pending-host-proof')
+      return finish(result, 1);
+    await startBridge(command, request, policy, {
+      requestSha256: extra[requestDigestIndex + 1],
+      manifestSha256: extra[digestIndex + 1],
+    });
     return;
   }
   if (extra.length) usage();

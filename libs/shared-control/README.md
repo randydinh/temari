@@ -26,8 +26,18 @@ The claimed group includes the complete worker assignments and concurrency
 bound. Run `pnpm exec nx run shared-control:control-test` for the focused check.
 The adapter is deliberately kept off the package's default entry.
 
-This is a same-disk test provider. It has no network service boundary, remote
-delivery, independent-disk recovery, or durable Temporal deployment. The
-runtime still calls its file stores rather than this provider. The NX05
-shared-provider gate remains blocked until a service implementation is wired
-into the runtime, tested from a second host, and independently reviewed.
+This SQLite provider is a same-disk test backend. The runtime still calls its
+file stores rather than this provider. The NX05 shared-provider gate remains
+blocked until a durable service is wired into the runtime, tested from a
+second host, and independently reviewed.
+
+`startNx05LoopbackService` and `Nx05NetworkClient` add a bounded, authenticated
+HTTP command boundary around the SQLite test provider. The server binds only to
+`127.0.0.1`; clients receive its URL and an ephemeral token, not a database
+path. The network test starts a worker in a separate process, retains an
+assignment and artifact through a service restart, has a replacement process
+publish the result, and refuses a stale worker fence. Run
+`pnpm nx run shared-control:network-test` for this proof. This local stack has
+no TLS, remote host access, external database, backup policy, or production
+service supervision. It proves the command transport and process recovery, not
+cross-machine takeover or the release gate.
