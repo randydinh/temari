@@ -82,6 +82,7 @@ export function parseInventory(value: unknown): Inventory {
     if (typeof file.path !== 'string' || !/^[A-Za-z0-9_.\/-]+$/.test(file.path))
       throw new Error('Invalid inventory path');
     const parts = file.path.split('/');
+    // Windows lstat cannot report the executable bit recorded by Git.
     if (
       parts.some(
         (part) =>
@@ -197,7 +198,10 @@ export async function checkPayload(
     const path = join(root, file.path);
     if (sha256(await readFile(path)) !== file.artifactSha256)
       throw new Error(`Hash mismatch: ${file.path}`);
-    if (Boolean((await lstat(path)).mode & 0o111) !== file.executable)
+    if (
+      process.platform !== 'win32' &&
+      Boolean((await lstat(path)).mode & 0o111) !== file.executable
+    )
       throw new Error(`Executable mode mismatch: ${file.path}`);
   }
 }

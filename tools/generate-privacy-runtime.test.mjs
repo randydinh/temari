@@ -279,6 +279,8 @@ for (const drift of [
   'missing-generated',
 ]) {
   test(`check detects ${drift} staleness without writes; write repairs only permitted outputs`, async (t) => {
+    if (drift === 'generated-mode' && process.platform === 'win32')
+      return t.skip('Windows does not expose POSIX executable bits.');
     const root = await fixture(t);
     await generatePrivacyRuntime(root);
     const path = `${assets}/${archon}privacy.ts`;
@@ -349,6 +351,8 @@ for (const drift of [
   'output-symlink',
 ]) {
   test(`write refuses ${drift} unrelated or unsafe drift before changing any files`, async (t) => {
+    if (drift === 'mode' && process.platform === 'win32')
+      return t.skip('Windows does not expose POSIX executable bits.');
     const root = await fixture(t);
     const readme = `${assets}/README.md`;
     if (drift === 'changed') await put(root, readme, 'unrelated edit');

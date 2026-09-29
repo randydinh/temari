@@ -309,7 +309,8 @@ export async function planPrivacyRuntime(root = process.cwd()) {
       generated.has(file.path),
     );
     if (generated.has(file.path)) continue;
-    if (current.executable !== file.executable)
+    // Windows lstat cannot report the executable bit recorded by Git.
+    if (process.platform !== 'win32' && current.executable !== file.executable)
       fail(`Asset executable-mode drift: ${file.path}`);
     if (
       !legacyChanges.has(file.path) &&

@@ -301,6 +301,8 @@ test('artifact checks reject unknown files and symlinked roots', async (t) => {
 });
 
 test('inventory verifies executable mode', async (t) => {
+  if (process.platform === 'win32')
+    return t.skip('Windows does not expose POSIX executable bits.');
   const { root, source } = await fixture(t);
   await chmod(join(source, 'LICENSE'), 0o755);
   await assert.rejects(
@@ -857,12 +859,14 @@ test('maintenance payload omissions, byte changes and lost executable modes reje
       /Hash mismatch/,
     );
     await writeFile(target, bytes);
-    await chmod(target, mode ^ 0o111);
-    await assert.rejects(
-      checkArtifact(artifact.root, inventory, 'portable'),
-      /Executable mode/,
-    );
-    await chmod(target, mode);
+    if (process.platform !== 'win32') {
+      await chmod(target, mode ^ 0o111);
+      await assert.rejects(
+        checkArtifact(artifact.root, inventory, 'portable'),
+        /Executable mode/,
+      );
+      await chmod(target, mode);
+    }
     await checkArtifact(artifact.root, inventory, 'portable');
   }
 });
