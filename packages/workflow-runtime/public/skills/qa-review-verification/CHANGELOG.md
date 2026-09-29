@@ -1,5 +1,14 @@
 # QA verification changes
 
+## 0.3.3 — 2026-09-29
+
+- Within admitted source scope and bounded queries, use configured Content
+  Registrar records and an existing codebase graph when available. Preserve their
+  provenance and gaps, and check material behavior against the selected candidate
+  and authoritative product requirement.
+- Keep indexed QA summaries and graph relationships as navigation, not acceptance
+  or runtime proof.
+
 ## 0.3.2 — 2026-09-29
 
 - Write Verified Behavior as concise, observable outcomes, grouped by area where useful;
