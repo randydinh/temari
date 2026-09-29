@@ -16,18 +16,22 @@ Evidence-only drafting produces a local document; it does not admit a QA executi
 route or complete its review obligations. Test-case authoring alone and generic code
 review keep their existing routes.
 
-## Codebase context before planning
+## Bounded codebase context intake
 
-For work that depends on existing product or code behavior, identify the selected
-repository and candidate first. Query the configured Content Registrar for relevant
-requirements and product documents, then read the source-backed results. Query an
-existing knowledge graph for the affected components, callers, and boundaries before
-broad file exploration. Record source identity, revision or graph snapshot, useful
-citations, and coverage gaps. Treat graph relationships and indexed summaries as
-navigation; verify material claims against the current ticket, document, and source.
-If either service is unavailable, stale, or lacks the needed corpus, state the gap
-and continue with scoped direct inspection. Do not silently substitute an old
-candidate, widen source access, or build a new graph as part of a read-only task.
+After reading the installed policy and identifying the selected repository and
+candidate, use context providers only within the admitted task authority. When a
+Content Registrar source is configured for that scope, select a bounded query and
+documents, then read relevant source-backed requirements and product decisions.
+When an existing knowledge graph covers the admitted repository and candidate,
+query affected components, callers, and boundaries before broad file exploration.
+Record the source scope, query, selection, budget, revisions or graph snapshot,
+useful citations, and coverage gaps. Treat graph relationships and indexed
+summaries as navigation; verify material claims against the current ticket,
+document, and source. A provider is optional and does not decide a QA disposition
+or expand the task's authority. If it is unavailable, stale, or lacks the needed
+corpus, state the gap and continue with scoped direct inspection. Do not silently
+substitute an old candidate, widen source access, or build a new graph as part of a
+read-only task.
 
 1. Read `policy.json` from the installed bundle root. The policy is the public admission contract; do not fall back to the legacy v4.1 implementation.
 2. Route engineering requests through the canonical Temari route table. Admit `lightweight-engineering-v1` only when every lightweight condition holds. A trusted `full-playbook`/`feature-v1` start requires the host to run a read-only architect, scoped builder, and independent reviewer, then prove forge access and bind their retained evidence to the selected invocation.

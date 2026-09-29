@@ -49,17 +49,21 @@ case-authoring skill when actual case drafting is requested.
 
 ## Establish the product and codebase context
 
-Before deriving an expected result, search the configured Content Registrar for the
-ticket's requirements, product behavior, and prior decisions; read the relevant
-source-backed records rather than relying on a search snippet or an indexed QA
-summary. Query an available knowledge graph for the affected code paths and related
-applications, then follow its source locations into the selected candidate. Record
-the Registrar source/revision and graph snapshot or freshness limit beside the
-requirements they informed. The ticket and authoritative product decision define
-the expected business behavior; source and graph explain implementation, not the
-oracle. If a context source is missing, stale, partial, or outside the admitted
-scope, name that gap and use scoped direct inspection. An indexed prior review
-cannot prove a current runtime result or resolve contradictory acceptance criteria.
+After applying the ticket filter and the installed policy, identify the candidate
+and admitted source scope. Before deriving an expected result, use a configured
+Content Registrar source within that scope for a bounded query and selection of
+requirements, product behavior, and prior decisions. Read relevant source-backed
+records rather than relying on a search snippet or indexed QA summary. If an
+existing knowledge graph covers the admitted applications, query affected code
+paths and follow its source locations into the selected candidate. Record the
+Registrar source/revision, query and coverage limits, and graph snapshot or
+freshness limit beside the requirements they informed. The ticket and authoritative
+product decision define the expected business behavior; source and graph explain
+implementation, not the oracle. These providers are optional and cannot set the
+QA disposition. If a context source is missing, stale, partial, or outside the
+admitted scope, name that gap and use scoped direct inspection. An indexed prior
+review cannot prove a current runtime result or resolve contradictory acceptance
+criteria.
 
 ## Present behavior clearly
 
