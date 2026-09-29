@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { lstat, readdir } from 'node:fs/promises';
-import { isAbsolute, join, posix } from 'node:path';
+import { basename, isAbsolute, join, posix } from 'node:path';
 import { parseArgs } from 'node:util';
 import { readBoundedFile, verifyBundle } from './public-entry.mjs';
 
@@ -181,7 +181,7 @@ async function main() {
   );
 }
 
-if (process.argv[1]?.endsWith('/overlay-check.mjs')) {
+if (process.argv[1] && basename(process.argv[1]) === 'overlay-check.mjs') {
   main().catch((error) => {
     process.stderr.write(`${error.message}\n`);
     process.exitCode = 1;
