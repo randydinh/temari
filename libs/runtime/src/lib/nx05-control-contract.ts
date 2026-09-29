@@ -339,7 +339,9 @@ export interface Nx05SharedControlProvider {
   ): Promise<MechanicalRunRecord>;
   claimChildGroup(
     request: Omit<ClaimChildTaskGroupRequest, 'now'>,
-  ): Promise<ClaimChildTaskGroupResult>;
+  ): Promise<
+    ClaimChildTaskGroupResult & { readonly dispatch: Nx05DispatchGroup }
+  >;
   renewChild(
     request: Omit<RenewChildTaskLeaseRequest, 'now'>,
   ): Promise<ChildTaskRecord>;
