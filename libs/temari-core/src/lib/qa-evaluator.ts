@@ -2,12 +2,14 @@ import type { WorkerEvidenceReference } from '@temari/contracts';
 
 import {
   assertQaReviewRecord,
+  createQaReviewRecord,
   type QaAreaDecision,
   type QaEvaluationRound,
   type QaReviewPlan,
   type QaReviewRecord,
   type QaScenarioRecord,
 } from './qa-review-record.js';
+import type { QaAssignment } from './qa-assignment.js';
 import type { QaEvaluatorVerdict, QaReviewDisposition } from './qa-review.js';
 
 export interface QaEvaluationAssignment {
@@ -46,6 +48,19 @@ export interface QaEvaluationInput {
   readonly priorRounds: readonly QaEvaluationRound[];
 }
 
+/** A complete review before the independent evaluator has supplied a round. */
+export interface QaReviewDraft {
+  readonly schemaVersion: 1;
+  readonly reviewRevision: string;
+  readonly parentRevision: string | null;
+  readonly authorId: string;
+  readonly assignment: QaAssignment;
+  readonly plan: QaReviewPlan;
+  readonly areaDecisions: readonly QaAreaDecision[];
+  readonly scenarios: readonly QaScenarioRecord[];
+  readonly residualRisks: readonly string[];
+}
+
 export type QaFreshContextStatus = 'proven' | 'unavailable';
 
 export type QaFindingSeverity = 'Blocking' | 'Important' | 'Minor';
@@ -70,6 +85,54 @@ export interface QaEvaluatorDecision {
     | 'unresolved-important-finding'
     | 'no-open-important-findings';
   readonly unresolvedFindingIds: readonly string[];
+}
+
+/**
+ * Review the frozen QA evidence independently of the author. This is deliberately
+ * narrower than a product oracle: it identifies missing execution, unresolved
+ * review areas, and unfinished required scenarios. A project control adapter is
+ * still responsible for supplying the actual product observation.
+ */
+export function deriveQaEvidenceFindings(
+  input: QaEvaluationInput,
+): readonly QaEvaluationFinding[] {
+  const findings: QaEvaluationFinding[] = [];
+  const evidenceRefs = input.canonicalEvidenceRefs;
+  for (const decision of input.frozenReview.areaDecisions) {
+    if (decision.status === 'NeedsInvestigation') {
+      findings.push({
+        findingId: `area-${decision.area}-unresolved`,
+        severity: 'Important',
+        evidenceRefs,
+        reason: `The ${decision.area} review area still needs investigation: ${decision.basis}`,
+        minimumCorrection:
+          'Resolve the area decision or record a supported scope exclusion.',
+        status: 'Open',
+      });
+    }
+  }
+  for (const scenario of input.frozenReview.scenarios) {
+    if (scenario.obligation !== 'Required') continue;
+    if (scenario.result === 'Passed') continue;
+    const severity = scenario.result === 'Failed' ? 'Blocking' : 'Important';
+    findings.push({
+      findingId: `scenario-${scenario.scenarioId}-${scenario.result.toLowerCase()}`,
+      severity,
+      evidenceRefs: scenario.executions.flatMap(
+        (execution) => execution.evidenceRefs,
+      ),
+      reason:
+        scenario.result === 'Failed'
+          ? `Required scenario ${scenario.scenarioId} failed its expected behavior.`
+          : `Required scenario ${scenario.scenarioId} has no passing candidate-bound result.`,
+      minimumCorrection:
+        scenario.result === 'Failed'
+          ? 'Repair the candidate or document a supported product decision, then recheck the scenario.'
+          : 'Execute the selected coverage on the assigned candidate and retain the observation.',
+      status: 'Open',
+    });
+  }
+  return findings;
 }
 
 function evidenceKey(reference: WorkerEvidenceReference): string {
@@ -149,6 +212,34 @@ export function createQaEvaluationInput(
     declaredConstraints: [...record.assignment.knownConstraints],
     priorRounds: record.evaluationRounds,
   };
+}
+
+/**
+ * Validate a review draft by constructing an internal blocked snapshot, then
+ * expose only the evaluator's read-only input. The temporary round is never
+ * returned or retained as a real evaluator attempt.
+ */
+export function createQaEvaluationInputFromDraft(
+  draft: QaReviewDraft,
+): QaEvaluationInput {
+  const temporary = createQaReviewRecord({
+    ...draft,
+    evaluationRounds: [
+      {
+        round: 1,
+        evaluatorId: 'qa-draft-validation',
+        freshContextAttestation: 'draft validation only; no evaluator was run',
+        verdict: 'BLOCKED',
+        findingIds: [],
+        evidenceRefs: [],
+      },
+    ],
+    qaDisposition: 'BlockedOrIncomplete',
+    dispositionBasis: 'independent evaluation pending',
+    externalWriteReceipts: [],
+  });
+  const input = createQaEvaluationInput(temporary);
+  return { ...input, priorRounds: [] };
 }
 
 /** Mechanical evaluator gate. It does not inspect product behavior. */
