@@ -254,6 +254,10 @@ fixture, environment, observer, access, or product decision; who can supply it; 
 check to run; and the observable outcomes that would pass or fail. Distinguish work the
 current authorized host can finish from an external prerequisite. A generic “needs
 testing” item is not a closeout instruction.
+Before calling a fixture unavailable, inspect the authorized QA resources and determine
+whether an owned disposable fixture can be created and cleaned up in the named test
+environment. Do not use customer-owned records or equipment as a substitute. Reserve
+Blocked for a prerequisite that is actually unavailable, unsafe, or outside authority.
 
 When a confirmed failure needs a developer ticket, use the user's established tracker
 bug template if available. Lead with the observed problem, include direct failing

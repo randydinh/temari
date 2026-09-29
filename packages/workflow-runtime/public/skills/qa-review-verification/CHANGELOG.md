@@ -8,6 +8,7 @@
   scenario matrix; verify authorized case writes by readback.
 - Check the oracle, fixture realism, observation boundary and normal control before
   presenting a finding as a confirmed bug; keep blocked prerequisites distinct.
+- Check authorized QA fixture creation before labeling a required scenario blocked.
 - Preserve the user's note-review gate and the separate comment and Done transition.
 - Identify repository, source and target branch, pull request and test ownership for
   cross-repository QA changes.
