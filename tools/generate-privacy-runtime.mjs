@@ -27,6 +27,10 @@ const generated = new Map([
     `${archon}codex-model-driver.ts`,
     'libs/host-adapters/src/lib/codex-model-driver.ts',
   ],
+  [
+    `${archon}openai-responses-driver.ts`,
+    'libs/host-adapters/src/lib/openai-responses-driver.ts',
+  ],
 ]);
 const rewrites = new Map([
   ['@temari/privacy', './privacy.ts'],
@@ -47,11 +51,11 @@ const legacyChanges = new Map([
   ],
   [
     `${archon}lifecycle.ts`,
-    'Include privacy.ts, model-transport.ts and codex-model-driver.ts in the standalone installation payload.',
+    'Include privacy.ts, model-transport.ts, codex-model-driver.ts and openai-responses-driver.ts in the standalone installation payload.',
   ],
   [
     `${archon}runtime-files.txt`,
-    'Include privacy.ts, model-transport.ts and codex-model-driver.ts in the runtime file inventory.',
+    'Include privacy.ts, model-transport.ts, codex-model-driver.ts and openai-responses-driver.ts in the runtime file inventory.',
   ],
 ]);
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');

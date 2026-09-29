@@ -1,6 +1,6 @@
 # PII protection at the model boundary
 
-Status on 2026-09-28: the protected host path is implemented, but live private use is blocked. The current `/opt/homebrew/bin/codex` reports `codex-cli 0.154.0`; its credential-free preflight returned `runtime-version`, exit 1, with zero credential requests. The earlier audit of `0.155.0-alpha.16.4` returned `feature-state (unified_exec)`, exit 1, also before credentials or a model turn. Do not remove either check to enable the path. A compatible runtime and independent native-tool isolation proof are required.
+Status on 2026-09-29: the protected host path has two optional drivers behind the same provider-neutral `ModelDriver` interface. Live private use is still blocked. The current `/opt/homebrew/bin/codex` reports `codex-cli 0.154.0`; its credential-free preflight returned `runtime-version`, exit 1, with zero credential requests. The earlier audit of `0.155.0-alpha.16.4` returned `feature-state (unified_exec)`, exit 1, also before credentials or a model turn. Do not remove either check to enable that driver. The direct Responses driver has only synthetic HTTP and relocated-package evidence; it still needs a credentialed end-to-end test and an independent egress review before private data is used.
 
 Temari has two Codex paths with different privacy coverage. The existing Archon pilot retains native tools. The new protected transport makes the host responsible for supplying data and executing approved tools.
 
@@ -9,7 +9,7 @@ Temari has two Codex paths with different privacy coverage. The existing Archon 
 | Protected host transport     | Prompt, schema text, tool descriptions and schemas, allowlisted text files, local screenshot text, tool arguments and results, final response | Only data routed through the host boundary. Raw image and audio inputs are unsupported.    |
 | Existing Archon native pilot | Explicit prompt and schema at dispatch, saved prompt and final response, emitted diagnostic and event bodies                                  | Native tools can introduce context internally. Its result reports `explicit-request-only`. |
 
-The protected transport is the intended host path for private application data, but live private use remains blocked until the native runtime and model egress are independently verified. The native pilot reports `explicit-request-only` because it masks only content that the host supplies at dispatch. It does not isolate the actor's filesystem, environment, network, or native tools. Use the pilot only with inputs already approved for model disclosure.
+The protected transport is the intended host path for private application data, but live private use remains blocked until the selected driver and model egress are independently verified. The native pilot reports `explicit-request-only` because it masks only content that the host supplies at dispatch. It does not isolate the actor's filesystem, environment, network, or native tools. Use the pilot only with inputs already approved for model disclosure.
 
 ## Host integration
 
@@ -94,6 +94,24 @@ The protected Codex driver owns its configuration, working directory, protocol h
 Configuration and protocol checks run before inference. Unexpected settings, instruction sources, permission changes, model/provider substitutions, unknown tool calls, invalid turn identities, and unsupported input types must fail without retrying through an unprotected path. Raw subprocess diagnostics are not forwarded. The driver is tied to its explicitly supported Codex release; upgrade it only with renewed verification.
 
 This is a source integration, not a claim that arbitrary desktop plugins, connectors, or browser tools are intercepted. Those hosts must route their results through this API. Text detection is incomplete by nature. Names, business identifiers, addresses, and other domain values need explicit policy entries; encoded or fragmented private content can evade pattern detection.
+
+## Direct Responses execution
+
+Hosts that cannot satisfy the Codex native-isolation preflight can select the optional direct API driver without changing `ModelTransport`, the privacy policy, or host tool callbacks:
+
+```ts
+const driver = createOpenAIResponsesDriver({
+  model: configuredModel,
+  credential: readModelApiKeyLocally,
+});
+const transport = createProtectedModelTransport(driver, hostConfiguration);
+```
+
+`createOpenAIResponsesModelTransport` is an Nx convenience entry. The generated standalone Archon payload also contains `openai-responses-driver.ts`; it can be composed with its generated `model-transport.ts`. The model is host-selected. The credential callback runs only after the request is validated and supplies an API key locally. The adapter calls the fixed OpenAI Responses endpoint with `store: false`, no provider-built tools, and only the host-defined function tools. It replays response items and host tool outputs for a bounded stateless function-call loop. Each request and response is size-bounded, unknown calls and unsupported output forms fail closed, and provider error bodies are not forwarded. The host still owns authorization and validation inside each tool callback. Other model providers can implement `ModelDriver` without changing the privacy boundary.
+
+This adapter has not made a real model request. Its mock HTTP tests verify request shape, stateless tool continuation, credential separation, masked prompt and callback content, JSON output, and refusal paths. A relocated Archon test verifies the generated copy. Before enabling private use, run a credentialed canary with the actual selected model, verify function and schema behavior, confirm the service's data-handling settings, and independently review the egress and host tool boundary. The Codex native-tool gate is specific to the Codex driver; a direct API call has no native model tools unless the host explicitly supplies callbacks.
+
+API references: [Responses function calling](https://developers.openai.com/api/docs/guides/function-calling), [stateless reasoning continuation](https://developers.openai.com/api/docs/guides/reasoning), and [structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs).
 
 ## Generated Archon assets
 

@@ -43,6 +43,7 @@ integrations/archon/live-tasks.ts
 integrations/archon/live.test.ts
 integrations/archon/live.ts
 integrations/archon/model-transport.ts
+integrations/archon/openai-responses-driver.ts
 integrations/archon/privacy.ts
 integrations/archon/runtime-files.txt
 integrations/archon/smoke.ts

@@ -56,6 +56,13 @@ const sources = new Map([
       'import { complete } from "./model-transport.js";\nexport const driver = complete;\n',
     ],
   ],
+  [
+    'openai-responses-driver.ts',
+    [
+      'libs/host-adapters/src/lib/openai-responses-driver.ts',
+      'import { complete } from "./model-transport.js";\nexport const responses = complete;\n',
+    ],
+  ],
 ]);
 const legacy = [
   'live-codex.ts',
@@ -163,7 +170,7 @@ async function fixture(t) {
   return root;
 }
 
-test('generates only three standalone sources and the two manifests, reproducibly', async (t) => {
+test('generates the standalone sources and two manifests reproducibly', async (t) => {
   const root = await fixture(t);
   const beforeFiles = await snapshot(root);
   const original = await readInventory(root);
@@ -182,7 +189,7 @@ test('generates only three standalone sources and the two manifests, reproducibl
     Object.keys(afterFiles)
       .filter((path) => !beforeFiles[path])
       .sort(),
-    expected.slice(0, 3).sort(),
+    expected.slice(0, sources.size).sort(),
   );
 
   const manifest = await readInventory(root);

@@ -11,6 +11,52 @@ afterAll(async () => {
   for (const root of roots) await rm(root, { recursive: true, force: true });
 });
 
+test('relocated Responses adapter uses the protected host boundary without private egress', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-responses-relocated-'));
+  roots.push(root);
+  const artifact = await packageRuntime('archon', join(root, 'installed'));
+  const { createProtectedModelTransport } = await import(
+    pathToFileURL(join(artifact.root, 'integrations/archon/model-transport.ts'))
+      .href
+  );
+  const { createOpenAIResponsesDriver } = await import(
+    pathToFileURL(
+      join(artifact.root, 'integrations/archon/openai-responses-driver.ts'),
+    ).href
+  );
+  const bodies = [];
+  const driver = createOpenAIResponsesDriver({
+    model: 'synthetic-model',
+    credential: async () => 'synthetic-credential',
+    fetchImpl: async (_url, options) => {
+      bodies.push(JSON.parse(options.body));
+      return new Response(
+        JSON.stringify({
+          status: 'completed',
+          output: [
+            {
+              type: 'message',
+              content: [{ type: 'output_text', text: 'Ready.' }],
+            },
+          ],
+        }),
+      );
+    },
+  });
+  const transport = createProtectedModelTransport(driver, {
+    policy: { literals: [{ value: 'Alice', kind: 'PERSON' }] },
+  });
+  const response = await transport.complete({ prompt: 'Review Alice.' });
+  try {
+    assert.equal(response.text, 'Ready.');
+    assert.equal(bodies.length, 1);
+    assert.equal(bodies[0].store, false);
+    assert.equal(JSON.stringify(bodies).includes('Alice'), false);
+  } finally {
+    response.dispose();
+  }
+});
+
 test('relocated host boundary protects tool replies and restores only permitted display values', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-host-relocated-'));
   roots.push(root);

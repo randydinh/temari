@@ -8,5 +8,9 @@
     "types": ["node"]
   },
   "include": ["src/**/*.ts"],
-  "references": []
+  "references": [
+    {
+      "path": "../../libs/temari-core/tsconfig.lib.json"
+    }
+  ]
 }
