@@ -571,9 +571,9 @@ function firstWorkerFailure(
     };
   }
 
-  const nonPass = required.find(
-    (outcome) => outcome.result && outcome.result.status !== 'PASS',
-  );
+  const status = aggregateWorkerStatus(required);
+  if (status === 'PASS') return null;
+  const nonPass = required.find((outcome) => outcome.result?.status === status);
   if (!nonPass?.result) return null;
   return {
     kind: 'worker-status',

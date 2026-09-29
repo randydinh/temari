@@ -438,6 +438,43 @@ test('degrades optional worker failures without hiding required success', () => 
   ]);
 });
 
+test('joins required statuses by policy severity and reports the decisive worker', () => {
+  const assignments = workerAssignments(3);
+  const outcome = (
+    assignment: WorkerAssignment,
+    status: 'PASS' | 'ISSUES' | 'BLOCKED' | 'DROPPED',
+  ) => ({
+    assignment,
+    result: {
+      status,
+      summary: `${assignment.id}: ${status}`,
+      evidencePaths: [`evidence/${assignment.id}.json`],
+      rawLogPath: null,
+    },
+    error: null,
+  });
+
+  for (const status of ['PASS', 'ISSUES', 'BLOCKED', 'DROPPED'] as const) {
+    const joined = joinParallelWorkers(assignments.slice(0, 1), [
+      outcome(assignments[0]!, status),
+    ]);
+    assert.equal(joined.status, status);
+    assert.equal(
+      joined.failure?.workerId ?? null,
+      status === 'PASS' ? null : 'worker-1',
+    );
+  }
+
+  const mixed = joinParallelWorkers(assignments, [
+    outcome(assignments[0]!, 'ISSUES'),
+    outcome(assignments[1]!, 'DROPPED'),
+    outcome(assignments[2]!, 'BLOCKED'),
+  ]);
+  assert.equal(mixed.status, 'BLOCKED');
+  assert.equal(mixed.failure?.workerId, 'worker-3');
+  assert.equal(mixed.failure?.message, 'worker-3: BLOCKED');
+});
+
 test('blocks parallel workers before execution when the host lacks parallelism', async () => {
   let invoked = false;
   const receipt = await runParallelWorkers({

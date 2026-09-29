@@ -220,6 +220,12 @@ verifies each retained artifact before reusing a terminal child. This is a
 provider-neutral publication boundary; provider-specific log capture and
 shared artifact storage remain outside this local proof.
 
+The local join rejects an outcome whose assignment differs from the declared
+assignment, including its required flag or brief. Required handler errors and
+`BLOCKED` results take precedence over `ISSUES`, then `DROPPED`; the reported
+failure identifies a worker with the decisive status. Optional non-PASS work
+is retained as a degradation. This policy does not prove shared delivery.
+
 Completed parallel receipts also retain a portable execution-evidence envelope
 with the child group identity, declared assignment IDs, and the measured
 maximum and peak concurrency. Restartable replay checks that envelope against
