@@ -9,6 +9,7 @@ import {
   mkdtemp,
   readFile,
   readdir,
+  realpath,
   rename,
   rm,
   symlink,
@@ -44,14 +45,14 @@ after(async () => {
   if (buildRoot) await rm(buildRoot, { recursive: true, force: true });
 });
 
-async function childResult(args, expectedCode = 0) {
+async function childResult(args, expectedCode = 0, env = {}) {
   const result = await new Promise((resolve, reject) => {
     execFile(
       process.execPath,
       args,
       {
         cwd: buildRoot,
-        env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '' },
+        env: { ...process.env, ...env, NODE_OPTIONS: '', NODE_PATH: '' },
         encoding: 'utf8',
         maxBuffer: 1024 * 1024,
         timeout: 30_000,
@@ -126,7 +127,7 @@ test('packages an isolated relocated outer bundle with three current public entr
   }
 });
 
-test('relocated public bundle routes read-only and scoped write workers without workspace dependencies', async (t) => {
+test('relocated public bundle routes workers and observes host-owned local processes', async (t) => {
   if (process.platform === 'win32')
     return t.skip('The fake Codex fixture is a POSIX executable script.');
   const root = await mkdtemp(join(tmpdir(), 'temari public-parallel-'));
@@ -272,6 +273,247 @@ process.stdin.on('end', () => {
     const receipt = JSON.parse(await readFile(write.receiptPath, 'utf8'));
     assert.equal(receipt.workerReceipt.peakConcurrency, 2);
     assert.equal(receipt.verification[0].code, 0);
+
+    const { runLocalHostWorker, runLocalFeatureWorkerPair } = await import(
+      pathToFileURL(join(artifact, 'host/local-worker.mjs')).href
+    );
+    const hostInput = {
+      runId: 'host-review-run',
+      revision: 'base',
+      candidateRoot: repo,
+      evidenceRoot: join(root, 'evidence'),
+      baseCommit,
+      executable,
+      timeoutMs: 5000,
+      assignment: {
+        id: 'host-reviewer',
+        role: 'reviewer',
+        required: true,
+        brief: brief('review'),
+      },
+    };
+    const observedReview = await runLocalHostWorker(hostInput);
+    assert.equal(observedReview.status, 'PASS');
+    assert.equal(observedReview.route, 'read-only');
+    assert.equal(observedReview.candidate.baseCommit, baseCommit);
+    assert.notEqual(observedReview.worker.pid, process.pid);
+    assert.equal(
+      observedReview.receipt.sha256,
+      createHash('sha256')
+        .update(await readFile(observedReview.receipt.path))
+        .digest('hex'),
+    );
+    assert.equal(
+      observedReview.observationSha256,
+      createHash('sha256')
+        .update(await readFile(observedReview.observationPath))
+        .digest('hex'),
+    );
+    await assert.rejects(
+      runLocalHostWorker({
+        ...hostInput,
+        runId: 'spoofed-host-run',
+        receiptPath: write.receiptPath,
+      }),
+      /Unexpected or missing JSON fields/,
+    );
+    await assert.rejects(lstat(join(root, 'evidence', 'spoofed-host-run')));
+    await assert.rejects(
+      runLocalHostWorker({
+        ...hostInput,
+        runId: 'invalid/revision',
+        revision: 'base',
+      }),
+      /runId must be a safe identifier/,
+    );
+    await assert.rejects(
+      runLocalHostWorker({
+        ...hostInput,
+        runId: 'nested-host-run',
+        evidenceRoot: repo,
+      }),
+      /Candidate and worker evidence must be disjoint/,
+    );
+    await assert.rejects(lstat(join(repo, 'nested-host-run')));
+    await writeFile(join(repo, 'untracked.txt'), 'dirty\n');
+    await assert.rejects(
+      runLocalHostWorker({ ...hostInput, runId: 'dirty-host-run' }),
+      /Candidate must be clean/,
+    );
+    await unlink(join(repo, 'untracked.txt'));
+    await assert.rejects(lstat(join(root, 'evidence', 'dirty-host-run')));
+
+    const observedWrite = await runLocalHostWorker({
+      ...hostInput,
+      runId: 'host-write-run',
+      assignment: {
+        id: 'host-builder',
+        role: 'implementer',
+        required: true,
+        brief: brief('gamma'),
+      },
+      owns: [{ kind: 'file', path: 'gamma.txt' }],
+      verify: [
+        {
+          program: process.execPath,
+          args: [
+            '-e',
+            "if(!require('fs').existsSync('gamma.txt'))process.exit(5)",
+          ],
+        },
+      ],
+    });
+    assert.equal(observedWrite.status, 'PASS');
+    assert.equal(observedWrite.route, 'write');
+    assert.notEqual(observedWrite.worker.pid, observedReview.worker.pid);
+    assert.match(observedWrite.integratedCommit, /^[0-9a-f]{40}$/);
+    assert.equal(
+      await readFile(join(observedWrite.integrationPath, 'gamma.txt'), 'utf8'),
+      'gamma\n',
+    );
+    assert.equal(
+      execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: repo,
+        encoding: 'utf8',
+      }).trim(),
+      baseCommit,
+    );
+
+    const pairInput = {
+      runId: 'feature-pair',
+      revision: 'feature-request',
+      candidateRoot: repo,
+      evidenceRoot: join(root, 'evidence'),
+      baseCommit,
+      executable,
+      timeoutMs: 5000,
+      builder: {
+        id: 'pair-builder',
+        role: 'implementer',
+        required: true,
+        brief: brief('delta'),
+      },
+      owns: [{ kind: 'file', path: 'delta.txt' }],
+      verify: [
+        {
+          program: process.execPath,
+          args: [
+            '-e',
+            "if(!require('fs').existsSync('delta.txt'))process.exit(5)",
+          ],
+        },
+      ],
+      reviewer: {
+        id: 'pair-reviewer',
+        role: 'reviewer',
+        required: true,
+        brief: brief('review'),
+      },
+    };
+    const pair = await runLocalFeatureWorkerPair(pairInput);
+    assert.equal(pair.status, 'PASS');
+    assert.notEqual(pair.builder.pid, pair.reviewer.pid);
+    assert.equal(pair.reviewer.candidate.baseCommit, pair.integratedCommit);
+    assert.equal(
+      pair.reviewer.candidate.root,
+      await realpath(
+        join(
+          root,
+          'evidence',
+          'feature-pair',
+          'build',
+          'feature-pair-build',
+          'integration',
+        ),
+      ),
+    );
+    assert.equal(
+      pair.reportSha256,
+      createHash('sha256')
+        .update(await readFile(pair.reportPath))
+        .digest('hex'),
+    );
+    assert.equal(
+      execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: repo,
+        encoding: 'utf8',
+      }).trim(),
+      baseCommit,
+    );
+
+    await symlink(executable, join(root, 'codex'));
+    const publicWorkerRequest = {
+      schemaVersion: 1,
+      entry: 'temari',
+      ...pairInput,
+      runId: 'public-feature-pair',
+    };
+    delete publicWorkerRequest.executable;
+    const publicWorkerBytes = Buffer.from(JSON.stringify(publicWorkerRequest));
+    const publicWorkerPath = join(root, 'public-workers.json');
+    await writeFile(publicWorkerPath, publicWorkerBytes);
+    const publicWorkerArgs = [
+      join(artifact, 'bin/temari.mjs'),
+      'run-workers',
+      '--request',
+      publicWorkerPath,
+      '--expected-request-sha256',
+      createHash('sha256').update(publicWorkerBytes).digest('hex'),
+      '--expected-manifest-sha256',
+      manifestSha256(manifest),
+    ];
+    const publicResult = JSON.parse(
+      (
+        await childResult(publicWorkerArgs, 0, {
+          PATH: `${root}:${process.env.PATH}`,
+        })
+      ).stdout,
+    );
+    assert.equal(publicResult.status, 'PASS');
+    assert.deepEqual(publicResult.hostBinding, {
+      entry: 'temari',
+      policyId: 'temari-public-lightweight-v1',
+      requestSha256: createHash('sha256')
+        .update(publicWorkerBytes)
+        .digest('hex'),
+      manifestSha256: manifestSha256(manifest),
+    });
+    assert.notEqual(publicResult.builder.pid, publicResult.reviewer.pid);
+    assert.equal(
+      publicResult.reviewer.candidate.baseCommit,
+      publicResult.integratedCommit,
+    );
+    const wrongDigest = [...publicWorkerArgs];
+    wrongDigest[5] = '0'.repeat(64);
+    const rejectedWorkers = await childResult(wrongDigest, 1, {
+      PATH: `${root}:${process.env.PATH}`,
+    });
+    assert.match(rejectedWorkers.stderr, /Request bytes differ/);
+    const spoofedWorkerRequest = {
+      ...publicWorkerRequest,
+      runId: 'public-spoofed-pair',
+      executable,
+    };
+    const spoofedWorkerBytes = Buffer.from(
+      JSON.stringify(spoofedWorkerRequest),
+    );
+    const spoofedWorkerPath = join(root, 'spoofed-public-workers.json');
+    await writeFile(spoofedWorkerPath, spoofedWorkerBytes);
+    const spoofedWorkerArgs = [
+      ...publicWorkerArgs.slice(0, 3),
+      spoofedWorkerPath,
+      publicWorkerArgs[4],
+      createHash('sha256').update(spoofedWorkerBytes).digest('hex'),
+      ...publicWorkerArgs.slice(6),
+    ];
+    const rejectedExecutable = await childResult(spoofedWorkerArgs, 1, {
+      PATH: `${root}:${process.env.PATH}`,
+    });
+    assert.match(
+      rejectedExecutable.stderr,
+      /Request has unknown or missing fields/,
+    );
+    await assert.rejects(lstat(join(root, 'evidence', 'public-spoofed-pair')));
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -102,7 +102,7 @@ function finish(value, code = 0) {
 
 function usage() {
   throw new Error(
-    'Usage: entry policy | admit --request ABS_JSON | start|resume --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX | closeout verify --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX --expected-current ABS_JSON --expected-current-sha256 HEX',
+    'Usage: entry policy | admit --request ABS_JSON | start|resume|run-workers --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX | closeout verify --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX --expected-current ABS_JSON --expected-current-sha256 HEX',
   );
 }
 
@@ -429,6 +429,7 @@ export async function run(entry, argv = process.argv.slice(2)) {
   const trusted =
     command === 'start' ||
     command === 'resume' ||
+    command === 'run-workers' ||
     (entry === 'closeout' && command === 'verify');
   const policy = trusted
     ? await verifyBundle(extra[digestIndex + 1])
@@ -439,6 +440,71 @@ export async function run(entry, argv = process.argv.slice(2)) {
   );
   if (command === 'policy' && argv.length === 1) {
     finish(policyDescription(entry, policy));
+    return;
+  }
+  if (command === 'run-workers' && entry !== 'closeout') {
+    if (flag !== '--request' || !isAbsolute(argument ?? '')) usage();
+    assert(
+      extra.length === 4 &&
+        digestIndex >= 0 &&
+        requestDigestIndex >= 0 &&
+        digestIndex % 2 === 0 &&
+        requestDigestIndex % 2 === 0 &&
+        digestIndex !== requestDigestIndex,
+      'Both independent digests are required.',
+    );
+    const request = trustedRequest(
+      await readBoundedFile(argument, REQUEST_BYTES),
+      extra[requestDigestIndex + 1],
+    );
+    exactFields(
+      request,
+      [
+        'schemaVersion',
+        'entry',
+        'runId',
+        'revision',
+        'candidateRoot',
+        'evidenceRoot',
+        'baseCommit',
+        'timeoutMs',
+        'builder',
+        'owns',
+        'verify',
+        'reviewer',
+      ],
+      ['prepare'],
+    );
+    assert.equal(
+      request.schemaVersion,
+      1,
+      'Unsupported worker request schema.',
+    );
+    assert.equal(
+      request.entry,
+      entry,
+      'Worker entry differs from selected entry.',
+    );
+    const {
+      schemaVersion: _schemaVersion,
+      entry: _entry,
+      ...workerInput
+    } = request;
+    const { runLocalFeatureWorkerPair } = await import(
+      pathToFileURL(join(root, 'host/local-worker.mjs')).href
+    );
+    finish(
+      await runLocalFeatureWorkerPair({
+        ...workerInput,
+        executable: 'codex',
+        hostBinding: {
+          entry,
+          policyId: policy.policyId,
+          requestSha256: extra[requestDigestIndex + 1],
+          manifestSha256: extra[digestIndex + 1],
+        },
+      }),
+    );
     return;
   }
   if (entry === 'closeout' && command === 'verify') {

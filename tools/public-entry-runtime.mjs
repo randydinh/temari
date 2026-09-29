@@ -37,6 +37,7 @@ const publicFiles = [
   ['packages/workflow-runtime/host/source.mjs', 'host/source.mjs'],
   ['packages/workflow-runtime/host/invocation.mjs', 'host/invocation.mjs'],
   ['packages/workflow-runtime/host/closeout.mjs', 'host/closeout.mjs'],
+  ['packages/workflow-runtime/host/local-worker.mjs', 'host/local-worker.mjs'],
   [
     'packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbook-contracts/v1/lightweight-engineering.json',
     'source/lightweight-engineering.json',
