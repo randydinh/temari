@@ -478,6 +478,25 @@ test('public engineering admission refuses unsupported routes and blocks unprove
   assert(lightweight.reasons.includes('profile-not-admitted'));
 });
 
+test('installed Temari and Poteto skills expose the bundled worker guide', async () => {
+  const temariSkill = await readFile(
+    join(output, 'skills/temari/SKILL.md'),
+    'utf8',
+  );
+  const potetoSkill = await readFile(
+    join(output, 'skills/poteto-mode/SKILL.md'),
+    'utf8',
+  );
+  const guide = await readFile(
+    join(output, 'skills/poteto-mode/references/codex-parallel-workers.md'),
+    'utf8',
+  );
+  assert.match(temariSkill, /parallel worker guide.*codex-parallel-workers\.md/);
+  assert.match(potetoSkill, /parallel worker guide.*codex-parallel-workers\.md/);
+  assert.match(guide, /bin\/codex-parallel\.mjs/);
+  assert((await lstat(join(output, 'bin/codex-parallel.mjs'))).isFile());
+});
+
 test('closeout preflight blocks without trusted candidate selection', async () => {
   const closeout = await child(
     [
@@ -1528,6 +1547,7 @@ test('installed entry refuses altered artifact, request, route, obligations, cap
     'route',
     'obligations',
     'capabilities',
+    'worker-receipt',
     'qa',
     'full',
     'qa-template',
@@ -1576,6 +1596,14 @@ test('installed entry refuses altered artifact, request, route, obligations, cap
         f.request.capabilities = ['subagents'];
         await writeFile(f.requestPath, JSON.stringify(f.request));
       }
+      if (mode === 'worker-receipt') {
+        const receiptPath = join(f.root, 'worker-receipt.json');
+        await writeFile(receiptPath, JSON.stringify({ status: 'PASS' }));
+        await writeFile(
+          f.requestPath,
+          JSON.stringify(request('temari', { workerReceipt: receiptPath })),
+        );
+      }
       if (mode === 'qa') {
         f.request.route = 'qa-review';
         f.request.profile = 'qa-review-v1';
@@ -1587,6 +1615,7 @@ test('installed entry refuses altered artifact, request, route, obligations, cap
         'route',
         'obligations',
         'capabilities',
+        'worker-receipt',
         'qa',
         'full',
       ].includes(mode)
@@ -1618,6 +1647,8 @@ test('installed entry refuses altered artifact, request, route, obligations, cap
           'obligations-not-admitted',
         ]);
       if (mode === 'capabilities')
+        assert.match(result.stderr, /unknown or missing fields/);
+      if (mode === 'worker-receipt')
         assert.match(result.stderr, /unknown or missing fields/);
       if (mode === 'qa')
         assert(result.messages[0].reasons.includes('route-not-admitted'));
