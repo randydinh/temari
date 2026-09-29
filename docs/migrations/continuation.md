@@ -4,6 +4,17 @@ This record is for the maintainer who resumes the migration. Read the current
 Git state and pull requests before acting. A checked implementation item does
 not replace acceptance evidence from the installed product.
 
+## NX-03 continuation — 2026-09-29
+
+The installed QA branch now integrates main through merged PR #78. The public
+entry retains both the `qa` command and the separate local `run-workers`
+command. Their combined public-entry suite passed 42 tests; the direct QA
+journey retained a BLOCKED receipt, `BlockedOrIncomplete` disposition, and
+zero evaluator rounds. The Archon package check and workflow-runtime typecheck
+passed. This is integration evidence for an honest blocked route, not a
+separate-evaluator PASS/REVISE proof. PR #61 remains draft until the evaluator
+adapter and independent review gates are met.
+
 ## NX-03 installed QA handoff — 2026-09-28
 
 Branch `codex/nx03-installed-qa-20260928` in the exclusive
@@ -32,6 +43,14 @@ no workaround was attempted. Independent review, exact-head CI, a real
 evaluator adapter, and final cutover approval remain open. The original dirty
 checkout and installed plugin are untouched. Do not merge this draft before
 independent review.
+
+## Deferred evaluation
+
+- [ ] Run the [independent QA output comparison](./qa-output-comparison.md)
+      with separate agent sessions, pinned versions, and blind scoring. The
+      first pilot used one agent and showed only that both workflows accepted
+      an identical test. It did not establish comparative output quality or a
+      v4.1 retirement gate.
 
 ## NX-02 installed closeout handoff — 2026-09-28
 

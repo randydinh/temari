@@ -12,6 +12,7 @@ export {
 } from './lib/stage-evidence.js';
 export * from './lib/run-store.js';
 export * from './lib/child-task-store.js';
+export * from './lib/nx05-control-contract.js';
 export * from './lib/parallel-runtime.js';
 export * from './lib/evidence-store.js';
 export * from './lib/workspace-manifest.js';

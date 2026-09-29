@@ -96,3 +96,25 @@ test('rejects non-portable worker evidence identities', () => {
   assert(issues.some((issue) => issue.includes('sha256')));
   assert(issues.some((issue) => issue.includes('bytes')));
 });
+
+test('accepts portable evidence without a local path', () => {
+  const result = {
+    status: 'PASS' as const,
+    summary: 'Output retained in the shared artifact store.',
+    evidencePaths: [],
+    rawLogPath: null,
+    evidenceReferences: [
+      {
+        schema: 1 as const,
+        runId: 'run-1',
+        revision: 'revision-1',
+        kind: 'worker-result' as const,
+        sha256: 'b'.repeat(64),
+        bytes: 42,
+      },
+    ],
+  };
+
+  assert.deepEqual(validateWorkerResult(result), []);
+  assert.doesNotThrow(() => assertWorkerResult(result));
+});
