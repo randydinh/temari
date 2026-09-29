@@ -16,6 +16,9 @@
   attempts, and triage ambiguous failures before calling them product defects.
 - Permit a requirement-backed regression test to fail on the broken baseline
   and pass on the repaired candidate; preserve both attempt results.
+- Require a revisioned product-intent baseline and independently derived oracles;
+  retain missing capabilities and preexisting rule violations even when current
+  code and tests agree, with conflicts explicit until resolved.
 
 ## 0.5.0 — 2026-09-29
 
