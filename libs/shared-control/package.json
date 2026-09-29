@@ -24,7 +24,15 @@
         "executor": "nx:run-commands",
         "cache": false,
         "options": {
-          "command": "node --import @swc-node/register/esm-register --test libs/shared-control/src/lib/temporal-control-proof.test.ts",
+          "command": "node --import @swc-node/register/esm-register --test libs/shared-control/src/lib/temporal-control-proof.test.ts libs/shared-control/src/lib/sqlite-artifact-provider.test.ts",
+          "cwd": "{workspaceRoot}"
+        }
+      },
+      "artifact-test": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test libs/shared-control/src/lib/sqlite-artifact-provider.test.ts",
           "cwd": "{workspaceRoot}"
         }
       }
@@ -32,6 +40,7 @@
   },
   "dependencies": {
     "@temari/contracts": "workspace:^",
+    "@temari/runtime": "workspace:^",
     "@temari/workflow-engine": "workspace:^",
     "@temporalio/worker": "1.24.0",
     "@temporalio/workflow": "1.24.0"
