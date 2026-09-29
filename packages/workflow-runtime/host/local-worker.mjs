@@ -3,7 +3,6 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { lstat, mkdir, realpath, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { runCodexParallelRequest } from '../bin/codex-parallel.mjs';
 import { exactFields, readBoundedFile } from './stdio.mjs';
 
 const RECEIPT_BYTES = 4 * 1024 * 1024;
@@ -158,6 +157,7 @@ export async function runLocalHostWorker(input, signal) {
           verify: input.verify,
           assignments: [{ worker: input.assignment, owns: input.owns }],
         };
+  const { runCodexParallelRequest } = await import('../bin/codex-parallel.mjs');
   const result = await runCodexParallelRequest(request, signal);
   assertPinnedCandidate(candidateRoot, input.baseCommit);
   assert.equal(result.route, route);
@@ -383,5 +383,165 @@ export async function runLocalFeatureWorkerPair(input, signal) {
   const reportPath = join(pairRoot, 'feature-workers.json');
   const reportBytes = Buffer.from(`${JSON.stringify(report, null, 2)}\n`);
   await writeFile(reportPath, reportBytes, { flag: 'wx', mode: 0o600 });
-  return { ...report, reportPath, reportSha256: digest(reportBytes) };
+  return {
+    ...report,
+    reportPath,
+    reportSha256: digest(reportBytes),
+    integrationPath: build.integrationPath,
+  };
+}
+
+/** Recheck a retained pair against host-selected paths and its original digest. */
+export async function verifyLocalFeatureWorkerPair(input) {
+  exactFields(input, [
+    'runId',
+    'revision',
+    'candidateRoot',
+    'evidenceRoot',
+    'baseCommit',
+    'hostBinding',
+    'reportSha256',
+  ]);
+  assert.match(input.runId, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/);
+  assert.match(input.baseCommit, /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/);
+  assert.match(input.reportSha256, /^[0-9a-f]{64}$/);
+  const candidateRoot = await existingDirectory(
+    input.candidateRoot,
+    'candidateRoot',
+  );
+  const evidenceRoot = await existingDirectory(
+    input.evidenceRoot,
+    'evidenceRoot',
+  );
+  assert(
+    !contains(candidateRoot, evidenceRoot) &&
+      !contains(evidenceRoot, candidateRoot),
+    'Candidate and worker evidence must be disjoint.',
+  );
+  assertPinnedCandidate(candidateRoot, input.baseCommit);
+  const pairRoot = join(evidenceRoot, input.runId);
+  const reportPath = join(pairRoot, 'feature-workers.json');
+  const reportBytes = await readBoundedFile(reportPath, RECEIPT_BYTES);
+  assert.equal(
+    digest(reportBytes),
+    input.reportSha256,
+    'Worker report digest changed.',
+  );
+  const report = JSON.parse(reportBytes.toString());
+  exactFields(report, [
+    'schemaVersion',
+    'host',
+    'status',
+    'runId',
+    'revision',
+    'hostBinding',
+    'source',
+    'integratedCommit',
+    'builder',
+    'reviewer',
+  ]);
+  assert.equal(report.schemaVersion, 1);
+  assert.equal(report.host, 'local-codex');
+  assert.equal(report.status, 'PASS');
+  assert.equal(report.runId, input.runId);
+  assert.equal(report.revision, input.revision);
+  assert.deepEqual(report.hostBinding, input.hostBinding);
+  assert.deepEqual(report.source, {
+    root: candidateRoot,
+    baseCommit: input.baseCommit,
+  });
+  assert.match(report.integratedCommit, /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/);
+  const integrationPath = join(
+    pairRoot,
+    'build',
+    `${input.runId}-build`,
+    'integration',
+  );
+  assertPinnedCandidate(
+    await existingDirectory(integrationPath, 'integrationPath'),
+    report.integratedCommit,
+  );
+  async function checkWorker(record, expected) {
+    exactFields(record, [
+      'id',
+      'pid',
+      'observationPath',
+      'observationSha256',
+      ...(expected.route === 'read-only' ? ['candidate'] : []),
+    ]);
+    assert.match(record.id, /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/);
+    assert.match(record.observationSha256, /^[0-9a-f]{64}$/);
+    const runRoot =
+      expected.route === 'write'
+        ? join(pairRoot, 'build', `${input.runId}-build`)
+        : join(
+            pairRoot,
+            'review',
+            `${input.runId}-review`,
+            report.integratedCommit,
+          );
+    assert.equal(
+      record.observationPath,
+      join(runRoot, 'host-observation.json'),
+    );
+    const bytes = await readBoundedFile(record.observationPath, PROCESS_BYTES);
+    assert.equal(digest(bytes), record.observationSha256);
+    const observation = JSON.parse(bytes.toString());
+    assert.equal(observation.status, 'PASS');
+    assert.equal(observation.route, expected.route);
+    assert.equal(observation.runId, expected.runId);
+    assert.equal(observation.revision, expected.revision);
+    assert.deepEqual(observation.candidate, expected.candidate);
+    assert.equal(observation.worker.id, record.id);
+    assert.equal(observation.worker.role, expected.role);
+    assert.equal(observation.worker.pid, record.pid);
+    if (expected.route === 'write') {
+      assert.equal(observation.integratedCommit, report.integratedCommit);
+      assert.equal(observation.integrationPath, integrationPath);
+    } else assert.deepEqual(record.candidate, expected.candidate);
+    const receiptPath = join(runRoot, 'receipt.json');
+    const processPath = join(
+      runRoot,
+      expected.route === 'write' ? `evidence-${record.id}` : record.id,
+      'process.json',
+    );
+    assert.equal(observation.receipt.path, receiptPath);
+    assert.equal(observation.process.path, processPath);
+    const receiptBytes = await readBoundedFile(receiptPath, RECEIPT_BYTES);
+    const processBytes = await readBoundedFile(processPath, PROCESS_BYTES);
+    assert.equal(digest(receiptBytes), observation.receipt.sha256);
+    assert.equal(digest(processBytes), observation.process.sha256);
+    const receipt = JSON.parse(receiptBytes.toString());
+    const processEvidence = JSON.parse(processBytes.toString());
+    assert.equal(receipt.status, 'PASS');
+    assert.equal(receipt.runId, expected.runId);
+    assert.equal(processEvidence.pid, record.pid);
+    assert.equal(processEvidence.exitCode, 0);
+    assert.equal(processEvidence.error, null);
+    assert.equal(processEvidence.timedOut, false);
+    assert.equal(processEvidence.cancelled, false);
+    assert.equal(processEvidence.outputLimitExceeded, false);
+  }
+  await checkWorker(report.builder, {
+    route: 'write',
+    role: 'implementer',
+    runId: `${input.runId}-build`,
+    revision: input.revision,
+    candidate: report.source,
+  });
+  await checkWorker(report.reviewer, {
+    route: 'read-only',
+    role: 'reviewer',
+    runId: `${input.runId}-review`,
+    revision: report.integratedCommit,
+    candidate: { root: integrationPath, baseCommit: report.integratedCommit },
+  });
+  assert.notEqual(report.builder.id, report.reviewer.id);
+  assert.notEqual(report.builder.pid, report.reviewer.pid);
+  return {
+    ...report,
+    reportPath,
+    reportSha256: input.reportSha256,
+    integrationPath,
+  };
 }

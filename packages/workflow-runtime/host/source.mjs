@@ -6,13 +6,59 @@ import { readBoundedFile } from './stdio.mjs';
 const sourceRevision = '959c8f7be3d7b684207d9e626263d41540d5ecdc';
 const sourceEvidenceName = 'source';
 const sourceClaimsName = 'source-requirements';
-const stageRequirements = {
+const lightweightStageRequirements = {
   investigate: ['lightweight.intake.inspect'],
   plan: ['lightweight.route.qualifies'],
   build: ['lightweight.build.smallest-complete-change'],
   review: ['lightweight.verify.direct-check'],
   verify: ['lightweight.verify.direct-check'],
   deliver: [],
+};
+const featureStageRequirements = {
+  investigate: ['feature.shape.how'],
+  plan: [
+    'feature.shape.parallel-design',
+    'feature.shape.throughput-checkpoint',
+  ],
+  build: ['feature.build.delegated-implementation'],
+  review: ['feature.review.ordered-commits'],
+  verify: ['feature.verify.matching-surface'],
+  deliver: ['feature.delivery.pull-request'],
+};
+const sourceProfiles = {
+  'lightweight-engineering-v1': {
+    file: 'lightweight-engineering',
+    profileSha256:
+      '94370c4bbbd48666807630abd2866f0727ccf3ab614d23fd4b2d3c3b98d493e7',
+    stageRequirements: lightweightStageRequirements,
+    requirementIds: [
+      'lightweight.intake.inspect',
+      'lightweight.route.qualifies',
+      'lightweight.build.smallest-complete-change',
+      'lightweight.verify.direct-check',
+    ],
+    obligations: {
+      workType: 'feature',
+      delegation: 'none',
+      review: 'self',
+      evidence: 'revision-bound',
+      delivery: 'local',
+    },
+  },
+  'feature-v1': {
+    file: 'feature',
+    profileSha256:
+      '27afa4044e7e1b0238b2ed6a33f7cff26417d7f905372bd6b5409f4d0462f959',
+    stageRequirements: featureStageRequirements,
+    requirementIds: Object.values(featureStageRequirements).flat(),
+    obligations: {
+      workType: 'feature',
+      delegation: 'required',
+      review: 'independent',
+      evidence: 'revision-bound',
+      delivery: 'pull-request',
+    },
+  },
 };
 const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const decode = (bytes) =>
@@ -22,26 +68,34 @@ export async function loadSourceContract(
   contracts,
   runtimeRoot,
   sourceProfile,
+  capabilities,
 ) {
-  assert.equal(
-    sourceProfile,
-    'lightweight-engineering-v1',
-    'Unsupported source profile.',
-  );
+  const selected = sourceProfiles[sourceProfile];
+  assert(selected, 'Unsupported source profile.');
+  if (sourceProfile === 'feature-v1')
+    assert.deepEqual(
+      contracts.missingOrUnprovenCapabilities(
+        ['subagents', 'forge'],
+        capabilities,
+      ),
+      [],
+      'Feature source requires independently proven host capabilities.',
+    );
   const root = dirname(runtimeRoot);
   const profileText = decode(
     await readBoundedFile(
-      join(root, 'source/lightweight-engineering.json'),
+      join(root, `source/${selected.file}.json`),
       64 * 1024,
     ),
   );
   const playbookText = decode(
-    await readBoundedFile(
-      join(root, 'source/lightweight-engineering.md'),
-      64 * 1024,
-    ),
+    await readBoundedFile(join(root, `source/${selected.file}.md`), 64 * 1024),
   );
-  const parsed = contracts.parseV41Profile({ sourceRevision, profileText });
+  const parsed = contracts.parseV41Profile({
+    sourceRevision,
+    profileText,
+    expectedProfileSha256: selected.profileSha256,
+  });
   assert.equal(parsed.status, 'valid', parsed.reason);
   const boundaries = ['final', 'commit', 'review', 'publish'].map((boundary) =>
     contracts.assessV41PlanBoundary({
@@ -53,19 +107,22 @@ export async function loadSourceContract(
   );
   assert.deepEqual(
     boundaries.map((result) => result.status),
-    ['blocked', 'blocked', 'blocked', 'blocked'],
+    sourceProfile === 'feature-v1'
+      ? ['supported', 'supported', 'supported', 'blocked']
+      : ['blocked', 'blocked', 'blocked', 'blocked'],
     'Pinned source boundary is incompatible.',
   );
-  assert(
-    boundaries
-      .slice(0, 3)
-      .every(
-        (result) =>
-          result.reason ===
-          'Verified lightweight source evidence is incomplete or incompatible.',
-      ),
-    'Source boundary did not require retained evidence.',
-  );
+  if (sourceProfile === 'lightweight-engineering-v1')
+    assert(
+      boundaries
+        .slice(0, 3)
+        .every(
+          (result) =>
+            result.reason ===
+            'Verified lightweight source evidence is incomplete or incompatible.',
+        ),
+      'Source boundary did not require retained evidence.',
+    );
   assert.deepEqual(boundaries[3].requiredGates, ['operator-approval']);
   const profile = parsed.value.profile;
   const requirements = new Map(
@@ -74,23 +131,13 @@ export async function loadSourceContract(
     ),
   );
   assert.deepEqual(
-    [...requirements.keys()],
-    [
-      'lightweight.intake.inspect',
-      'lightweight.route.qualifies',
-      'lightweight.build.smallest-complete-change',
-      'lightweight.verify.direct-check',
-    ],
+    [...requirements.keys()].sort(),
+    [...selected.requirementIds].sort(),
   );
   return {
     requirements,
-    plan: contracts.reconcilePlan({
-      workType: 'feature',
-      delegation: 'none',
-      review: 'self',
-      evidence: 'revision-bound',
-      delivery: 'local',
-    }),
+    stageRequirements: selected.stageRequirements,
+    plan: contracts.reconcilePlan(selected.obligations),
     parsed: parsed.value,
     playbookText,
     contracts,
@@ -98,7 +145,7 @@ export async function loadSourceContract(
 }
 
 export function attachSourceClaims(stage, result, input, contract) {
-  const expected = stageRequirements[stage];
+  const expected = contract.stageRequirements[stage];
   assert(expected, 'Unknown source stage.');
   assert(
     !result.evidence.some((item) => item.name === sourceClaimsName),
@@ -188,7 +235,7 @@ export async function assertSourceEvidence(
   const satisfied = new Set();
   const verifiedEvidence = [];
   for (const stage of record.stages) {
-    const expected = stageRequirements[stage.stage];
+    const expected = contract.stageRequirements[stage.stage];
     assert(expected, 'Unknown source evidence stage.');
     const attestationBytes = await store.loadPortable({
       ...stage.stageEvidence,
