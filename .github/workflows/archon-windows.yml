@@ -14,6 +14,8 @@ on:
       - 'packages/initializer/**'
       - 'tools/canonical-runtime*'
       - 'tools/public-entry-runtime*'
+      - 'tools/qa-installed-journey.mjs'
+      - 'tools/fixtures/qa-synthetic.mjs'
       - 'tools/host-session.test.mjs'
       - 'packages/workflow-runtime/host/**'
       - 'packages/workflow-runtime/public/**'
@@ -65,6 +67,9 @@ jobs:
 
       - name: Verify relocated installed public entry and process recovery
         run: pnpm exec nx run workflow-runtime:public-entry-test --skipNxCache --skipSync --output-style=static
+
+      - name: Verify installed QA capability block from a relocated package
+        run: pnpm exec nx run workflow-runtime:qa-installed-journey --skipNxCache --skipSync --output-style=static
 
       - name: Initialize Temari and install pinned Archon
         run: |

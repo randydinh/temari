@@ -86,6 +86,10 @@
       "public-entry-test": {
         "command": "node --test tools/public-entry-runtime.test.mjs",
         "cache": false
+      },
+      "qa-installed-journey": {
+        "command": "node tools/qa-installed-journey.mjs",
+        "cache": false
       }
     }
   },

@@ -27,6 +27,7 @@ import {
   packagePublicEntries,
 } from './public-entry-runtime.mjs';
 import { assertSourceEvidence } from '../packages/workflow-runtime/host/source.mjs';
+import { syntheticQaRequest } from './fixtures/qa-synthetic.mjs';
 
 const repository = fileURLToPath(new URL('../', import.meta.url));
 const packager = fileURLToPath(
@@ -125,6 +126,201 @@ test('packages an isolated relocated outer bundle with three current public entr
     assert.equal(policy.supportedProfile, 'lightweight-engineering-v1');
   } finally {
     await rm(relocatedRoot, { recursive: true, force: true });
+  }
+});
+
+test('relocated QA entry retains a blocked attempt and no evaluator round', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari qa-relocated-'));
+  try {
+    const artifact = join(root, 'artifact');
+    const candidate = join(root, 'candidate');
+    await cp(output, artifact, { recursive: true });
+    const loader = join(root, 'deny-source-loader.mjs');
+    await writeFile(
+      loader,
+      `export async function resolve(specifier, context, nextResolve) {
+  const result = await nextResolve(specifier, context);
+  if (result.url.startsWith(${JSON.stringify(pathToFileURL(repository).href)})) throw Error('Source checkout import refused');
+  return result;
+}\n`,
+    );
+    const denied = await childResult(
+      [
+        '--experimental-loader',
+        pathToFileURL(loader).href,
+        '--input-type=module',
+        '-e',
+        `import(${JSON.stringify(pathToFileURL(packager).href)})`,
+      ],
+      1,
+    );
+    assert.match(denied.stderr, /Source checkout import refused/);
+    await mkdir(candidate);
+    await writeFile(join(candidate, 'product.txt'), 'synthetic fixture\n');
+    const base = syntheticQaRequest(candidate, join(root, 'run'));
+    const invoke = async (input, name, expectedCode = 1) => {
+      const path = join(root, `${name}.json`);
+      const bytes = Buffer.from(`${JSON.stringify(input)}\n`);
+      await writeFile(path, bytes);
+      return childResult(
+        [
+          '--experimental-loader',
+          pathToFileURL(loader).href,
+          join(artifact, 'bin/temari.mjs'),
+          'qa',
+          '--request',
+          path,
+          '--expected-request-sha256',
+          createHash('sha256').update(bytes).digest('hex'),
+          '--expected-manifest-sha256',
+          manifestSha256(manifest),
+        ],
+        expectedCode,
+      );
+    };
+    const result = await invoke(base, 'valid');
+    const qaOutput = JSON.parse(result.stdout.trim().split('\n').at(-1));
+    assert.equal(qaOutput.route.route, 'qa-review');
+    assert.deepEqual(qaOutput.plan.stages, [
+      'investigate',
+      'plan',
+      'build',
+      'review',
+      'verify',
+      'deliver',
+    ]);
+    assert.equal(qaOutput.workflowReceipt.status, 'BLOCKED');
+    assert.equal(qaOutput.workflowReceipt.failure.kind, 'capability-gap');
+    assert.deepEqual(qaOutput.workflowReceipt.stages, []);
+    assert.equal(qaOutput.qaDisposition.disposition, 'BlockedOrIncomplete');
+    assert.deepEqual(qaOutput.record.evaluationRounds, []);
+    assert.equal(qaOutput.record.evaluationAttempts.length, 1);
+    assert.equal(qaOutput.record.evaluationAttempts[0].outputSha256, null);
+    assert.equal(
+      qaOutput.record.evaluationAttempts[0].reason,
+      'separate-evaluator-unavailable',
+    );
+    assert.deepEqual(qaOutput.record.externalWriteReceipts, []);
+    assert.deepEqual(qaOutput.allowedInputs.canonicalEvidenceRefs, []);
+    assert.equal(qaOutput.capabilityObservation.exitCode, 1);
+    assert.deepEqual(qaOutput.capabilityObservation.missing, ['subagents']);
+    assert.equal(qaOutput.capabilityObservation.evaluatorLaunch, 'unavailable');
+    assert.deepEqual(
+      JSON.parse(await readFile(join(root, 'run/config/qa-result.json'))),
+      qaOutput,
+    );
+
+    const missingEnvironment = {
+      ...base,
+      assignment: {
+        ...base.assignment,
+        environmentRef: undefined,
+        missingEnvironmentBlocker: 'synthetic environment is unavailable',
+      },
+      invocation: {
+        ...base.invocation,
+        runId: 'missing-environment',
+        runDirectory: join(root, 'missing-environment'),
+      },
+    };
+    delete missingEnvironment.assignment.environmentRef;
+    const unavailable = await invoke(missingEnvironment, 'missing-environment');
+    const unavailableOutput = JSON.parse(
+      unavailable.stdout.trim().split('\n').at(-1),
+    );
+    assert.equal(
+      unavailableOutput.record.evaluationAttempts[0].reason,
+      'environment-unavailable',
+    );
+    assert.deepEqual(unavailableOutput.record.evaluationRounds, []);
+
+    for (const [name, change] of [
+      [
+        'forged-round',
+        {
+          review: {
+            ...base.review,
+            evaluationRounds: [
+              {
+                verdict: 'PASS',
+                evaluatorId: 'caller',
+                freshContext: 'proven',
+              },
+            ],
+          },
+        },
+      ],
+      ['forged-context', { freshContext: 'proven' }],
+      ['forged-evaluator', { evaluatorId: 'caller-selected-evaluator' }],
+      ['forged-capabilities', { capabilities: ['subagents'] }],
+      [
+        'forged-disposition',
+        { review: { ...base.review, qaDisposition: 'Passed' } },
+      ],
+      [
+        'forged-execution',
+        {
+          review: {
+            ...base.review,
+            scenarios: [{ ...base.review.scenarios[0], result: 'Passed' }],
+          },
+        },
+      ],
+      [
+        'external-write',
+        {
+          assignment: {
+            ...base.assignment,
+            authority: {
+              ...base.assignment.authority,
+              allowedActions: ['write ticket'],
+            },
+          },
+        },
+      ],
+      [
+        'external-write-ref',
+        {
+          review: {
+            ...base.review,
+            scenarios: [
+              {
+                ...base.review.scenarios[0],
+                coverageBindings: [
+                  {
+                    ...base.review.scenarios[0].coverageBindings[0],
+                    writeReceiptRef: 'caller-write',
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    ]) {
+      const forged = {
+        ...base,
+        ...change,
+        invocation: {
+          ...base.invocation,
+          runId: name,
+          runDirectory: join(root, name),
+        },
+      };
+      const refused = await invoke(forged, name);
+      assert.match(
+        refused.stderr,
+        /unknown or missing fields|external writes|source references|unexecuted scenarios/i,
+      );
+      await assert.rejects(lstat(join(root, name)), /ENOENT/);
+    }
+    const generic = await invoke(
+      { ...request('temari'), route: 'qa-review' },
+      'generic',
+    );
+    assert.match(generic.stderr, /unknown or missing fields|QA requires/i);
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 });
 
@@ -1246,6 +1442,8 @@ test('public policy records the exact reviewed legacy profile and playbook prove
   const policy = JSON.parse(
     await readFile(join(output, 'policy.json'), 'utf8'),
   );
+  assert.equal(policy.policyId, 'temari-public-feature-v2');
+  assert.deepEqual(policy.feature.unsupportedRoutes, ['qa-review']);
   const sha256 = (text) => createHash('sha256').update(text).digest('hex');
   const profile = await readFile(
     join(

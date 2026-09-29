@@ -4,6 +4,57 @@ This record is for the maintainer who resumes the migration. Read the current
 Git state and pull requests before acting. A checked implementation item does
 not replace acceptance evidence from the installed product.
 
+## Current integration — 2026-09-29
+
+PR #58 merged at `4ed26eab1dab11e95d349206b61597755b11ce01` after
+exact-head Linux and Windows CI passed. It adds the provider-neutral protected
+transport and a synthetic local Ollama canary; private application use and
+provider egress review remain open. PR #61 is being integrated as a preparatory
+installed QA route. Its clean local journey remains `BlockedOrIncomplete` with
+zero evaluator rounds; a real separate evaluator is still required. The NX-06
+cutover and v4.1 retirement gate remain blocked. Historical checkpoints below
+describe the state at their recorded time.
+
+## NX-03 continuation — 2026-09-29
+
+The installed QA branch now integrates main through merged PR #78. The public
+entry retains both the `qa` command and the separate local `run-workers`
+command. Their combined public-entry suite passed 42 tests; the direct QA
+journey retained a BLOCKED receipt, `BlockedOrIncomplete` disposition, and
+zero evaluator rounds. The Archon package check and workflow-runtime typecheck
+passed. This is integration evidence for an honest blocked route, not a
+separate-evaluator PASS/REVISE proof. At this checkpoint PR #61 was draft;
+the later preparatory merge does not establish full QA acceptance.
+
+## NX-03 installed QA handoff — 2026-09-28
+
+Branch `codex/nx03-installed-qa-20260928` in the exclusive
+`/private/tmp/temari-nx03-qa-20260928` worktree starts at merged main
+`c3e3d6b57d3dd085821c400d8c4ec69936ee70fe`. Milestone
+`70efc63b690bf9155e329f6f79ba2cb98e1f9257` adds the explicit QA
+public route, strict read-only draft boundary, and a host-observed blocked
+attempt separate from the six-stage workflow receipt. Milestone
+`15e147174cc4f6e7bc7cc6c7a1f045adda980634` adds the relocated direct
+journey and Linux and Windows CI targets. Milestone
+`c83c316117a9efe36a37a03ad04ab1f1a7710d0a` binds the installed policy
+owner to the exported QA domain entry; its focused public-entry and relocated
+journey targets exited 0. The [installed QA record](./installed-qa.md)
+contains the exact SHA, commands and exits, host invocation lifetime,
+artifact digest, negative cases, and retained local evidence path.
+
+The selected installed bridge reports zero available capabilities. It cannot
+launch an evaluator context, so QA remains `BlockedOrIncomplete` with no
+round. The synthetic PASS and REVISE core tests exercise mechanical verdict
+plumbing only. The generic feature exclusion and public policy ID remain
+unchanged, protecting existing lightweight and closeout admissions.
+At this checkpoint, draft [PR #61](https://github.com/randydinh/temari/pull/61) was open. A fresh
+read-only Codex review attempt was rejected by the workspace approval
+boundary because it could transmit repository contents to another service;
+no workaround was attempted. Independent review, exact-head CI, a real
+evaluator adapter, and final cutover approval remain open. The original dirty
+checkout and installed plugin were untouched. Full QA acceptance still requires
+an independent evaluator and review.
+
 ## NX-04 continuation — 2026-09-29
 
 The isolated privacy branch has integrated current main through merged PR #78.
@@ -12,8 +63,8 @@ Responses driver. The direct driver has synthetic HTTP, host-boundary, and
 relocated Archon evidence; it has not made a credentialed model request. The
 Codex CLI driver still refuses its installed runtime preflight. Keep live
 private use blocked until the selected provider/model path has a credentialed
-canary, independent egress review, and operator approval. PR #58 remains draft
-while these gates are open. The original dirty source checkout is unchanged.
+canary, independent egress review, and operator approval. PR #58 was draft
+at this checkpoint. The original dirty source checkout is unchanged.
 
 ## NX-04 privacy integration handoff — 2026-09-28
 
