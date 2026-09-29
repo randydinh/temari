@@ -302,6 +302,11 @@ export async function packageRuntime(
     await checkArtifact(stage, inventory, lane);
     await mkdir(destination);
     reserved = true;
+    if (process.platform === 'win32') {
+      // Windows cannot rename a directory over an existing empty directory.
+      await rmdir(destination);
+      reserved = false;
+    }
     await rename(stage, destination);
     reserved = false;
     return { ...result, status: 'created' };
