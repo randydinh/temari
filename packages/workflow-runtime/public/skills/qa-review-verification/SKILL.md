@@ -2,7 +2,7 @@
 name: qa-review-verification
 description: Draft or review per-ticket QA verification notes and release QA reports from requirements, source reviews, and actual execution evidence. Use for QA Review closeout, verification handoffs, and evidence audits; not for authoring reusable test cases alone or generic code review.
 metadata:
-  version: '0.4.0'
+  version: '0.5.0'
 ---
 
 # QA Review verification
@@ -68,6 +68,12 @@ admitted scope, name that gap and use scoped direct inspection. An indexed prior
 review cannot prove a current runtime result or resolve contradictory acceptance
 criteria.
 
+For related applications, retain one small context packet per ticket or feature group:
+selected requirement and decision revisions, Registrar query and read receipts, graph
+paths and snapshot, candidate source locations, and known gaps. Reuse it only after
+checking its sources and candidate are current. Honor a project instruction to consult
+both providers for every task; an unavailable provider is a recorded coverage gap.
+
 ## Present behavior clearly
 
 Write the **Verified Behavior** section as concise, factual descriptions of what the
@@ -111,6 +117,11 @@ outcome to the distinct required verification scenarios. Current code, a previou
 summary, and a green test show implementation or historical behavior; they do not define
 an otherwise missing product rule. Mark conflicting or missing rules **Needs
 clarification**, name the decision owner and question, and keep the affected result open.
+
+For new behavior, write concrete input → action → observable outcome examples from the
+ticket, epic, linked specification and dated decisions before authoring automation.
+Compare them with existing expected behavior. If they conflict, stop the affected case
+and automation change until the product decision is resolved; retain unaffected work.
 
 For new source review or execution, record repository, target branch/release, full commit,
 comparison base when relevant, observed remote head and check time, actual tested checkout
@@ -161,6 +172,26 @@ attempt or **Not run** reason, observed result, evidence, and separate Testmo ca
 run/result links. Identify passing controls and failed variants without counting a shared
 failure twice. A narrative audit, test plan, case definition, source concern, or passing
 subset does not by itself establish ticket acceptance or support moving to Done.
+
+When the project requires test-management records, reconcile each settled example with
+its case definition before running or revising automation. Create or update cases only
+within the authorized scope; verify saved fields by readback. Link each case to its
+ticket in the project's test matrix, with distinct ticket, case revision, automation,
+and actual run/result columns. Then select automation that asserts the promised outcome
+and run it on the named candidate. Record skipped tests, failed parameter rows, and
+unmapped cases. Case creation, source mapping, and a green badge never substitute for a
+current asserted result. Keep missing case or automation work visible.
+
+Check the test oracle and fixture before reporting a defect. Compare the assertion with
+the authoritative example, the real input path, candidate source, and a normal control.
+Identify mocks, injected impossible states, local component boundaries, and missing
+service, persistence, queue, station or UI observation. Classify a finding only at the
+boundary observed: confirmed in-scope failure, source-supported, component-reproduced,
+reported, or investigation pending. A blocked fixture or undecided product rule is not
+a product failure. For state changes or cross-service effects, choose the smallest real
+integration or deployed test that distinguishes a product defect from a bad oracle;
+retain candidate, fixture ownership, independent readback and cleanup. Repeating an
+unchanged fake does not increase confidence in its realism.
 
 Label the verification boundary on every result:
 
@@ -214,6 +245,9 @@ overlapping suites or unlike denominators into a coverage percentage.
 Check that outcomes trace to candidate, fixture, expectation and evidence; material gaps
 remain visible; and links resolve to the intended artifacts. Unknown required facts stay
 explicit with the next action needed to resolve them.
+For QA automation or product changes across repositories, report each repository, source
+branch, target branch and clickable pull request. Describe the change's purpose, test
+ownership, executed checks and remaining gaps in the PR or its linked review record.
 
 For each blocked required scenario, make the handoff executable: state the missing
 fixture, environment, observer, access, or product decision; who can supply it; the exact
@@ -227,6 +261,13 @@ evidence and a relevant successful comparison, then give environment, preconditi
 minimal reproduction, expected and actual behavior. Label reported, reproduced and
 source-supported claims accurately; keep an unsupported root cause out of the ticket.
 Drafting that bug does not turn a QA assignment into defect repair.
+
+Honor a project or user review gate before posting verification notes or changing
+ticket state. A passing recommendation requires every required scenario and its actual
+evidence. Where the agreed workflow calls for it, review and post the note before
+moving a passing ticket to Done. Keep draft, posted comment, recommendation, and
+observed tracker state separate. Do not repair product code in a reporting assignment
+unless that work was requested.
 
 For a readability pass, ask whether a reader can find the main observed behavior quickly,
 whether related behaviors are grouped when useful, and whether the prose describes system

@@ -1,5 +1,19 @@
 # QA verification changes
 
+## 0.5.0 — 2026-09-29
+
+- Establish specification examples and resolve conflicting product rules before
+  changing cases or automation.
+- Put ticket, case revision, automation identity, and actual run/result in the
+  scenario matrix; verify authorized case writes by readback.
+- Check the oracle, fixture realism, observation boundary and normal control before
+  presenting a finding as a confirmed bug; keep blocked prerequisites distinct.
+- Preserve the user's note-review gate and the separate comment and Done transition.
+- Identify repository, source and target branch, pull request and test ownership for
+  cross-repository QA changes.
+- Require actual automated or manual coverage for a Passed QA record; a case
+  definition or gap binding alone cannot supply executable coverage.
+
 ## 0.4.0 — 2026-09-29
 
 - Make the product or business outcome and its authoritative source explicit for each

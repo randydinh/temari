@@ -9,6 +9,7 @@
 {{Change / original failure, behavior covered, relevant excluded variants.}}
 
 - Requirement / acceptance source: {{ticket section, comment, spec revision or decision link}}
+- Examples and conflicts: {{input → action → expected observable result per required scenario; conflicting rule and decision owner, or none found}}
 - Scope eligibility: {{requested reviewer label/filter; confirmed membership and capture time}}
 - Related source / PR: {{commit-pinned links and comparison base when relevant}}
 - Verification depth and rationale: {{static sufficient / smoke / focused integration / broader regression; affected outcome + failure risk + minimum proof; provisional or historically unknown where appropriate}}
@@ -53,15 +54,19 @@ for other change types. Preserve missing evidence explicitly; proposed checks ar
 
 ## Test cases and execution links
 
-| Case                                                                     | Relationship and asserted subset                                               | Actual run/result                                      | Remaining coverage                        |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------ | ------------------------------------------------------ | ----------------------------------------- |
-| {{Testmo repository/project + case ID/link, or not found/not inspected}} | {{definition / local mapping / verified native association; exact assertions}} | {{run/result link + date/build, or not run/not found}} | {{manual/integration paths still needed}} |
+| Ticket and scenario | Case and revision | Automation and asserted subset | Actual run/result | Remaining coverage |
+| ------------------- | ----------------- | ------------------------------ | ----------------- | ------------------ |
+| {{ticket link + required scenario ID}} | {{Testmo project/repository + case link/revision + saved readback, or missing}} | {{test identity/revision, native link status and exact assertions, or missing}} | {{run/result link + candidate/date, including skipped or failed rows; or not run}} | {{manual/integration paths and ownership}} |
 
-Case existence and publication state are separate from execution status.
+Case existence, approval, automation mapping and execution status are separate facts.
+For a new case or correction, record the original expectation, authorized change and
+saved readback. Do not carry an incorrect case or linked failed row forward as a
+product defect without rechecking the oracle.
 
 ## Failures, risks and gaps
 
 - In-scope failure: {{expected vs observed, failing evidence, impact, linked defect or draft ID}}
+- Failure confidence: {{deployed/integration/component/source/reported boundary; oracle and fixture check; normal control; further proof needed before a bug claim}}
 - Adjacent observation/risk: {{boundary and uncertainty; avoid invented requirements}}
 - Blocked / not run / ambiguous: {{missing fixture/environment/observer/access or product decision; who can supply it; exact next check; observable pass/fail outcomes; consequence for acceptance}}
 - Accepted exception, if any: {{decision owner + dated link + rationale + follow-up; otherwise pending}}

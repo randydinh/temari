@@ -11,6 +11,7 @@ checks belong under Additional Observations.
 
 - Context: {{environment + candidate/build or unknown; relevant role/device/protocol; execution or historical note date}}
 - Selection: {{ticket link + requested reviewer-label membership; use a linked scope record if available}}
+- Expected examples: {{authoritative ticket/epic/spec decision; conflict or unresolved question; link full scenario matrix}}
 - Verification depth: {{level + brief risk-based reason; reported scope/unknown rationale for historical notes}}
 
 ## Change Summary (optional)
@@ -35,3 +36,5 @@ an optional follow-up.}}
 
 **{{Scoped disposition}}** — {{what the evidence establishes and what remains required}}.
 {{Keep existing workflow/approval separate when it differs or evidence is missing.}}
+{{If reviewer sign-off is required, label this as a draft until reviewed; distinguish
+posting the comment from moving a passing ticket to Done.}}
