@@ -470,6 +470,14 @@ process.stdin.on('end', () => {
       ).stdout,
     );
     assert.equal(publicResult.status, 'PASS');
+    assert.deepEqual(publicResult.hostBinding, {
+      entry: 'temari',
+      policyId: 'temari-public-lightweight-v1',
+      requestSha256: createHash('sha256')
+        .update(publicWorkerBytes)
+        .digest('hex'),
+      manifestSha256: manifestSha256(manifest),
+    });
     assert.notEqual(publicResult.builder.pid, publicResult.reviewer.pid);
     assert.equal(
       publicResult.reviewer.candidate.baseCommit,

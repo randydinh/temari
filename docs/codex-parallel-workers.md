@@ -111,7 +111,7 @@ The installed public Temari plugin also bundles the standalone router as `bin/co
 
 ## Host-run feature workers
 
-The installed `bin/temari.mjs` and `bin/poteto-mode.mjs` now expose `run-workers`. This command verifies the bundled artifact and an externally pinned request digest, selects `codex` from the host process environment, and runs one required implementer followed by a distinct required reviewer. The reviewer sees the exact verified integration commit in a separate read-only Codex process. The source checkout stays pinned. The command returns a retained report with the two PIDs, candidate commit, and hashes of both host observations; the report and observations are written exclusively under the evidence directory.
+The installed `bin/temari.mjs` and `bin/poteto-mode.mjs` now expose `run-workers`. This command verifies the bundled artifact and an externally pinned request digest, selects `codex` from the host process environment, and runs one required implementer followed by a distinct required reviewer. The reviewer sees the exact verified integration commit in a separate read-only Codex process. The source checkout stays pinned. The command returns a retained report with the two PIDs, candidate commit, hashes of both host observations, and the verified request and bundle digests; the report and observations are written exclusively under the evidence directory.
 
 Use the same digest flags as the public `start` command:
 

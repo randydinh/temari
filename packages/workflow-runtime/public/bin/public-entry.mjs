@@ -494,7 +494,16 @@ export async function run(entry, argv = process.argv.slice(2)) {
       pathToFileURL(join(root, 'host/local-worker.mjs')).href
     );
     finish(
-      await runLocalFeatureWorkerPair({ ...workerInput, executable: 'codex' }),
+      await runLocalFeatureWorkerPair({
+        ...workerInput,
+        executable: 'codex',
+        hostBinding: {
+          entry,
+          policyId: policy.policyId,
+          requestSha256: extra[requestDigestIndex + 1],
+          manifestSha256: extra[digestIndex + 1],
+        },
+      }),
     );
     return;
   }

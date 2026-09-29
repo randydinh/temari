@@ -261,7 +261,7 @@ export async function runLocalFeatureWorkerPair(input, signal) {
       'verify',
       'reviewer',
     ],
-    ['prepare'],
+    ['prepare', 'hostBinding'],
   );
   assert.match(
     input.runId,
@@ -275,6 +275,21 @@ export async function runLocalFeatureWorkerPair(input, signal) {
     input.reviewer.id,
     'Builder and reviewer must have distinct identities.',
   );
+  if (input.hostBinding !== undefined) {
+    exactFields(input.hostBinding, [
+      'entry',
+      'policyId',
+      'requestSha256',
+      'manifestSha256',
+    ]);
+    assert(['temari', 'poteto-mode'].includes(input.hostBinding.entry));
+    assert.match(
+      input.hostBinding.policyId,
+      /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/,
+    );
+    assert.match(input.hostBinding.requestSha256, /^[0-9a-f]{64}$/);
+    assert.match(input.hostBinding.manifestSha256, /^[0-9a-f]{64}$/);
+  }
   const candidateRoot = await existingDirectory(
     input.candidateRoot,
     'candidateRoot',
@@ -346,6 +361,9 @@ export async function runLocalFeatureWorkerPair(input, signal) {
     status: 'PASS',
     runId: input.runId,
     revision: input.revision,
+    ...(input.hostBinding === undefined
+      ? {}
+      : { hostBinding: input.hostBinding }),
     source: build.candidate,
     integratedCommit: build.integratedCommit,
     builder: {
