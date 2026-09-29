@@ -19,6 +19,9 @@
 - Require a revisioned product-intent baseline and independently derived oracles;
   retain missing capabilities and preexisting rule violations even when current
   code and tests agree, with conflicts explicit until resolved.
+- Render confirmed developer defects in the selected project's exact bug template;
+  keep missing fields and uncertain severity explicit instead of replacing the
+  tracker standard with a QA note or custom report.
 
 ## 0.5.0 — 2026-09-29
 

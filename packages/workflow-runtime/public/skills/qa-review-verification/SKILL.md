@@ -310,11 +310,18 @@ environment. Do not use customer-owned records or equipment as a substitute. Res
 Blocked for a prerequisite that is actually unavailable, unsafe, or outside authority.
 
 When a confirmed failure needs a developer ticket, use the user's established tracker
-bug template if available. Lead with the observed problem, include direct failing
-evidence and a relevant successful comparison, then give environment, preconditions,
-minimal reproduction, expected and actual behavior. Label reported, reproduced and
-source-supported claims accurately; keep an unsupported root cause out of the ticket.
-Drafting that bug does not turn a QA assignment into defect repair.
+bug template. Load the approved project template or user-provided reference before
+drafting, and preserve its required headings, field order and field meanings. A QA
+verification note or a custom report layout is not a substitute. If the template is
+unavailable, label the draft provisional and identify the missing template instead of
+claiming it meets the tracker standard. Lead with the observed problem, include direct
+failing evidence and a relevant successful comparison, then fill the template's
+environment, trigger, affected-user, precondition, replication, expected/actual,
+resolution and verification fields where required. Mark unknown severity or other
+required facts for confirmation rather than inventing them. Before posting, compare
+the rendered draft with the selected template field by field. Label reported,
+reproduced and source-supported claims accurately; keep an unsupported root cause out
+of the ticket. Drafting that bug does not turn a QA assignment into defect repair.
 
 Honor a project or user review gate before posting verification notes or changing
 ticket state. A passing recommendation requires every required scenario and its actual
