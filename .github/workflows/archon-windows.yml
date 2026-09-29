@@ -6,6 +6,7 @@ on:
       - 'codex/**'
     paths:
       - '.github/workflows/archon-windows.yml'
+      - '.gitattributes'
       - 'libs/archon-harness/**'
       - 'libs/contracts/**'
       - 'libs/temari-core/**'
