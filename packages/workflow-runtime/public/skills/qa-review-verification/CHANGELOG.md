@@ -14,6 +14,14 @@
 - Preserve target-profile identity, permission and safe evidence boundaries for
   browser checks; distinguish proposed scenarios, generated tests and observed
   attempts, and triage ambiguous failures before calling them product defects.
+- Permit a requirement-backed regression test to fail on the broken baseline
+  and pass on the repaired candidate; preserve both attempt results.
+- Require a revisioned product-intent baseline and independently derived oracles;
+  retain missing capabilities and preexisting rule violations even when current
+  code and tests agree, with conflicts explicit until resolved.
+- Render confirmed developer defects in the selected project's exact bug template;
+  keep missing fields and uncertain severity explicit instead of replacing the
+  tracker standard with a QA note or custom report.
 
 ## 0.5.0 — 2026-09-29
 

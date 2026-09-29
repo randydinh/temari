@@ -10,7 +10,14 @@
   },
   "include": ["src/**/*.ts"],
   "references": [
-    { "path": "../contracts/tsconfig.lib.json" },
-    { "path": "../privacy/tsconfig.lib.json" }
+    {
+      "path": "../temari-core/tsconfig.lib.json"
+    },
+    {
+      "path": "../privacy/tsconfig.lib.json"
+    },
+    {
+      "path": "../contracts/tsconfig.lib.json"
+    }
   ]
 }

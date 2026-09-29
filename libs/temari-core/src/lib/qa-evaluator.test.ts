@@ -8,6 +8,8 @@ import {
 } from './qa-review-record.js';
 import {
   createQaEvaluationInput,
+  createQaEvaluationInputFromDraft,
+  deriveQaEvidenceFindings,
   deriveQaEvaluatorDecision,
   type QaEvaluationFinding,
 } from './qa-evaluator.js';
@@ -115,6 +117,23 @@ test('builds an evaluator allowlist without author or write controls', () => {
   assert.equal(input.priorRounds[0]?.verdict, 'BLOCKED');
 });
 
+test('validates an unevaluated draft without retaining a made-up round', () => {
+  const input = createQaEvaluationInputFromDraft({
+    schemaVersion: BASE_RECORD.schemaVersion,
+    reviewRevision: BASE_RECORD.reviewRevision,
+    parentRevision: BASE_RECORD.parentRevision,
+    authorId: BASE_RECORD.authorId,
+    assignment: BASE_RECORD.assignment,
+    plan: BASE_RECORD.plan,
+    areaDecisions: BASE_RECORD.areaDecisions,
+    scenarios: BASE_RECORD.scenarios,
+    residualRisks: BASE_RECORD.residualRisks,
+  });
+
+  assert.deepEqual(input.priorRounds, []);
+  assert.equal(input.frozenReview.reviewRevision, 'review-revision-1');
+});
+
 test('blocks evaluation without a proven fresh context', () => {
   assert.deepEqual(
     deriveQaEvaluatorDecision({
@@ -176,6 +195,58 @@ test('passes only when no important finding remains open', () => {
     }).verdict,
     'PASS',
   );
+});
+
+test('identifies an incomplete required scenario', () => {
+  const record = createQaReviewRecord(BASE_RECORD);
+  const findings = deriveQaEvidenceFindings(createQaEvaluationInput(record));
+
+  assert.deepEqual(
+    findings.map((finding) => [finding.findingId, finding.severity]),
+    [['scenario-scenario-1-notrun', 'Important']],
+  );
+});
+
+test('identifies an unresolved review area', () => {
+  const record = createQaReviewRecord({
+    ...BASE_RECORD,
+    areaDecisions: BASE_RECORD.areaDecisions.map((decision, index) =>
+      index === 0
+        ? {
+            ...decision,
+            status: 'NeedsInvestigation',
+            basis: 'the scope boundary has not been established',
+          }
+        : decision,
+    ),
+  });
+  const findings = deriveQaEvidenceFindings(createQaEvaluationInput(record));
+
+  assert.equal(
+    findings.some(
+      (finding) =>
+        finding.findingId === `area-${QA_REVIEW_AREAS[0]}-unresolved` &&
+        finding.severity === 'Important',
+    ),
+    true,
+  );
+});
+
+test('identifies a failed required scenario as blocking', () => {
+  const record = createQaReviewRecord({
+    ...BASE_RECORD,
+    scenarios: [
+      {
+        ...BASE_RECORD.scenarios[0],
+        result: 'Failed',
+        nextAction: 'repair the product behavior',
+      },
+    ],
+  });
+  const findings = deriveQaEvidenceFindings(createQaEvaluationInput(record));
+
+  assert.equal(findings.at(-1)?.findingId, 'scenario-scenario-1-failed');
+  assert.equal(findings.at(-1)?.severity, 'Blocking');
 });
 
 test('blocks rounds outside the three-round evaluation bound', () => {

@@ -71,6 +71,16 @@ When a selected Registrar record or graph path is missing, stale, or misleading,
 record the source and correction needed for an authorized knowledge-maintenance
 follow-up. Do not silently keep using the bad context.
 
+Before choosing assertions, retain a bounded expected-behavior baseline: the
+applicable approved requirement or product decision and revision, affected actor
+and business outcome, preconditions and permissions, state/data invariants,
+observable results, and unresolved conflicts or assumptions with their decision
+owner. Identify the authority for this scope rather than imposing one universal
+document ranking. Current code, UI, tests and older builds are implementation
+observations; agreement among them cannot redefine the promised behavior. If
+intent is unclear, mark the affected expectation unresolved and continue checks
+that do not depend on it.
+
 For related applications, retain one small context packet per ticket or feature group:
 selected requirement and decision revisions, Registrar query and read receipts, graph
 paths and snapshot, candidate source locations, and known gaps. Reuse it only after
@@ -179,6 +189,12 @@ Carry one stable inventory of distinct required scenarios and assess each of the
 canonical QA review areas for applicability; a large scenario count is not a quota.
 If the current route or host cannot execute the full review and independent challenge,
 retain the inventory and exact blocked obligations, then report partial work honestly.
+Derive required scenarios from the intended outcomes first, including capabilities
+missing from the current UI or code. Add implementation risks after that. Choose
+the least costly reliable unit, property, API, integration, UI or exploratory check
+that can observe each claim. Derive expected values independently of production
+calculations and test helpers; shared arithmetic or data rules can make code and
+tests agree while both violate the requirement.
 
 When the project requires test-management records, reconcile each settled example with
 its case definition before running or revising automation. Create or update cases only
@@ -210,15 +226,22 @@ the relevant boundary; production is not automatically required. If the remainin
 check is manual, give the tester a concise run sheet with setup, actions, expected and
 failing observations, independent readback, and cleanup. Before describing a finding
 as a regression from a base branch, verify the behavior existed there; new paths on a
-release branch are not proven regressions from a base that lacks them.
+release branch are not proven regressions from a base that lacks them. A rule
+violation that existed on the base can still be a product defect; unchanged
+behavior is not a pass when the approved intent says otherwise. Classify a
+reported behavior as intentional or a feature request only with product-decision
+support. A repair cannot silently change the expected result to match the code.
 For browser evidence, retain the target profile revision, candidate build,
 environment, persona, permitted actions, owned data, and sanitized trace or
 screenshot references. Saved browser auth state is credential material. Keep
 proposed scenarios, selected checks, generated automation, and observed attempts
 distinct. Triage a failed attempt as a suspected product defect, test defect,
 environment issue, or unresolved, with the observation and next discriminating
-check. A generated Playwright test is not proof until its intended behavior is
-confirmed and its assertions pass on the named target branch.
+check. A generated Playwright test is not proof of a QA pass. Confirm its
+expected behavior from the requirement, then retain its observed assertion
+results on each named candidate. A valid regression test can fail on a broken
+baseline and pass on the repaired candidate; do not weaken the assertion to
+make the earlier failure disappear.
 
 Label the verification boundary on every result:
 
@@ -287,11 +310,18 @@ environment. Do not use customer-owned records or equipment as a substitute. Res
 Blocked for a prerequisite that is actually unavailable, unsafe, or outside authority.
 
 When a confirmed failure needs a developer ticket, use the user's established tracker
-bug template if available. Lead with the observed problem, include direct failing
-evidence and a relevant successful comparison, then give environment, preconditions,
-minimal reproduction, expected and actual behavior. Label reported, reproduced and
-source-supported claims accurately; keep an unsupported root cause out of the ticket.
-Drafting that bug does not turn a QA assignment into defect repair.
+bug template. Load the approved project template or user-provided reference before
+drafting, and preserve its required headings, field order and field meanings. A QA
+verification note or a custom report layout is not a substitute. If the template is
+unavailable, label the draft provisional and identify the missing template instead of
+claiming it meets the tracker standard. Lead with the observed problem, include direct
+failing evidence and a relevant successful comparison, then fill the template's
+environment, trigger, affected-user, precondition, replication, expected/actual,
+resolution and verification fields where required. Mark unknown severity or other
+required facts for confirmation rather than inventing them. Before posting, compare
+the rendered draft with the selected template field by field. Label reported,
+reproduced and source-supported claims accurately; keep an unsupported root cause out
+of the ticket. Drafting that bug does not turn a QA assignment into defect repair.
 
 Honor a project or user review gate before posting verification notes or changing
 ticket state. A passing recommendation requires every required scenario and its actual

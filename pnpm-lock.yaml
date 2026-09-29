@@ -52,6 +52,9 @@ importers:
       '@temari/privacy':
         specifier: workspace:*
         version: link:../privacy
+      '@temari/temari-core':
+        specifier: workspace:^
+        version: link:../temari-core
 
   libs/knowledge:
     dependencies:
