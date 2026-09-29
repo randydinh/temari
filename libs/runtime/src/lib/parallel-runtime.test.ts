@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -321,6 +322,131 @@ test('retains a thrown handler as FAILED mechanics and a blocked semantic receip
       result.tasks[0]?.error,
       'lease expired while contacting worker',
     );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('persists bounded diagnostics for blank and oversized worker failures', async (t) => {
+  const oversized = 'worker failed: '.repeat(400);
+  const combined = `${'handler failure; '.repeat(200)}lease renewal failed: ${'timeout '.repeat(200)}`;
+  const cases = [
+    {
+      name: 'empty Error',
+      thrown: new Error(''),
+      expected: 'Worker failed without a diagnostic message.',
+    },
+    {
+      name: 'whitespace Error',
+      thrown: new Error('   '),
+      expected: 'Worker failed without a diagnostic message.',
+    },
+    { name: 'oversized Error', thrown: new Error(oversized), expected: null },
+    {
+      name: 'combined oversized Error',
+      thrown: new Error(combined),
+      expected: null,
+    },
+    {
+      name: 'unprintable thrown value',
+      thrown: {
+        toString: () => {
+          throw new Error('unprintable');
+        },
+      },
+      expected: 'Worker failed without a diagnostic message.',
+    },
+  ];
+
+  for (const [index, entry] of cases.entries()) {
+    await t.test(entry.name, async () => {
+      const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
+      try {
+        const childStore = await FileChildTaskStore.create(
+          join(root, 'children'),
+        );
+        const receiptStore = await FileParallelWorkerReceiptStore.create(
+          join(root, 'receipts'),
+        );
+        const completed = await executeRestartableParallelWorkers({
+          runId: `parallel-runtime-error-${index}`,
+          revision: `revision-parallel-runtime-error-${index}`,
+          plan: parallelPlan('feature', 1),
+          capabilities: parallelCapabilities(),
+          assignments: workerAssignments(1),
+          childStore,
+          receiptStore,
+          owner: 'worker-a',
+          leaseMs: 30_000,
+          now: fixedClock(),
+          handler: () => {
+            throw entry.thrown;
+          },
+        });
+
+        const task = completed.tasks[0];
+        assert(task);
+        assert.equal(completed.state, 'COMPLETE');
+        assert.equal(completed.receipt?.status, 'BLOCKED');
+        assert.equal(completed.receipt?.failure?.kind, 'worker-error');
+        assert.equal(task.status, 'FAILED');
+        assert.equal(task.result, null);
+        assert(task.error);
+        assert(task.error.trim().length > 0);
+        assert(task.error.length <= 4096);
+        assert.equal(completed.receipt?.outcomes[0]?.error, task.error);
+        assert.deepEqual(await childStore.load(task.taskId), task);
+        assert.equal(
+          (await childStore.events(task.taskId)).at(-1)?.type,
+          'task-completed',
+        );
+        if (entry.expected !== null) {
+          assert.equal(task.error, entry.expected);
+        } else {
+          const original = (entry.thrown as Error).message;
+          const digest = createHash('sha256').update(original).digest('hex');
+          assert.equal(task.error.length, 4096);
+          assert(task.error.endsWith(`... [truncated; sha256=${digest}]`));
+        }
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    });
+  }
+});
+
+test('an oversized first failure remains retryable under the attempt bound', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-parallel-runtime-'));
+  try {
+    const childStore = await FileChildTaskStore.create(join(root, 'children'));
+    const receiptStore = await FileParallelWorkerReceiptStore.create(
+      join(root, 'receipts'),
+    );
+    let calls = 0;
+    const completed = await executeRestartableParallelWorkers({
+      runId: 'parallel-runtime-error-retry',
+      revision: 'revision-parallel-runtime-error-retry',
+      plan: parallelPlan('feature', 1),
+      capabilities: parallelCapabilities(),
+      assignments: workerAssignments(1),
+      childStore,
+      receiptStore,
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      retryPolicy: { maxAttempts: 2 },
+      now: fixedClock(),
+      handler: () => {
+        calls += 1;
+        if (calls === 1) throw new Error('x'.repeat(4097));
+        return result('retry succeeded');
+      },
+    });
+
+    assert.equal(calls, 2);
+    assert.equal(completed.state, 'COMPLETE');
+    assert.equal(completed.receipt?.status, 'PASS');
+    assert.equal(completed.tasks[0]?.attempt, 2);
+    assert.equal(completed.tasks[0]?.status, 'SUCCEEDED');
   } finally {
     await rm(root, { recursive: true, force: true });
   }

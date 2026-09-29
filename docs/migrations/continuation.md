@@ -4,6 +4,17 @@ This record is for the maintainer who resumes the migration. Read the current
 Git state and pull requests before acting. A checked implementation item does
 not replace acceptance evidence from the installed product.
 
+## NX-04 continuation — 2026-09-29
+
+The isolated privacy branch has integrated current main through merged PR #78.
+It retains the provider-neutral protected transport and adds an optional direct
+Responses driver. The direct driver has synthetic HTTP, host-boundary, and
+relocated Archon evidence; it has not made a credentialed model request. The
+Codex CLI driver still refuses its installed runtime preflight. Keep live
+private use blocked until the selected provider/model path has a credentialed
+canary, independent egress review, and operator approval. PR #58 remains draft
+while these gates are open. The original dirty source checkout is unchanged.
+
 ## NX-04 privacy integration handoff — 2026-09-28
 
 The privacy source is on the isolated
@@ -38,6 +49,14 @@ new independent review remain pending. The real installed Codex preflight
 refused `runtime-version` before credentials. Keep private use blocked pending
 compatible runtime isolation, independent review, and explicit operator
 cutover approval.
+
+## Deferred evaluation
+
+- [ ] Run the [independent QA output comparison](./qa-output-comparison.md)
+      with separate agent sessions, pinned versions, and blind scoring. The
+      first pilot used one agent and showed only that both workflows accepted
+      an identical test. It did not establish comparative output quality or a
+      v4.1 retirement gate.
 
 ## NX-02 installed closeout handoff — 2026-09-28
 

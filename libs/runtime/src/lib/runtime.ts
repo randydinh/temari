@@ -945,6 +945,7 @@ export async function executeScheduledAndPersist(
   await request.runStore.appendEvent({
     runId: request.runId,
     actor: request.owner,
+    leaseToken,
     idempotencyKey: `dispatch:${request.runId}:${attempt}`,
     payload: { attempt, revision: request.revision },
     now: now(),

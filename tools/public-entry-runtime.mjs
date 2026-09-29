@@ -25,6 +25,7 @@ const toolPath = fileURLToPath(import.meta.url);
 const workspace = resolve(dirname(toolPath), '..');
 const manifestName = 'public-entry-manifest.json';
 const entries = ['temari', 'poteto-mode', 'closeout'];
+const generatedFiles = ['bin/codex-parallel.mjs'];
 const publicFiles = [
   ['packages/workflow-runtime/public/policy.json', 'policy.json'],
   [
@@ -36,6 +37,7 @@ const publicFiles = [
   ['packages/workflow-runtime/host/source.mjs', 'host/source.mjs'],
   ['packages/workflow-runtime/host/invocation.mjs', 'host/invocation.mjs'],
   ['packages/workflow-runtime/host/closeout.mjs', 'host/closeout.mjs'],
+  ['packages/workflow-runtime/host/local-worker.mjs', 'host/local-worker.mjs'],
   [
     'packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbook-contracts/v1/lightweight-engineering.json',
     'source/lightweight-engineering.json',
@@ -47,6 +49,10 @@ const publicFiles = [
   [
     'packages/workflow-runtime/public/bin/public-entry.mjs',
     'bin/public-entry.mjs',
+  ],
+  [
+    'packages/workflow-runtime/public/bin/overlay-check.mjs',
+    'bin/overlay-check.mjs',
   ],
   ['packages/workflow-runtime/public/bin/temari.mjs', 'bin/temari.mjs'],
   [
@@ -63,9 +69,24 @@ const publicFiles = [
     'skills/poteto-mode/SKILL.md',
   ],
   [
+    'packages/workflow-runtime/public/skills/poteto-mode/references/codex-parallel-workers.md',
+    'skills/poteto-mode/references/codex-parallel-workers.md',
+  ],
+  [
     'packages/workflow-runtime/public/skills/closeout/SKILL.md',
     'skills/closeout/SKILL.md',
   ],
+  ...[
+    'SKILL.md',
+    'CHANGELOG.md',
+    'references/maintenance.md',
+    'assets/ticket-comment.md',
+    'assets/ticket-verification.md',
+    'assets/release-qa-report.md',
+  ].map((path) => [
+    `packages/workflow-runtime/public/skills/qa-review-verification/${path}`,
+    `skills/qa-review-verification/${path}`,
+  ]),
 ];
 
 function digest(content) {
@@ -259,6 +280,7 @@ export async function checkPublicEntryArtifact(root, expectedManifestSha256) {
   );
   const expectedPaths = [
     ...publicFiles.map(([, destination]) => destination),
+    ...generatedFiles,
     ...[...files.keys()].filter((path) => path.startsWith('runtime/')),
     manifestName,
   ].sort();
@@ -268,6 +290,9 @@ export async function checkPublicEntryArtifact(root, expectedManifestSha256) {
   const plugin = JSON.parse(files.get('.codex-plugin/plugin.json').toString());
   assert.equal(plugin.name, 'temari');
   assert.equal(plugin.skills, './skills/');
+  assert.equal(manifest.build.parallelBundler.name, 'bun');
+  assert.match(manifest.build.parallelBundler.version, /^\d+\.\d+\.\d+/);
+  assert(files.has('bin/codex-parallel.mjs'));
   for (const entry of entries) {
     const path = `bin/${entry}.mjs`;
     assert(files.has(path), `Missing public entry: ${entry}`);
@@ -339,6 +364,31 @@ export async function packagePublicEntries(
         destination.startsWith('bin/'),
       );
     }
+    const parallelBundle = join(staging, generatedFiles[0]);
+    const parallelMetafile = join(staging, 'parallel-metafile.json');
+    execFileSync(
+      'bun',
+      [
+        'build',
+        '--target=node',
+        '--format=esm',
+        '--reject-unresolved',
+        `--metafile=${parallelMetafile}`,
+        `--outfile=${parallelBundle}`,
+        'tools/run-codex-parallel.mts',
+      ],
+      { cwd: workspace, encoding: 'utf8' },
+    );
+    const parallelInputs = Object.keys(
+      JSON.parse(await readFile(parallelMetafile, 'utf8')).inputs,
+    );
+    assert(parallelInputs.includes('tools/run-codex-parallel.mts'));
+    for (const source of parallelInputs) {
+      safePath(source);
+      sourceFiles.set(source, await readFile(join(workspace, source)));
+    }
+    await rm(parallelMetafile);
+    await chmod(parallelBundle, 0o755);
 
     const canonicalBytes = await readFile(
       join(runtime, 'canonical-manifest.json'),
@@ -352,6 +402,12 @@ export async function packagePublicEntries(
       },
       build: {
         node: process.version,
+        parallelBundler: {
+          name: 'bun',
+          version: execFileSync('bun', ['--version'], {
+            encoding: 'utf8',
+          }).trim(),
+        },
         tool: record(
           'tools/public-entry-runtime.mjs',
           await readFile(toolPath),

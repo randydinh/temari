@@ -297,9 +297,12 @@ function immutableGroupRecord(
   });
 }
 
+export const MAX_CHILD_TASK_ERROR_LENGTH = 4096;
+
 function assertError(error: string | null): void {
   assert(
-    error === null || (error.trim().length > 0 && error.length <= 4096),
+    error === null ||
+      (error.trim().length > 0 && error.length <= MAX_CHILD_TASK_ERROR_LENGTH),
     'Task error must be non-empty and no longer than 4096 characters.',
   );
 }
