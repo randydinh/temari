@@ -14,6 +14,8 @@
 - Preserve target-profile identity, permission and safe evidence boundaries for
   browser checks; distinguish proposed scenarios, generated tests and observed
   attempts, and triage ambiguous failures before calling them product defects.
+- Permit a requirement-backed regression test to fail on the broken baseline
+  and pass on the repaired candidate; preserve both attempt results.
 
 ## 0.5.0 — 2026-09-29
 

@@ -217,8 +217,11 @@ screenshot references. Saved browser auth state is credential material. Keep
 proposed scenarios, selected checks, generated automation, and observed attempts
 distinct. Triage a failed attempt as a suspected product defect, test defect,
 environment issue, or unresolved, with the observation and next discriminating
-check. A generated Playwright test is not proof until its intended behavior is
-confirmed and its assertions pass on the named target branch.
+check. A generated Playwright test is not proof of a QA pass. Confirm its
+expected behavior from the requirement, then retain its observed assertion
+results on each named candidate. A valid regression test can fail on a broken
+baseline and pass on the repaired candidate; do not weaken the assertion to
+make the earlier failure disappear.
 
 Label the verification boundary on every result:
 
