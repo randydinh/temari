@@ -338,6 +338,119 @@ test('both engineering skills reach the complete versioned QA writer inside the 
   }
 });
 
+test('installed overlay checker accepts pinned external assets and refuses incompatible overlays', async () => {
+  const checker = join(output, 'bin/overlay-check.mjs');
+  const publicDigest = manifestSha256(manifest);
+  const absent = await child([
+    checker,
+    '--expected-manifest-sha256',
+    publicDigest,
+  ]);
+  assert.equal(absent.status, 'compatible');
+  assert.equal(absent.overlayId, null);
+
+  const overlayRoot = await mkdtemp(join(tmpdir(), 'temari-overlay-'));
+  const assetPath = 'knowledge/context.md';
+  const assetBytes = Buffer.from('Sanitized overlay fixture.\n');
+  const assetFile = join(overlayRoot, assetPath);
+  const overlayManifest = {
+    schemaVersion: 1,
+    overlayId: 'fixture-overlay',
+    compatiblePublicManifestSha256: publicDigest,
+    assets: [
+      {
+        path: assetPath,
+        kind: 'knowledge',
+        sha256: createHash('sha256').update(assetBytes).digest('hex'),
+        bytes: assetBytes.length,
+      },
+    ],
+    credentialRefs: [
+      {
+        id: 'model',
+        provider: 'openai',
+        handle: 'credential-ref:fixture-model',
+      },
+    ],
+  };
+  const run = async (value, expectedCode = 0) => {
+    const bytes = Buffer.from(`${JSON.stringify(value)}\n`);
+    await writeFile(join(overlayRoot, 'temari-overlay.json'), bytes);
+    return childResult(
+      [
+        checker,
+        '--expected-manifest-sha256',
+        publicDigest,
+        '--overlay-root',
+        overlayRoot,
+        '--expected-overlay-sha256',
+        createHash('sha256').update(bytes).digest('hex'),
+      ],
+      expectedCode,
+    );
+  };
+  try {
+    await mkdir(join(overlayRoot, 'knowledge'));
+    await writeFile(assetFile, assetBytes);
+    const accepted = await run(overlayManifest);
+    assert.equal(accepted.code, 0);
+    const report = JSON.parse(accepted.stdout);
+    assert.equal(report.overlayId, 'fixture-overlay');
+    assert.equal(report.assetCount, 1);
+    assert.equal(report.credentialReferenceCount, 1);
+    assert(!accepted.stdout.includes('fixture-model'));
+
+    await writeFile(assetFile, 'Changed overlay fixture.\n');
+    assert.equal((await run(overlayManifest, 1)).code, 1);
+    await writeFile(assetFile, assetBytes);
+    assert.equal(
+      (
+        await run(
+          {
+            ...overlayManifest,
+            compatiblePublicManifestSha256: '0'.repeat(64),
+          },
+          1,
+        )
+      ).code,
+      1,
+    );
+    assert.equal(
+      (
+        await run(
+          {
+            ...overlayManifest,
+            credentialRefs: [
+              {
+                ...overlayManifest.credentialRefs[0],
+                value: 'forbidden-secret',
+              },
+            ],
+          },
+          1,
+        )
+      ).code,
+      1,
+    );
+    assert.equal(
+      (
+        await run(
+          {
+            ...overlayManifest,
+            assets: [{ ...overlayManifest.assets[0], path: '../outside.md' }],
+          },
+          1,
+        )
+      ).code,
+      1,
+    );
+    await writeFile(join(overlayRoot, 'undeclared.txt'), 'extra');
+    assert.equal((await run(overlayManifest, 1)).code, 1);
+  } finally {
+    await rm(overlayRoot, { recursive: true, force: true });
+  }
+});
+
 test('public policy records the exact reviewed legacy profile and playbook provenance', async () => {
   const policy = JSON.parse(
     await readFile(join(output, 'policy.json'), 'utf8'),
