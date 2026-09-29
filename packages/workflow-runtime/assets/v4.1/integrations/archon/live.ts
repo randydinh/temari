@@ -248,10 +248,9 @@ async function model(frozen: Frozen, role: "build" | "review", launch: Authorize
   await writeJson(schemaPath, responseSchema);
   const playbook = join(launch.context, "feature.md");
   const prompt = `You are the bounded delegated ${role === "build" ? "implementation owner" : "independent reviewer"} for Temari's Feature playbook. Invoke only this bounded role from the packaged Feature instructions at ${playbook}. Read that file. The coordinator has completed planning and owns orchestration, verification, Git and delivery. Do not load full orchestration, delegate, commit, retry, or expand scope. You are explicitly forbidden to spawn; the Feature playbook permits the forbidden worker to own its assigned diff directly.\n\n${recipe.task}\n${role === "build" ? `Your only writable output is the existing ${recipe.actorFilename} in this scratch directory. Do not add other files. Tests and Git are controller owned. Report changedFiles as exactly ${JSON.stringify([recipe.repositoryPath])} when implemented: this names the controller's repository destination, not an additional scratch path to create. Return blocked honestly if needed. Report changedFiles as [] when blocked.` : "Tools are read-only. Inspect source, tests, the actual baseline-to-HEAD commit diff, supplied observed test output and planning. Assess semantic adherence and explain any deviations. Return reject for actionable problems. Do not repair code."}\n\nInvocation ID: ${invocationId}\nExpected ${role === "build" ? "baseline" : "identity"}: ${JSON.stringify(expected)}\n\n${context}\n\nReturn only the structured final object. Never claim tests you did not run or planning you did not perform.\n`;
-  await writeFile(join(control, `${role}-prompt.txt`), prompt, { flag: "wx" });
-  process.stderr.write(`${JSON.stringify({ kind: "live-invocation", ...invocation, expected })}\n`);
+  process.stderr.write(`${JSON.stringify({ kind: "live-invocation", role, task: recipe.id, privacyCoverage: "explicit-request-only" })}\n`);
   await assertPilotExecution(frozen.execution, launch);
-  const result = await executeCodex({ launch, executable: frozen.codex, cwd: launch.cwd, ...frozen.routing.roles[role], role, prompt, schema: schemaPath, lastMessage: join(control, `${role}-last-message.json`) });
+  const result = await executeCodex({ launch, executable: frozen.codex, cwd: launch.cwd, ...frozen.routing.roles[role], role, prompt, schema: schemaPath, lastMessage: join(control, `${role}-last-message.json`), promptArtifact: join(control, `${role}-prompt.txt`) });
   await assertPilotExecution(frozen.execution, launch);
   const keys = role === "build" ? ["verdict", "invocationId", "baseline", "summary", "changedFiles"] : ["verdict", "invocationId", "identity", "rationale", "designAdherence", "inspectedFiles", "findings"];
   const verdict = object(result.final, keys, `${role} verdict`);
@@ -264,7 +263,7 @@ async function model(frozen: Frozen, role: "build" | "review", launch: Authorize
     if (!nonempty(verdict.rationale) || !nonempty(verdict.designAdherence) || !Array.isArray(verdict.findings) || verdict.findings.some(finding => !nonempty(finding)) || !same(verdict.inspectedFiles, [recipe.actorFilename, recipe.testFilename, ...recipe.references, "commit-diff", "planning"])) throw new Error("invalid reviewer findings or inspection report");
     if (verdict.verdict !== "accept" || verdict.findings.length !== 0) throw new Error("reviewer rejected candidate or returned contradictory acceptance");
   }
-  const report = { ...invocation, threadId: result.threadId, turnId: result.turnId, observed: result.observed, finalSha256: hash(result.finalText), verdict };
+  const report = { ...invocation, threadId: result.threadId, turnId: result.turnId, observed: result.observed, privacyCoverage: result.privacyCoverage, finalSha256: hash(result.finalText), verdict };
   await writeJson(join(control, `${role}-result.json`), report);
   return report;
 }

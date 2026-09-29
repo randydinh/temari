@@ -20,16 +20,51 @@
       "type:distribution"
     ],
     "targets": {
+      "privacy-generate": {
+        "command": "node tools/generate-privacy-runtime.mjs --write",
+        "cache": false
+      },
+      "privacy-check": {
+        "command": "node tools/generate-privacy-runtime.mjs --check",
+        "cache": false
+      },
+      "privacy-test": {
+        "command": "node --test tools/generate-privacy-runtime.test.mjs && bun test tools/privacy-adapter.test.mjs",
+        "dependsOn": [
+          "privacy-check"
+        ],
+        "cache": false
+      },
+      "privacy-native-test": {
+        "command": "node --import @swc-node/register/esm-register tools/run-privacy-native-tests.mjs",
+        "dependsOn": [
+          "privacy-check"
+        ],
+        "cache": false
+      },
+      "privacy-preflight": {
+        "command": "node --import @swc-node/register/esm-register tools/privacy-preflight.mjs",
+        "cache": false
+      },
       "test": {
         "command": "node --import @swc-node/register/esm-register --test packages/workflow-runtime/src/lib/workflow-runtime.test.ts",
+        "dependsOn": [
+          "privacy-check"
+        ],
         "cache": true
       },
       "package": {
         "command": "node --import @swc-node/register/esm-register packages/workflow-runtime/src/cli.ts package",
+        "dependsOn": [
+          "privacy-check"
+        ],
         "cache": false
       },
       "check": {
         "command": "node --import @swc-node/register/esm-register packages/workflow-runtime/src/cli.ts check",
+        "dependsOn": [
+          "privacy-check"
+        ],
         "cache": false
       },
       "canonical-package": {

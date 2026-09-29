@@ -49,6 +49,9 @@ importers:
       '@temari/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@temari/privacy':
+        specifier: workspace:*
+        version: link:../privacy
 
   libs/knowledge:
     dependencies:
@@ -71,6 +74,8 @@ importers:
       '@temari/workflow-engine':
         specifier: workspace:*
         version: link:../workflow-engine
+
+  libs/privacy: {}
 
   libs/runtime:
     dependencies:

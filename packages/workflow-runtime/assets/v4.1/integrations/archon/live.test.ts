@@ -210,15 +210,17 @@ test("synthetic command failure can recover within a successful actor turn", asy
   for (const stage of ["build", "review"]) {
     const pointer = await json(join(request.artifactsDirectory, "temari-bridge/stages", `${stage}.json`));
     const events = (await readFile(join(request.artifactsDirectory, "temari-bridge/attempts", pointer.attempt, "stdout.log"), "utf8")).trim().split("\n").map(line => JSON.parse(line));
-    const commands = events.filter(event => event.method === "item/completed" && event.params.item.type === "commandExecution").map(event => ({ id: event.params.item.id, status: event.params.item.status, exitCode: event.params.item.exitCode }));
-    expect(commands).toEqual([{ id: "failed-command", status: "failed", exitCode: 128 }, { id: "recovery-command", status: "completed", exitCode: 0 }]);
+    const commands = events.filter(event => event.method === "item/completed" && event.item?.type === "commandExecution").map(event => ({ status: event.item.status, exitCode: event.item.exitCode }));
+    expect(commands).toEqual([{ status: "failed", exitCode: 128 }, { status: "completed", exitCode: 0 }]);
+    expect(JSON.stringify(events)).not.toContain("Source inspected without Git");
+    expect(JSON.stringify(events)).not.toContain("git status --short");
   }
 }, 20_000);
 
 test("synthetic command recovery still rejects a failed terminal turn", async () => {
   const request = await fixture("rpc-command-failed-turn");
   await expect(captureStage(request, "build")).rejects.toThrow("command failed");
-  expect(await failedLog(request, "build")).toContain("Codex turn did not complete successfully");
+  expect(await failedLog(request, "build")).toContain("Codex protocol or privacy validation failed");
   expect(await Bun.file(join(request.root, "control/build-result.json")).exists()).toBe(false);
   expect(await readFile(join(request.repositoryRoot, "charge-cost.ts"), "utf8")).not.toBe(solution);
 });
@@ -449,7 +451,7 @@ async function transport(code: string, limit: Record<string, number> = {}, task:
   return executeCodex({ launch, executable: file, cwd: root, model: "synthetic-model", reasoning: "xhigh", role: "build", prompt: "Synthetic protocol test", schema: join(root, "schema.json"), lastMessage }, limit);
 }
 test("fake app-server rejects unsupported effective configuration before a turn", async () => {
-  await expect(transport(`const {createInterface}=await import("node:readline");for await(const line of createInterface({input:process.stdin})){const m=JSON.parse(line);if(!m.id)continue;const result=m.method==="config/read"?{layers:[{name:{type:"project"},version:"changed",config:{}}]}:m.method==="configRequirements/read"?{requirements:null}:{};const bytes=Buffer.from(JSON.stringify({id:m.id,result})+"\\n");process.stdout.write(bytes.subarray(0,10));await Bun.sleep(5);process.stdout.write(bytes.subarray(10));}`)).rejects.toThrow("non-user");
+  await expect(transport(`const {createInterface}=await import("node:readline");for await(const line of createInterface({input:process.stdin})){const m=JSON.parse(line);if(!m.id)continue;const result=m.method==="config/read"?{layers:[{name:{type:"project"},version:"changed",config:{}}]}:m.method==="configRequirements/read"?{requirements:null}:{};const bytes=Buffer.from(JSON.stringify({id:m.id,result})+"\\n");process.stdout.write(bytes.subarray(0,10));await Bun.sleep(5);process.stdout.write(bytes.subarray(10));}`)).rejects.toThrow("Codex protocol or privacy validation failed");
 });
 test("fake executable nonzero, timeout, overflow and missing final message fail closed", async () => {
   await expect(transport('process.exit(7)')).rejects.toThrow("exited 7");
