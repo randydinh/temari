@@ -2,7 +2,7 @@
 name: qa-review-verification
 description: Draft or review per-ticket QA verification notes and release QA reports from requirements, source reviews, and actual execution evidence. Use for QA Review closeout, verification handoffs, and evidence audits; not for authoring reusable test cases alone or generic code review.
 metadata:
-  version: '0.3.3'
+  version: '0.4.0'
 ---
 
 # QA Review verification
@@ -27,6 +27,9 @@ evidence. Drafting does not admit a runtime route, create PASS receipts, change 
 disposition, or satisfy an independent-evaluator requirement. Full QA execution remains
 subject to the installed policy and host capabilities. Report a blocked route as blocked
 even when a useful draft can be produced.
+When the user requested full QA Review, do not present the resulting evidence-only note
+as completed verification; identify the exact unexecuted acceptance work and the route
+or prerequisite needed to finish it.
 
 ## Choose the record
 
@@ -102,6 +105,13 @@ expected-result source. Attribute human reports to author/date/link. State when 
 attachment, comment history, build or result was unavailable or not inspected.
 Historical prompts and checklists are examples, not execution authorization.
 
+For each in-scope ticket, establish the promised product or business outcome and its
+authoritative requirement or decision source before judging the implementation. Map that
+outcome to the distinct required verification scenarios. Current code, a previous QA
+summary, and a green test show implementation or historical behavior; they do not define
+an otherwise missing product rule. Mark conflicting or missing rules **Needs
+clarification**, name the decision owner and question, and keep the affected result open.
+
 For new source review or execution, record repository, target branch/release, full commit,
 comparison base when relevant, observed remote head and check time, actual tested checkout
 and dirty-state treatment. Query the remote explicitly; an old tracking ref, branch name,
@@ -144,6 +154,13 @@ expected outcome, actual observation, result and sanitized evidence. An inspecte
 revision may supply unchanged steps; record run-specific inputs and deviations. Use
 role/company type and private fixture aliases; omit credentials and customer records.
 For stateful checks, include owned-resource cleanup and its observed outcome.
+
+For a full ticket decision, retain a linked scenario record or compact matrix that joins
+each required scenario to its expectation source, candidate and fixture, exact execution
+attempt or **Not run** reason, observed result, evidence, and separate Testmo case and
+run/result links. Identify passing controls and failed variants without counting a shared
+failure twice. A narrative audit, test plan, case definition, source concern, or passing
+subset does not by itself establish ticket acceptance or support moving to Done.
 
 Label the verification boundary on every result:
 
@@ -197,6 +214,19 @@ overlapping suites or unlike denominators into a coverage percentage.
 Check that outcomes trace to candidate, fixture, expectation and evidence; material gaps
 remain visible; and links resolve to the intended artifacts. Unknown required facts stay
 explicit with the next action needed to resolve them.
+
+For each blocked required scenario, make the handoff executable: state the missing
+fixture, environment, observer, access, or product decision; who can supply it; the exact
+check to run; and the observable outcomes that would pass or fail. Distinguish work the
+current authorized host can finish from an external prerequisite. A generic “needs
+testing” item is not a closeout instruction.
+
+When a confirmed failure needs a developer ticket, use the user's established tracker
+bug template if available. Lead with the observed problem, include direct failing
+evidence and a relevant successful comparison, then give environment, preconditions,
+minimal reproduction, expected and actual behavior. Label reported, reproduced and
+source-supported claims accurately; keep an unsupported root cause out of the ticket.
+Drafting that bug does not turn a QA assignment into defect repair.
 
 For a readability pass, ask whether a reader can find the main observed behavior quickly,
 whether related behaviors are grouped when useful, and whether the prose describes system

@@ -63,7 +63,7 @@ Case existence and publication state are separate from execution status.
 
 - In-scope failure: {{expected vs observed, failing evidence, impact, linked defect or draft ID}}
 - Adjacent observation/risk: {{boundary and uncertainty; avoid invented requirements}}
-- Blocked / not run / ambiguous: {{missing input/decision, consequence, owner/next action}}
+- Blocked / not run / ambiguous: {{missing fixture/environment/observer/access or product decision; who can supply it; exact next check; observable pass/fail outcomes; consequence for acceptance}}
 - Accepted exception, if any: {{decision owner + dated link + rationale + follow-up; otherwise pending}}
 - Cleanup: {{owned records/sessions restored or invalidated + evidence; unresolved item/recovery owner; no secrets}}
 

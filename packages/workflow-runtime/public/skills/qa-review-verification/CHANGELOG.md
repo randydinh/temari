@@ -1,5 +1,15 @@
 # QA verification changes
 
+## 0.4.0 — 2026-09-29
+
+- Make the product or business outcome and its authoritative source explicit for each
+  ticket before comparing code or test output.
+- Require a scenario-level evidence link for a full ticket decision, including actual
+  execution, Testmo case and run identities, and unresolved acceptance boundaries.
+- Turn blocked results into executable handoffs and use the owner's established bug
+  format for confirmed developer-facing defects.
+- Keep evidence-only writing visibly separate from a requested full QA Review.
+
 ## 0.3.3 — 2026-09-29
 
 - Within admitted source scope and bounded queries, use configured Content
