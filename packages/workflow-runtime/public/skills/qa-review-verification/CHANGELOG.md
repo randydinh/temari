@@ -11,6 +11,9 @@
   run history when an expected result or automation mapping was wrong.
 - Verify a baseline actually contains the behavior before claiming a regression,
   and capture actionable Registrar/graph corrections when context is stale.
+- Preserve target-profile identity, permission and safe evidence boundaries for
+  browser checks; distinguish proposed scenarios, generated tests and observed
+  attempts, and triage ambiguous failures before calling them product defects.
 
 ## 0.5.0 — 2026-09-29
 

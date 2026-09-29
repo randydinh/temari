@@ -211,6 +211,14 @@ check is manual, give the tester a concise run sheet with setup, actions, expect
 failing observations, independent readback, and cleanup. Before describing a finding
 as a regression from a base branch, verify the behavior existed there; new paths on a
 release branch are not proven regressions from a base that lacks them.
+For browser evidence, retain the target profile revision, candidate build,
+environment, persona, permitted actions, owned data, and sanitized trace or
+screenshot references. Saved browser auth state is credential material. Keep
+proposed scenarios, selected checks, generated automation, and observed attempts
+distinct. Triage a failed attempt as a suspected product defect, test defect,
+environment issue, or unresolved, with the observation and next discriminating
+check. A generated Playwright test is not proof until its intended behavior is
+confirmed and its assertions pass on the named target branch.
 
 Label the verification boundary on every result:
 
