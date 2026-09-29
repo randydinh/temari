@@ -1,5 +1,14 @@
 # QA verification changes
 
+## 0.3.1 — 2026-09-29
+
+- Label ticket/requirements-only work as Documentation review only. Reserve Source
+  review only for actual implementation review without execution.
+- Preserve attributed execution reports separately from the current author's review
+  boundary. Reading a documented expectation does not establish a runtime result.
+- Record a fixed-input author comparison with visible unchanged outputs; no independent
+  quality gain or new product verification is claimed.
+
 ## 0.3.0 — 2026-09-29
 
 - Bundle the verification writer and all three templates in the Nx public artifact.

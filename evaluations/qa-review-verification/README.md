@@ -8,3 +8,8 @@ The [0.3.0 integration trial](v0.3.0-integration.md) is an author self-review of
 synthetic evidence. It establishes example behavior, not independent model quality
 or a completed full QA execution route. For subsequent changes, replay its prompts
 with the same evidence and save both versions' actual outputs and observed differences.
+
+The [0.3.1 documentation-boundary trial](v0.3.1-documentation-boundary.md) retains
+the fixed-input outputs and adds explicit documentation/source boundary examples.
+The correction removes an ambiguous instruction; it does not claim that previously
+correct notes became better or that additional evidence came from the writer change.

@@ -2,7 +2,7 @@
 name: qa-review-verification
 description: Draft or review per-ticket QA verification notes and release QA reports from requirements, source reviews, and actual execution evidence. Use for QA Review closeout, verification handoffs, and evidence audits; not for authoring reusable test cases alone or generic code review.
 metadata:
-  version: '0.3.0'
+  version: '0.3.1'
 ---
 
 # QA Review verification
@@ -108,13 +108,14 @@ For stateful checks, include owned-resource cleanup and its observed outcome.
 
 Label the verification boundary on every result:
 
-| Boundary                  | Permitted claim                                                                    |
-| ------------------------- | ---------------------------------------------------------------------------------- |
-| Source review             | Implementation supports or contradicts an expectation; behavior was not executed.  |
-| Local execution           | Named assertions ran on pinned source; state host, mocks/substitutions and limits. |
-| Deployed execution        | Specified behavior was observed on the identified environment/build and persona.   |
-| Attributed human evidence | Named person reported a scoped result; identify whether evidence was inspected.    |
-| Not executed              | Explain blocked prerequisites, deliberate omissions or unsupported scope; no pass. |
+| Boundary                  | Permitted claim                                                                                         |
+| ------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Documentation review      | Requirements or reports were inspected; implementation and execution are not established by that alone. |
+| Source review             | Implementation supports or contradicts an expectation; behavior was not executed.                       |
+| Local execution           | Named assertions ran on pinned source; state host, mocks/substitutions and limits.                      |
+| Deployed execution        | Specified behavior was observed on the identified environment/build and persona.                        |
+| Attributed human evidence | Named person reported a scoped result; identify whether evidence was inspected.                         |
+| Not executed              | Explain blocked prerequisites, deliberate omissions or unsupported scope; no pass.                      |
 
 Distinguish assertions from process exit, HTTP success, ticket state, cleanup and overall
 acceptance. Preserve failed attempts and corrected reruns separately. Separate reproduced
@@ -130,10 +131,13 @@ planned checks into results or require new execution merely to complete a histor
 
 Use **Pass / Fail / Blocked / Not run / Not applicable (reason)** for individual checks.
 Use **Verified (named scope) / Partially verified / Failed (named scope) / Blocked /
-Needs clarification** for the conclusion. State **Source review only** when nothing ran.
-A partial pass or source review cannot close an untested acceptance boundary. An accepted
-exception needs a real decision owner and rationale; a follow-up ticket alone does not
-accept risk. Keep existing workflow state separate from recommended QA disposition.
+Needs clarification** for the conclusion. State **Documentation review only** when only
+ticket text, requirements or other documentation was inspected. Reserve **Source review
+only** for actual implementation review without execution. Neither boundary turns a
+documented expectation into an observed result; preserve separately attributed execution
+reports when supplied. A partial pass or review alone cannot close an untested acceptance
+boundary. An accepted exception needs a real decision owner and rationale; a follow-up
+ticket alone does not accept risk. Keep existing workflow state separate from recommended QA disposition.
 An approval label with missing verification notes is an evidence gap; do not manufacture
 the execution or change the historical approval decision while reconstructing a note.
 
