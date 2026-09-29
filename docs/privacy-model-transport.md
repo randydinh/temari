@@ -1,6 +1,6 @@
 # PII protection at the model boundary
 
-Status on 2026-09-29: the protected host path has two optional drivers behind the same provider-neutral `ModelDriver` interface. Live private use is still blocked. The current `/opt/homebrew/bin/codex` reports `codex-cli 0.154.0`; its credential-free preflight returned `runtime-version`, exit 1, with zero credential requests. The earlier audit of `0.155.0-alpha.16.4` returned `feature-state (unified_exec)`, exit 1, also before credentials or a model turn. Do not remove either check to enable that driver. The direct Responses driver has only synthetic HTTP and relocated-package evidence; it still needs a credentialed end-to-end test and an independent egress review before private data is used.
+Status on 2026-09-29: the protected host path has three optional drivers behind the same provider-neutral `ModelDriver` interface. Live private application use is still blocked. The current `/opt/homebrew/bin/codex` reports `codex-cli 0.154.0`; its credential-free preflight returned `runtime-version`, exit 1, with zero credential requests. The earlier audit of `0.155.0-alpha.16.4` returned `feature-state (unified_exec)`, exit 1, also before credentials or a model turn. Do not remove either check to enable that driver. The direct OpenAI Responses driver has synthetic HTTP and relocated-package evidence; it still needs a credentialed end-to-end test and an independent egress review. A local Ollama driver has a live synthetic canary but has not been used with private application data.
 
 Temari has two Codex paths with different privacy coverage. The existing Archon pilot retains native tools. The new protected transport makes the host responsible for supplying data and executing approved tools.
 
@@ -112,6 +112,14 @@ const transport = createProtectedModelTransport(driver, hostConfiguration);
 This adapter has not made a real model request. Its mock HTTP tests verify request shape, stateless tool continuation, credential separation, masked prompt and callback content, JSON output, and refusal paths. A relocated Archon test verifies the generated copy. Before enabling private use, run a credentialed canary with the actual selected model, verify function and schema behavior, confirm the service's data-handling settings, and independently review the egress and host tool boundary. The Codex native-tool gate is specific to the Codex driver; a direct API call has no native model tools unless the host explicitly supplies callbacks.
 
 API references: [Responses function calling](https://developers.openai.com/api/docs/guides/function-calling), [stateless reasoning continuation](https://developers.openai.com/api/docs/guides/reasoning), and [structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs).
+
+## Local Ollama execution
+
+Hosts can select an installed local model through `createOllamaModelDriver` or the `createOllamaModelTransport` convenience entry. The adapter uses Ollama's native `/api/chat` endpoint, restricted to a `127.0.0.1` origin. It accepts the same protected prompt, JSON schema, and host tool definitions as the other drivers; it has bounded request and response sizes, turns, and tool calls. It has no credential callback and cannot point at a remote endpoint. This driver is available from the Nx host-adapters package; it is not part of the historical standalone v4.1 Archon payload.
+
+On this host, Ollama `0.31.1` is listening on loopback and `qwen3-coder:30b` is installed. `pnpm nx run host-adapters:local-ollama-canary` used only synthetic text and passed prompt masking, JSON schema output, and a live host-tool callback. The canary is intentionally separate from CI because CI does not install a model. It does not prove QA judgment, all schema shapes, host confinement of a future evaluator, or private application policy quality. Use the installed model only after the host has approved its local data handling and tool callbacks.
+
+API references: [Ollama native chat API](https://github.com/ollama/ollama/blob/main/docs/api.md), [structured outputs](https://github.com/ollama/ollama/blob/main/docs/capabilities/structured-outputs.mdx), and [OpenAI compatibility](https://github.com/ollama/ollama/blob/main/docs/api/openai-compatibility.mdx).
 
 ## Generated Archon assets
 

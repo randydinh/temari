@@ -24,7 +24,15 @@
       "test": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "node --import @swc-node/register/esm-register --test libs/host-adapters/src/lib/host-adapters.test.ts libs/host-adapters/src/lib/codex-exec-worker.test.ts libs/host-adapters/src/lib/codex-model-driver.test.ts libs/host-adapters/src/lib/model-transport.test.ts libs/host-adapters/src/lib/openai-responses-driver.test.ts tools/run-codex-workers.test.mts tools/run-codex-write-workers.test.mts tools/run-codex-parallel.test.mts",
+          "command": "node --import @swc-node/register/esm-register --test libs/host-adapters/src/lib/host-adapters.test.ts libs/host-adapters/src/lib/codex-exec-worker.test.ts libs/host-adapters/src/lib/codex-model-driver.test.ts libs/host-adapters/src/lib/model-transport.test.ts libs/host-adapters/src/lib/openai-responses-driver.test.ts libs/host-adapters/src/lib/ollama-model-driver.test.ts tools/run-codex-workers.test.mts tools/run-codex-write-workers.test.mts tools/run-codex-parallel.test.mts",
+          "cwd": "{workspaceRoot}"
+        }
+      },
+      "local-ollama-canary": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --import @swc-node/register/esm-register tools/ollama-protected-canary.mjs",
           "cwd": "{workspaceRoot}"
         }
       }

@@ -3,6 +3,7 @@ export * from './lib/codex-exec-worker.js';
 export * from './lib/model-transport.js';
 export * from './lib/codex-model-driver.js';
 export * from './lib/openai-responses-driver.js';
+export * from './lib/ollama-model-driver.js';
 
 import {
   createCodexModelDriver,
@@ -16,6 +17,10 @@ import {
   createOpenAIResponsesDriver,
   type OpenAIResponsesDriverOptions,
 } from './lib/openai-responses-driver.js';
+import {
+  createOllamaModelDriver,
+  type OllamaModelDriverOptions,
+} from './lib/ollama-model-driver.js';
 
 export function createCodexModelTransport(
   options: CodexModelDriverOptions,
@@ -36,4 +41,11 @@ export function createOpenAIResponsesModelTransport(
     createOpenAIResponsesDriver(options),
     host,
   );
+}
+
+export function createOllamaModelTransport(
+  options: OllamaModelDriverOptions,
+  host: PrivacyHost = {},
+) {
+  return createProtectedModelTransport(createOllamaModelDriver(options), host);
 }
