@@ -107,8 +107,8 @@ jobs:
           if ($report.candidateSha -ne $candidate -or $report.gates.localPreparatoryRehearsal -ne 'PASS' -or $report.rollback.restoredInvocation -ne 'routing_ok=yes') { throw 'Windows rehearsal report did not match the checked-out candidate and rollback result.' }
           node tools/nx06-matrix-drift.mjs --matrix docs/migrations/v4.1-to-nx-matrix.md --rehearsal $reportPath
           if ($LASTEXITCODE -ne 0) { throw 'Windows matrix and artifact structure check failed.' }
-          node tools/nx06-matrix-drift.mjs --matrix docs/migrations/v4.1-to-nx-matrix.md --rehearsal $reportPath --release
-          if ($LASTEXITCODE -ne 2) { throw 'The Windows release checker did not refuse unverified external proof.' }
+          $releaseCheck = Start-Process -FilePath (Get-Command node).Source -ArgumentList @('tools/nx06-matrix-drift.mjs', '--matrix', 'docs/migrations/v4.1-to-nx-matrix.md', '--rehearsal', $reportPath, '--release') -NoNewWindow -PassThru -Wait
+          if ($releaseCheck.ExitCode -ne 2) { throw 'The Windows release checker did not refuse unverified external proof.' }
           $reportSha = (Get-FileHash -LiteralPath $reportPath -Algorithm SHA256).Hash.ToLowerInvariant()
           "NX-06 Windows rollback passed for $candidate; report SHA-256 $reportSha. Release remains blocked." | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
 
