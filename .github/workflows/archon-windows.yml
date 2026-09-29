@@ -75,6 +75,53 @@ jobs:
       - name: Verify NX-06 path safety and release refusal
         run: pnpm exec nx run workflow-runtime:nx06-safety-test --skipNxCache --skipSync --output-style=static
 
+      - name: Rehearse NX-06 Windows installation and rollback
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $false
+          $public = Join-Path $env:RUNNER_TEMP 'temari-nx06-public'
+          $previous = Join-Path $env:RUNNER_TEMP 'temari-nx06-previous'
+          $rehearsal = Join-Path $env:RUNNER_TEMP 'temari-nx06-rehearsal'
+          $bashDir = Join-Path $env:ProgramFiles 'Git\bin'
+          if (-not (Test-Path -LiteralPath (Join-Path $bashDir 'bash.exe') -PathType Leaf)) { throw 'Git Bash is required for the v4.1 rollback check.' }
+          $env:PATH = "$bashDir;$env:PATH"
+
+          pnpm exec nx run workflow-runtime:package --lane portable --output $previous --skipNxCache --skipSync --output-style=static
+          if ($LASTEXITCODE -ne 0) { throw 'Could not package the prior v4.1 projection.' }
+          node tools/public-entry-runtime.mjs package --output $public > $null
+          if ($LASTEXITCODE -ne 0) { throw 'Could not package the public successor.' }
+
+          $publicSha = (Get-FileHash -LiteralPath (Join-Path $public 'public-entry-manifest.json') -Algorithm SHA256).Hash.ToLowerInvariant()
+          $previousSha = (Get-FileHash -LiteralPath (Join-Path $previous '.temari-distribution.json') -Algorithm SHA256).Hash.ToLowerInvariant()
+          $candidate = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'Could not identify the checked-out revision.' }
+          node tools/nx06-cutover-rehearsal.mjs --public-artifact $public --public-sha256 $publicSha --previous-artifact $previous --previous-sha256 $previousSha --candidate-sha $candidate --output $rehearsal
+          if ($LASTEXITCODE -ne 0) { throw 'Windows installation and rollback rehearsal failed.' }
+
+          $reportPath = Join-Path $rehearsal 'result.json'
+          $report = Get-Content -Raw -LiteralPath $reportPath | ConvertFrom-Json
+          if ($report.candidateSha -ne $candidate -or $report.gates.localPreparatoryRehearsal -ne 'PASS' -or $report.rollback.restoredInvocation -ne 'routing_ok=yes') { throw 'Windows rehearsal report did not match the checked-out candidate and rollback result.' }
+          node tools/nx06-matrix-drift.mjs --matrix docs/migrations/v4.1-to-nx-matrix.md --rehearsal $reportPath
+          if ($LASTEXITCODE -ne 0) { throw 'Windows matrix and artifact structure check failed.' }
+          node tools/nx06-matrix-drift.mjs --matrix docs/migrations/v4.1-to-nx-matrix.md --rehearsal $reportPath --release
+          if ($LASTEXITCODE -ne 2) { throw 'The Windows release checker did not refuse unverified external proof.' }
+          $reportSha = (Get-FileHash -LiteralPath $reportPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          "NX-06 Windows rollback passed for $candidate; report SHA-256 $reportSha. Release remains blocked." | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+
+      - name: Retain NX-06 Windows rollback evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nx06-windows-rollback-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/temari-nx06-public/public-entry-manifest.json
+            ${{ runner.temp }}/temari-nx06-previous/.temari-distribution.json
+            ${{ runner.temp }}/temari-nx06-rehearsal/result.json
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 14
+
       - name: Initialize Temari and install pinned Archon
         run: |
           pnpm temari:init
