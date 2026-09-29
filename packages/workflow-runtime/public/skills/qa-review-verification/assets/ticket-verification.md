@@ -31,6 +31,10 @@ Unknown facts remain explicit; omit non-applicable details with a reason.
 
 Use one row per meaningful check/variant. Give exact safe inputs, ordered actions and
 observation windows, or an inspected case revision plus run inputs and deviations.
+After the results, summarize confirmed behavior in concise, factual bullets grouped by
+feature area where useful. Lead with what the system does; leave detailed QA chronology
+in the evidence rows. Keep the source/run boundary, candidate and limits attached to
+the claims they support.
 
 | Check / requirement | Boundary, executor and time                                          | Exact steps / inputs                  | Expected                        | Observed                                   | Result                                     | Evidence                          |
 | ------------------- | -------------------------------------------------------------------- | ------------------------------------- | ------------------------------- | ------------------------------------------ | ------------------------------------------ | --------------------------------- |

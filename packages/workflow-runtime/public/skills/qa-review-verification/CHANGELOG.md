@@ -1,5 +1,15 @@
 # QA verification changes
 
+## 0.3.2 — 2026-09-29
+
+- Write Verified Behavior as concise, observable outcomes, grouped by area where useful;
+  retain boundary, candidate and evidence attribution.
+- Add a non-duplicative optional Before/After Change Summary and label reported,
+  reproduced, observed and expected behavior accurately.
+- Keep in-scope failures and acceptance gaps prominent; do not recast them as optional
+  Additional Observations.
+- Add a readability check alongside the existing evidence and disposition checks.
+
 ## 0.3.1 — 2026-09-29
 
 - Label ticket/requirements-only work as Documentation review only. Reserve Source

@@ -2,7 +2,7 @@
 name: qa-review-verification
 description: Draft or review per-ticket QA verification notes and release QA reports from requirements, source reviews, and actual execution evidence. Use for QA Review closeout, verification handoffs, and evidence audits; not for authoring reusable test cases alone or generic code review.
 metadata:
-  version: '0.3.1'
+  version: '0.3.2'
 ---
 
 # QA Review verification
@@ -46,6 +46,27 @@ even when a useful draft can be produced.
 A reusable test case defines future verification; a run result records an attempt;
 a ticket note interprets evidence. Keep these identities distinct. Use an existing
 case-authoring skill when actual case drafting is requested.
+
+## Present behavior clearly
+
+Write the **Verified Behavior** section as concise, factual descriptions of what the
+system does under the named conditions. Group multiple behaviors by feature area when
+that helps a reader scan them. Lead with the behavior and outcome, not a chronology of
+QA actions. Keep only the inputs, actions, observation window and setup needed to
+identify or reproduce that result; link detailed steps and artifacts when they would
+overload an ordinary ticket comment.
+
+For example, prefer “A required name with surrounding spaces is saved without them
+(`␠Bay␠` → `Bay`)” over “QA entered spaces around a name and clicked Save.” The
+visible `␠` marks a literal space. The statement still needs the boundary, candidate and
+evidence required below. For attributed human reports, keep the attribution visible
+instead of recasting the report as an observation by the current author.
+
+An optional **Change Summary** may follow Scope when a distinct before/after description
+will help explain a meaningful behavior change. Omit it when Scope or Verified Behavior
+already says the same thing. Label each side accurately: reported or reproduced before,
+and observed after or still only expected. A ticket description or intended outcome
+does not establish the observed behavior.
 
 ## Establish scope and candidate
 
@@ -129,6 +150,11 @@ failure from a reported one; use the original report when a before-fix run is un
 Mark missing before/after/control evidence and its acceptance limit explicitly. Do not turn
 planned checks into results or require new execution merely to complete a historical note.
 
+Keep an in-scope failure, blocked acceptance check or material evidence gap visible in
+Verified Behavior and QA Status. Additional Observations is for useful adjacent behavior
+and follow-up; do not move an acceptance failure there in a way that makes the ticket
+sound unblocked or treats a requirement as optional.
+
 Use **Pass / Fail / Blocked / Not run / Not applicable (reason)** for individual checks.
 Use **Verified (named scope) / Partially verified / Failed (named scope) / Blocked /
 Needs clarification** for the conclusion. State **Documentation review only** when only
@@ -153,6 +179,12 @@ overlapping suites or unlike denominators into a coverage percentage.
 Check that outcomes trace to candidate, fixture, expectation and evidence; material gaps
 remain visible; and links resolve to the intended artifacts. Unknown required facts stay
 explicit with the next action needed to resolve them.
+
+For a readability pass, ask whether a reader can find the main observed behavior quickly,
+whether related behaviors are grouped when useful, and whether the prose describes system
+outcomes rather than only QA actions. Then check separately that each claim has the right
+boundary and evidence, and that the status reflects failures and remaining acceptance gaps.
+Readable prose cannot substitute for verification evidence.
 
 Keep raw payloads, tokens, auth state, recovery material and customer data private. Inspect
 and sanitize extracts before rendering/copying; remove sensitive URL paths/query values
