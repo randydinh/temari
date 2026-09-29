@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { lstat, realpath, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, realpath, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { runCodexParallelRequest } from '../bin/codex-parallel.mjs';
 import { exactFields, readBoundedFile } from './stdio.mjs';
@@ -242,4 +242,128 @@ export async function runLocalHostWorker(input, signal) {
     observationPath,
     observationSha256: digest(observationBytes),
   };
+}
+
+/** Run a builder and an independent reviewer against the builder's exact commit. */
+export async function runLocalFeatureWorkerPair(input, signal) {
+  exactFields(
+    input,
+    [
+      'runId',
+      'revision',
+      'candidateRoot',
+      'evidenceRoot',
+      'baseCommit',
+      'executable',
+      'timeoutMs',
+      'builder',
+      'owns',
+      'verify',
+      'reviewer',
+    ],
+    ['prepare'],
+  );
+  assert.match(
+    input.runId,
+    /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/,
+    'Pair runId must leave room for worker suffixes.',
+  );
+  assert.equal(input.builder?.role, 'implementer');
+  assert.equal(input.reviewer?.role, 'reviewer');
+  assert.notEqual(
+    input.builder.id,
+    input.reviewer.id,
+    'Builder and reviewer must have distinct identities.',
+  );
+  const candidateRoot = await existingDirectory(
+    input.candidateRoot,
+    'candidateRoot',
+  );
+  const evidenceRoot = await existingDirectory(
+    input.evidenceRoot,
+    'evidenceRoot',
+  );
+  assert(
+    !contains(candidateRoot, evidenceRoot) &&
+      !contains(evidenceRoot, candidateRoot),
+    'Candidate and worker evidence must be disjoint.',
+  );
+  const pairRoot = join(evidenceRoot, input.runId);
+  await mkdir(pairRoot, { mode: 0o700 });
+  const buildEvidenceRoot = join(pairRoot, 'build');
+  const reviewEvidenceRoot = join(pairRoot, 'review');
+  await mkdir(buildEvidenceRoot, { mode: 0o700 });
+  await mkdir(reviewEvidenceRoot, { mode: 0o700 });
+  const common = {
+    revision: input.revision,
+    candidateRoot,
+    baseCommit: input.baseCommit,
+    executable: input.executable,
+    timeoutMs: input.timeoutMs,
+  };
+  const build = await runLocalHostWorker(
+    {
+      ...common,
+      runId: `${input.runId}-build`,
+      evidenceRoot: buildEvidenceRoot,
+      assignment: input.builder,
+      owns: input.owns,
+      verify: input.verify,
+      prepare: input.prepare ?? [],
+    },
+    signal,
+  );
+  assert.match(
+    build.integratedCommit,
+    /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/,
+    'Builder did not produce a commit.',
+  );
+  const review = await runLocalHostWorker(
+    {
+      ...common,
+      runId: `${input.runId}-review`,
+      revision: build.integratedCommit,
+      candidateRoot: build.integrationPath,
+      evidenceRoot: reviewEvidenceRoot,
+      baseCommit: build.integratedCommit,
+      assignment: input.reviewer,
+    },
+    signal,
+  );
+  assert.notEqual(
+    build.worker.pid,
+    review.worker.pid,
+    'Builder and reviewer did not run in distinct processes.',
+  );
+  assert.equal(
+    review.candidate.baseCommit,
+    build.integratedCommit,
+    'Reviewer inspected a different commit.',
+  );
+  const report = {
+    schemaVersion: 1,
+    host: 'local-codex',
+    status: 'PASS',
+    runId: input.runId,
+    revision: input.revision,
+    source: build.candidate,
+    integratedCommit: build.integratedCommit,
+    builder: {
+      id: build.worker.id,
+      pid: build.worker.pid,
+      observationPath: build.observationPath,
+      observationSha256: build.observationSha256,
+    },
+    reviewer: {
+      id: review.worker.id,
+      pid: review.worker.pid,
+      candidate: review.candidate,
+      observationPath: review.observationPath,
+      observationSha256: review.observationSha256,
+    },
+  };
+  const reportPath = join(pairRoot, 'feature-workers.json');
+  const reportBytes = Buffer.from(`${JSON.stringify(report, null, 2)}\n`);
+  await writeFile(reportPath, reportBytes, { flag: 'wx', mode: 0o600 });
+  return { ...report, reportPath, reportSha256: digest(reportBytes) };
 }

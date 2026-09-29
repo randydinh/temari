@@ -109,8 +109,25 @@ The router selects `read-only` for a homogeneous investigator/reviewer batch and
 
 The installed public Temari plugin also bundles the standalone router as `bin/codex-parallel.mjs`. Its [Poteto Mode worker guide](../packages/workflow-runtime/public/skills/poteto-mode/references/codex-parallel-workers.md) gives the installed invocation and request shapes. Both copies route independent local batches; neither automatically selects workers for a public workflow run. A successful local receipt proves only that batch. Full-feature admission still requires independent host proof of `subagents` and `forge`, which the current public bridge does not provide.
 
+## Host-run feature workers
+
+The installed `bin/temari.mjs` and `bin/poteto-mode.mjs` now expose `run-workers`. This command verifies the bundled artifact and an externally pinned request digest, selects `codex` from the host process environment, and runs one required implementer followed by a distinct required reviewer. The reviewer sees the exact verified integration commit in a separate read-only Codex process. The source checkout stays pinned. The command returns a retained report with the two PIDs, candidate commit, and hashes of both host observations; the report and observations are written exclusively under the evidence directory.
+
+Use the same digest flags as the public `start` command:
+
+```sh
+node /absolute/path/to/temari/bin/temari.mjs run-workers \
+  --request /absolute/path/to/feature-workers.json \
+  --expected-request-sha256 SHA256_OF_REQUEST_BYTES \
+  --expected-manifest-sha256 SHA256_OF_PUBLIC_ENTRY_MANIFEST
+```
+
+The request contains `schemaVersion: 1`, `entry: "temari"` (or `"poteto-mode"`), `runId`, `revision`, `candidateRoot`, `evidenceRoot`, a full `baseCommit`, `timeoutMs`, required `builder` and `reviewer` assignments, `owns`, `verify`, and optional `prepare`. Use the assignment and ownership shapes shown above. Omit `executable` and all receipt or observation paths; the host chooses the executable and writes its own evidence. The request digest must come from the trusted invocation, outside the request and artifact.
+
+This command is a host worker bridge, separate from `start`/`resume`. It does not yet turn the worker report into a full-feature lifecycle receipt or prove forge delivery.
+
 ## Full-feature host proof gap
 
 The public entry admits only the pinned lightweight route today. Its bridge reports no host capabilities, and a full-playbook request stops before creating a run directory. A future host integration must observe native subagent delegation and forge access independently of request fields and local worker receipts, bind that proof to the selected invocation, and retain it across resume. It must then satisfy the feature profile's distinct builder and reviewer ownership and pull-request delivery requirements. Until that integration exists, keep full-feature admission blocked even when a local parallel batch passes.
 
-The bundled `host/local-worker.mjs` now exports `runLocalHostWorker` for a trusted local host integration. It runs one required Codex reviewer, investigator, or implementer through the bundled router using a host-selected executable, clean pinned candidate, and evidence directory outside the repository. For an implementer, the host supplies owned paths and verification commands. It writes a host observation containing the actual child PID and hashes of the controller's process evidence and receipt; a caller-supplied receipt path is rejected. The public entry does not consume this observation yet. Full-feature admission still needs the host to own the invocation and stage assignments, validate these observations on resume, prove builder/reviewer separation, and establish forge access.
+The bundled `host/local-worker.mjs` exports `runLocalHostWorker` and `runLocalFeatureWorkerPair`. Each worker uses a clean pinned candidate and evidence directory outside that checkout. For an implementer, the host supplies owned paths and verification commands. Each observation contains the actual child PID and hashes of the controller's process evidence and receipt; caller-supplied receipt paths are rejected. The public `run-workers` command consumes the pair and retains a combined report. Full-feature admission still needs the runtime to bind that report to stage evidence and retained resume state, and to establish forge access.
