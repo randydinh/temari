@@ -127,8 +127,14 @@ export function validateWorkerResult(result: WorkerResult): readonly string[] {
   ) {
     evidencePath(result.workspaceManifestId, 'workspaceManifestId', issues);
   }
-  if (result.evidencePaths.length === 0 && result.rawLogPath === null) {
-    issues.push('a worker result must retain evidencePaths or rawLogPath.');
+  if (
+    result.evidencePaths.length === 0 &&
+    result.rawLogPath === null &&
+    (result.evidenceReferences?.length ?? 0) === 0
+  ) {
+    issues.push(
+      'a worker result must retain evidencePaths, rawLogPath, or portable evidence references.',
+    );
   }
   return issues;
 }

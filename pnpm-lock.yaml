@@ -89,6 +89,9 @@ importers:
       '@temari/contracts':
         specifier: workspace:^
         version: link:../contracts
+      '@temari/runtime':
+        specifier: workspace:^
+        version: link:../runtime
       '@temari/workflow-engine':
         specifier: workspace:^
         version: link:../workflow-engine

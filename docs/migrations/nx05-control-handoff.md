@@ -48,3 +48,9 @@ The shared-provider conformance gate remains BLOCKED in milestone 1 because no s
 Milestones 2 through 4 remain open after NX03 is integrated. They need a selected transactional control service, an immutable shared artifact service, explicit durability and backup assumptions, remote at-least-once dispatch, fenced receipt and checkpoint publication, and workspace recovery policy. Independent QA must review the integrated path. A second host with an independent disk and a shared external service is required before any multi-machine claim. Automatic failover, production RTO and RPO, and exactly-once external effects are outside this milestone.
 
 The branch is for independent review. Do not treat the file adapter as a shared service or this process result as a cutover approval.
+
+## Follow-on dispatch contract increment
+
+The dependent local Temporal proof merged into this branch as `b99031ed8b3500e247634bf9545324918f1b59e5`. Its in-memory test server retains a wait across worker replacement and then invokes the canonical six-stage engine. It is not an implementation of `Nx05SharedControlProvider` and does not change the blocked shared-service verdict.
+
+The next contract increment groups dispatch intents by immutable `groupId` and `maxConcurrency`. Each task carries its complete worker assignment, assignment SHA-256, idempotency key, and declared same-group dependencies. `assertNx05ParentCommit` refuses a changed assignment, duplicate task or assignment identity, undeclared dependency, cycle, invalid bound, or dispatch attached to a terminal parent. A provider must copy and atomically retain the validated command; a caller-owned object can change after validation. It must also compare `claimChildGroup` against the committed group and bound, and prove dispatch delivery and artifact-verified publication. The contract validator alone does not provide those guarantees.
