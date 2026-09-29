@@ -657,6 +657,29 @@ export function validateQaReviewRecord(
     'qaDisposition',
     issues,
   );
+  if (record.qaDisposition === 'Passed') {
+    if (record.assignment.requestKind !== 'full') {
+      issues.push('Passed requires a full review assignment.');
+    }
+    if (
+      record.scenarios.some(
+        (scenario) =>
+          scenario.obligation === 'Required' && scenario.result !== 'Passed',
+      )
+    ) {
+      issues.push('Passed requires every required scenario to be Passed.');
+    }
+    if (
+      record.areaDecisions.some(
+        (decision) => decision.status === 'NeedsInvestigation',
+      )
+    ) {
+      issues.push('Passed cannot contain an unresolved review area.');
+    }
+    if (record.evaluationRounds.at(-1)?.verdict !== 'PASS') {
+      issues.push('Passed requires a final independent PASS round.');
+    }
+  }
   validateEvaluationRounds(record, issues);
   validateExternalWrites(record, issues);
   return issues;

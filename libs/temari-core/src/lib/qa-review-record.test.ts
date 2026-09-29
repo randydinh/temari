@@ -124,6 +124,43 @@ test('creates and validates a digest-bound full review record', () => {
   assert.doesNotThrow(() => assertQaReviewRecord(record));
 });
 
+test('a full Passed record rejects unexecuted required work and unresolved evaluation', () => {
+  const notRun = createQaReviewRecord({
+    ...BASE_INPUT,
+    scenarios: [
+      {
+        ...SCENARIO,
+        executions: [],
+        result: 'NotRun',
+      },
+    ],
+  });
+  assert.match(
+    validateQaReviewRecord(notRun).join(' '),
+    /every required scenario to be Passed/,
+  );
+  const unresolvedArea = createQaReviewRecord({
+    ...BASE_INPUT,
+    areaDecisions: BASE_INPUT.areaDecisions.map((decision, index) =>
+      index === 0 ? { ...decision, status: 'NeedsInvestigation' } : decision,
+    ),
+  });
+  assert.match(
+    validateQaReviewRecord(unresolvedArea).join(' '),
+    /unresolved review area/,
+  );
+  const revised = createQaReviewRecord({
+    ...BASE_INPUT,
+    evaluationRounds: [
+      { ...BASE_INPUT.evaluationRounds[0]!, verdict: 'REVISE' },
+    ],
+  });
+  assert.match(
+    validateQaReviewRecord(revised).join(' '),
+    /final independent PASS round/,
+  );
+});
+
 test('retains a blocked host attempt without inventing an evaluator round', () => {
   const record = createQaReviewRecord({
     ...BASE_INPUT,
