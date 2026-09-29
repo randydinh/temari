@@ -18,8 +18,16 @@ read. It uses Node 24.15+ `node:sqlite` and is kept off the package's default
 entry. Its tests reopen the same SQLite file and reject tampered bytes. Run
 `pnpm exec nx run shared-control:artifact-test` for that focused check.
 
-The library does not implement `Nx05SharedControlProvider`. The SQLite file
-is still on one host, and the Temporal fixture uses an in-memory server. There
-is no atomic parent/dispatch commit, child publication, remote delivery, or
-independent-disk recovery. The NX05 shared-provider gate remains blocked
-until those operations and a second-host test pass.
+`SqliteNx05ControlTestProvider` uses the same local database to atomically
+retain parent state, its event, and complete dispatch groups. It fences lease
+takeover and verifies artifact bytes and their run/revision binding before
+publishing a child result. A separate process can claim a committed group.
+The claimed group includes the complete worker assignments and concurrency
+bound. Run `pnpm exec nx run shared-control:control-test` for the focused check.
+The adapter is deliberately kept off the package's default entry.
+
+This is a same-disk test provider. It has no network service boundary, remote
+delivery, independent-disk recovery, or durable Temporal deployment. The
+runtime still calls its file stores rather than this provider. The NX05
+shared-provider gate remains blocked until a service implementation is wired
+into the runtime, tested from a second host, and independently reviewed.
