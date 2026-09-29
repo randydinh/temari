@@ -7,6 +7,15 @@ description: Use Temari as the current Nx conversational engineering entry point
 
 Temari is the conversational entry point for the current Nx workflow runtime.
 
+When the requested output includes ticket verification notes, a QA evidence audit,
+or a release QA report, use the bundled
+[QA verification skill](../qa-review-verification/SKILL.md) for that deliverable.
+Carry the user's reviewer-label filter into evidence selection before opening ticket
+details. Reuse canonical QA records and preserve their scope and disposition.
+Evidence-only drafting produces a local document; it does not admit a QA execution
+route or complete its review obligations. Test-case authoring alone and generic code
+review keep their existing routes.
+
 1. Read `policy.json` from the installed bundle root. The policy is the public admission contract; do not fall back to the legacy v4.1 implementation.
 2. Route engineering requests through the canonical Temari route table. The installed bundle admits `lightweight-engineering-v1` only when every lightweight condition holds and its fixed obligations match.
 3. The lightweight source requirements map to all six canonical stages. Review and deliver remain mandatory, and publish still requires operator approval.
