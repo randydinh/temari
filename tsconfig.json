@@ -32,6 +32,9 @@
     },
     {
       "path": "./packages/workflow-runtime"
+    },
+    {
+      "path": "./libs/shared-control"
     }
   ],
   "compilerOptions": {}

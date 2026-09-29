@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFile, spawn } from 'node:child_process';
+import { execFile, execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   chmod,
@@ -123,6 +123,218 @@ test('packages an isolated relocated outer bundle with three current public entr
     assert.equal(policy.supportedProfile, 'lightweight-engineering-v1');
   } finally {
     await rm(relocatedRoot, { recursive: true, force: true });
+  }
+});
+
+test('relocated public bundle routes read-only and scoped write workers without workspace dependencies', async (t) => {
+  if (process.platform === 'win32')
+    return t.skip('The fake Codex fixture is a POSIX executable script.');
+  const root = await mkdtemp(join(tmpdir(), 'temari public-parallel-'));
+  try {
+    const artifact = join(root, 'artifact');
+    await cp(output, artifact, { recursive: true });
+    await checkPublicEntryArtifact(artifact, manifestSha256(manifest));
+    const repo = join(root, 'repo');
+    execFileSync('git', ['init', '-q', repo]);
+    execFileSync('git', ['config', 'user.name', 'Test'], { cwd: repo });
+    execFileSync('git', ['config', 'user.email', 'test@localhost'], {
+      cwd: repo,
+    });
+    await writeFile(join(repo, 'README.md'), 'base\n');
+    execFileSync('git', ['add', 'README.md'], { cwd: repo });
+    execFileSync('git', ['commit', '-qm', 'base'], { cwd: repo });
+    const baseCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: repo,
+      encoding: 'utf8',
+    }).trim();
+    const executable = join(root, 'fake-codex');
+    await writeFile(
+      executable,
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+const final = args[args.indexOf('--output-last-message') + 1];
+const sandbox = args[args.indexOf('--sandbox') + 1];
+let prompt = '';
+process.stdin.on('data', chunk => prompt += chunk);
+process.stdin.on('end', () => {
+  const id = prompt.match(/Goal: ([A-Za-z]+)/)?.[1] ?? 'unknown';
+  setTimeout(() => {
+    if (sandbox === 'workspace-write') fs.writeFileSync(id + '.txt', id + '\\n');
+    fs.writeFileSync(final, JSON.stringify({status:'PASS',summary:id}));
+  }, 150);
+});
+`,
+    );
+    await chmod(executable, 0o755);
+    const brief = (id) => ({
+      goal: id,
+      context: 'relocated bundle test',
+      scope: id,
+      acceptanceCriteria: ['produce result'],
+      verificationCommand: null,
+      reportFormat: 'json',
+      forbiddenActions: ['stay in scope'],
+    });
+    const readRequest = join(root, 'read-request.json');
+    await writeFile(
+      readRequest,
+      JSON.stringify({
+        runId: 'read-run',
+        revision: 'base',
+        workspaceRoot: repo,
+        evidenceRoot: join(root, 'evidence'),
+        maxConcurrency: 2,
+        executable,
+        timeoutMs: 5000,
+        assignments: [
+          {
+            id: 'review',
+            role: 'reviewer',
+            required: true,
+            brief: brief('review'),
+          },
+        ],
+      }),
+    );
+    const runner = join(artifact, 'bin/codex-parallel.mjs');
+    const read = await child([runner, readRequest]);
+    assert.equal(read.route, 'read-only');
+    assert.equal(read.status, 'PASS');
+    assert.equal(
+      JSON.parse(await readFile(read.receiptPath, 'utf8')).status,
+      'PASS',
+    );
+    const invalidRequest = join(root, 'invalid-request.json');
+    await writeFile(
+      invalidRequest,
+      JSON.stringify({
+        ...JSON.parse(await readFile(readRequest, 'utf8')),
+        runId: 'invalid-run',
+        mode: 'write',
+      }),
+    );
+    const rejected = await childResult([runner, invalidRequest], 1);
+    assert.match(rejected.stderr, /mode is unsupported/);
+    await assert.rejects(lstat(join(root, 'evidence', 'invalid-run')));
+
+    const writeRequest = join(root, 'write-request.json');
+    await writeFile(
+      writeRequest,
+      JSON.stringify({
+        runId: 'write-run',
+        sourceRepo: repo,
+        baseCommit,
+        evidenceRoot: join(root, 'evidence'),
+        maxConcurrency: 2,
+        executable,
+        timeoutMs: 5000,
+        verify: [
+          {
+            program: process.execPath,
+            args: [
+              '-e',
+              "const fs=require('fs');if(!fs.existsSync('alpha.txt')||!fs.existsSync('beta.txt'))process.exit(5)",
+            ],
+          },
+        ],
+        assignments: ['alpha', 'beta'].map((id) => ({
+          worker: { id, role: 'implementer', required: true, brief: brief(id) },
+          owns: [{ kind: 'file', path: `${id}.txt` }],
+        })),
+      }),
+    );
+    const write = await child([runner, writeRequest]);
+    assert.equal(write.route, 'write');
+    assert.equal(write.status, 'PASS');
+    assert.equal(
+      await readFile(join(write.integrationPath, 'alpha.txt'), 'utf8'),
+      'alpha\n',
+    );
+    assert.equal(
+      await readFile(join(write.integrationPath, 'beta.txt'), 'utf8'),
+      'beta\n',
+    );
+    assert.equal(
+      execFileSync('git', ['status', '--porcelain'], {
+        cwd: repo,
+        encoding: 'utf8',
+      }),
+      '',
+    );
+    assert.equal(
+      execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: repo,
+        encoding: 'utf8',
+      }).trim(),
+      baseCommit,
+    );
+    const receipt = JSON.parse(await readFile(write.receiptPath, 'utf8'));
+    assert.equal(receipt.workerReceipt.peakConcurrency, 2);
+    assert.equal(receipt.verification[0].code, 0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('both engineering skills reach the complete versioned QA writer inside the artifact', async () => {
+  for (const entry of ['temari', 'poteto-mode']) {
+    const visited = new Set();
+    const visit = async (path) => {
+      if (visited.has(path)) return;
+      visited.add(path);
+      const bytes = await readFile(join(output, path));
+      const artifactRecord = manifest.files.find((file) => file.path === path);
+      assert(artifactRecord, `Unmanifested skill resource: ${path}`);
+      assert.equal(
+        artifactRecord.sha256,
+        createHash('sha256').update(bytes).digest('hex'),
+      );
+      for (const [, link] of bytes.toString().matchAll(/\]\(([^)]+)\)/g)) {
+        if (/^[a-z][a-z\d+.-]*:|^#/i.test(link)) continue;
+        const target = fileURLToPath(
+          new URL(link, pathToFileURL(join(output, path))),
+        );
+        const resource = relative(output, target).split('\\').join('/');
+        assert(
+          resource.startsWith('skills/'),
+          `Link escapes bundled skills: ${link}`,
+        );
+        await visit(resource);
+      }
+    };
+    await visit(`skills/${entry}/SKILL.md`);
+    for (const resource of [
+      'SKILL.md',
+      'CHANGELOG.md',
+      'references/maintenance.md',
+      'assets/ticket-comment.md',
+      'assets/ticket-verification.md',
+      'assets/release-qa-report.md',
+    ]) {
+      const path = `skills/qa-review-verification/${resource}`;
+      assert(
+        visited.has(path),
+        `Unreachable QA resource from ${entry}: ${resource}`,
+      );
+      assert(
+        manifest.source.files.some(
+          (file) => file.path === `packages/workflow-runtime/public/${path}`,
+        ),
+      );
+    }
+    const skill = await readFile(
+      join(output, 'skills/qa-review-verification/SKILL.md'),
+      'utf8',
+    );
+    const frontmatter = skill.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    assert(frontmatter, 'Missing QA skill frontmatter');
+    assert.match(frontmatter[1], /^name: qa-review-verification$/m);
+    assert.match(frontmatter[1], /^description: .+$/m);
+    assert.match(
+      frontmatter[1],
+      /^metadata:\r?\n  version: (['"]?)\d+\.\d+\.\d+\1$/m,
+    );
   }
 });
 
@@ -377,6 +589,31 @@ test('public engineering admission refuses unsupported routes and blocks unprove
   );
   assert.equal(lightweight.status, 'rejected');
   assert(lightweight.reasons.includes('profile-not-admitted'));
+});
+
+test('installed Temari and Poteto skills expose the bundled worker guide', async () => {
+  const temariSkill = await readFile(
+    join(output, 'skills/temari/SKILL.md'),
+    'utf8',
+  );
+  const potetoSkill = await readFile(
+    join(output, 'skills/poteto-mode/SKILL.md'),
+    'utf8',
+  );
+  const guide = await readFile(
+    join(output, 'skills/poteto-mode/references/codex-parallel-workers.md'),
+    'utf8',
+  );
+  assert.match(
+    temariSkill,
+    /parallel worker guide.*codex-parallel-workers\.md/,
+  );
+  assert.match(
+    potetoSkill,
+    /parallel worker guide.*codex-parallel-workers\.md/,
+  );
+  assert.match(guide, /bin\/codex-parallel\.mjs/);
+  assert((await lstat(join(output, 'bin/codex-parallel.mjs'))).isFile());
 });
 
 test('closeout preflight blocks without trusted candidate selection', async () => {
@@ -1429,8 +1666,10 @@ test('installed entry refuses altered artifact, request, route, obligations, cap
     'route',
     'obligations',
     'capabilities',
+    'worker-receipt',
     'qa',
     'full',
+    'qa-template',
   ]) {
     await t.test(mode, async (t) => {
       const f = await installedFixture(t);
@@ -1440,6 +1679,14 @@ test('installed entry refuses altered artifact, request, route, obligations, cap
         await writeFile(
           join(f.artifact, 'host/entry.mjs'),
           'throw Error("altered")',
+        );
+      if (mode === 'qa-template')
+        await writeFile(
+          join(
+            f.artifact,
+            'skills/qa-review-verification/assets/ticket-comment.md',
+          ),
+          'altered template',
         );
       if (mode === 'profile')
         await writeFile(
@@ -1468,6 +1715,14 @@ test('installed entry refuses altered artifact, request, route, obligations, cap
         f.request.capabilities = ['subagents'];
         await writeFile(f.requestPath, JSON.stringify(f.request));
       }
+      if (mode === 'worker-receipt') {
+        const receiptPath = join(f.root, 'worker-receipt.json');
+        await writeFile(receiptPath, JSON.stringify({ status: 'PASS' }));
+        await writeFile(
+          f.requestPath,
+          JSON.stringify(request('temari', { workerReceipt: receiptPath })),
+        );
+      }
       if (mode === 'qa') {
         f.request.route = 'qa-review';
         f.request.profile = 'qa-review-v1';
@@ -1479,6 +1734,7 @@ test('installed entry refuses altered artifact, request, route, obligations, cap
         'route',
         'obligations',
         'capabilities',
+        'worker-receipt',
         'qa',
         'full',
       ].includes(mode)
@@ -1490,7 +1746,11 @@ test('installed entry refuses altered artifact, request, route, obligations, cap
       assert.notEqual(result.code, 0);
       assert(!result.messages.some((message) => message.type === 'stage'));
       await assert.rejects(lstat(f.runDirectory), { code: 'ENOENT' });
-      if (['policy', 'package', 'profile', 'playbook'].includes(mode))
+      if (
+        ['policy', 'package', 'profile', 'playbook', 'qa-template'].includes(
+          mode,
+        )
+      )
         assert.match(result.stderr, /Artifact (bytes|size) changed/);
       if (mode === 'request')
         assert.match(
@@ -1506,6 +1766,8 @@ test('installed entry refuses altered artifact, request, route, obligations, cap
           'obligations-not-admitted',
         ]);
       if (mode === 'capabilities')
+        assert.match(result.stderr, /unknown or missing fields/);
+      if (mode === 'worker-receipt')
         assert.match(result.stderr, /unknown or missing fields/);
       if (mode === 'qa')
         assert(result.messages[0].reasons.includes('route-not-admitted'));
