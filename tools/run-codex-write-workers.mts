@@ -10,7 +10,15 @@ import {
   stat,
   writeFile,
 } from 'node:fs/promises';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   reconcilePlan,
@@ -914,7 +922,11 @@ async function main(): Promise<void> {
     process.off('SIGTERM', sigterm);
   }
 }
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1])
+if (
+  process.argv[1] &&
+  basename(process.argv[1]) === 'run-codex-write-workers.mts' &&
+  fileURLToPath(import.meta.url) === process.argv[1]
+)
   main().catch((error: unknown) => {
     process.stderr.write(
       `${error instanceof Error ? error.message : String(error)}\n`,

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFile, spawn } from 'node:child_process';
+import { execFile, execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   chmod,
@@ -123,6 +123,157 @@ test('packages an isolated relocated outer bundle with three current public entr
     assert.equal(policy.supportedProfile, 'lightweight-engineering-v1');
   } finally {
     await rm(relocatedRoot, { recursive: true, force: true });
+  }
+});
+
+test('relocated public bundle routes read-only and scoped write workers without workspace dependencies', async (t) => {
+  if (process.platform === 'win32')
+    return t.skip('The fake Codex fixture is a POSIX executable script.');
+  const root = await mkdtemp(join(tmpdir(), 'temari public-parallel-'));
+  try {
+    const artifact = join(root, 'artifact');
+    await cp(output, artifact, { recursive: true });
+    await checkPublicEntryArtifact(artifact, manifestSha256(manifest));
+    const repo = join(root, 'repo');
+    execFileSync('git', ['init', '-q', repo]);
+    execFileSync('git', ['config', 'user.name', 'Test'], { cwd: repo });
+    execFileSync('git', ['config', 'user.email', 'test@localhost'], {
+      cwd: repo,
+    });
+    await writeFile(join(repo, 'README.md'), 'base\n');
+    execFileSync('git', ['add', 'README.md'], { cwd: repo });
+    execFileSync('git', ['commit', '-qm', 'base'], { cwd: repo });
+    const baseCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: repo,
+      encoding: 'utf8',
+    }).trim();
+    const executable = join(root, 'fake-codex');
+    await writeFile(
+      executable,
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+const final = args[args.indexOf('--output-last-message') + 1];
+const sandbox = args[args.indexOf('--sandbox') + 1];
+let prompt = '';
+process.stdin.on('data', chunk => prompt += chunk);
+process.stdin.on('end', () => {
+  const id = prompt.match(/Goal: ([A-Za-z]+)/)?.[1] ?? 'unknown';
+  setTimeout(() => {
+    if (sandbox === 'workspace-write') fs.writeFileSync(id + '.txt', id + '\\n');
+    fs.writeFileSync(final, JSON.stringify({status:'PASS',summary:id}));
+  }, 150);
+});
+`,
+    );
+    await chmod(executable, 0o755);
+    const brief = (id) => ({
+      goal: id,
+      context: 'relocated bundle test',
+      scope: id,
+      acceptanceCriteria: ['produce result'],
+      verificationCommand: null,
+      reportFormat: 'json',
+      forbiddenActions: ['stay in scope'],
+    });
+    const readRequest = join(root, 'read-request.json');
+    await writeFile(
+      readRequest,
+      JSON.stringify({
+        runId: 'read-run',
+        revision: 'base',
+        workspaceRoot: repo,
+        evidenceRoot: join(root, 'evidence'),
+        maxConcurrency: 2,
+        executable,
+        timeoutMs: 5000,
+        assignments: [
+          {
+            id: 'review',
+            role: 'reviewer',
+            required: true,
+            brief: brief('review'),
+          },
+        ],
+      }),
+    );
+    const runner = join(artifact, 'bin/codex-parallel.mjs');
+    const read = await child([runner, readRequest]);
+    assert.equal(read.route, 'read-only');
+    assert.equal(read.status, 'PASS');
+    assert.equal(
+      JSON.parse(await readFile(read.receiptPath, 'utf8')).status,
+      'PASS',
+    );
+    const invalidRequest = join(root, 'invalid-request.json');
+    await writeFile(
+      invalidRequest,
+      JSON.stringify({
+        ...JSON.parse(await readFile(readRequest, 'utf8')),
+        runId: 'invalid-run',
+        mode: 'write',
+      }),
+    );
+    const rejected = await childResult([runner, invalidRequest], 1);
+    assert.match(rejected.stderr, /mode is unsupported/);
+    await assert.rejects(lstat(join(root, 'evidence', 'invalid-run')));
+
+    const writeRequest = join(root, 'write-request.json');
+    await writeFile(
+      writeRequest,
+      JSON.stringify({
+        runId: 'write-run',
+        sourceRepo: repo,
+        baseCommit,
+        evidenceRoot: join(root, 'evidence'),
+        maxConcurrency: 2,
+        executable,
+        timeoutMs: 5000,
+        verify: [
+          {
+            program: process.execPath,
+            args: [
+              '-e',
+              "const fs=require('fs');if(!fs.existsSync('alpha.txt')||!fs.existsSync('beta.txt'))process.exit(5)",
+            ],
+          },
+        ],
+        assignments: ['alpha', 'beta'].map((id) => ({
+          worker: { id, role: 'implementer', required: true, brief: brief(id) },
+          owns: [{ kind: 'file', path: `${id}.txt` }],
+        })),
+      }),
+    );
+    const write = await child([runner, writeRequest]);
+    assert.equal(write.route, 'write');
+    assert.equal(write.status, 'PASS');
+    assert.equal(
+      await readFile(join(write.integrationPath, 'alpha.txt'), 'utf8'),
+      'alpha\n',
+    );
+    assert.equal(
+      await readFile(join(write.integrationPath, 'beta.txt'), 'utf8'),
+      'beta\n',
+    );
+    assert.equal(
+      execFileSync('git', ['status', '--porcelain'], {
+        cwd: repo,
+        encoding: 'utf8',
+      }),
+      '',
+    );
+    assert.equal(
+      execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: repo,
+        encoding: 'utf8',
+      }).trim(),
+      baseCommit,
+    );
+    const receipt = JSON.parse(await readFile(write.receiptPath, 'utf8'));
+    assert.equal(receipt.workerReceipt.peakConcurrency, 2);
+    assert.equal(receipt.verification[0].code, 0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 });
 
