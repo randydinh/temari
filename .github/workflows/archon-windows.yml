@@ -15,6 +15,7 @@ on:
       - 'tools/canonical-runtime*'
       - 'tools/public-entry-runtime*'
       - 'tools/qa-installed-journey.mjs'
+      - 'tools/nx06-*.mjs'
       - 'tools/fixtures/qa-synthetic.mjs'
       - 'tools/host-session.test.mjs'
       - 'packages/workflow-runtime/host/**'
@@ -70,6 +71,9 @@ jobs:
 
       - name: Verify installed QA capability block from a relocated package
         run: pnpm exec nx run workflow-runtime:qa-installed-journey --skipNxCache --skipSync --output-style=static
+
+      - name: Verify NX-06 path safety and release refusal
+        run: pnpm exec nx run workflow-runtime:nx06-safety-test --skipNxCache --skipSync --output-style=static
 
       - name: Initialize Temari and install pinned Archon
         run: |

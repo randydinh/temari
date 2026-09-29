@@ -90,6 +90,10 @@
       "qa-installed-journey": {
         "command": "node tools/qa-installed-journey.mjs",
         "cache": false
+      },
+      "nx06-safety-test": {
+        "command": "node --test tools/nx06-safety.test.mjs",
+        "cache": false
       }
     }
   },

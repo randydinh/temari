@@ -1,0 +1,6 @@
+ts	phase	decision	why	evidence	result
+2026-09-28T14:59:15Z	artifact	Package the prior v4.1 distribution from the vendored source at c3e3d6b	Restore from packaged bytes without legacy checkout reads	/private/tmp/temari-nx06-legacy-probe-20260928/.temari-distribution.json	portable package created
+2026-09-28T15:03:10Z	harness	Commit a standalone packaged-input runner on the exclusive NX-06 branch	Make the direct installed and rollback check rerunnable	49ee163053e40df210e44524b95ced75072d5166	syntax and format passed
+2026-09-28T15:06:16Z	boundary	Use minimal child environment and fresh destinations	Packaged install can back up existing entries; inherited credentials are unnecessary	8370143d8d2463c10b7ff56b61c78c3f2e868898	direct rehearsal passed
+2026-09-28T15:08:00Z	matrix	Add a structural and artifact drift check with a blocking release mode	The matrix has 13 rows but lacks candidate-specific proof for release	b13068842976a1996da5a65480e3e2843b65a29f	structure PASS; release BLOCKED
+2026-09-28T15:08:29Z	rehearsal	Run installed entries, closeout, and v4.1 rollback at the clean candidate SHA	Verify product bytes and restored projection rather than relying on typecheck	/private/tmp/temari-nx06-rehearsal-b130688-20260928/result.json	local preparation PASS; external gates OPEN
