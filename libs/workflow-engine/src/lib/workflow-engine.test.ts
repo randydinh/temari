@@ -371,6 +371,34 @@ test('joins the exact worker membership in declaration order', () => {
       ]),
     /outcome is not declared: worker-extra/,
   );
+  assert.throws(
+    () =>
+      joinParallelWorkers(assignments, [
+        {
+          ...outcomes[0]!,
+          assignment: { ...assignments[0]!, required: false },
+          result: { ...outcomes[0]!.result!, status: 'BLOCKED' },
+        },
+        outcomes[1]!,
+        outcomes[2]!,
+      ]),
+    /assignment changed: worker-1/,
+  );
+  assert.throws(
+    () =>
+      joinParallelWorkers(assignments, [
+        {
+          ...outcomes[0]!,
+          assignment: {
+            ...assignments[0]!,
+            brief: { ...assignments[0]!.brief, scope: 'different work' },
+          },
+        },
+        outcomes[1]!,
+        outcomes[2]!,
+      ]),
+    /assignment changed: worker-1/,
+  );
 });
 
 test('degrades optional worker failures without hiding required success', () => {
