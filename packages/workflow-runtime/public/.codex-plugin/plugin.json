@@ -1,6 +1,6 @@
 {
   "name": "temari",
-  "version": "0.0.1",
+  "version": "0.0.1+codex.20260929091043",
   "description": "Temari's current Nx public engineering entry surfaces.",
   "author": {
     "name": "Randy Dinh"
@@ -8,7 +8,12 @@
   "homepage": "https://github.com/randydinh/temari",
   "repository": "https://github.com/randydinh/temari",
   "license": "MIT",
-  "keywords": ["temari", "pstack", "engineering", "nx"],
+  "keywords": [
+    "temari",
+    "pstack",
+    "engineering",
+    "nx"
+  ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Temari",
@@ -17,6 +22,8 @@
     "developerName": "Randy Dinh",
     "category": "Productivity",
     "capabilities": [],
-    "defaultPrompt": ["Temari, help me work through this engineering request."]
+    "defaultPrompt": [
+      "Temari, help me work through this engineering request."
+    ]
   }
 }
