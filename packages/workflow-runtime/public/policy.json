@@ -69,6 +69,39 @@
     "requiredCapabilities": ["subagents", "forge"],
     "unsupportedRoutes": ["qa-review"]
   },
+  "qa": {
+    "profile": "qa-review-v1",
+    "owner": "./qa-review",
+    "obligations": {
+      "workType": "qa",
+      "delegation": "required",
+      "review": "independent",
+      "evidence": "revision-bound",
+      "delivery": "local"
+    },
+    "requiredCapabilities": ["subagents"],
+    "stageMapping": [
+      "investigate",
+      "plan",
+      "build",
+      "review",
+      "verify",
+      "deliver"
+    ],
+    "evaluatorInput": [
+      "frozenReview",
+      "canonicalEvidenceRefs",
+      "declaredConstraints",
+      "priorRounds"
+    ],
+    "allowedActions": [
+      "read-source",
+      "read-candidate",
+      "read-evidence",
+      "run-local-check"
+    ],
+    "externalWrites": "denied"
+  },
   "admission": {
     "capabilitiesMustBeProvenByHost": true,
     "callerDeclaredCapabilitiesAreNotProof": true,

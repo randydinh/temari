@@ -251,6 +251,24 @@ function assertPolicy(policy) {
   assert.match(policy.feature.source.playbookSha256, /^[a-f0-9]{64}$/);
   assert.deepEqual(policy.feature.requiredCapabilities, ['subagents', 'forge']);
   assert.deepEqual(policy.feature.unsupportedRoutes, ['qa-review']);
+  assert.equal(policy.qa.profile, 'qa-review-v1');
+  assert.equal(policy.qa.owner, './qa-review');
+  assert.deepEqual(policy.qa.requiredCapabilities, ['subagents']);
+  assert.deepEqual(policy.qa.stageMapping, [
+    'investigate',
+    'plan',
+    'build',
+    'review',
+    'verify',
+    'deliver',
+  ]);
+  assert.deepEqual(policy.qa.allowedActions, [
+    'read-source',
+    'read-candidate',
+    'read-evidence',
+    'run-local-check',
+  ]);
+  assert.equal(policy.qa.externalWrites, 'denied');
   assert.equal(policy.admission.capabilitiesMustBeProvenByHost, true);
   assert.equal(policy.admission.callerDeclaredCapabilitiesAreNotProof, true);
   assert.equal(policy.admission.publicEntriesStartNoLifecycle, false);

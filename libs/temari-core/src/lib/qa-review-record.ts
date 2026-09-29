@@ -108,6 +108,20 @@ export interface QaEvaluationRound {
   readonly evidenceRefs: readonly WorkerEvidenceReference[];
 }
 
+export interface QaEvaluationAttempt {
+  readonly status: 'BLOCKED';
+  readonly reason: 'separate-evaluator-unavailable' | 'environment-unavailable';
+  readonly host: string;
+  readonly tool: string;
+  readonly invocationId: string;
+  readonly startedAt: string;
+  readonly endedAt: string;
+  readonly inputSha256: string;
+  readonly allowedInputSha256: string;
+  readonly outputSha256: null;
+  readonly findings: readonly [];
+}
+
 export type QaReadbackStatus = 'Verified' | 'Failed' | 'Unavailable';
 
 export interface QaExternalWriteReceipt {
@@ -131,6 +145,7 @@ export interface QaReviewRecord {
   readonly areaDecisions: readonly QaAreaDecision[];
   readonly scenarios: readonly QaScenarioRecord[];
   readonly evaluationRounds: readonly QaEvaluationRound[];
+  readonly evaluationAttempts?: readonly QaEvaluationAttempt[];
   readonly qaDisposition: QaReviewDisposition;
   readonly dispositionBasis: string;
   readonly externalWriteReceipts: readonly QaExternalWriteReceipt[];
@@ -446,7 +461,14 @@ function validateEvaluationRounds(
     record.assignment.requestKind === 'full' &&
     record.evaluationRounds.length === 0
   ) {
-    issues.push('full reviews require an independent evaluation round.');
+    if (
+      !record.evaluationAttempts?.length ||
+      record.qaDisposition !== 'BlockedOrIncomplete'
+    ) {
+      issues.push(
+        'full reviews require an independent evaluation round or a blocked attempt.',
+      );
+    }
   }
   if (record.evaluationRounds.length > 3) {
     issues.push('evaluationRounds must contain at most three rounds.');
@@ -481,6 +503,37 @@ function validateEvaluationRounds(
       ),
     );
   });
+  record.evaluationAttempts?.forEach((attempt, index) => {
+    const field = `evaluationAttempts[${index}]`;
+    if (attempt.status !== 'BLOCKED')
+      issues.push(`${field}.status must be BLOCKED.`);
+    enumValue(
+      attempt.reason,
+      ['separate-evaluator-unavailable', 'environment-unavailable'],
+      `${field}.reason`,
+      issues,
+    );
+    for (const key of [
+      'host',
+      'tool',
+      'invocationId',
+      'startedAt',
+      'endedAt',
+    ] as const)
+      nonEmpty(attempt[key], `${field}.${key}`, issues);
+    for (const key of ['inputSha256', 'allowedInputSha256'] as const) {
+      if (!/^[0-9a-f]{64}$/.test(attempt[key]))
+        issues.push(`${field}.${key} must be SHA-256.`);
+    }
+    if (attempt.outputSha256 !== null) {
+      issues.push(`${field}.outputSha256 must be null without an evaluator.`);
+    }
+    if (attempt.findings.length !== 0)
+      issues.push(`${field}.findings must be empty without an evaluator.`);
+  });
+  if (record.evaluationAttempts?.length && record.qaDisposition === 'Passed') {
+    issues.push('a blocked attempt cannot support a Passed disposition.');
+  }
 }
 
 function validateExternalWrites(
@@ -604,6 +657,29 @@ export function validateQaReviewRecord(
     'qaDisposition',
     issues,
   );
+  if (record.qaDisposition === 'Passed') {
+    if (record.assignment.requestKind !== 'full') {
+      issues.push('Passed requires a full review assignment.');
+    }
+    if (
+      record.scenarios.some(
+        (scenario) =>
+          scenario.obligation === 'Required' && scenario.result !== 'Passed',
+      )
+    ) {
+      issues.push('Passed requires every required scenario to be Passed.');
+    }
+    if (
+      record.areaDecisions.some(
+        (decision) => decision.status === 'NeedsInvestigation',
+      )
+    ) {
+      issues.push('Passed cannot contain an unresolved review area.');
+    }
+    if (record.evaluationRounds.at(-1)?.verdict !== 'PASS') {
+      issues.push('Passed requires a final independent PASS round.');
+    }
+  }
   validateEvaluationRounds(record, issues);
   validateExternalWrites(record, issues);
   return issues;
