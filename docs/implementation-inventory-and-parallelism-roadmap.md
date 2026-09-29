@@ -286,12 +286,19 @@ remains RUNNING with no receipt. This is separate from the takeover fixture's
 premature clock advancement, and the original Windows error payload was not
 retained. The exact Windows causal chain is therefore not established.
 
-Before claiming complete worker-failure recovery, define a bounded diagnostic
-representation, preserve the original diagnostic in retained evidence where
-appropriate, and test empty, whitespace-only, oversized and combined errors.
-Verify FAILED mechanics, semantic refusal, retry bounds and stale-owner fencing
-without weakening the store contract or masking the fixture race. This follow-up
-does not authorize a new service or expand the local proof to multi-machine use.
+The local runtime candidate now converts blank diagnostics to a fixed message and
+bounds oversized diagnostics to the store limit with a SHA-256 suffix identifying
+the original text. The store retains its nonempty, 4096-character invariant.
+Focused tests cover empty, whitespace-only, oversized, combined, and unprintable
+errors; they verify durable `FAILED` mechanics, a blocked semantic receipt, and
+retry within the declared attempt bound. The existing lease-loss and stale-owner
+tests remain part of `runtime:test`. This candidate passed uncached `runtime:test`
+and the runtime/dependency typechecks on its development branch.
+
+The complete original diagnostic is not retained in a separate evidence record;
+only the bounded text and digest are durable. This local repair does not establish
+shared-service failure recovery, explain the historical Windows payload, or
+authorize multi-machine claims.
 
 ## Explicit non-goals
 
