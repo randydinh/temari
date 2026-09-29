@@ -15,6 +15,9 @@ import {
 import { FileEvidenceStore } from '../libs/runtime/src/index.ts';
 
 const MAX_OUTPUT_BYTES = 256 * 1024;
+const defaultWorkerPath = fileURLToPath(
+  new URL('./qa-evaluator-worker.mjs', import.meta.url),
+);
 const workspace = fileURLToPath(new URL('..', import.meta.url));
 
 function sha256(value) {
@@ -50,17 +53,13 @@ function optionsFrom(argv) {
   };
 }
 
-function invokeWorker(input) {
+function invokeWorker(input, workerPath) {
   return new Promise((resolve, reject) => {
-    const child = spawn(
-      process.execPath,
-      [...process.execArgv, 'tools/qa-evaluator-worker.mjs'],
-      {
-        cwd: workspace,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env, NODE_OPTIONS: '' },
-      },
-    );
+    const child = spawn(process.execPath, [...process.execArgv, workerPath], {
+      cwd: workspace,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, NODE_OPTIONS: '' },
+    });
     let stdout = Buffer.alloc(0);
     let stderr = Buffer.alloc(0);
     child.stdout.on('data', (chunk) => {
@@ -105,66 +104,70 @@ function behaviorResult(draft) {
   return 'passed';
 }
 
-const options = optionsFrom(process.argv.slice(2));
-const draft = JSON.parse(await readFile(options.draftPath, 'utf8'));
-const evaluationInput = createQaEvaluationInputFromDraft(draft);
-const evidence = await FileEvidenceStore.openExisting(options.evidenceRoot);
-await Promise.all(
-  evaluationInput.canonicalEvidenceRefs.map((reference) =>
-    evidence.loadPortable(reference),
-  ),
-);
-const inputBytes = Buffer.from(JSON.stringify(evaluationInput));
-const startedAt = new Date().toISOString();
-const { output, pid } = await invokeWorker(inputBytes);
-const endedAt = new Date().toISOString();
-assert(Number.isSafeInteger(pid) && pid > 0 && pid !== process.pid);
-const evaluatorEvidence = await evidence.put({
-  runId: draft.assignment.assignmentId,
-  revision: draft.assignment.candidateRef ?? draft.reviewRevision,
-  kind: 'verification',
-  content: JSON.stringify(output),
-});
-const decision = deriveQaEvaluatorDecision({
-  authorId: draft.authorId,
-  evaluatorId: output.evaluatorId,
-  freshContext: 'proven',
-  round: 1,
-  findings: output.findings,
-});
-const disposition = deriveQaDisposition({
-  scope: 'full',
-  evaluatorVerdict: decision.verdict,
-  behaviorResult: behaviorResult(draft),
-});
-const record = createQaReviewRecord({
-  ...draft,
-  evaluationRounds: [
-    {
-      round: 1,
-      evaluatorId: output.evaluatorId,
-      freshContextAttestation: `Independent local evaluator process ${pid} received only the frozen review input.`,
-      verdict: decision.verdict,
-      findingIds: output.findings.map((finding) => finding.findingId),
-      evidenceRefs: [
-        {
-          schema: evaluatorEvidence.schema,
-          runId: evaluatorEvidence.runId,
-          revision: evaluatorEvidence.revision,
-          kind: evaluatorEvidence.kind,
-          sha256: evaluatorEvidence.sha256,
-          bytes: evaluatorEvidence.bytes,
-        },
-      ],
-    },
-  ],
-  qaDisposition: disposition.disposition,
-  dispositionBasis: decision.reason,
-  externalWriteReceipts: [],
-});
-assertQaReviewRecord(record);
-process.stdout.write(
-  `${JSON.stringify({
+export async function runQaEvaluator({
+  draft,
+  evidenceRoot,
+  workerPath = defaultWorkerPath,
+}) {
+  assert(isAbsolute(evidenceRoot), 'Evidence root must be an absolute path.');
+  assert(isAbsolute(workerPath), 'Evaluator worker must be an absolute path.');
+  const evaluationInput = createQaEvaluationInputFromDraft(draft);
+  const evidence = await FileEvidenceStore.openExisting(evidenceRoot);
+  await Promise.all(
+    evaluationInput.canonicalEvidenceRefs.map((reference) =>
+      evidence.loadPortable(reference),
+    ),
+  );
+  const inputBytes = Buffer.from(JSON.stringify(evaluationInput));
+  const startedAt = new Date().toISOString();
+  const { output, pid } = await invokeWorker(inputBytes, workerPath);
+  const endedAt = new Date().toISOString();
+  assert(Number.isSafeInteger(pid) && pid > 0 && pid !== process.pid);
+  const evaluatorEvidence = await evidence.put({
+    runId: draft.assignment.assignmentId,
+    revision: draft.assignment.candidateRef ?? draft.reviewRevision,
+    kind: 'verification',
+    content: JSON.stringify(output),
+  });
+  const decision = deriveQaEvaluatorDecision({
+    authorId: draft.authorId,
+    evaluatorId: output.evaluatorId,
+    freshContext: 'proven',
+    round: 1,
+    findings: output.findings,
+  });
+  const disposition = deriveQaDisposition({
+    scope: 'full',
+    evaluatorVerdict: decision.verdict,
+    behaviorResult: behaviorResult(draft),
+  });
+  const record = createQaReviewRecord({
+    ...draft,
+    evaluationRounds: [
+      {
+        round: 1,
+        evaluatorId: output.evaluatorId,
+        freshContextAttestation: `Independent local evaluator process ${pid} received only the frozen review input.`,
+        verdict: decision.verdict,
+        findingIds: output.findings.map((finding) => finding.findingId),
+        evidenceRefs: [
+          {
+            schema: evaluatorEvidence.schema,
+            runId: evaluatorEvidence.runId,
+            revision: evaluatorEvidence.revision,
+            kind: evaluatorEvidence.kind,
+            sha256: evaluatorEvidence.sha256,
+            bytes: evaluatorEvidence.bytes,
+          },
+        ],
+      },
+    ],
+    qaDisposition: disposition.disposition,
+    dispositionBasis: decision.reason,
+    externalWriteReceipts: [],
+  });
+  assertQaReviewRecord(record);
+  return {
     schemaVersion: 1,
     evaluator: {
       id: output.evaluatorId,
@@ -176,5 +179,18 @@ process.stdout.write(
     decision,
     qaDisposition: disposition,
     record,
-  })}\n`,
-);
+  };
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  const options = optionsFrom(process.argv.slice(2));
+  const draft = JSON.parse(await readFile(options.draftPath, 'utf8'));
+  process.stdout.write(
+    `${JSON.stringify(
+      await runQaEvaluator({
+        draft,
+        evidenceRoot: options.evidenceRoot,
+      }),
+    )}\n`,
+  );
+}

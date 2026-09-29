@@ -1,5 +1,13 @@
 # QA verification changes
 
+## 0.7.0 — 2026-09-29
+
+- Package the local QA evaluator and its worker in the installed Temari artifact.
+- Route a full, versioned QA assignment through the installed evaluator with an
+  existing canonical local evidence store; retain the evaluator output and final
+  disposition in the local run.
+- Keep external writes denied and reject caller-supplied evaluator claims.
+
 ## 0.6.0 — 2026-09-29
 
 - Carry the full-review scenario inventory and all eleven area decisions without

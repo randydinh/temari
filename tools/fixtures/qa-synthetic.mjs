@@ -81,6 +81,8 @@ export function syntheticQaRequest(candidateRoot, runDirectory) {
       revision: 'synthetic-revision',
       candidate: { scopeId: 'synthetic-scope', root: candidateRoot },
       runDirectory,
+      evidenceRoot: join(runDirectory, 'evidence'),
     },
   };
 }
+import { join } from 'node:path';

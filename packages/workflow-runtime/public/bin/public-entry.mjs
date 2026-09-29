@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
 import {
   lstat,
+  mkdir,
   mkdtemp,
   open,
   readdir,
@@ -124,7 +125,7 @@ function policyDescription(entry, policy) {
       ? {
           qaRoute: 'qa-review',
           qaProfile: policy.qa.profile,
-          qaHostStatus: 'separate-evaluator-unavailable',
+          qaHostStatus: policy.qa.evaluator,
         }
       : {}),
     policyId: policy.policyId,
@@ -570,8 +571,14 @@ async function startQa(request, requestSha256, policy) {
     'revision',
     'candidate',
     'runDirectory',
+    'evidenceRoot',
   ]);
   exactFields(request.invocation.candidate, ['scopeId', 'root']);
+  assert(
+    isAbsolute(request.invocation.runDirectory) &&
+      isAbsolute(request.invocation.evidenceRoot),
+    'Installed QA requires absolute local run and evidence paths.',
+  );
   exactFields(request.review, [
     'reviewRevision',
     'authorId',
@@ -679,24 +686,11 @@ async function startQa(request, requestSha256, policy) {
     ),
     'QA source references and write controls differ from the assignment.',
   );
-  assert.equal(
-    request.review.scenarios.every(
-      (scenario) =>
-        scenario.result === 'NotRun' &&
-        Array.isArray(scenario.executions) &&
-        scenario.executions.length === 0,
-    ),
-    true,
-    'Installed QA accepts only unexecuted scenarios.',
-  );
   const require = createRequire(
     pathToFileURL(join(root, 'runtime/consumer.mjs')),
   );
   const core = await import(
     pathToFileURL(require.resolve('@temari/temari-core')).href
-  );
-  const contracts = await import(
-    pathToFileURL(require.resolve('@temari/contracts')).href
   );
   core.assertQaAssignment(request.assignment);
   const route = core.createRequestPlan({
@@ -720,152 +714,52 @@ async function startQa(request, requestSha256, policy) {
   assert.equal(route.route.owner, policy.qa.owner);
   assert.deepEqual(route.obligations, policy.qa.obligations);
   assert.deepEqual(route.plan.stages, policy.qa.stageMapping);
-  const allowedInputs = {
-    frozenReview: {
+  const { runQaEvaluator } = await import(
+    pathToFileURL(join(root, 'bin/qa-evaluator.mjs')).href
+  );
+  const evaluator = await runQaEvaluator({
+    draft: {
+      schemaVersion: 1,
       reviewRevision: request.review.reviewRevision,
-      assignment: {
-        assignmentId: request.assignment.assignmentId,
-        requestKind: request.assignment.requestKind,
-        tier: request.assignment.tier,
-        requestedScope: request.assignment.requestedScope,
-        excludedScope: request.assignment.excludedScope,
-        ticketRef: request.assignment.ticketRef,
-        ticketRevision: request.assignment.ticketRevision,
-        requirementRefs: request.assignment.requirementRefs,
-        requirementRevisions: request.assignment.requirementRevisions,
-        candidateRef: request.assignment.candidateRef,
-        environmentRef: request.assignment.environmentRef ?? null,
-        missingEnvironmentBlocker:
-          request.assignment.missingEnvironmentBlocker ?? null,
-      },
+      parentRevision: null,
+      authorId: request.review.authorId,
+      assignment: request.assignment,
       plan: request.review.plan,
       areaDecisions: request.review.areaDecisions,
       scenarios: request.review.scenarios,
       residualRisks: request.review.residualRisks,
     },
-    canonicalEvidenceRefs: [],
-    declaredConstraints: request.assignment.knownConstraints,
-    priorRounds: [],
-  };
-  const allowedInputSha256 = sha256(Buffer.from(JSON.stringify(allowedInputs)));
-  const startedAt = new Date().toISOString();
-  const { code, pid } = await startBridge('start', request, policy);
-  const endedAt = new Date().toISOString();
-  assert(
-    Number.isSafeInteger(pid) && pid > 0,
-    'Host process identity is missing.',
-  );
-  const invocationId = `node-pid-${pid}`;
-  const runtime = await import(
-    pathToFileURL(require.resolve('@temari/runtime')).href
-  );
-  const receipts = await runtime.FileWorkflowReceiptStore.openExisting(
-    join(request.invocation.runDirectory, 'receipts'),
-  );
-  const receipt = await receipts.load(request.invocation.runId);
-  assert(receipt, 'QA bridge did not retain a workflow receipt.');
-  assert.equal(
-    receipt.status,
-    'BLOCKED',
-    'QA without a separate evaluator cannot complete the workflow.',
-  );
-  assert.equal(
-    receipt.failure?.kind,
-    'capability-gap',
-    'QA must block on the missing host capability.',
-  );
-  assert.deepEqual(
-    receipt.plan,
-    route.plan,
-    'QA bridge plan differs from the domain route.',
-  );
-  const retained = await readJson(
-    join(request.invocation.runDirectory, 'config', 'input.json'),
-    REQUEST_BYTES,
-  );
-  const report = retained.capabilities;
-  assert.equal(
-    report.host,
-    'experimental-local-host',
-    'Unexpected installed host.',
-  );
-  assert.deepEqual(
-    report.available,
-    [],
-    'QA host claimed an unobserved capability.',
-  );
-  assert.deepEqual(report.missing, [...contracts.HOST_CAPABILITIES]);
-  const missing = contracts.missingOrUnprovenCapabilities(
-    policy.qa.requiredCapabilities,
-    report,
-  );
-  assert.deepEqual(missing, policy.qa.requiredCapabilities);
-  const attempt = {
-    status: 'BLOCKED',
-    reason: request.assignment.missingEnvironmentBlocker
-      ? 'environment-unavailable'
-      : 'separate-evaluator-unavailable',
-    host: report.host,
-    tool: 'host/entry.mjs',
-    invocationId,
-    startedAt,
-    endedAt,
-    inputSha256: requestSha256,
-    allowedInputSha256,
-    outputSha256: null,
-    findings: [],
-  };
-  const record = core.createQaReviewRecord({
-    schemaVersion: 1,
-    reviewRevision: request.review.reviewRevision,
-    parentRevision: null,
-    authorId: request.review.authorId,
-    assignment: request.assignment,
-    plan: request.review.plan,
-    areaDecisions: request.review.areaDecisions,
-    scenarios: request.review.scenarios,
-    evaluationRounds: [],
-    evaluationAttempts: [attempt],
-    qaDisposition: 'BlockedOrIncomplete',
-    dispositionBasis: attempt.reason,
-    externalWriteReceipts: [],
-    residualRisks: request.review.residualRisks,
+    evidenceRoot: request.invocation.evidenceRoot,
   });
-  core.assertQaReviewRecord(record);
+  assert.deepEqual(
+    evaluator.record.externalWriteReceipts,
+    [],
+    'Installed QA must not create external writes.',
+  );
   const result = {
     schemaVersion: 1,
     route: route.route,
     plan: route.plan,
-    workflowReceipt: {
-      status: receipt.status,
-      failure: receipt.failure,
-      stages: receipt.stages,
-    },
-    qaDisposition: core.deriveQaDisposition({
-      scope: 'full',
-      evaluatorVerdict: 'BLOCKED',
-      behaviorResult: 'blocked',
-    }),
-    record,
-    allowedInputs,
-    capabilityObservation: {
-      host: report.host,
-      tool: 'host/entry.mjs',
-      invocationId,
-      startedAt,
-      endedAt,
-      exitCode: code,
-      report,
-      missing,
-      evaluatorLaunch: 'unavailable',
+    evaluator,
+    qaDisposition: evaluator.qaDisposition,
+    record: evaluator.record,
+    delivery: {
+      mode: 'local',
+      externalWrites: 'denied',
+      requestSha256,
+      evaluatorLaunch: 'packaged-local-process',
     },
   };
+  await mkdir(join(request.invocation.runDirectory, 'config'), {
+    recursive: true,
+    mode: 0o700,
+  });
   await writeFile(
     join(request.invocation.runDirectory, 'config', 'qa-result.json'),
     `${JSON.stringify(result)}\n`,
     { flag: 'wx', mode: 0o600 },
   );
-  finish(result, 1);
+  finish(result, evaluator.qaDisposition.disposition === 'Passed' ? 0 : 1);
 }
 
 export async function run(entry, argv = process.argv.slice(2)) {
