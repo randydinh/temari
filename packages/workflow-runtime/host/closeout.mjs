@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import { isAbsolute, join, relative, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { invocationScope } from './invocation.mjs';
+import { verifyLocalFeatureHostProof } from './feature-proof.mjs';
 import { assertSourceEvidence, loadSourceContract } from './source.mjs';
 import { exactFields, readBoundedFile, readBoundedJson } from './stdio.mjs';
 
@@ -68,6 +69,8 @@ export async function verifyInstalledCloseout({
   request,
   expectedCurrent,
   selectionPath,
+  requestSha256,
+  manifestSha256,
 }) {
   const runtimeRoot = await directory(join(bundleRoot, 'runtime'));
   const invocation = request.invocation;
@@ -110,18 +113,23 @@ export async function verifyInstalledCloseout({
     stores.set(name, await directory(join(runDirectory, name), true));
 
   const input = await readBoundedJson(join(config, 'input.json'), CONFIG_BYTES);
-  exactFields(input, [
-    'schemaVersion',
-    'runId',
-    'revision',
-    'candidate',
-    'runDirectory',
-    'plan',
-    'capabilities',
-    'expectedInitial',
-    'runtimeManifestSha256',
-    'sourceProfile',
-  ]);
+  const feature = request.route === 'full-playbook';
+  exactFields(
+    input,
+    [
+      'schemaVersion',
+      'runId',
+      'revision',
+      'candidate',
+      'runDirectory',
+      'plan',
+      'capabilities',
+      'expectedInitial',
+      'runtimeManifestSha256',
+      'sourceProfile',
+    ],
+    ['featureHost'],
+  );
   assert.equal(input.schemaVersion, 1, 'Unsupported run descriptor schema.');
   exactFields(input.candidate, ['scopeId', 'root']);
   assert.equal(input.runId, invocation.runId, 'Retained run ID differs.');
@@ -130,9 +138,49 @@ export async function verifyInstalledCloseout({
     invocation.revision,
     'Retained revision differs.',
   );
+  let featureProof;
+  if (feature) {
+    exactFields(input.featureHost, [
+      'sourceCandidate',
+      'evidenceRoot',
+      'baseCommit',
+      'hostBinding',
+      'proofSha256',
+    ]);
+    assert.deepEqual(input.featureHost.sourceCandidate, {
+      scopeId: invocation.candidate.scopeId,
+      root: await directory(invocation.candidate.root),
+    });
+    assert.equal(
+      input.featureHost.evidenceRoot,
+      await directory(request.featureWorkers.evidenceRoot),
+    );
+    assert.equal(
+      input.featureHost.baseCommit,
+      request.featureWorkers.baseCommit,
+    );
+    assert.deepEqual(input.featureHost.hostBinding, {
+      entry: request.entry,
+      policyId: policy.policyId,
+      requestSha256,
+      manifestSha256,
+    });
+    featureProof = await verifyLocalFeatureHostProof({
+      runId: input.runId,
+      revision: input.revision,
+      candidateRoot: input.featureHost.sourceCandidate.root,
+      evidenceRoot: input.featureHost.evidenceRoot,
+      baseCommit: input.featureHost.baseCommit,
+      hostBinding: input.featureHost.hostBinding,
+      proofSha256: input.featureHost.proofSha256,
+    });
+  } else assert(input.featureHost === undefined);
   assert.deepEqual(
     input.candidate,
-    { scopeId: invocation.candidate.scopeId, root: candidateRoot },
+    {
+      scopeId: invocation.candidate.scopeId,
+      root: feature ? featureProof.integrationPath : candidateRoot,
+    },
     'Retained candidate differs from trusted invocation.',
   );
   assert.equal(
@@ -142,22 +190,45 @@ export async function verifyInstalledCloseout({
   );
   assert.equal(
     input.sourceProfile,
-    policy.entries[request.entry].supportedProfile,
+    feature ? 'feature-v1' : policy.entries[request.entry].supportedProfile,
     'Retained source profile differs from admitted policy.',
   );
   assert.deepEqual(
     input.plan,
-    core.createExecutionPlan(policy.lightweight.obligations),
+    core.createExecutionPlan(
+      feature ? policy.feature.obligations : policy.lightweight.obligations,
+    ),
     'Retained plan differs from admitted policy.',
   );
   assert.deepEqual(
     input.capabilities,
-    {
-      host: 'experimental-local-host',
-      available: [],
-      missing: [...contracts.HOST_CAPABILITIES],
-      notes: {},
-    },
+    feature
+      ? {
+          host: 'local-codex-feature-host',
+          available: ['subagents', 'forge'],
+          missing: [...contracts.HOST_CAPABILITIES].filter(
+            (name) => name !== 'subagents' && name !== 'forge',
+          ),
+          notes: {},
+          provenance: {
+            subagents: {
+              status: 'proven',
+              source: featureProof.proofSha256,
+              observedAt: featureProof.forge.observedAt,
+            },
+            forge: {
+              status: 'proven',
+              source: featureProof.forge.nameWithOwner,
+              observedAt: featureProof.forge.observedAt,
+            },
+          },
+        }
+      : {
+          host: 'experimental-local-host',
+          available: [],
+          missing: [...contracts.HOST_CAPABILITIES],
+          notes: {},
+        },
     'Retained capabilities differ from the bridge report.',
   );
   contracts.assertCandidateIdentity(input.expectedInitial);
@@ -177,6 +248,7 @@ export async function verifyInstalledCloseout({
     contracts,
     runtimeRoot,
     input.sourceProfile,
+    input.capabilities,
   );
   assert.deepEqual(input.plan, sourceContract.plan);
   await readBoundedFile(

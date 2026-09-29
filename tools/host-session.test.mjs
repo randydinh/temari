@@ -29,7 +29,15 @@ let build;
 before(async () => {
   build = await realpath(await mkdtemp(join(tmpdir(), 'temari-host-build-')));
   await packageCanonicalRuntime(join(build, 'runtime'));
-  for (const file of ['entry.mjs', 'stdio.mjs', 'source.mjs', 'invocation.mjs'])
+  for (const file of [
+    'entry.mjs',
+    'stdio.mjs',
+    'source.mjs',
+    'invocation.mjs',
+    'feature-proof.mjs',
+    'forge.mjs',
+    'local-worker.mjs',
+  ])
     await copyFile(
       new URL(`../packages/workflow-runtime/host/${file}`, import.meta.url),
       join(build, file),
@@ -50,7 +58,15 @@ async function fixture(t, changes = {}) {
   });
   const artifact = join(root, 'runtime');
   await cp(join(build, 'runtime'), artifact, { recursive: true });
-  for (const file of ['entry.mjs', 'stdio.mjs', 'source.mjs', 'invocation.mjs'])
+  for (const file of [
+    'entry.mjs',
+    'stdio.mjs',
+    'source.mjs',
+    'invocation.mjs',
+    'feature-proof.mjs',
+    'forge.mjs',
+    'local-worker.mjs',
+  ])
     await copyFile(join(build, file), join(root, file));
   const candidate = join(root, 'candidate');
   await mkdir(candidate);

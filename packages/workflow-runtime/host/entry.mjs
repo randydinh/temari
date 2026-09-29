@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { lstat, mkdir, open, realpath } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -19,6 +20,8 @@ import {
   assertSourceEvidence,
 } from './source.mjs';
 import { invocationScope } from './invocation.mjs';
+import { verifyLocalFeatureHostProof } from './feature-proof.mjs';
+import { verifyLocalPullRequest } from './forge.mjs';
 import {
   controlLine,
   createStdioSession,
@@ -105,6 +108,56 @@ function validateObligations(value, capabilities) {
     );
   }
 }
+async function featureCapabilities(
+  featureHost,
+  runId,
+  revision,
+  candidateRoot,
+  all,
+) {
+  exactFields(featureHost, [
+    'sourceCandidate',
+    'evidenceRoot',
+    'baseCommit',
+    'hostBinding',
+    'proofSha256',
+  ]);
+  exactFields(featureHost.sourceCandidate, ['scopeId', 'root']);
+  assert.equal(featureHost.sourceCandidate.scopeId.length > 0, true);
+  const proof = await verifyLocalFeatureHostProof({
+    runId,
+    revision,
+    candidateRoot: featureHost.sourceCandidate.root,
+    evidenceRoot: featureHost.evidenceRoot,
+    baseCommit: featureHost.baseCommit,
+    hostBinding: featureHost.hostBinding,
+    proofSha256: featureHost.proofSha256,
+  });
+  assert.equal(
+    candidateRoot,
+    proof.integrationPath,
+    'Feature candidate differs from the verified worker integration.',
+  );
+  const capabilities = {
+    host: 'local-codex-feature-host',
+    available: ['subagents', 'forge'],
+    missing: all.filter((name) => name !== 'subagents' && name !== 'forge'),
+    notes: {},
+    provenance: {
+      subagents: {
+        status: 'proven',
+        source: proof.proofSha256,
+        observedAt: proof.forge.observedAt,
+      },
+      forge: {
+        status: 'proven',
+        source: proof.forge.nameWithOwner,
+        observedAt: proof.forge.observedAt,
+      },
+    },
+  };
+  return { capabilities, proof };
+}
 async function directory(path) {
   const selected = absolute(path);
   const stat = await lstat(selected);
@@ -187,6 +240,149 @@ async function writeDescriptor(path, descriptor) {
   }
 }
 
+async function featureStageResult(stage, result, proof) {
+  assert(
+    result.sourceRequirements === undefined,
+    'Feature source claims are owned by the host.',
+  );
+  const suppliedSource = result.evidence.filter(
+    (item) => item.name === 'source',
+  );
+  assert(suppliedSource.length <= 1, 'Duplicate feature source evidence.');
+  const callerSource = suppliedSource[0];
+  if (['investigate', 'plan', 'deliver'].includes(stage))
+    assert(
+      callerSource?.kind === 'other' && callerSource.content.length > 0,
+      `Feature ${stage} requires source input.`,
+    );
+  else assert(!callerSource, `Feature ${stage} source is host-owned.`);
+  const verifiedJson = async (path, expectedSha256, limit) => {
+    const bytes = await readBoundedFile(path, limit);
+    assert.equal(
+      createHash('sha256').update(bytes).digest('hex'),
+      expectedSha256,
+    );
+    return JSON.parse(bytes.toString());
+  };
+  const workerReport = await verifiedJson(
+    proof.workers.reportPath,
+    proof.workers.reportSha256,
+    64 * 1024,
+  );
+  const builderObservation = await verifiedJson(
+    workerReport.builder.observationPath,
+    workerReport.builder.observationSha256,
+    64 * 1024,
+  );
+  const reviewerObservation = await verifiedJson(
+    workerReport.reviewer.observationPath,
+    workerReport.reviewer.observationSha256,
+    64 * 1024,
+  );
+  const builderReceipt = await verifiedJson(
+    builderObservation.receipt.path,
+    builderObservation.receipt.sha256,
+    4 * 1024 * 1024,
+  );
+  let source;
+  let claims;
+  if (stage === 'investigate') {
+    source = callerSource.content;
+    claims = [{ id: 'feature.shape.how', sourceKind: 'document' }];
+  } else if (stage === 'plan') {
+    source = Buffer.from(
+      JSON.stringify({
+        hostProofSha256: proof.proofSha256,
+        architectObservationSha256: proof.architect.observationSha256,
+        throughputCheckpoint: callerSource.content.toString(),
+      }),
+    );
+    claims = [
+      { id: 'feature.shape.parallel-design', sourceKind: 'review' },
+      { id: 'feature.shape.throughput-checkpoint', sourceKind: 'document' },
+    ];
+  } else if (stage === 'build') {
+    const diff = execFileSync(
+      'git',
+      ['-C', proof.integrationPath, 'show', '--format=', '--binary', 'HEAD'],
+      { encoding: 'utf8', timeout: 10000, maxBuffer: 750 * 1024 },
+    );
+    assert(diff.length > 0, 'Builder produced no committed diff.');
+    source = Buffer.from(
+      JSON.stringify({
+        hostProofSha256: proof.proofSha256,
+        integratedCommit: proof.integratedCommit,
+        diff,
+      }),
+    );
+    claims = [
+      { id: 'feature.build.delegated-implementation', sourceKind: 'diff' },
+    ];
+  } else if (stage === 'review') {
+    const receipt = await readBoundedFile(
+      reviewerObservation.receipt.path,
+      4 * 1024 * 1024,
+    );
+    assert.equal(
+      createHash('sha256').update(receipt).digest('hex'),
+      reviewerObservation.receipt.sha256,
+      'Reviewer receipt changed.',
+    );
+    source = Buffer.from(
+      JSON.stringify({
+        hostProofSha256: proof.proofSha256,
+        reviewerObservationSha256: workerReport.reviewer.observationSha256,
+        integratedCommit: proof.integratedCommit,
+        receiptSha256: createHash('sha256').update(receipt).digest('hex'),
+      }),
+    );
+    claims = [{ id: 'feature.review.ordered-commits', sourceKind: 'review' }];
+  } else if (stage === 'verify') {
+    assert(
+      Array.isArray(builderReceipt.verification) &&
+        builderReceipt.verification.length > 0 &&
+        builderReceipt.verification.every((item) => item.code === 0),
+      'Matching-surface verification did not pass.',
+    );
+    source = Buffer.from(
+      JSON.stringify({
+        hostProofSha256: proof.proofSha256,
+        integratedCommit: proof.integratedCommit,
+        verification: builderReceipt.verification,
+      }),
+    );
+    claims = [{ id: 'feature.verify.matching-surface', sourceKind: 'command' }];
+  } else {
+    const deliveryInput = JSON.parse(callerSource.content.toString());
+    exactFields(deliveryInput, ['pullRequestUrl']);
+    source = Buffer.from(
+      JSON.stringify(
+        verifyLocalPullRequest(
+          proof.forge,
+          proof.integratedCommit,
+          deliveryInput.pullRequestUrl,
+        ),
+      ),
+    );
+    claims = [{ id: 'feature.delivery.pull-request', sourceKind: 'runtime' }];
+  }
+  assert(
+    source.length <= 1024 * 1024,
+    'Feature source evidence exceeds 1 MiB.',
+  );
+  return {
+    ...result,
+    evidence: [
+      ...result.evidence.filter((item) => item.name !== 'source'),
+      { name: 'source', kind: 'other', content: source },
+    ],
+    sourceRequirements: claims.map((claim) => ({
+      ...claim,
+      evidenceName: 'source',
+    })),
+  };
+}
+
 async function main(session) {
   const [
     mode,
@@ -230,7 +426,7 @@ async function main(session) {
   const runtime = await load('@temari/runtime');
   const { DEFAULT_STAGES: stages, HOST_CAPABILITIES: hostCapabilities } =
     contracts;
-  const capabilities = {
+  let capabilities = {
     host: 'experimental-local-host',
     available: [],
     missing: [...hostCapabilities],
@@ -238,6 +434,7 @@ async function main(session) {
   };
   let input;
   let paths;
+  let featureProof;
   if (mode === 'start') {
     const request = await readBoundedJson(
       absolute(inputArgument),
@@ -253,7 +450,7 @@ async function main(session) {
         'runDirectory',
         'obligations',
       ],
-      ['sourceProfile'],
+      ['sourceProfile', 'featureHost'],
     );
     assert(request.schemaVersion === 1, 'Unsupported request schema.');
     identity(request);
@@ -262,6 +459,21 @@ async function main(session) {
       scopeId: request.candidate.scopeId,
       root: await directory(request.candidate.root),
     };
+    if (request.sourceProfile === 'feature-v1') {
+      const feature = await featureCapabilities(
+        request.featureHost,
+        request.runId,
+        request.revision,
+        candidate.root,
+        hostCapabilities,
+      );
+      capabilities = feature.capabilities;
+      featureProof = feature.proof;
+    } else
+      assert(
+        request.featureHost === undefined,
+        'Feature host proof is only valid for the feature profile.',
+      );
     const runDirectory = await freshDirectory(request.runDirectory);
     disjoint(candidate.root, runtimeRoot, runDirectory);
     const plan = core.createExecutionPlan(request.obligations);
@@ -279,6 +491,9 @@ async function main(session) {
       ...(request.sourceProfile === undefined
         ? {}
         : { sourceProfile: request.sourceProfile }),
+      ...(request.featureHost === undefined
+        ? {}
+        : { featureHost: request.featureHost }),
     };
     checkControlPaths(input, paths, stages);
     session.assertHealthy();
@@ -315,7 +530,7 @@ async function main(session) {
         'expectedInitial',
         'runtimeManifestSha256',
       ],
-      ['sourceProfile'],
+      ['sourceProfile', 'featureHost'],
     );
     assert(input.schemaVersion === 1, 'Unsupported run descriptor schema.');
     identity(input);
@@ -334,10 +549,25 @@ async function main(session) {
       runtimeManifestSha256,
       'Runtime manifest changed.',
     );
+    if (input.sourceProfile === 'feature-v1') {
+      const feature = await featureCapabilities(
+        input.featureHost,
+        input.runId,
+        input.revision,
+        input.candidate.root,
+        hostCapabilities,
+      );
+      capabilities = feature.capabilities;
+      featureProof = feature.proof;
+    } else
+      assert(
+        input.featureHost === undefined,
+        'Feature host proof is only valid for the feature profile.',
+      );
     assert.deepEqual(
       input.capabilities,
       capabilities,
-      'Host capabilities differ from fixed experimental report.',
+      'Host capabilities differ from independently verified proof.',
     );
     contracts.assertCandidateIdentity(input.expectedInitial);
     exactFields(
@@ -371,7 +601,12 @@ async function main(session) {
   const sourceContract =
     input.sourceProfile === undefined
       ? null
-      : await loadSourceContract(contracts, runtimeRoot, input.sourceProfile);
+      : await loadSourceContract(
+          contracts,
+          runtimeRoot,
+          input.sourceProfile,
+          input.capabilities,
+        );
   if (sourceContract)
     assert.deepEqual(
       input.plan,
@@ -458,9 +693,15 @@ async function main(session) {
         paths.workspaceForStage(stage).root,
         input.candidate,
       );
-      return sourceContract && result.status === 'PASS'
-        ? attachSourceClaims(stage, result, input, sourceContract)
-        : result;
+      if (!sourceContract || result.status !== 'PASS') return result;
+      return attachSourceClaims(
+        stage,
+        featureProof
+          ? await featureStageResult(stage, result, featureProof)
+          : result,
+        input,
+        sourceContract,
+      );
     },
     onStageCheckpoint: async (checkpoint) => {
       await session.emit({
