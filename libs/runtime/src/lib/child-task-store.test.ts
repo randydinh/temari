@@ -267,6 +267,7 @@ test('durably cancels queued work and fences an active lease until it expires', 
     });
     assert.equal(active.status, 'RUNNING');
     assert.equal(active.lease?.owner, 'worker-a');
+    assert.equal(await store.cancellationRequested('child-cancel-1'), true);
 
     const cancelled = await store.cancel({
       taskId: 'child-cancel-1',
@@ -288,10 +289,287 @@ test('durably cancels queued work and fences an active lease until it expires', 
     assert.deepEqual(replay, cancelled);
     assert.deepEqual(
       (await store.events('child-cancel-1')).map((event) => event.type),
-      ['task-created', 'task-claimed', 'task-cancelled'],
+      [
+        'task-created',
+        'task-claimed',
+        'task-cancellation-requested',
+        'task-cancelled',
+      ],
     );
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('active cancellation wins completion and is replayed with the original request', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-child-task-store-'));
+  try {
+    const store = await FileChildTaskStore.create(root);
+    await store.create({
+      taskId: 'cancel-completion',
+      runId: 'cancel-run',
+      revision: 'cancel-revision',
+      dependsOn: [],
+      actor: 'coordinator',
+      now: at('2026-09-24T12:00:00.000Z'),
+    });
+    const claim = await store.claim({
+      taskId: 'cancel-completion',
+      owner: 'worker-a',
+      leaseMs: 1_000,
+      now: at('2026-09-24T12:00:01.000Z'),
+    });
+    assert(claim.record.lease);
+    await store.cancel({
+      taskId: 'cancel-completion',
+      actor: 'coordinator',
+      idempotencyKey: 'cancel:completion',
+      now: at('2026-09-24T12:00:01.100Z'),
+    });
+    await assert.rejects(
+      store.renew({
+        taskId: 'cancel-completion',
+        owner: 'worker-a',
+        leaseToken: claim.record.lease.token,
+        fencingEpoch: claim.record.lease.fencingEpoch,
+        leaseMs: 1_000,
+        idempotencyKey: 'renew:after-cancel',
+        now: at('2026-09-24T12:00:01.200Z'),
+      }),
+      /cancellation was requested/,
+    );
+    const completion = {
+      taskId: 'cancel-completion',
+      owner: 'worker-a',
+      leaseToken: claim.record.lease.token,
+      fencingEpoch: claim.record.lease.fencingEpoch,
+      status: 'SUCCEEDED' as const,
+      idempotencyKey: 'complete:cancel-completion',
+      result: result('PASS', 'finished'),
+      now: at('2026-09-24T12:00:01.300Z'),
+    };
+    const cancelled = await store.complete(completion);
+    assert.equal(cancelled.status, 'CANCELLED');
+    assert.equal(cancelled.result, null);
+    assert.equal(cancelled.error, null);
+    assert.deepEqual(await store.complete(completion), cancelled);
+    await assert.rejects(
+      store.complete({ ...completion, result: result('PASS', 'changed') }),
+      /completion request result changed/,
+    );
+    assert.deepEqual(
+      (await store.events('cancel-completion')).map((event) => event.type),
+      [
+        'task-created',
+        'task-claimed',
+        'task-cancellation-requested',
+        'task-completed',
+      ],
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('completed work wins a later request while an expired requested child is never reclaimed', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-child-task-store-'));
+  try {
+    const store = await FileChildTaskStore.create(root);
+    for (const taskId of ['complete-first', 'cancel-expired']) {
+      await store.create({
+        taskId,
+        runId: 'race-run',
+        revision: 'race-revision',
+        dependsOn: [],
+        actor: 'coordinator',
+        now: at('2026-09-24T12:00:00.000Z'),
+      });
+    }
+    const first = await store.claim({
+      taskId: 'complete-first',
+      owner: 'worker-a',
+      leaseMs: 1_000,
+      now: at('2026-09-24T12:00:01.000Z'),
+    });
+    assert(first.record.lease);
+    const completed = await store.complete({
+      taskId: 'complete-first',
+      owner: 'worker-a',
+      leaseToken: first.record.lease.token,
+      fencingEpoch: first.record.lease.fencingEpoch,
+      status: 'SUCCEEDED',
+      idempotencyKey: 'complete:first',
+      result: result('PASS', 'finished'),
+      now: at('2026-09-24T12:00:01.100Z'),
+    });
+    assert.equal(
+      (
+        await store.cancel({
+          taskId: 'complete-first',
+          actor: 'coordinator',
+          idempotencyKey: 'cancel:late',
+          now: at('2026-09-24T12:00:01.200Z'),
+        })
+      ).status,
+      'SUCCEEDED',
+    );
+    assert.equal(completed.status, 'SUCCEEDED');
+    assert.equal(await store.cancellationRequested('complete-first'), false);
+
+    const held = await store.claim({
+      taskId: 'cancel-expired',
+      owner: 'worker-a',
+      leaseMs: 1_000,
+      now: at('2026-09-24T12:00:01.000Z'),
+    });
+    assert(held.record.lease);
+    await store.cancel({
+      taskId: 'cancel-expired',
+      actor: 'coordinator',
+      idempotencyKey: 'cancel:expired',
+      now: at('2026-09-24T12:00:01.500Z'),
+    });
+    const replacement = await FileChildTaskStore.create(root);
+    assert.equal(
+      await replacement.cancellationRequested('cancel-expired'),
+      true,
+    );
+    const claim = await replacement.claim({
+      taskId: 'cancel-expired',
+      owner: 'worker-b',
+      leaseMs: 1_000,
+      now: at('2026-09-24T12:00:02.001Z'),
+    });
+    assert.equal(claim.claimed, false);
+    assert.equal(claim.record.status, 'CANCELLED');
+    assert.equal(claim.record.attempt, 1);
+    await assert.rejects(
+      replacement.complete({
+        taskId: 'cancel-expired',
+        owner: 'worker-a',
+        leaseToken: held.record.lease.token,
+        fencingEpoch: held.record.lease.fencingEpoch,
+        status: 'SUCCEEDED',
+        idempotencyKey: 'complete:stale',
+        result: result('PASS', 'too late'),
+        now: at('2026-09-24T12:00:02.001Z'),
+      }),
+      /Only a running lease/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('group capacity does not delay finalizing an expired cancellation request', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-child-task-store-'));
+  try {
+    const store = await FileChildTaskStore.create(root);
+    const taskIds = ['group-active', 'group-cancel-requested'];
+    for (const taskId of taskIds) {
+      await store.create({
+        taskId,
+        runId: 'group-cancel-run',
+        revision: 'group-cancel-revision',
+        dependsOn: [],
+        actor: 'coordinator',
+        now: at('2026-09-24T12:00:00.000Z'),
+      });
+    }
+    await store.ensureGroup({
+      groupId: 'group-cancel',
+      runId: 'group-cancel-run',
+      revision: 'group-cancel-revision',
+      taskIds,
+      assignmentIds: ['assignment-active', 'assignment-cancel'],
+      now: at('2026-09-24T12:00:00.000Z'),
+    });
+    await store.claim({
+      taskId: 'group-active',
+      owner: 'worker-a',
+      leaseMs: 5_000,
+      now: at('2026-09-24T12:00:01.000Z'),
+    });
+    await store.claim({
+      taskId: 'group-cancel-requested',
+      owner: 'worker-b',
+      leaseMs: 1_000,
+      now: at('2026-09-24T12:00:01.000Z'),
+    });
+    await store.cancel({
+      taskId: 'group-cancel-requested',
+      actor: 'coordinator',
+      idempotencyKey: 'cancel:group-child',
+      now: at('2026-09-24T12:00:01.500Z'),
+    });
+    const resumed = await FileChildTaskStore.create(root);
+    const reservation = await resumed.claimGroup({
+      groupId: 'group-cancel',
+      runId: 'group-cancel-run',
+      revision: 'group-cancel-revision',
+      taskIds,
+      maxConcurrency: 1,
+      owner: 'replacement',
+      leaseMs: 1_000,
+      now: at('2026-09-24T12:00:02.001Z'),
+    });
+    assert.equal(reservation.claimed.length, 0);
+    assert.equal(reservation.records[0]?.status, 'RUNNING');
+    assert.equal(reservation.records[1]?.status, 'CANCELLED');
+    assert.equal(reservation.records[1]?.attempt, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('reconciles an interrupted active cancellation request without losing intent', async () => {
+  for (const stage of [
+    'after-sidecar-fsync',
+    'after-state-publication',
+    'after-event-publication',
+    'after-sidecar-removal',
+  ] as const) {
+    const root = await mkdtemp(join(tmpdir(), 'temari-child-task-store-'));
+    try {
+      const store = await FileChildTaskStore.create(root);
+      await store.create({
+        taskId: 'cancel-recovery',
+        runId: 'cancel-recovery-run',
+        revision: 'cancel-recovery-revision',
+        dependsOn: [],
+        actor: 'coordinator',
+        now: at('2026-09-24T12:00:00.000Z'),
+      });
+      await store.claim({
+        taskId: 'cancel-recovery',
+        owner: 'worker-a',
+        leaseMs: 1_000,
+        now: at('2026-09-24T12:00:01.000Z'),
+      });
+      const request = {
+        taskId: 'cancel-recovery',
+        actor: 'coordinator',
+        idempotencyKey: 'cancel:recovery',
+        now: at('2026-09-24T12:00:01.100Z'),
+      };
+      setFailureInjection(stage);
+      await assert.rejects(store.cancel(request), /Injected child task/);
+      const resumed = await FileChildTaskStore.create(root);
+      assert.equal(await resumed.cancellationRequested(request.taskId), true);
+      assert.equal(
+        (await resumed.reconcile(request.taskId))?.status,
+        'RUNNING',
+      );
+      assert.deepEqual(
+        (await resumed.events(request.taskId)).map((event) => event.type),
+        ['task-created', 'task-claimed', 'task-cancellation-requested'],
+      );
+      assert.equal((await resumed.cancel(request)).status, 'RUNNING');
+      assert.equal((await resumed.events(request.taskId)).length, 3);
+    } finally {
+      setFailureInjection(null);
+      await rm(root, { recursive: true, force: true });
+    }
   }
 });
 

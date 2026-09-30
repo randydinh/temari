@@ -203,6 +203,16 @@ mechanical retry and cancellation gating are implemented for explicitly
 configured child attempts/assignments; they do not imply automatic failover,
 semantic retry decisions, or a complete cancellation policy.
 
+Active child cancellation now records one durable request event. The child
+keeps its fenced lease until completion or expiry, but cannot renew it. A
+completion that wins the child-store lock before the request remains terminal;
+when the request is recorded first, a valid owner completion settles as
+`CANCELLED` and retains no worker result. After expiry, a claim pass finalizes
+the cancellation without delivering the child again, even when the group is at
+its concurrency limit. Restarted coordinators report the request as
+`cancellation-gated` and refuse the join. This is a local filesystem policy;
+it does not stop handler side effects or supply shared-service cancellation.
+
 Two independently opened local coordinators now have an integration proof for
 expired-child takeover: the replacement reuses the completed sibling,
 publishes the resumed child workspace/evidence, converges on one receipt, and
@@ -261,10 +271,10 @@ failover.
    restartable child completion and serial PASS-stage checkpoint resume;
    bounded local retry and executor-integrated provider-neutral evidence
    publication/replay verification and durable run-level concurrency evidence
-   are implemented; durable parent cancellation requests now have an explicit
-   completion-boundary policy. Complete cancellation policy, notifications,
-   provider-specific capture, shared artifact storage, and cross-machine
-   failover remain explicit follow-on gates.
+   are implemented; durable parent and active-child cancellation requests now
+   have explicit local completion-boundary policies. Complete cancellation
+   policy, notifications, provider-specific capture, shared artifact storage,
+   and cross-machine failover remain explicit follow-on gates.
 4. **Temporal/shared-service proof.** Move the local Stage 1 proof to a shared
    Temporal service and artifact store. Prove builder/coordinator replacement,
    approval recovery, required-concurrency failure, serial fallback only when
