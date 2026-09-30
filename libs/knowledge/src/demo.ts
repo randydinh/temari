@@ -18,7 +18,9 @@ import { prepareRegistrar } from './support/prepare.js';
 import { object, text } from './lib/codec.js';
 import {
   captureArchive,
+  rebindArchivePublication,
   type ArchiveIntakeOptions,
+  type ArchiveRebindOptions,
 } from './lib/archive-intake.js';
 import {
   createArchiveRegistrar,
@@ -28,6 +30,7 @@ import { collectKnowledge, type RetrievalOptions } from './lib/retrieval.js';
 
 const help = `Knowledge demo (explicit local files; no model or semantic approval):
   pnpm nx run knowledge:demo -- capture --input /absolute/intake.json
+  pnpm nx run knowledge:demo -- rebind --input /absolute/rebind.json
   pnpm nx run knowledge:demo -- archive-collect --input /absolute/retrieval.json [--resume /absolute/retrieval-HASH.json]
   pnpm nx run knowledge:demo -- archive-assess --input /absolute/investigation.json --assessment /absolute/assessment.json
   pnpm nx run knowledge:demo -- --help
@@ -61,6 +64,15 @@ async function main(): Promise<void> {
     ) as ArchiveIntakeOptions;
     process.stdout.write(
       JSON.stringify(await captureArchive(input), null, 2) + '\n',
+    );
+    return;
+  }
+  if (command === 'rebind') {
+    const input = JSON.parse(
+      await readFile(arg('--input'), 'utf8'),
+    ) as ArchiveRebindOptions;
+    process.stdout.write(
+      JSON.stringify(await rebindArchivePublication(input), null, 2) + '\n',
     );
     return;
   }

@@ -64,6 +64,7 @@ export async function archiveTransport(options: ArchiveTransportOptions) {
       'archive-transport',
       'archive-intake',
       'archive-registrar',
+      'archive-graph',
       'durable',
       'codec',
     ])
@@ -79,7 +80,14 @@ export async function archiveTransport(options: ArchiveTransportOptions) {
     await readFile(join(config.registrarSource, protocolFile)),
   );
   async function invoke(
-    operation: 'capture' | 'inspect' | 'read' | 'discover' | 'list',
+    operation:
+      | 'capture'
+      | 'inspect'
+      | 'read'
+      | 'discover'
+      | 'list'
+      | 'graph-read'
+      | 'graph-projection',
     args: string[],
     responseBytes = maxStdoutBytes,
   ): Promise<Record<string, unknown>> {
@@ -203,10 +211,11 @@ export async function archiveTransport(options: ArchiveTransportOptions) {
           'Registrar archive operation refused; retained archive or requested capability unavailable',
         );
       }
-      assert(
-        ['complete', 'partial'].includes(text(resultObject['status'])),
-        'Invalid Registrar status',
-      );
+      if (operation !== 'graph-read' && operation !== 'graph-projection')
+        assert(
+          ['complete', 'partial'].includes(text(resultObject['status'])),
+          'Invalid Registrar status',
+        );
     } else assert.equal(result.code, 0);
     return resultObject;
   }

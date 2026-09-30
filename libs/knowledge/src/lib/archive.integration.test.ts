@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
+  cp,
   mkdir,
   readFile,
   readdir,
@@ -22,6 +23,7 @@ import {
 import {
   captureArchive,
   loadArchivePublication,
+  rebindArchivePublication,
   ArchivePersistenceError,
   type ArchiveIntakeOptions,
   type ArchiveIntakeOutcome,
@@ -101,6 +103,29 @@ async function captured(useDemo = false) {
     publication,
     readerConfig,
     provider: await createArchiveRegistrar(readerConfig),
+  };
+}
+async function capturedForRebind() {
+  const f = await fixture();
+  const registrarSource = join(f.base, 'registrar-runtime');
+  await mkdir(registrarSource);
+  await cp(join(f.config.registrarSource, 'src'), join(registrarSource, 'src'), {
+    recursive: true,
+  });
+  await cp(
+    join(f.config.registrarSource, 'docs/design/source-archive-contract-v1.json'),
+    join(registrarSource, 'docs/design/source-archive-contract-v1.json'),
+  );
+  for (const name of ['pyproject.toml', 'uv.lock'])
+    await cp(join(f.config.registrarSource, name), join(registrarSource, name));
+  const transport = { ...f.options.transport, registrarSource };
+  const result = await captureArchive({ ...f.options, transport });
+  assert(result.publicationPath, await readFile(result.resultPath, 'utf8'));
+  return {
+    ...f,
+    transport,
+    priorPath: result.publicationPath,
+    prior: await loadArchivePublication(result.publicationPath),
   };
 }
 async function python(
@@ -387,6 +412,176 @@ test('ACTUAL ARCHIVE CLI: durable pre-capture binding, interrupted publication r
     ).sort(),
     ['discover', 'identity', 'read', 'revalidate'],
   );
+});
+
+test('ACTUAL ARCHIVE CLI: rebind upgrades a retained generation after runtime change without originals or recapture', async () => {
+  const f = await capturedForRebind();
+  const priorBytes = await readFile(f.priorPath);
+  await rm(join(f.base, 'sources'), { recursive: true });
+  await writeFile(
+    join(f.transport.registrarSource, 'src/knowledge_agent/rebind_marker.py'),
+    'READER_VERSION = 2\n',
+  );
+  await assert.rejects(
+    createArchiveRegistrar({ publications: [f.priorPath], readScope: 'source-root' }),
+    /Publication implementation changed/,
+  );
+  const first = await rebindArchivePublication({
+    priorPublicationPath: f.priorPath,
+    transport: f.transport,
+  });
+  const publication = await loadArchivePublication(first.publicationPath);
+  assert.notEqual(first.publicationPath, f.priorPath);
+  assert.equal(publication.generation, f.prior.generation);
+  assert.equal(publication.manifestSha256, f.prior.manifestSha256);
+  assert.equal(publication.captureFingerprint, f.prior.captureFingerprint);
+  assert.notEqual(publication.implementation, f.prior.implementation);
+  assert.equal(publication.rebind?.priorPublicationSha256, hash(priorBytes));
+  assert.deepEqual(await readFile(f.priorPath), priorBytes);
+  const audit = JSON.parse(await readFile(first.auditPath, 'utf8'));
+  assert.equal(audit.priorPublicationPath, f.priorPath);
+  assert.equal(audit.currentOriginal, 'not-checked');
+  const provider = await createArchiveRegistrar({
+    publications: [first.publicationPath],
+    readScope: 'source-root',
+  });
+  const read = await provider.read(readRequest(f));
+  assert(read.ok, JSON.stringify(read));
+  assert.equal(read.value.evidence.excerpt, documents['plan.txt']);
+  assert.equal(read.value.evidence.archive?.generation, f.prior.generation);
+  const second = await rebindArchivePublication({
+    priorPublicationPath: f.priorPath,
+    transport: f.transport,
+  });
+  assert.deepEqual(second, first);
+  await writeFile(
+    join(f.transport.registrarSource, 'src/knowledge_agent/rebind_marker.py'),
+    'READER_VERSION = 3\n',
+  );
+  await assert.rejects(
+    createArchiveRegistrar({ publications: [first.publicationPath], readScope: 'source-root' }),
+    /Publication implementation changed/,
+  );
+  const third = await rebindArchivePublication({
+    priorPublicationPath: first.publicationPath,
+    transport: f.transport,
+  });
+  assert.notEqual(third.publicationPath, first.publicationPath);
+  assert.equal(
+    (await loadArchivePublication(third.publicationPath)).rebind?.priorPublicationPath,
+    first.publicationPath,
+  );
+  assert((await createArchiveRegistrar({
+    publications: [third.publicationPath],
+    readScope: 'source-root',
+  })).identity);
+  const auditBytes = await readFile(first.auditPath);
+  await rm(first.auditPath);
+  await assert.rejects(
+    createArchiveRegistrar({ publications: [third.publicationPath], readScope: 'source-root' }),
+  );
+  await writeFile(first.auditPath, auditBytes);
+  const firstBytes = await readFile(first.publicationPath);
+  const altered = JSON.parse(firstBytes.toString());
+  altered.task.id = 'different-authority';
+  await writeFile(first.publicationPath, canonical(altered));
+  await assert.rejects(
+    rebindArchivePublication({ priorPublicationPath: first.publicationPath, transport: f.transport }),
+    /Rebound publication changed/,
+  );
+  await assert.rejects(
+    createArchiveRegistrar({ publications: [third.publicationPath], readScope: 'source-root' }),
+  );
+  await writeFile(first.publicationPath, firstBytes);
+  const generations = await cli(f, ['generations', f.source.id]);
+  assert.equal(generations.generations.length, 1);
+});
+
+test('ACTUAL ARCHIVE CLI: rebind refuses an unreadable seventeenth ancestry entry', async () => {
+  const f = await capturedForRebind();
+  await rm(join(f.base, 'sources'), { recursive: true });
+  let priorPublicationPath = f.priorPath;
+  for (let version = 2; version <= 16; version++) {
+    await writeFile(
+      join(f.transport.registrarSource, 'src/knowledge_agent/rebind_marker.py'),
+      `READER_VERSION = ${version}\n`,
+    );
+    priorPublicationPath = (await rebindArchivePublication({
+      priorPublicationPath, transport: f.transport,
+    })).publicationPath;
+  }
+  assert((await createArchiveRegistrar({
+    publications: [priorPublicationPath], readScope: 'source-root',
+  })).identity);
+  await writeFile(
+    join(f.transport.registrarSource, 'src/knowledge_agent/rebind_marker.py'),
+    'READER_VERSION = 17\n',
+  );
+  await assert.rejects(
+    rebindArchivePublication({ priorPublicationPath, transport: f.transport }),
+    /Rebind ancestry limit/,
+  );
+});
+
+test('ACTUAL ARCHIVE CLI: rebind checks bounded prior bytes and every audit provenance field', async () => {
+  const f = await capturedForRebind();
+  await writeFile(
+    join(f.transport.registrarSource, 'src/knowledge_agent/rebind_marker.py'),
+    'READER_VERSION = 2\n',
+  );
+  const rebound = await rebindArchivePublication({
+    priorPublicationPath: f.priorPath, transport: f.transport,
+  });
+  const auditBytes = await readFile(rebound.auditPath);
+  for (const field of ['priorImplementation', 'priorProtocolSha256', 'currentOriginal']) {
+    const audit = JSON.parse(auditBytes.toString());
+    audit[field] = field === 'currentOriginal' ? 'checked' : '0'.repeat(64);
+    await writeFile(rebound.auditPath, canonical(audit));
+    await assert.rejects(loadArchivePublication(rebound.publicationPath));
+  }
+  await writeFile(rebound.auditPath, auditBytes);
+  const oversized = join(f.prior.task.directory, 'oversized-prior.json');
+  await writeFile(oversized, 'x'.repeat(1_048_577));
+  const publication = JSON.parse(await readFile(rebound.publicationPath, 'utf8'));
+  publication.rebind.priorPublicationPath = oversized;
+  const audit = JSON.parse(auditBytes.toString());
+  audit.priorPublicationPath = oversized;
+  audit.publicationSha256 = hash(canonical(publication));
+  await writeFile(rebound.publicationPath, canonical(publication));
+  await writeFile(rebound.auditPath, canonical(audit));
+  await assert.rejects(
+    loadArchivePublication(rebound.publicationPath),
+    /Artifact exceeds bound/,
+  );
+});
+
+test('ACTUAL ARCHIVE CLI: rebind refuses changed or disabled registration and tampered manifest', async () => {
+  for (const mode of ['disabled', 'changed', 'manifest']) {
+    const f = await capturedForRebind();
+    if (mode === 'manifest') {
+      await python(
+        f,
+        "import sqlite3,sys; db=sqlite3.connect(sys.argv[1]); db.execute(\"UPDATE archive_generations SET manifest=x'7b7d'\"); db.commit()",
+        [join(f.base, 'state/registry.sqlite3')],
+      );
+    } else {
+      await python(
+        f,
+        "import sqlite3,sys,json; db=sqlite3.connect(sys.argv[1]); row=json.loads(db.execute('SELECT data FROM sources WHERE id=?',(sys.argv[3],)).fetchone()[0]); row.update({'enabled':False} if sys.argv[2]=='disabled' else {'exclude':['*.txt']}); db.execute('UPDATE sources SET data=? WHERE id=?',(json.dumps(row),sys.argv[3])); db.commit()",
+        [join(f.base, 'state/registry.sqlite3'), mode, f.source.id],
+      );
+    }
+    await assert.rejects(rebindArchivePublication({
+      priorPublicationPath: f.priorPath,
+      transport: f.transport,
+    }));
+    const artifacts = await readdir(f.options.task.directory);
+    assert(!artifacts.some((name) => name.startsWith('archive-rebind-')));
+    assert.equal(
+      artifacts.filter((name) => name.startsWith('archive-publication-')).length,
+      1,
+    );
+  }
 });
 
 test('ACTUAL ARCHIVE CLI: reader scope denial precedes process invocation; traversal, symlinks and cursor mismatches refuse', async () => {

@@ -1,6 +1,6 @@
 # Durable knowledge for Temari
 
-Status: **proposed architecture; documentation and scoped design graph delivered**.
+Status: **design baseline with local preservation and phases 2–3 implementation candidates**.
 Baseline: Temari `664144d17272697d68e045143f0ede0458ee6eca`, reviewed 2026-09-29.
 Audience: the Temari owner implementing and evaluating the next knowledge increment.
 The reader owns deployment policy and promotion decisions; this document supplies
@@ -21,12 +21,33 @@ versions under an explicit retention policy, accounting for every admitted asset
 derived assertion to evidence. It does not mean perfect recall of every possible
 meaning. Measure semantic retrieval and complete-task success separately.
 
-This increment writes no application runtime, installs no tools, reads no credentials,
-activates no schedules and sends no private corpus to a model. The graph is a design
+The original design increment wrote no application runtime, installed no tools, read no
+credentials, activated no schedules and sent no private corpus to a model. Its graph is a design
 synthesis, not a populated product knowledge base or proof of semantic correctness.
 The [evidence ledger](knowledge-system/evidence.json) preserves source-backed points,
 conditions, limitations, decisions and relationship rationale. The
 [graph report](knowledge-system/GRAPH_REPORT.md) records the actual local projection.
+
+## Local phases 2–3 implementation update
+
+The standalone Registrar now has archive-pinned cross-source RevisionSets, immutable
+graph generations with retraction and exact historical replay, bounded graph reads,
+a checked directed projection and an OKF v0.2 profile. Its archive discovery adds
+opt-in SQLite FTS5 BM25 over the selected retained generations; exact remains the
+default. Temari can rebind an existing archived publication after a verified runtime
+upgrade, select BM25 discovery, and read graph pages/projections only when every
+RevisionSet generation and manifest matches its selected publications. A separate
+Jev adapter produces typed judgments in shadow mode from explicitly approved,
+bounded text. It does not change the evidence order used for decisions.
+
+Synthetic local checks cover Nx and ordinary repository layouts, text and Office
+documents, searchable and scanned PDFs, and images with explicit extraction gaps.
+The combined Registrar suite passed 317 tests; the combined Temari knowledge suite
+passed typecheck, 36 unit tests and 24 actual CLI integration tests. The checks used
+mocked Jev responses and no private corpus. Native Graphify execution, Graft code
+navigation, OCR/visual interpretation, full graph relationship extraction and a
+measured complete-task gain remain unproven. These are material limits on any
+claim of lossless semantic recall or production readiness.
 
 ## Decisions, uncertainty and lineage
 
@@ -58,16 +79,12 @@ historical design evidence, not new instructions or proof of current runtime beh
 | Reported extraction/connector coverage, generation caps and historical test counts | Historical reports; recheck the selected code revision before implementation claims. The OpConnect/OCPP scenario remains an example, not an adopted benchmark or corpus grant. |
 
 The guide reinforces the refactor recommendation. Preserve its checks while retaining
-the current design's explicit capture gaps, distinct evidence-progress sets and conditional
-model roles. It neither settles the Jev-only scope nor authorizes hosted data access.
-
-The phrase “only Jev” remains unresolved. Recommended **conditional** interpretation:
-Jev owns Registrar decision/reranking judgments; existing generative agents may write
-answers, propose semantic extractions and make SkillOpt text edits. This is not approved
-by assumption. If Jev is the only model everywhere, deterministic extraction and
-closed candidate judgments remain possible; defer free-form semantic extraction and
-SkillOpt optimization. Human-authored text and templates remain available in that fork.
-A saved API key establishes neither integration nor permission for hosted data use.
+the current design's explicit capture gaps and distinct evidence-progress sets.
+The user's later decision selects **Jev as the only hosted model** for this knowledge path
+and skips SkillOpt. Deterministic extraction, human-authored assertions and closed Jev
+judgments remain available. Free-form model generation, semantic extraction and SkillOpt
+optimization are outside this implementation. A saved API key does not itself authorize
+sending a corpus; each Jev request requires explicit text approval.
 
 | Decision | Standing | Consequence |
 | --- | --- | --- |
@@ -75,9 +92,9 @@ A saved API key establishes neither integration nor permission for hosted data u
 | BM25 lexical ranking | Selected by the user | Rank text candidates alongside exact lookup and graph context; validate quality before runtime rollout. |
 | Registrar authority; Temari orchestration | Recommended | Preserve independent releases and version the interface. |
 | Directed, reified Graphify projection | Selected preservation approach | Verify IDs, attributes and edges after every projection. |
-| Jev judgment plus generative workers | Conditional | Do not start dependent model work until scope is resolved. |
+| Jev as the only hosted model | Selected by the user | Use bounded, approved text judgment; no generative extraction or answer writing in this path. |
 | No automatic purge for admitted local pilot | Proposed policy | Owner must select retention before live admission. |
-| SkillOpt across Temari | Proposed platform capability | Manual, one-skill experiments first; no automatic adoption. |
+| SkillOpt across Temari | Deferred by the user | No SkillOpt integration or automatic skill evolution in phases 2–3. |
 
 ## What exists and what must be reconciled
 
@@ -397,8 +414,8 @@ Direct TypeSafe transport fits the requested key; a Vercel gateway is optional.
 Use existing secure runtime secret configuration when an integration is authorized.
 No key belongs in graph nodes, prompts, logs, exported OKF or SkillOpt trajectories.
 Text-only input requires independently admitted modality extraction; Jev supplies no OCR.
-The pending all-Temari Jev-only fork blocks generative optimization/extraction, not this
-design or deterministic synthetic preservation and retrieval work.
+The selected Jev-only path blocks generative optimization/extraction. It still allows
+deterministic synthetic preservation and retrieval work, and an opt-in Jev shadow trial.
 
 ## Continual graph quality and portable views
 
@@ -592,17 +609,16 @@ compare new ranking/model routes on the same journey.
 | 0 — this increment | Design, reconciliation inventory, ledger and separate Graphify projection | Artifact readback/query and diff checks; no runtime readiness claim. |
 | 1 — local preservation journey | Reconcile main plus both candidates behind versioned contracts; add explicit local revision archive and synthetic fixture workflow | Compatibility tests plus the four-part v1/v2/resume/currentness receipt above and explicit capture-gap cases; exercise synthetic backup/restore with hash, derived-view and revocation/erasure checks; scope stays deterministic/local while policy is unresolved. |
 | 2 — relationship lifecycle | Multi-anchor/cross-source RevisionSet, reversible identity, invalidation, checked projection and OKF profile | Same-name/rename/conflict fixtures, exact topology/provenance and OKF roundtrip; failed publish rollback. |
-| 3 — serving and judgment trial | Published-snapshot BM25 indexes, exact/BM25/graph ablations and conditional Jev adapter in shadow | Preserve assurance modes, required evidence and citations; measured complete-task benefit before default promotion. |
+| 3 — serving and judgment trial | Published-snapshot BM25 indexes, exact/BM25/graph ablations and Jev adapter in shadow | Preserve assurance modes, required evidence and citations; measured complete-task benefit before default promotion. |
 | 4 — one real connector | Selected admitted corpus with identity, freshness, retention and revocation decisions | Real end-to-end task, grants/withdrawal, capture watermarks/history availability, omissions and deletion/purge recovery; before production claims, satisfy the preservation gate with an exercised recovery receipt and selected/tested RPO/RTO; no broad corpus expansion by inference. |
-| 5 — offline evolution | One retrieval skill through custom SkillOpt adapter; depends on model-role decision and stable evaluation | Sanitized replay with real tools, sealed final test, reviewed patch and rollback; broaden across Temari only on evidence. |
+| 5 — offline evolution | Deferred; no SkillOpt work in the selected Jev-only path | Revisit only after a new user decision and stable evaluation. |
 
 Evaluation starts in increment 1 and runs at every boundary; the corpus matrix above
 tracks Nx, non-Nx, document and proposed image coverage through those increments.
 Named tool roles remain roadmap obligations, even where unsupported modalities or
 integration gaps prevent implementation in the first local increment.
 
-Open deployment decisions: Jev-only scope; generative extraction/optimization permission;
-first live corpus and modalities; per-agent grants; retention/erasure; original-currentness
+Open deployment decisions: first live corpus and modalities; per-agent grants; retention/erasure; original-currentness
 policy; SDK retry/cost caps; task SLOs and owner of final domain assessment. Resolve each
 before its dependent work. They do not block this design or the synthetic local journey.
 
