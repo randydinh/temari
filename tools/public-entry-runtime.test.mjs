@@ -1639,7 +1639,7 @@ test('public engineering admission refuses unsupported routes and blocks unprove
   assert(lightweight.reasons.includes('profile-not-admitted'));
 });
 
-test('installed Temari and Poteto skills expose the bundled worker guide', async () => {
+test('installed skills keep worker contract host-neutral and bundle the Codex adapter separately', async () => {
   const temariSkill = await readFile(
     join(output, 'skills/temari/SKILL.md'),
     'utf8',
@@ -1649,17 +1649,14 @@ test('installed Temari and Poteto skills expose the bundled worker guide', async
     'utf8',
   );
   const guide = await readFile(
-    join(output, 'skills/poteto-mode/references/codex-parallel-workers.md'),
+    join(output, 'adapters/codex/parallel-workers.md'),
     'utf8',
   );
-  assert.match(
-    temariSkill,
-    /parallel worker guide.*codex-parallel-workers\.md/,
-  );
-  assert.match(
-    potetoSkill,
-    /parallel worker guide.*codex-parallel-workers\.md/,
-  );
+  assert.match(temariSkill, /selected host adapter/);
+  assert.match(potetoSkill, /selected host adapter/);
+  assert.doesNotMatch(temariSkill, /codex-parallel-workers|local Codex/i);
+  assert.doesNotMatch(potetoSkill, /codex-parallel-workers|local Codex/i);
+  assert.match(guide, /^# Codex host adapter:/);
   assert.match(guide, /bin\/codex-parallel\.mjs/);
   assert((await lstat(join(output, 'bin/codex-parallel.mjs'))).isFile());
 });

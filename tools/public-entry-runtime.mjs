@@ -94,8 +94,8 @@ const publicFiles = [
     'skills/poteto-mode/SKILL.md',
   ],
   [
-    'packages/workflow-runtime/public/skills/poteto-mode/references/codex-parallel-workers.md',
-    'skills/poteto-mode/references/codex-parallel-workers.md',
+    'packages/workflow-runtime/public/adapters/codex/parallel-workers.md',
+    'adapters/codex/parallel-workers.md',
   ],
   [
     'packages/workflow-runtime/public/skills/closeout/SKILL.md',

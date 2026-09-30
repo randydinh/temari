@@ -107,7 +107,7 @@ node --import @swc-node/register/esm-register tools/run-codex-parallel.mts /abso
 
 The router selects `read-only` for a homogeneous investigator/reviewer batch and `write` for a homogeneous implementer batch with typed `owns` scopes. It validates with the selected runner's parser before launching Codex and rejects mixed or ambiguous batches. A caller-provided `mode` label is rejected before any worker launches; omit it and use the existing request shape. The command prints JSON with `route`, `status`, and `receiptPath`; write results also include `integrationPath` and `integratedCommit`. Nonpassing receipts make the command exit nonzero. Inspect the receipt and, for writes, the verified integration checkout before accepting or applying the result.
 
-The installed public Temari plugin also bundles the standalone router as `bin/codex-parallel.mjs`. Its [Poteto Mode worker guide](../packages/workflow-runtime/public/skills/poteto-mode/references/codex-parallel-workers.md) gives the installed invocation and request shapes. Both copies route independent local batches. A successful local receipt proves only that batch.
+The installed public Temari plugin also bundles the standalone router as `bin/codex-parallel.mjs`. Its optional [Codex host adapter guide](../packages/workflow-runtime/public/adapters/codex/parallel-workers.md) is packaged at `adapters/codex/parallel-workers.md` and gives the installed invocation and request shapes. Both copies route independent local batches. A successful local receipt proves only that batch.
 
 ## Host-run feature workers
 

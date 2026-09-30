@@ -1,4 +1,4 @@
-# Local Codex parallel workers
+# Codex host adapter: parallel workers
 
 The bundled `bin/codex-parallel.mjs` runs independent local Codex CLI workers. Resolve that file from the installed plugin root and invoke it with Node and an absolute JSON request path:
 
