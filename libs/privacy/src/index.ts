@@ -12,3 +12,21 @@ export {
   type PrivacyPolicy,
   type PrivacySession,
 } from './lib/privacy.js';
+
+export {
+  loadPrivacyPreferences,
+  planPrivacySubmission,
+  recordPrivacyOverride,
+  resolvePrivacyOverride,
+  savePrivacyPreferences,
+  validatePrivacyPreferences,
+  type PlannedPrivacySubmission,
+  type PrivacyApprovalMemory,
+  type PrivacyDecisionPreview,
+  type PrivacyLevel,
+  type PrivacyPersistenceChoice,
+  type PrivacyPersistenceOffer,
+  type PrivacyPreferences,
+  type PrivacyRule,
+  type PrivacyScope,
+} from './lib/privacy-preferences.js';

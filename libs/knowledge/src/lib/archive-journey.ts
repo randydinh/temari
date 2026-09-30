@@ -14,6 +14,10 @@ import {
   type ArchiveIntakeOutcome,
 } from './archive-intake.js';
 import { createArchiveRegistrar } from './archive-registrar.js';
+import {
+  evaluateArchiveGraphTrial,
+  type ArchiveGraphTrial,
+} from './archive-graph-trial.js';
 import { canonical, checkBasis, hash, integer, object, text } from './codec.js';
 import { publishJson, readJson } from './durable.js';
 import {
@@ -54,6 +58,8 @@ export interface ArchiveEvaluationCase {
   readonly discoveryMode: 'exact' | 'bm25';
   /** Never inferred from task authority. Explicit approval is required per case. */
   readonly hostedTextApproved: boolean;
+  /** Optional one-hop graph ablation; lexical ranking remains the baseline. */
+  readonly graphId?: string;
 }
 export interface ArchiveSearchPlan {
   readonly handoffPath: string;
@@ -87,6 +93,7 @@ export interface ArchiveCaseResult {
   };
   readonly gaps: readonly KnowledgeGap[];
   readonly jev: JevShadowResult | null;
+  readonly graph?: ArchiveGraphTrial;
 }
 export interface ArchiveSearchReport {
   readonly schema: 1;
@@ -410,6 +417,19 @@ export async function evaluateArchiveSearch(
         jevMs = Math.max(0, Math.round(performance.now() - jevStarted));
       }
     }
+    const graph =
+      c.graphId === undefined
+        ? undefined
+        : await evaluateArchiveGraphTrial({
+            graphId: c.graphId,
+            publications: selectedPublications,
+            scope,
+            provider,
+            lexical: ranked,
+            expected: c.expected,
+            topK: c.topK,
+            taskDirectory: handoff.task.directory,
+          });
     const hitCount = ranked.filter((item) =>
       expected.has(key(item.sourceId, item.path)),
     ).length;
@@ -433,6 +453,7 @@ export async function evaluateArchiveSearch(
       shortlistVerified,
       gaps,
       jev,
+      ...(graph === undefined ? {} : { graph }),
       timingMs: {
         discovery: discoveryMs,
         excerptReads: excerptReadsMs,

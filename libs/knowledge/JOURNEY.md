@@ -99,6 +99,17 @@ produces shadow advice only. Do not set it for private corpora without an explic
 sharing decision. The first live check should use synthetic text. Missing key,
 network or invalid response leaves judgments `unknown`.
 
+For an optional graph ablation, set `graphId` on a search case to a published
+Registrar graph ID covering the selected archive publications. The report keeps
+`ranked` and `expectedRecallAtK` as the lexical baseline and adds `graph.ranked`,
+`graph.expectedRecallAtK`, relationship provenance and explicit gaps. The trial
+uses the first lexical hit as its seed and verifies at most `topK - 1` one-hop
+related documents through the same archived provider. Its ordering is an
+experimental policy, not a default ranker or evidence of semantic correctness.
+No graph quotations or source excerpts enter the report; a private checkpoint
+retains verified graph evidence. A missing/stale graph leaves lexical results
+available and records a gap.
+
 This loop measures local archive, exact/BM25 ranking and bounded evidence reads.
 Native Graft structure, Graphify non-code extraction, image interpretation, a
 scheduled pair of autonomous agents and semantic answer quality remain separate

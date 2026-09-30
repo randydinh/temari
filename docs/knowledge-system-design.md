@@ -1,6 +1,6 @@
 # Durable knowledge for Temari
 
-Status: **design baseline with local preservation and phases 2–3 implementation candidates**.
+Status: **design baseline with merged archive, graph/BM25, and local intake/search pilot; production knowledge workflow incomplete**.
 Baseline: Temari `664144d17272697d68e045143f0ede0458ee6eca`, reviewed 2026-09-29.
 Audience: the Temari owner implementing and evaluating the next knowledge increment.
 The reader owns deployment policy and promotion decisions; this document supplies
@@ -48,6 +48,48 @@ mocked Jev responses and no private corpus. Native Graphify execution, Graft cod
 navigation, OCR/visual interpretation, full graph relationship extraction and a
 measured complete-task gain remain unproven. These are material limits on any
 claim of lossless semantic recall or production readiness.
+
+## Delivery decision: complete the knowledge journey before plugin packaging
+
+On 2026-09-30 the owner chose to keep building the knowledge system before
+refactoring it into an installable Temari plugin. This supersedes the proposed
+near-term plugin refactor, but not the long-term requirement to let users remove
+and reinstall the capability. The present `KnowledgeProvider` contract isolates
+archive discovery, reads and revalidation. The journey still imports Registrar
+capture and Jev directly; Jev's endpoint and model are fixed in its adapter.
+There is no separate knowledge-plugin install/uninstall lifecycle yet.
+
+Build order now:
+
+1. Finish a useful admitted-source journey: captured originals, extraction
+   accounting, exact/BM25 and graph-assisted retrieval, verified citations,
+   explicit gaps and real task evaluation. Keep Jev as the only hosted model;
+   approved text is still required before a live call.
+2. Validate Nx and non-Nx code structure and document modalities against
+   pinned archives. Compare graph-assisted search with lexical ranking at the
+   same candidate budget before changing the default ranker.
+3. Once the journey and contracts have real consumers, extract the capture,
+   retrieval and model ports. Package Temari Knowledge as an optional capability
+   installed by default on new installations. Support disconnect, uninstall and
+   explicit reinstall while preserving archives and audit history by default;
+   deletion remains a separate purge decision. An uninstall preference must
+   survive upgrades. No silent model substitution is permitted.
+
+The current local pilot in merged PR #92 recovered 14/14 admitted originals
+byte-for-byte and found the expected document in the top K for 6/8 annotated
+queries. PDF and image-text misses, separate Nx/Graft probes, lack of native
+Graphify non-code execution, and no live Jev validation remain open. These
+results do not certify lossless semantic retrieval or a production deployment.
+
+This increment trials one-hop archived graph candidates alongside
+unchanged lexical ranking. It reports both top-K results, preserves the
+publication and source scope, verifies every added excerpt against the retained
+archive, and keeps graph evidence in private checkpoints. This tests the graph
+serving boundary; it does not yet import Nx or Graft structure or promote graph
+ranking by default. A private single-edge non-Nx code pilot used an inferred Graft
+link published by an operator: at K=2, lexical search missed the annotated related
+document and the graph trial found it. That one query is a feasibility check, not
+a quality estimate or evidence that Graft ingestion is automated.
 
 ## Decisions, uncertainty and lineage
 

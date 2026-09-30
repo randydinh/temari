@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { access, realpath, stat } from 'node:fs/promises';
+import { access, readFile, realpath, stat } from 'node:fs/promises';
 import { constants } from 'node:fs';
-import { dirname, isAbsolute, win32 } from 'node:path';
+import { dirname, isAbsolute, join, win32 } from 'node:path';
 
 import type {
   ExecutionHarness,
@@ -10,6 +10,7 @@ import type {
   HarnessRunRequest,
   HarnessRunSnapshot,
 } from '@temari/contracts';
+import { DEFAULT_STAGES } from '@temari/contracts';
 import type { ManagedArchonRuntime } from './managed-runtime.js';
 
 const EXPECTED_VERSION = '0.10.1';
@@ -37,6 +38,12 @@ export interface ArchonHarnessOptions {
   readonly environment?: NodeJS.ProcessEnv;
   readonly commandRunner?: ArchonCommandRunner;
   readonly timeoutMs?: number;
+}
+
+export interface CanonicalArchonPaths {
+  readonly specPath: string;
+  readonly bridgePath: string;
+  readonly finalizerPath: string;
 }
 
 function defaultRunner(): ArchonCommandRunner {
@@ -316,6 +323,48 @@ export class ArchonHarness implements ExecutionHarness {
       entrypoint: request.entrypoint,
       startedAt: new Date().toISOString(),
     };
+  }
+
+  /** Start the installed, model-free six-stage conformance workflow. */
+  async startCanonical(
+    request: Omit<HarnessRunRequest, 'entrypoint' | 'inputs'>,
+    paths: CanonicalArchonPaths,
+  ): Promise<HarnessRunRef> {
+    if (!this.options.workflowSource || !isAbsolute(this.options.workflowSource)) {
+      throw new Error('Canonical workflow requires an absolute installed workflow source.');
+    }
+    await access(join(this.options.workflowSource, '.archon', 'workflows', 'temari-nx-canonical.yaml'));
+    for (const path of [paths.specPath, paths.bridgePath, paths.finalizerPath]) {
+      if (!isAbsolute(path)) throw new Error('Canonical workflow paths must be absolute.');
+      await access(path);
+    }
+    const spec = JSON.parse(await readFile(paths.specPath, 'utf8')) as {
+      runId?: unknown;
+      revision?: unknown;
+      repositoryRoot?: unknown;
+      plan?: { stages?: unknown };
+    };
+    if (
+      spec.runId !== request.runId ||
+      spec.revision !== request.revision ||
+      typeof spec.repositoryRoot !== 'string' ||
+      !isAbsolute(spec.repositoryRoot) ||
+      (await realpath(spec.repositoryRoot)) !== (await realpath(request.workspaceRoot)) ||
+      !Array.isArray(spec.plan?.stages) ||
+      JSON.stringify(spec.plan.stages) !== JSON.stringify(DEFAULT_STAGES) ||
+      sha256(canonical(spec.plan)) !== sha256(canonical(request.plan))
+    ) {
+      throw new Error('Canonical spec does not match the frozen Temari request.');
+    }
+    return this.start({
+      ...request,
+      entrypoint: 'temari-nx-canonical',
+      inputs: {
+        bridge: paths.bridgePath,
+        finalizer: paths.finalizerPath,
+        spec: paths.specPath,
+      },
+    });
   }
 
   async status(reference: HarnessRunRef): Promise<HarnessRunSnapshot> {

@@ -24,10 +24,13 @@ agents/poteto-agent.md
 docs/guide/01-setup.md
 docs/guide/02-poteto-mode.md
 integrations/archon/.archon/workflows/temari-live-pilot.yaml
+integrations/archon/.archon/workflows/temari-nx-canonical.yaml
 integrations/archon/.archon/workflows/temari-pilot.yaml
 integrations/archon/README.md
 integrations/archon/bridge.test.ts
 integrations/archon/bridge.ts
+integrations/archon/canonical-bridge.test.ts
+integrations/archon/canonical-bridge.ts
 integrations/archon/codex-model-driver.ts
 integrations/archon/fixtures/pilot.ts
 integrations/archon/fixtures/stage.ts

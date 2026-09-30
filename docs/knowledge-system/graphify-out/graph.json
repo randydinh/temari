@@ -1822,6 +1822,66 @@
       "type": "informs"
     },
     {
+      "id": "A-055",
+      "label": "A-055 | D-plugin-order reorders D-increments",
+      "basis": "The new decision keeps the existing knowledge increments but moves plugin packaging after a measured working journey.",
+      "community": null,
+      "confidence": "INFERRED",
+      "file_type": "concept",
+      "norm_label": "a-055 | d-plugin-order reorders d-increments",
+      "record_kind": "assertion",
+      "source": "D-plugin-order",
+      "source_file": "docs/knowledge-system/evidence.json",
+      "source_location": "docs/knowledge-system/sources/plugin-order-2026-09-30.md @ sha256:0563872086f36b761e85ec123dc766b992035afdf1329afcc927201e89ed42eb :: Owner statement and interpretation",
+      "source_refs": [
+        {
+          "source_id": "S-plugin-order-request",
+          "locator": "docs/knowledge-system/sources/plugin-order-2026-09-30.md",
+          "revision": "sha256:0563872086f36b761e85ec123dc766b992035afdf1329afcc927201e89ed42eb",
+          "span": "Owner statement and interpretation"
+        }
+      ],
+      "status": "design-link",
+      "tags": [
+        "assertion",
+        "reorders",
+        "INFERRED"
+      ],
+      "target": "D-increments",
+      "title": "D-plugin-order reorders D-increments",
+      "type": "reorders"
+    },
+    {
+      "id": "A-054",
+      "label": "A-054 | P-plugin-order selects D-plugin-order",
+      "basis": "The owner explicitly chose this delivery order.",
+      "community": null,
+      "confidence": "EXTRACTED",
+      "file_type": "concept",
+      "norm_label": "a-054 | p-plugin-order selects d-plugin-order",
+      "record_kind": "assertion",
+      "source": "P-plugin-order",
+      "source_file": "docs/knowledge-system/evidence.json",
+      "source_location": "docs/knowledge-system/sources/plugin-order-2026-09-30.md @ sha256:0563872086f36b761e85ec123dc766b992035afdf1329afcc927201e89ed42eb :: Owner statement and interpretation",
+      "source_refs": [
+        {
+          "source_id": "S-plugin-order-request",
+          "locator": "docs/knowledge-system/sources/plugin-order-2026-09-30.md",
+          "revision": "sha256:0563872086f36b761e85ec123dc766b992035afdf1329afcc927201e89ed42eb",
+          "span": "Owner statement and interpretation"
+        }
+      ],
+      "status": "design-link",
+      "tags": [
+        "assertion",
+        "selects",
+        "EXTRACTED"
+      ],
+      "target": "D-plugin-order",
+      "title": "P-plugin-order selects D-plugin-order",
+      "type": "selects"
+    },
+    {
       "id": "A-053",
       "label": "A-053 | P-validation-corpus constrains-evaluation D-increments",
       "basis": "The requested corpus scope adds explicit per-family checks across the already ordered preservation, relationship and ranking increments.",
@@ -3244,6 +3304,38 @@
       "topic": "delivery"
     },
     {
+      "id": "P-plugin-order",
+      "label": "P-plugin-order | Build and measure the knowledge journey before plugin refactor",
+      "benefit": "Stabilizes the workflow and contracts around observed usage before extracting extension seams.",
+      "community": null,
+      "conditions": "Plugin packaging follows a working, measured knowledge flow; no live private-text grant follows from this choice.",
+      "confidence_basis": "Explicit owner instruction in the active conversation.",
+      "evidence_type": "user decision",
+      "file_type": "concept",
+      "limits": "Does not waive future modularity or choose install mechanics, retention, hosted-text approval or production readiness.",
+      "norm_label": "p-plugin-order | build and measure the knowledge journey before plugin refactor",
+      "record_kind": "point",
+      "risk": "Direct dependencies can accumulate; keep the existing provider boundary and revisit packaging at the stated trigger.",
+      "source_file": "docs/knowledge-system/evidence.json",
+      "source_location": "docs/knowledge-system/sources/plugin-order-2026-09-30.md @ sha256:0563872086f36b761e85ec123dc766b992035afdf1329afcc927201e89ed42eb :: Owner statement and interpretation",
+      "source_refs": [
+        {
+          "source_id": "S-plugin-order-request",
+          "locator": "docs/knowledge-system/sources/plugin-order-2026-09-30.md",
+          "revision": "sha256:0563872086f36b761e85ec123dc766b992035afdf1329afcc927201e89ed42eb",
+          "span": "Owner statement and interpretation"
+        }
+      ],
+      "status": "selected",
+      "tags": [
+        "delivery-order",
+        "user decision",
+        "selected"
+      ],
+      "title": "Build and measure the knowledge journey before plugin refactor",
+      "topic": "delivery-order"
+    },
+    {
       "id": "P-graft",
       "label": "P-graft | Graft code structure differs from generated summaries",
       "benefit": "Structural navigation and documented diff impact",
@@ -3698,6 +3790,34 @@
         "selected-direction-with-proposed-boundary"
       ],
       "title": "Use two agents with Registrar as evidence authority"
+    },
+    {
+      "id": "D-plugin-order",
+      "label": "D-plugin-order | Defer installable knowledge plugin until the journey works",
+      "community": null,
+      "file_type": "concept",
+      "norm_label": "d-plugin-order | defer installable knowledge plugin until the journey works",
+      "point_ids": [
+        "P-plugin-order"
+      ],
+      "rationale": "The owner chose functional end-to-end knowledge behavior and evaluation before a plugin lifecycle refactor; future uninstall/reinstall remains a requirement.",
+      "record_kind": "decision",
+      "source_file": "docs/knowledge-system/evidence.json",
+      "source_location": "docs/knowledge-system/sources/plugin-order-2026-09-30.md @ sha256:0563872086f36b761e85ec123dc766b992035afdf1329afcc927201e89ed42eb :: Owner statement and interpretation",
+      "source_refs": [
+        {
+          "source_id": "S-plugin-order-request",
+          "locator": "docs/knowledge-system/sources/plugin-order-2026-09-30.md",
+          "revision": "sha256:0563872086f36b761e85ec123dc766b992035afdf1329afcc927201e89ed42eb",
+          "span": "Owner statement and interpretation"
+        }
+      ],
+      "status": "selected",
+      "tags": [
+        "decision",
+        "selected"
+      ],
+      "title": "Defer installable knowledge plugin until the journey works"
     },
     {
       "id": "D-preserve",
@@ -5290,6 +5410,46 @@
       "target": "A-053",
       "relation": "assertion_subject",
       "assertion_id": "A-053",
+      "confidence": "INFERRED",
+      "confidence_score": 0.55,
+      "source_file": "docs/knowledge-system/evidence.json",
+      "weight": 1.0
+    },
+    {
+      "source": "A-054",
+      "target": "D-plugin-order",
+      "relation": "assertion_object",
+      "assertion_id": "A-054",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/knowledge-system/evidence.json",
+      "weight": 1.0
+    },
+    {
+      "source": "P-plugin-order",
+      "target": "A-054",
+      "relation": "assertion_subject",
+      "assertion_id": "A-054",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/knowledge-system/evidence.json",
+      "weight": 1.0
+    },
+    {
+      "source": "A-055",
+      "target": "D-increments",
+      "relation": "assertion_object",
+      "assertion_id": "A-055",
+      "confidence": "INFERRED",
+      "confidence_score": 0.55,
+      "source_file": "docs/knowledge-system/evidence.json",
+      "weight": 1.0
+    },
+    {
+      "source": "D-plugin-order",
+      "target": "A-055",
+      "relation": "assertion_subject",
+      "assertion_id": "A-055",
       "confidence": "INFERRED",
       "confidence_score": 0.55,
       "source_file": "docs/knowledge-system/evidence.json",

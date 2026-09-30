@@ -1,12 +1,12 @@
 # Scoped design graph report
 
 Status: **documentation projection built and read back; runtime architecture proposed**.
-Date: 2026-09-29. Temari base: `664144d17272697d68e045143f0ede0458ee6eca`.
+Updated: 2026-09-30. Original Temari base: `664144d17272697d68e045143f0ede0458ee6eca`.
 
 ## Corpus and provenance
 
-Canonical input is [evidence.json](evidence.json): **33 source records,
-36 points, 10 decisions and 53 relationship assertions**.
+Canonical input is [evidence.json](evidence.json): **34 source records,
+37 points, 11 decisions and 55 relationship assertions**.
 The corpus is bounded to the supplied research brief, selected historical design lineage,
 pinned Temari contracts/adapter, selected Registrar source, unmerged candidate designs,
 and official Nx, Graft, Graphify, OKF, TypeSafe and SkillOpt documentation/code.
@@ -18,7 +18,7 @@ SHA-256 are recorded in the [source provenance](README.md#archived-worker-source
 it remains a candidate source, not implementation delivered by this PR.
 No existing Temari code graph was changed or treated as current runtime proof.
 
-The actual projection contains **99 nodes and 106 directed edges**.
+The actual projection contains **103 nodes and 110 directed edges**.
 Every relationship becomes its own assertion node between subject and object. The two
 relationships from `P-graphify` to `D-projection` survive with distinct assertion IDs.
 Tags retain topic, evidence type, status and assertion provenance class. Here Graphify's
@@ -180,3 +180,13 @@ The focused query `graphify query 'formats' --budget 1600` returned five nodes a
 four edges with no truncation: the new corpus point, A-052/A-053 and D-routing/D-increments.
 Exact attributes/topology and preserved decisions were checked again. This clarification
 uses focused self-review; prior independent review remains bound to its original commit.
+
+## Delivery-order update
+
+The [owner's 2026-09-30 decision](sources/plugin-order-2026-09-30.md) selects a
+working, measured knowledge journey before installable plugin packaging.
+`P-plugin-order` supports `D-plugin-order` through extracted assertion `A-054`;
+`A-055` links the decision to the prior increment plan as an inference. The
+projection and [readback](readback.json) include these exact records. The graph
+records delivery intent, not a completed plugin or a production-ready knowledge
+system.

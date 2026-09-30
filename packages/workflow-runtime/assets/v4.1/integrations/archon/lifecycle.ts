@@ -10,10 +10,10 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const recordName = ".temari-archon-install.json";
 const compatibility = { version: "0.10.1", commit: "9820785c" };
 export const payload = [
-  "integrations/archon/lifecycle.ts", "integrations/archon/README.md", "integrations/archon/bridge.ts", "integrations/archon/smoke.ts",
+  "integrations/archon/lifecycle.ts", "integrations/archon/README.md", "integrations/archon/bridge.ts", "integrations/archon/canonical-bridge.ts", "integrations/archon/smoke.ts",
   "integrations/archon/live.ts", "integrations/archon/live-codex.ts", "integrations/archon/live-routing.ts", "integrations/archon/live-tasks.ts", "integrations/archon/live-permissions.ts", "integrations/archon/.archon/workflows/temari-live-pilot.yaml",
   "integrations/archon/privacy.ts", "integrations/archon/model-transport.ts", "integrations/archon/codex-model-driver.ts", "integrations/archon/openai-responses-driver.ts",
-  "integrations/archon/fixtures/pilot.ts", "integrations/archon/fixtures/stage.ts", "integrations/archon/.archon/workflows/temari-pilot.yaml",
+  "integrations/archon/fixtures/pilot.ts", "integrations/archon/fixtures/stage.ts", "integrations/archon/.archon/workflows/temari-pilot.yaml", "integrations/archon/.archon/workflows/temari-nx-canonical.yaml",
   "skills/poteto-mode/scripts/package.json", "skills/poteto-mode/scripts/bun.lock",
   ...["profiles", "receipt", "store", "types", "workflow"].map(name => `skills/poteto-mode/scripts/workflow/${name}.ts`),
   "skills/poteto-mode/playbook-contracts/v1/feature.json", "skills/poteto-mode/playbooks/feature.md",
@@ -141,7 +141,7 @@ async function inspect(root: string, executable: string, verify: boolean, eviden
       await check("workflow", async () => {
         await mkdir(join(probeRoot, ".archon/workflows"), { recursive: true });
         run("git", ["init", "-b", "main", probeRoot], probeRoot, env);
-        for (const name of ["temari-pilot", "temari-live-pilot"]) {
+        for (const name of ["temari-pilot", "temari-live-pilot", "temari-nx-canonical"]) {
           await copyFile(join(root, `integrations/archon/.archon/workflows/${name}.yaml`), join(probeRoot, `.archon/workflows/${name}.yaml`));
           const validation: unknown = JSON.parse(run(executable, ["validate", "workflows", name, "--cwd", probeRoot, "--json"], probeRoot, env));
           if (!validation || typeof validation !== "object" || !("summary" in validation)) throw new Error("workflow validation returned no summary");

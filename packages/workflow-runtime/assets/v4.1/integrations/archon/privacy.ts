@@ -37,6 +37,10 @@ export type PrivacyLiteral = {
 
 export type PrivacyPolicy = {
   readonly literals?: readonly PrivacyLiteral[];
+  /** Explicitly authorized exact values bypass automatic identity detection only. */
+  readonly allowedLiterals?: readonly (string | number | boolean)[];
+  /** Derived local values bypass field-name defaults, but not text detectors. */
+  readonly derivedLiterals?: readonly (string | number | boolean)[];
   readonly fields?: readonly PrivacyFieldRule[];
   readonly detect?: boolean;
   readonly fieldDefaults?: boolean;
@@ -309,6 +313,8 @@ function policyProperties(
 
 function validatePolicy(policy: unknown) {
   const options = policyProperties(policy, [
+    'allowedLiterals',
+    'derivedLiterals',
     'detect',
     'fieldDefaults',
     'fields',
@@ -351,11 +357,41 @@ function validatePolicy(policy: unknown) {
       restore: restoreFlag(literal.restore, category),
     };
   });
+  const allowedLiterals = (
+    options.allowedLiterals === undefined
+      ? []
+      : arrayValues(options.allowedLiterals)
+  ).map((value) => {
+    if (!literalValue(value) || value === '')
+      throw new PrivacyError(
+        'Allowed literals must be nonempty finite JSON scalars.',
+      );
+    if (typeof value === 'string') checkInputText(value);
+    return value;
+  });
+  if (allowedLiterals.length > 64)
+    throw new PrivacyError('Too many allowed privacy literals.');
+  const derivedLiterals = (
+    options.derivedLiterals === undefined
+      ? []
+      : arrayValues(options.derivedLiterals)
+  ).map((value) => {
+    if (!literalValue(value) || value === '')
+      throw new PrivacyError(
+        'Derived literals must be nonempty finite JSON scalars.',
+      );
+    if (typeof value === 'string') checkInputText(value);
+    return value;
+  });
+  if (derivedLiterals.length > 64)
+    throw new PrivacyError('Too many derived privacy literals.');
   return {
     detect: options.detect !== false,
     fieldDefaults: options.fieldDefaults !== false,
     fields,
     literals,
+    allowedLiterals,
+    derivedLiterals,
   };
 }
 
@@ -598,7 +634,16 @@ export function mask(
   trustedSessions: readonly PrivacySession[] = [],
 ): MaskedRequest {
   const input = copyJson(payload);
-  const { detect, fieldDefaults, fields, literals } = validatePolicy(policy);
+  const {
+    detect,
+    fieldDefaults,
+    fields,
+    literals,
+    allowedLiterals,
+    derivedLiterals,
+  } = validatePolicy(policy);
+  const allowed = new Set(allowedLiterals.map(canonical));
+  const derived = new Set(derivedLiterals.map(canonical));
   arrayValues(trustedSessions);
   const states = scopeStates(trustedSessions);
   const inherited = scopeEntries(states);
@@ -611,9 +656,11 @@ export function mask(
     value: Scalar,
     category: PrivacyKind,
     restore: boolean,
+    forced = false,
   ): void => {
     if (value === null || value === '') return;
     const key = canonical(value);
+    if (!forced && category !== 'CREDENTIAL' && allowed.has(key)) return;
     const entry = { kind: category, restore, value: restore ? value : null };
     known.set(key, restrictiveEntry(known.get(key) ?? entry, entry));
   };
@@ -622,14 +669,14 @@ export function mask(
     if (scanned.has(text)) return;
     scanned.add(text);
     fingerprints.scan(text, (value, category) =>
-      remember(value, category, false),
+      remember(value, category, false, true),
     );
   };
   for (const literal of literals)
-    remember(literal.value, literal.kind, literal.restore);
+    remember(literal.value, literal.kind, literal.restore, true);
   for (const entry of trusted.values()) {
     if (entry.restore) {
-      remember(entry.value, entry.kind, true);
+      remember(entry.value, entry.kind, true, true);
       collectFingerprints(String(entry.value));
     }
   }
@@ -637,12 +684,12 @@ export function mask(
     const entry = trusted.get(token)!;
     const effective = restrictiveEntry(entry, restriction);
     if (effective.restore) return;
-    remember(entry.value, effective.kind, false);
+    remember(entry.value, effective.kind, false, true);
     Object.assign(entry, { kind: effective.kind, restore: false, value: null });
   };
   const collectText = (text: string, protectedEntry?: Entry): void => {
     const parts = textParts(text, trusted);
-    const scanning = detect || protectedEntry?.kind === 'CREDENTIAL';
+    // `detect: false` disables ordinary PII patterns, never credential syntax.
     const rememberMatch = (value: string, entry: Entry): void => {
       remember(value, entry.kind, entry.restore);
       if (entry.kind === 'CREDENTIAL') {
@@ -663,15 +710,14 @@ export function mask(
       const value = text.slice(part.start, part.end);
       collectFingerprints(value);
       if (protectedEntry)
-        remember(value, protectedEntry.kind, protectedEntry.restore);
-      if (scanning)
-        for (const match of detectorMatches(value, detect))
-          rememberMatch(value.slice(match.start, match.end), {
-            ...match,
-            value: null,
-          });
+        remember(value, protectedEntry.kind, protectedEntry.restore, true);
+      for (const match of detectorMatches(value, detect))
+        rememberMatch(value.slice(match.start, match.end), {
+          ...match,
+          value: null,
+        });
     }
-    if (scanning && parts.some((part) => part.token)) {
+    if (parts.some((part) => part.token)) {
       for (const match of detectorMatches(text, false)) {
         const overlaps = parts.filter(
           (part) => part.start < match.end && part.end > match.start,
@@ -740,7 +786,16 @@ export function mask(
             return part.token;
           })
           .join('');
-        const rule = fieldRule([...path, semanticKey], semanticKey);
+        const rule =
+          child !== null &&
+          typeof child !== 'object' &&
+          (allowed.has(canonical(child)) || derived.has(canonical(child))) &&
+          !credentialKeys.has(normalKey(semanticKey)) &&
+          !fields.some((candidate) =>
+            pathMatches(candidate.path, [...path, semanticKey]),
+          )
+            ? undefined
+            : fieldRule([...path, semanticKey], semanticKey);
         const next = rule
           ? restrictiveEntry(rule, keyRestriction)
           : keyRestriction;
@@ -762,7 +817,7 @@ export function mask(
     else if (value !== null) {
       collectFingerprints(String(value));
       if (protectedEntry)
-        remember(value, protectedEntry.kind, protectedEntry.restore);
+        remember(value, protectedEntry.kind, protectedEntry.restore, true);
     }
   };
   for (const literal of literals) {
