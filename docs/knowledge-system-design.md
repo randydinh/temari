@@ -41,6 +41,26 @@ Historical [knowledge decisions](https://github.com/randydinh/temari-v4.1/blob/0
 retain tool separation and non-destructive identity. Latest instructions refine code
 routing: use Nx first where present, without treating Nx as a symbol graph.
 
+### Reconciliation with the supplied Content Registrar guide
+
+The user supplied an [earlier consolidated guide](knowledge-system/sources/content-registrar-guide-received-2026-09-29.md),
+described as written about one week earlier. Its exact authoring date is unverified;
+the archived bytes and original locator are recorded in the source ledger. This is
+historical design evidence, not new instructions or proof of current runtime behavior.
+
+| Guide point | Standing in this design |
+| --- | --- |
+| Independent Python Registrar; source authority; derived Graphify and OKF views | Preserved. Reconcile the existing implementation and candidate branches. |
+| Two responsibility groups, exact agent organization unresolved | Newer user instruction selects intake and search/retrieval agents. Process placement and final domain-assessment ownership remain open. |
+| BM25 proposed challenger, adoption unresolved | Newer user instruction selects BM25. Backend choice and rollout evaluation remain open. Preserve the guide's granularity, diversity and reproducibility checks below. |
+| Source history plus investigation history | Both remain necessary. Immutable concept records alone do not establish original-version recovery. |
+| Existing local TF-IDF/SVD provider and caller-declared relationship traversal | Guide-reported bounded implementations; this reconciliation does not verify those providers or imply integration with persistent concept generations. |
+| Reported extraction/connector coverage, generation caps and historical test counts | Historical reports; recheck the selected code revision before implementation claims. The OpConnect/OCPP scenario remains an example, not an adopted benchmark or corpus grant. |
+
+The guide reinforces the refactor recommendation. Preserve its checks while retaining
+the current design's explicit capture gaps, distinct evidence-progress sets and conditional
+model roles. It neither settles the Jev-only scope nor authorizes hosted data access.
+
 The phrase “only Jev” remains unresolved. Recommended **conditional** interpretation:
 Jev owns Registrar decision/reranking judgments; existing generative agents may write
 answers, propose semantic extractions and make SkillOpt text edits. This is not approved
@@ -80,6 +100,10 @@ Characterize compatibility before combining them; do not blindly cherry-pick rep
 already present in Registrar main. Historical test counts and a prior Graphify 0.9.63
 roundtrip are reported history, not tests run on this combined design. The earlier
 MCP comparison was inconclusive and supports no superiority claim.
+
+The pinned Registrar `discover()` lexical route uses token-set overlap plus filename-stem
+weighting; it does not implement BM25. This was checked directly at the pinned Registrar
+revision above. Selecting BM25 in the design therefore does not make it a shipped provider.
 
 Registrar's `coverage.consumed` means enumeration offset plus returned documents.
 It does **not** mean passages fetched, supplied to the reader or semantically assessed.
@@ -289,6 +313,18 @@ Combine BM25 candidates with exact matches and relevant graph context before con
 Jev reranking. Retain required context and contrary evidence regardless of lexical rank.
 BM25 scores are ranking signals, not confidence in a claim or proof of complete retrieval.
 
+Carry forward the guide's BM25 evaluation details: compare document-level, section-level
+and fielded ranking across path, title, headings and body. Group or cap repeated sections
+from one document for candidate diversity, while retaining required-context expansion.
+Preserve the incumbent route for comparison and rollback; tune supported controls on a
+development partition, then evaluate complete tasks on held-out cases.
+
+The proposed index receipt records tokenizer and normalization revisions, scoring variant
+and actual parameters, field weights, implementation version and source generation.
+Record engine-fixed parameters as such; do not imply every backend exposes the same knobs.
+These are implementation/evaluation details retained from the guide, not a backend choice,
+executed ranking experiment or measured improvement.
+
 Each evidence packet includes citation IDs, exact excerpts, applicability, origin, support
 and contradiction anchors, freshness mode, omission reasons and the next useful action.
 A no-answer outcome distinguishes unavailable, unsearched, not-understood and genuinely
@@ -302,6 +338,14 @@ Also retain matched/returned/remaining discovery counts with original provider s
 A cursor pins scope, query, generation, policy and provider identity. Resume preserves old
 artifacts; changed authority requires reauthorization or a new investigation, never an
 implicit latest-state substitution. Failed saves cannot report durable completion.
+
+Preserve the existing consumer's save-before-assessment behavior: first persist retrieved
+evidence and pending work, then assess, and save the resulting findings or failure gap.
+The [pinned investigation implementation](../libs/knowledge/src/lib/investigation.ts)
+also skips a completed assessment when its recorded input key is unchanged. These are
+static source observations, not new executions here. Revalidate on resume and after
+assessment; changed evidence can invalidate findings. Retained completed work does not
+establish exactly-once external actions or remove independent semantic review.
 
 ## Efficient serving without weakened integrity
 

@@ -5,8 +5,8 @@ Date: 2026-09-29. Temari base: `664144d17272697d68e045143f0ede0458ee6eca`.
 
 ## Corpus and provenance
 
-Canonical input is [evidence.json](evidence.json): **30 source records,
-31 points, 10 decisions and 46 relationship assertions**.
+Canonical input is [evidence.json](evidence.json): **32 source records,
+35 points, 10 decisions and 51 relationship assertions**.
 The corpus is bounded to the supplied research brief, selected historical design lineage,
 pinned Temari contracts/adapter, selected Registrar source, unmerged candidate designs,
 and official Nx, Graft, Graphify, OKF, TypeSafe and SkillOpt documentation/code.
@@ -18,7 +18,7 @@ SHA-256 are recorded in the [source provenance](README.md#archived-worker-source
 it remains a candidate source, not implementation delivered by this PR.
 No existing Temari code graph was changed or treated as current runtime proof.
 
-The actual projection contains **87 nodes and 92 directed edges**.
+The actual projection contains **96 nodes and 102 directed edges**.
 Every relationship becomes its own assertion node between subject and object. The two
 relationships from `P-graphify` to `D-projection` survive with distinct assertion IDs.
 Tags retain topic, evidence type, status and assertion provenance class. Here Graphify's
@@ -55,8 +55,8 @@ remains conditional. Regenerated readback checks that provenance as well as topo
 These are integrity checks; they do not establish that every claim is true or that a
 proposed runtime meets the design. No Temari/Registrar runtime tests were run here.
 
-- Evidence SHA-256: `4b347a59b76a6de00c1c8728d1c0cbdbb1bb514a9c2e47020cfaa1e9145ebe9e`.
-- Graph SHA-256: `4ac5a5bc98947d84edf94eba45c6a8c6afc3636f97ddcb0c3466cae17fd54039`.
+- Evidence SHA-256: `53870a87211ba916a945fa8b28bd73fc0176bb3901fc3b7b6d0848a5bf71ab00`.
+- Graph SHA-256: `85fdefd02240a97808895a29b7aa5e78500a3908f37184598ecd87ba5f7567e7`.
 
 ## Query executed
 
@@ -89,7 +89,7 @@ Degree counts are structural navigation statistics, not truth or importance scor
 
 | Node | Total directed degree | Why it connects |
 | --- | ---: | --- |
-| `D-reconcile` | 5 | Reconcile pinned main and candidates before extending runtime |
+| `D-reconcile` | 6 | Reconcile pinned main and candidates before extending runtime |
 | `D-projection` | 5 | Preserve exact identity through directed reified Graphify view |
 | `D-evolution` | 5 | Trial SkillOpt as offline platform capability with stronger gate |
 | `D-increments` | 5 | Require synthetic preservation journey before ranking promotion |
@@ -127,5 +127,36 @@ and official BM25 reference are recorded in the ledger. `P-retrieval-flow` and
 its existing inferred link to `D-serving` now carry that selection and context.
 This bounded documentation follow-up uses focused self-review and exact artifact
 readback. The earlier independent review remains bound to the prior design commit.
-Node/edge identities and topology are unchanged; the ledger and projection
-attributes/hashes are refreshed. No ranking implementation or benchmark is claimed.
+In that BM25 clarification, node/edge identities and topology were unchanged;
+the later guide reconciliation below adds source-backed points and links. No ranking implementation or benchmark is claimed.
+
+## Supplied-guide reconciliation
+
+The [user guide](sources/content-registrar-guide-received-2026-09-29.md) is archived
+byte-for-byte with its original locator, SHA-256 and user-reported approximate age in
+`S-user-guide`. Its 13 sections were read; implementation/test statements remain
+historical unless separately checked. Several historical sources retell this same
+lineage and do not count as independent corroboration.
+
+New points retain the guide's BM25 granularity/diversity/receipt proposal, confirmed
+checkpoint reuse behavior, bounded provider reports and the precedence of newer user
+selections. Existing decision records and relationship assertions are unchanged; five
+inferred links connect the four new points to existing selected roles and proposed work.
+Static inspection of pinned `retrieval.py` confirms lexical overlap plus filename-stem
+weighting rather than BM25. `S-investigation` separately records direct inspection of
+save-before-assessment and unchanged input-key skipping at the pinned Temari baseline.
+No provider execution or historical test rerun is claimed for this reconciliation.
+
+Executed focused query: `graphify query 'granularity assessment' --budget 1800`.
+Both terms appear in actual labels. BFS depth 2 returned six nodes with no truncation:
+`P-bm25-receipt`, `P-investigation-checkpoints`, `A-049`, `A-050`, `D-serving` and
+`D-reconcile`, with four connecting edges. These paths explain which existing plans the
+new source details inform; they do not establish that ranking or checkpoint behavior has
+been evaluated at runtime. Full provenance remains in the canonical ledger.
+
+The initial broader navigation query requested 1,400 tokens and omitted two of thirteen
+selected nodes; those results were not treated as complete coverage. Decisive source and
+ledger passages were inspected directly, and the focused query above supplies the guide
+navigation witness. Exact source-byte comparison and the regenerated verifier receipt
+check archival and projection integrity. The documentation delta uses focused self-review;
+prior independent reviews stay bound to their original candidates.

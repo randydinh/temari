@@ -1,16 +1,16 @@
 {
   "verified": true,
-  "sources": 30,
-  "points": 31,
+  "sources": 32,
+  "points": 35,
   "decisions": 10,
-  "relationships": 46,
-  "graph_nodes": 87,
-  "graph_edges": 92,
+  "relationships": 51,
+  "graph_nodes": 96,
+  "graph_edges": 102,
   "exact_attributes": true,
   "exact_topology": true,
   "repeated_endpoints": true,
-  "evidence_sha256": "4b347a59b76a6de00c1c8728d1c0cbdbb1bb514a9c2e47020cfaa1e9145ebe9e",
-  "graph_sha256": "4ac5a5bc98947d84edf94eba45c6a8c6afc3636f97ddcb0c3466cae17fd54039",
+  "evidence_sha256": "53870a87211ba916a945fa8b28bd73fc0176bb3901fc3b7b6d0848a5bf71ab00",
+  "graph_sha256": "85fdefd02240a97808895a29b7aa5e78500a3908f37184598ecd87ba5f7567e7",
   "query": {
     "question": "Why can Jev not replace SkillOpt editing, and what gates are required?",
     "expanded_terms": [

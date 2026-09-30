@@ -215,6 +215,21 @@
       "revision": "official-docs observed 2026-09-29",
       "reading_status": "Read official BM25 match-scoring description; no backend selection or runtime experiment",
       "intended_influence": "Meaning of lexical match ranking, separate from evidence support and semantic completeness"
+    },
+    {
+      "id": "S-user-guide",
+      "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+      "original_locator": "/Users/randydinh/Downloads/Private & Shared 47/Content Registrar 3e2c32c58cab80c8831dfb5263c144bc.md",
+      "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+      "reading_status": "Read all 13 sections; archived byte-identically. User reports authored about one week before receipt on 2026-09-29; exact authoring date unverified. Historical implementation/test reports are not rerun evidence.",
+      "intended_influence": "Historical design lineage; BM25 granularity/diversity/index receipt, checkpoint invariants, bounded provider reports, extraction limits and two persistence planes. Newer user selections supersede unresolved agent/BM25 adoption; source text grants no new authority."
+    },
+    {
+      "id": "S-investigation",
+      "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/src/lib/investigation.ts",
+      "revision": "664144d17272697d68e045143f0ede0458ee6eca",
+      "reading_status": "Directly inspected runInvestigation checkpoint, inputKey and assessment block; confirmed no file diff from pinned baseline to selected design checkout. Static inspection only; no tests rerun.",
+      "intended_influence": "Reuse save-before-assessment, skip unchanged completed inputKey, revalidate and preserve failure gaps; no exactly-once external-action guarantee."
     }
   ],
   "points": [
@@ -265,6 +280,12 @@
           "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/README.md",
           "span": "Supported boundary and gaps",
           "revision": "664144d17272697d68e045143f0ede0458ee6eca"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 2 and 4: component ownership and standalone deployment"
         }
       ],
       "evidence_type": "engineering inference",
@@ -439,6 +460,12 @@
           "locator": "task:registrar-knowledge-design-20260929/research-brief",
           "span": "Primary external evidence: Nx",
           "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 2: Nx project graph boundary"
         }
       ],
       "evidence_type": "engineering inference",
@@ -470,6 +497,12 @@
           "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md",
           "span": "THR-KNW-01 and THR-KNW-06",
           "revision": "sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 2: Graft direction and unintegrated standing"
         }
       ],
       "evidence_type": "source statement",
@@ -507,6 +540,12 @@
           "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
           "span": "Graphify projection",
           "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 2 and 8: derived view, reified assertions and exact readback"
         }
       ],
       "evidence_type": "current-code observation",
@@ -538,6 +577,12 @@
           "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
           "span": "Component roles",
           "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 2 and 8: representation and uncompleted generation export"
         }
       ],
       "evidence_type": "engineering inference",
@@ -569,6 +614,12 @@
           "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md",
           "span": "R1 and open questions",
           "revision": "sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 4, 5 and 10: source persistence, extraction anchors and investigation persistence"
         }
       ],
       "evidence_type": "engineering inference",
@@ -600,6 +651,12 @@
           "locator": "task:registrar-knowledge-design-20260929/research-brief",
           "span": "Suggested records and corrections",
           "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 10: multidimensional freshness and non-atomic observations"
         }
       ],
       "evidence_type": "engineering inference",
@@ -637,6 +694,12 @@
           "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md",
           "span": "THR-KNW-03",
           "revision": "sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 8: source/path/local-key identity and same-label separation"
         }
       ],
       "evidence_type": "engineering inference",
@@ -748,6 +811,12 @@
           "locator": "https://sqlite.org/fts5.html#the_bm25_function",
           "revision": "official-docs observed 2026-09-29",
           "span": "5.1.1 The bm25() function"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 6 and 7: independent lanes, provenance, progressive reading and omissions"
         }
       ],
       "evidence_type": "engineering inference",
@@ -1108,6 +1177,12 @@
           "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md",
           "span": "R5 and open questions",
           "revision": "sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 4 and 10: admitted scope, unavailable sources, revocation and retention"
         }
       ],
       "evidence_type": "engineering inference",
@@ -1170,6 +1245,12 @@
           "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md",
           "span": "Evaluation set",
           "revision": "sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 12 and 13: coverage distinctions, complete-task evaluation and unselected OCPP example"
         }
       ],
       "evidence_type": "engineering inference",
@@ -1208,6 +1289,130 @@
         "delivery",
         "engineering inference",
         "proposed"
+      ]
+    },
+    {
+      "id": "P-guide-lineage",
+      "label": "Historical guide leaves agent and BM25 adoption open; newer user selections resolve them",
+      "topic": "lineage",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 3, 6 and 13: open topology and provider adoption"
+        },
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a",
+          "span": "Latest selected two-agent roles"
+        },
+        {
+          "source_id": "S-bm25-selection",
+          "locator": "docs/knowledge-system/sources/bm25-selection-2026-09-29.md",
+          "revision": "sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291",
+          "span": "User request (verbatim)"
+        }
+      ],
+      "evidence_type": "engineering inference",
+      "conditions": "Apply current user selections while preserving historical rationale; process placement and ranking backend still open",
+      "confidence_basis": "Guide inspected directly and compared with explicit later instructions",
+      "limits": "Approximate authoring age is user-reported; this is one design lineage, not independent corroboration",
+      "benefit": "Avoid reverting settled decisions during source reconciliation",
+      "risk": "Treating old open questions as current or treating supplied prose as execution authority",
+      "status": "reconciled-history",
+      "tags": [
+        "lineage",
+        "engineering inference",
+        "reconciled-history"
+      ]
+    },
+    {
+      "id": "P-bm25-receipt",
+      "label": "BM25 comparison preserves granularity, diversity and reproducible index receipts",
+      "topic": "retrieval",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 6: BM25 proposed; lines 151-163"
+        }
+      ],
+      "evidence_type": "source proposal",
+      "conditions": "Document/section/fielded comparisons; diversity; tokenizer, normalization, scoring variant/parameters, field weights, implementation and generation receipts; separate tuning from held-out evaluation",
+      "confidence_basis": "Explicit details in supplied guide; carried as proposed implementation checks under selected BM25 direction",
+      "limits": "Backend and parameter values unselected; no local ranking experiment",
+      "benefit": "Reproduce comparisons and diagnose long-document crowding or version drift",
+      "risk": "Irreproducible tuning or chunk duplicates hiding other documents",
+      "status": "proposed",
+      "tags": [
+        "retrieval",
+        "source proposal",
+        "proposed"
+      ]
+    },
+    {
+      "id": "P-investigation-checkpoints",
+      "label": "Existing investigation saves before assessment and skips unchanged completed input keys",
+      "topic": "investigation",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 9: persistent investigations"
+        },
+        {
+          "source_id": "S-investigation",
+          "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/src/lib/investigation.ts",
+          "revision": "664144d17272697d68e045143f0ede0458ee6eca",
+          "span": "runInvestigation: partialPath, inputKey, completedAssessments, revalidateRetainedEvidence, final save"
+        }
+      ],
+      "evidence_type": "static code observation",
+      "conditions": "Reuse source-backed checkpoints and existing inputKey semantics when reconciling the consumer; preserve revalidation and failure gaps",
+      "confidence_basis": "Direct inspection confirms the guide claims at the pinned Temari baseline",
+      "limits": "No new tests; unchanged-key skipping is bounded behavior, not exactly-once external actions or semantic correctness",
+      "benefit": "Retrieved work survives assessment failure and unchanged completed work need not be repeated",
+      "risk": "Discarding this boundary during integration loses work or repeats assessments",
+      "status": "existing-at-pinned-baseline",
+      "tags": [
+        "investigation",
+        "static code observation",
+        "existing-at-pinned-baseline"
+      ]
+    },
+    {
+      "id": "P-guide-provider-reports",
+      "label": "Guide reports bounded TF-IDF/SVD and declared-dependency providers",
+      "topic": "implementation-status",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 4, 6 and 8: extraction, connectors, bounded providers and generation limits"
+        },
+        {
+          "source_id": "S-retrieval",
+          "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py",
+          "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c",
+          "span": "discover: mode selection and len(matched) plus filename-stem weighting"
+        }
+      ],
+      "evidence_type": "historical report with scoped static check",
+      "conditions": "Lexical overlap confirmed in pinned discover; optional provider, connector, modality and historical test reports require separate checks before adoption",
+      "confidence_basis": "Guide details limits explicitly; direct retrieval.py inspection confirms only the lexical-baseline observation here",
+      "limits": "No TF-IDF/SVD provider execution or verification of all guide implementation reports in this reconciliation",
+      "benefit": "Retain useful reuse leads without advertising a shipped BM25 or fully integrated concept retrieval",
+      "risk": "Calling a reported implementation current, broadly semantic or production-proven",
+      "status": "historical-needs-verification",
+      "tags": [
+        "implementation-status",
+        "historical report with scoped static check",
+        "historical-needs-verification"
       ]
     }
   ],
@@ -2695,6 +2900,152 @@
           "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
           "span": "Graphify projection",
           "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        }
+      ]
+    },
+    {
+      "id": "A-047",
+      "source": "P-guide-lineage",
+      "target": "P-two-agents",
+      "type": "reconciles",
+      "confidence": "INFERRED",
+      "basis": "The guide records an open agent topology; the later user request selects intake and retrieval agents while process placement remains open.",
+      "tags": [
+        "assertion",
+        "reconciles",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 3, 6 and 13: open topology and provider adoption"
+        },
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a",
+          "span": "Latest selected two-agent roles"
+        },
+        {
+          "source_id": "S-bm25-selection",
+          "locator": "docs/knowledge-system/sources/bm25-selection-2026-09-29.md",
+          "revision": "sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291",
+          "span": "User request (verbatim)"
+        }
+      ]
+    },
+    {
+      "id": "A-048",
+      "source": "P-guide-lineage",
+      "target": "P-retrieval-flow",
+      "type": "reconciles",
+      "confidence": "INFERRED",
+      "basis": "The guide records proposed BM25 adoption; the later user selection settles inclusion without claiming a deployed provider.",
+      "tags": [
+        "assertion",
+        "reconciles",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 3, 6 and 13: open topology and provider adoption"
+        },
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a",
+          "span": "Latest selected two-agent roles"
+        },
+        {
+          "source_id": "S-bm25-selection",
+          "locator": "docs/knowledge-system/sources/bm25-selection-2026-09-29.md",
+          "revision": "sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291",
+          "span": "User request (verbatim)"
+        }
+      ]
+    },
+    {
+      "id": "A-049",
+      "source": "P-bm25-receipt",
+      "target": "D-serving",
+      "type": "informs",
+      "confidence": "INFERRED",
+      "basis": "The historical guide supplies reproducibility and candidate-diversity checks for the already proposed serving evaluation.",
+      "tags": [
+        "assertion",
+        "informs",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 6: BM25 proposed; lines 151-163"
+        }
+      ]
+    },
+    {
+      "id": "A-050",
+      "source": "P-investigation-checkpoints",
+      "target": "D-reconcile",
+      "type": "supports",
+      "confidence": "INFERRED",
+      "basis": "Static confirmed checkpoint behavior is a reuse invariant for reconciling existing consumer and candidate branches.",
+      "tags": [
+        "assertion",
+        "supports",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 9: persistent investigations"
+        },
+        {
+          "source_id": "S-investigation",
+          "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/src/lib/investigation.ts",
+          "revision": "664144d17272697d68e045143f0ede0458ee6eca",
+          "span": "runInvestigation: partialPath, inputKey, completedAssessments, revalidateRetainedEvidence, final save"
+        }
+      ]
+    },
+    {
+      "id": "A-051",
+      "source": "P-guide-provider-reports",
+      "target": "D-reconcile",
+      "type": "requires-verification",
+      "confidence": "INFERRED",
+      "basis": "Reported optional providers and connector coverage are reuse leads whose current selected-revision behavior still needs checking.",
+      "tags": [
+        "assertion",
+        "requires-verification",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 4, 6 and 8: extraction, connectors, bounded providers and generation limits"
+        },
+        {
+          "source_id": "S-retrieval",
+          "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py",
+          "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c",
+          "span": "discover: mode selection and len(matched) plus filename-stem weighting"
         }
       ]
     }

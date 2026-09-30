@@ -1600,6 +1600,42 @@
       "type": "constrains"
     },
     {
+      "id": "A-051",
+      "label": "A-051 | P-guide-provider-reports requires-verification D-reconcile",
+      "basis": "Reported optional providers and connector coverage are reuse leads whose current selected-revision behavior still needs checking.",
+      "community": null,
+      "confidence": "INFERRED",
+      "file_type": "concept",
+      "norm_label": "a-051 | p-guide-provider-reports requires-verification d-reconcile",
+      "record_kind": "assertion",
+      "source": "P-guide-provider-reports",
+      "source_file": "docs/knowledge-system/evidence.json",
+      "source_location": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Sections 4, 6 and 8: extraction, connectors, bounded providers and generation limits; https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py @ dfdb9882f814df05354a74b7ab1f72d78d7acc2c :: discover: mode selection and len(matched) plus filename-stem weighting",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 4, 6 and 8: extraction, connectors, bounded providers and generation limits"
+        },
+        {
+          "source_id": "S-retrieval",
+          "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py",
+          "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c",
+          "span": "discover: mode selection and len(matched) plus filename-stem weighting"
+        }
+      ],
+      "status": "design-link",
+      "tags": [
+        "assertion",
+        "requires-verification",
+        "INFERRED"
+      ],
+      "target": "D-reconcile",
+      "title": "P-guide-provider-reports requires-verification D-reconcile",
+      "type": "requires-verification"
+    },
+    {
       "id": "A-041",
       "label": "A-041 | P-two-agents does-not-resolve P-model-fork",
       "basis": "Selecting two responsibility boundaries does not resolve whether other Temari models may generate text",
@@ -1634,6 +1670,156 @@
       "target": "P-model-fork",
       "title": "P-two-agents does-not-resolve P-model-fork",
       "type": "does-not-resolve"
+    },
+    {
+      "id": "A-050",
+      "label": "A-050 | P-investigation-checkpoints supports D-reconcile",
+      "basis": "Static confirmed checkpoint behavior is a reuse invariant for reconciling existing consumer and candidate branches.",
+      "community": null,
+      "confidence": "INFERRED",
+      "file_type": "concept",
+      "norm_label": "a-050 | p-investigation-checkpoints supports d-reconcile",
+      "record_kind": "assertion",
+      "source": "P-investigation-checkpoints",
+      "source_file": "docs/knowledge-system/evidence.json",
+      "source_location": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Section 9: persistent investigations; https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/src/lib/investigation.ts @ 664144d17272697d68e045143f0ede0458ee6eca :: runInvestigation: partialPath, inputKey, completedAssessments, revalidateRetainedEvidence, final save",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 9: persistent investigations"
+        },
+        {
+          "source_id": "S-investigation",
+          "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/src/lib/investigation.ts",
+          "revision": "664144d17272697d68e045143f0ede0458ee6eca",
+          "span": "runInvestigation: partialPath, inputKey, completedAssessments, revalidateRetainedEvidence, final save"
+        }
+      ],
+      "status": "design-link",
+      "tags": [
+        "assertion",
+        "supports",
+        "INFERRED"
+      ],
+      "target": "D-reconcile",
+      "title": "P-investigation-checkpoints supports D-reconcile",
+      "type": "supports"
+    },
+    {
+      "id": "A-047",
+      "label": "A-047 | P-guide-lineage reconciles P-two-agents",
+      "basis": "The guide records an open agent topology; the later user request selects intake and retrieval agents while process placement remains open.",
+      "community": null,
+      "confidence": "INFERRED",
+      "file_type": "concept",
+      "norm_label": "a-047 | p-guide-lineage reconciles p-two-agents",
+      "record_kind": "assertion",
+      "source": "P-guide-lineage",
+      "source_file": "docs/knowledge-system/evidence.json",
+      "source_location": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Sections 3, 6 and 13: open topology and provider adoption; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Latest selected two-agent roles; docs/knowledge-system/sources/bm25-selection-2026-09-29.md @ sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291 :: User request (verbatim)",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 3, 6 and 13: open topology and provider adoption"
+        },
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a",
+          "span": "Latest selected two-agent roles"
+        },
+        {
+          "source_id": "S-bm25-selection",
+          "locator": "docs/knowledge-system/sources/bm25-selection-2026-09-29.md",
+          "revision": "sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291",
+          "span": "User request (verbatim)"
+        }
+      ],
+      "status": "design-link",
+      "tags": [
+        "assertion",
+        "reconciles",
+        "INFERRED"
+      ],
+      "target": "P-two-agents",
+      "title": "P-guide-lineage reconciles P-two-agents",
+      "type": "reconciles"
+    },
+    {
+      "id": "A-048",
+      "label": "A-048 | P-guide-lineage reconciles P-retrieval-flow",
+      "basis": "The guide records proposed BM25 adoption; the later user selection settles inclusion without claiming a deployed provider.",
+      "community": null,
+      "confidence": "INFERRED",
+      "file_type": "concept",
+      "norm_label": "a-048 | p-guide-lineage reconciles p-retrieval-flow",
+      "record_kind": "assertion",
+      "source": "P-guide-lineage",
+      "source_file": "docs/knowledge-system/evidence.json",
+      "source_location": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Sections 3, 6 and 13: open topology and provider adoption; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Latest selected two-agent roles; docs/knowledge-system/sources/bm25-selection-2026-09-29.md @ sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291 :: User request (verbatim)",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 3, 6 and 13: open topology and provider adoption"
+        },
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a",
+          "span": "Latest selected two-agent roles"
+        },
+        {
+          "source_id": "S-bm25-selection",
+          "locator": "docs/knowledge-system/sources/bm25-selection-2026-09-29.md",
+          "revision": "sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291",
+          "span": "User request (verbatim)"
+        }
+      ],
+      "status": "design-link",
+      "tags": [
+        "assertion",
+        "reconciles",
+        "INFERRED"
+      ],
+      "target": "P-retrieval-flow",
+      "title": "P-guide-lineage reconciles P-retrieval-flow",
+      "type": "reconciles"
+    },
+    {
+      "id": "A-049",
+      "label": "A-049 | P-bm25-receipt informs D-serving",
+      "basis": "The historical guide supplies reproducibility and candidate-diversity checks for the already proposed serving evaluation.",
+      "community": null,
+      "confidence": "INFERRED",
+      "file_type": "concept",
+      "norm_label": "a-049 | p-bm25-receipt informs d-serving",
+      "record_kind": "assertion",
+      "source": "P-bm25-receipt",
+      "source_file": "docs/knowledge-system/evidence.json",
+      "source_location": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Section 6: BM25 proposed; lines 151-163",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 6: BM25 proposed; lines 151-163"
+        }
+      ],
+      "status": "design-link",
+      "tags": [
+        "assertion",
+        "informs",
+        "INFERRED"
+      ],
+      "target": "D-serving",
+      "title": "P-bm25-receipt informs D-serving",
+      "type": "informs"
     },
     {
       "id": "A-044",
@@ -1741,7 +1927,7 @@
       "record_kind": "point",
       "risk": "Contract drift across independent releases",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Preserve standalone Python Registrar; https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/README.md @ 664144d17272697d68e045143f0ede0458ee6eca :: Supported boundary and gaps",
+      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Preserve standalone Python Registrar; https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/README.md @ 664144d17272697d68e045143f0ede0458ee6eca :: Supported boundary and gaps; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Sections 2 and 4: component ownership and standalone deployment",
       "source_refs": [
         {
           "source_id": "S-request",
@@ -1754,6 +1940,12 @@
           "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/README.md",
           "span": "Supported boundary and gaps",
           "revision": "664144d17272697d68e045143f0ede0458ee6eca"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 2 and 4: component ownership and standalone deployment"
         }
       ],
       "status": "proposed",
@@ -1764,6 +1956,50 @@
       ],
       "title": "Registrar authority remains separate from Temari orchestration",
       "topic": "ownership"
+    },
+    {
+      "id": "P-guide-lineage",
+      "label": "P-guide-lineage | Historical guide leaves agent and BM25 adoption open; newer user selections resolve them",
+      "benefit": "Avoid reverting settled decisions during source reconciliation",
+      "community": null,
+      "conditions": "Apply current user selections while preserving historical rationale; process placement and ranking backend still open",
+      "confidence_basis": "Guide inspected directly and compared with explicit later instructions",
+      "evidence_type": "engineering inference",
+      "file_type": "concept",
+      "limits": "Approximate authoring age is user-reported; this is one design lineage, not independent corroboration",
+      "norm_label": "p-guide-lineage | historical guide leaves agent and bm25 adoption open; newer user selections resolve them",
+      "record_kind": "point",
+      "risk": "Treating old open questions as current or treating supplied prose as execution authority",
+      "source_file": "docs/knowledge-system/evidence.json",
+      "source_location": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Sections 3, 6 and 13: open topology and provider adoption; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Latest selected two-agent roles; docs/knowledge-system/sources/bm25-selection-2026-09-29.md @ sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291 :: User request (verbatim)",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 3, 6 and 13: open topology and provider adoption"
+        },
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a",
+          "span": "Latest selected two-agent roles"
+        },
+        {
+          "source_id": "S-bm25-selection",
+          "locator": "docs/knowledge-system/sources/bm25-selection-2026-09-29.md",
+          "revision": "sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291",
+          "span": "User request (verbatim)"
+        }
+      ],
+      "status": "reconciled-history",
+      "tags": [
+        "lineage",
+        "engineering inference",
+        "reconciled-history"
+      ],
+      "title": "Historical guide leaves agent and BM25 adoption open; newer user selections resolve them",
+      "topic": "lineage"
     },
     {
       "id": "P-jev",
@@ -1829,7 +2065,7 @@
       "record_kind": "point",
       "risk": "Missing symbol evidence if project edges are treated as semantics",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "https://nx.dev/docs/features/explore-graph @ official-docs observed 2026-09-29 :: Project Graph and Task Graph; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Primary external evidence: Nx",
+      "source_location": "https://nx.dev/docs/features/explore-graph @ official-docs observed 2026-09-29 :: Project Graph and Task Graph; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Primary external evidence: Nx; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Section 2: Nx project graph boundary",
       "source_refs": [
         {
           "source_id": "S-nx",
@@ -1842,6 +2078,12 @@
           "locator": "task:registrar-knowledge-design-20260929/research-brief",
           "span": "Primary external evidence: Nx",
           "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 2: Nx project graph boundary"
         }
       ],
       "status": "proposed",
@@ -2019,7 +2261,7 @@
       "record_kind": "point",
       "risk": "Tombstone confused with purge, or old checkpoint leaks revoked evidence",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Lossless contract; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md @ sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33 :: R5 and open questions",
+      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Lossless contract; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md @ sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33 :: R5 and open questions; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Sections 4 and 10: admitted scope, unavailable sources, revocation and retention",
       "source_refs": [
         {
           "source_id": "S-request",
@@ -2032,6 +2274,12 @@
           "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md",
           "span": "R5 and open questions",
           "revision": "sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 4 and 10: admitted scope, unavailable sources, revocation and retention"
         }
       ],
       "status": "proposed",
@@ -2095,7 +2343,7 @@
       "record_kind": "point",
       "risk": "Dropping low-ranked contradictions or dependencies biases results",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Search/retrieval and corrections; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md @ sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc :: Retrieval and evaluation proposals; https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py @ dfdb9882f814df05354a74b7ab1f72d78d7acc2c :: discover coverage; docs/knowledge-system/sources/bm25-selection-2026-09-29.md @ sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291 :: User request (verbatim); https://sqlite.org/fts5.html#the_bm25_function @ official-docs observed 2026-09-29 :: 5.1.1 The bm25() function",
+      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Search/retrieval and corrections; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md @ sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc :: Retrieval and evaluation proposals; https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py @ dfdb9882f814df05354a74b7ab1f72d78d7acc2c :: discover coverage; docs/knowledge-system/sources/bm25-selection-2026-09-29.md @ sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291 :: User request (verbatim); https://sqlite.org/fts5.html#the_bm25_function @ official-docs observed 2026-09-29 :: 5.1.1 The bm25() function; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Sections 6 and 7: independent lanes, provenance, progressive reading and omissions",
       "source_refs": [
         {
           "source_id": "S-request",
@@ -2126,6 +2374,12 @@
           "locator": "https://sqlite.org/fts5.html#the_bm25_function",
           "revision": "official-docs observed 2026-09-29",
           "span": "5.1.1 The bm25() function"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 6 and 7: independent lanes, provenance, progressive reading and omissions"
         }
       ],
       "status": "proposed",
@@ -2196,7 +2450,7 @@
       "record_kind": "point",
       "risk": "Edge counts, vendor benchmarks or one-hit recall hide omissions",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Acceptance/evaluation; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md @ sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc :: Evaluation set",
+      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Acceptance/evaluation; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md @ sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc :: Evaluation set; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Sections 12 and 13: coverage distinctions, complete-task evaluation and unselected OCPP example",
       "source_refs": [
         {
           "source_id": "S-request",
@@ -2209,6 +2463,12 @@
           "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md",
           "span": "Evaluation set",
           "revision": "sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 12 and 13: coverage distinctions, complete-task evaluation and unselected OCPP example"
         }
       ],
       "status": "proposed",
@@ -2304,7 +2564,7 @@
       "record_kind": "point",
       "risk": "Uncontrolled dedup or rekey can conflate identity",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "https://github.com/Graphify-Labs/graphify/blob/1cd9a36c0c57a661d2d2234bc3207e887e1ba104/graphify/build.py @ 1cd9a36c0c57a661d2d2234bc3207e887e1ba104 :: build_from_json; build deduplicate_entities call; pkg:pypi/graphifyy@0.9.49 @ installed distribution metadata 0.9.49; build.py sha256:6e181353a94a5547ceb8cfa0832b13228c2b98d4de96863337fec40c4099f511 :: build_from_json and export.to_json; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Graphify projection",
+      "source_location": "https://github.com/Graphify-Labs/graphify/blob/1cd9a36c0c57a661d2d2234bc3207e887e1ba104/graphify/build.py @ 1cd9a36c0c57a661d2d2234bc3207e887e1ba104 :: build_from_json; build deduplicate_entities call; pkg:pypi/graphifyy@0.9.49 @ installed distribution metadata 0.9.49; build.py sha256:6e181353a94a5547ceb8cfa0832b13228c2b98d4de96863337fec40c4099f511 :: build_from_json and export.to_json; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Graphify projection; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Sections 2 and 8: derived view, reified assertions and exact readback",
       "source_refs": [
         {
           "source_id": "S-graphify",
@@ -2323,6 +2583,12 @@
           "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
           "span": "Graphify projection",
           "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 2 and 8: derived view, reified assertions and exact readback"
         }
       ],
       "status": "projection-executed-separately",
@@ -2348,7 +2614,7 @@
       "record_kind": "point",
       "risk": "Destructive entity fusion spreads unsupported claims",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Data shape: source/path/local keys; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Corrections accepted: concept IDs; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md @ sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb :: THR-KNW-03",
+      "source_location": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Data shape: source/path/local keys; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Corrections accepted: concept IDs; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md @ sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb :: THR-KNW-03; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Section 8: source/path/local-key identity and same-label separation",
       "source_refs": [
         {
           "source_id": "S-generations",
@@ -2367,6 +2633,12 @@
           "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md",
           "span": "THR-KNW-03",
           "revision": "sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 8: source/path/local-key identity and same-label separation"
         }
       ],
       "status": "proposed",
@@ -2436,7 +2708,7 @@
       "record_kind": "point",
       "risk": "Path-only imports can lose stable identity and overtrust verified declarations",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/ad30107c31c06aec8a7d5636e0d1058118604e6f/SPEC.md @ ad30107c31c06aec8a7d5636e0d1058118604e6f; spec v0.2 :: Concept format, identity and relationships; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Component roles",
+      "source_location": "https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/ad30107c31c06aec8a7d5636e0d1058118604e6f/SPEC.md @ ad30107c31c06aec8a7d5636e0d1058118604e6f; spec v0.2 :: Concept format, identity and relationships; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Component roles; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Sections 2 and 8: representation and uncompleted generation export",
       "source_refs": [
         {
           "source_id": "S-okf",
@@ -2449,6 +2721,12 @@
           "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
           "span": "Component roles",
           "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 2 and 8: representation and uncompleted generation export"
         }
       ],
       "status": "proposed",
@@ -2512,7 +2790,7 @@
       "record_kind": "point",
       "risk": "Summary-only storage loses original structure; untested backups or stale access/retention state can break recovery or resurrect erased material",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Lossless contract; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md @ sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33 :: R1 and open questions",
+      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Lossless contract; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md @ sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33 :: R1 and open questions; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Sections 4, 5 and 10: source persistence, extraction anchors and investigation persistence",
       "source_refs": [
         {
           "source_id": "S-request",
@@ -2525,6 +2803,12 @@
           "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md",
           "span": "R1 and open questions",
           "revision": "sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 4, 5 and 10: source persistence, extraction anchors and investigation persistence"
         }
       ],
       "status": "proposed",
@@ -2535,6 +2819,38 @@
       ],
       "title": "Losslessness covers successfully captured retained bytes and visible gaps",
       "topic": "preservation"
+    },
+    {
+      "id": "P-bm25-receipt",
+      "label": "P-bm25-receipt | BM25 comparison preserves granularity, diversity and reproducible index receipts",
+      "benefit": "Reproduce comparisons and diagnose long-document crowding or version drift",
+      "community": null,
+      "conditions": "Document/section/fielded comparisons; diversity; tokenizer, normalization, scoring variant/parameters, field weights, implementation and generation receipts; separate tuning from held-out evaluation",
+      "confidence_basis": "Explicit details in supplied guide; carried as proposed implementation checks under selected BM25 direction",
+      "evidence_type": "source proposal",
+      "file_type": "concept",
+      "limits": "Backend and parameter values unselected; no local ranking experiment",
+      "norm_label": "p-bm25-receipt | bm25 comparison preserves granularity, diversity and reproducible index receipts",
+      "record_kind": "point",
+      "risk": "Irreproducible tuning or chunk duplicates hiding other documents",
+      "source_file": "docs/knowledge-system/evidence.json",
+      "source_location": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Section 6: BM25 proposed; lines 151-163",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 6: BM25 proposed; lines 151-163"
+        }
+      ],
+      "status": "proposed",
+      "tags": [
+        "retrieval",
+        "source proposal",
+        "proposed"
+      ],
+      "title": "BM25 comparison preserves granularity, diversity and reproducible index receipts",
+      "topic": "retrieval"
     },
     {
       "id": "P-revisions",
@@ -2550,7 +2866,7 @@
       "record_kind": "point",
       "risk": "Mixed build/document/test versions can produce false conclusions",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/handoffs/persistent-knowledge-retrieval-reconciliation-2026-09-21.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Recommended next bounded work; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Suggested records and corrections",
+      "source_location": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/handoffs/persistent-knowledge-retrieval-reconciliation-2026-09-21.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Recommended next bounded work; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Suggested records and corrections; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Section 10: multidimensional freshness and non-atomic observations",
       "source_refs": [
         {
           "source_id": "S-reconcile",
@@ -2563,6 +2879,12 @@
           "locator": "task:registrar-knowledge-design-20260929/research-brief",
           "span": "Suggested records and corrections",
           "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 10: multidimensional freshness and non-atomic observations"
         }
       ],
       "status": "proposed",
@@ -2573,6 +2895,82 @@
       ],
       "title": "RevisionSet declares multi-source versions and consistency gaps",
       "topic": "revisions"
+    },
+    {
+      "id": "P-guide-provider-reports",
+      "label": "P-guide-provider-reports | Guide reports bounded TF-IDF/SVD and declared-dependency providers",
+      "benefit": "Retain useful reuse leads without advertising a shipped BM25 or fully integrated concept retrieval",
+      "community": null,
+      "conditions": "Lexical overlap confirmed in pinned discover; optional provider, connector, modality and historical test reports require separate checks before adoption",
+      "confidence_basis": "Guide details limits explicitly; direct retrieval.py inspection confirms only the lexical-baseline observation here",
+      "evidence_type": "historical report with scoped static check",
+      "file_type": "concept",
+      "limits": "No TF-IDF/SVD provider execution or verification of all guide implementation reports in this reconciliation",
+      "norm_label": "p-guide-provider-reports | guide reports bounded tf-idf/svd and declared-dependency providers",
+      "record_kind": "point",
+      "risk": "Calling a reported implementation current, broadly semantic or production-proven",
+      "source_file": "docs/knowledge-system/evidence.json",
+      "source_location": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Sections 4, 6 and 8: extraction, connectors, bounded providers and generation limits; https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py @ dfdb9882f814df05354a74b7ab1f72d78d7acc2c :: discover: mode selection and len(matched) plus filename-stem weighting",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 4, 6 and 8: extraction, connectors, bounded providers and generation limits"
+        },
+        {
+          "source_id": "S-retrieval",
+          "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py",
+          "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c",
+          "span": "discover: mode selection and len(matched) plus filename-stem weighting"
+        }
+      ],
+      "status": "historical-needs-verification",
+      "tags": [
+        "implementation-status",
+        "historical report with scoped static check",
+        "historical-needs-verification"
+      ],
+      "title": "Guide reports bounded TF-IDF/SVD and declared-dependency providers",
+      "topic": "implementation-status"
+    },
+    {
+      "id": "P-investigation-checkpoints",
+      "label": "P-investigation-checkpoints | Existing investigation saves before assessment and skips unchanged completed input keys",
+      "benefit": "Retrieved work survives assessment failure and unchanged completed work need not be repeated",
+      "community": null,
+      "conditions": "Reuse source-backed checkpoints and existing inputKey semantics when reconciling the consumer; preserve revalidation and failure gaps",
+      "confidence_basis": "Direct inspection confirms the guide claims at the pinned Temari baseline",
+      "evidence_type": "static code observation",
+      "file_type": "concept",
+      "limits": "No new tests; unchanged-key skipping is bounded behavior, not exactly-once external actions or semantic correctness",
+      "norm_label": "p-investigation-checkpoints | existing investigation saves before assessment and skips unchanged completed input keys",
+      "record_kind": "point",
+      "risk": "Discarding this boundary during integration loses work or repeats assessments",
+      "source_file": "docs/knowledge-system/evidence.json",
+      "source_location": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Section 9: persistent investigations; https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/src/lib/investigation.ts @ 664144d17272697d68e045143f0ede0458ee6eca :: runInvestigation: partialPath, inputKey, completedAssessments, revalidateRetainedEvidence, final save",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 9: persistent investigations"
+        },
+        {
+          "source_id": "S-investigation",
+          "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/src/lib/investigation.ts",
+          "revision": "664144d17272697d68e045143f0ede0458ee6eca",
+          "span": "runInvestigation: partialPath, inputKey, completedAssessments, revalidateRetainedEvidence, final save"
+        }
+      ],
+      "status": "existing-at-pinned-baseline",
+      "tags": [
+        "investigation",
+        "static code observation",
+        "existing-at-pinned-baseline"
+      ],
+      "title": "Existing investigation saves before assessment and skips unchanged completed input keys",
+      "topic": "investigation"
     },
     {
       "id": "P-skill-platform",
@@ -2766,7 +3164,7 @@
       "record_kind": "point",
       "risk": "Initialization can change host config; summaries are interpretation",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "https://github.com/trailhq/Graft/tree/d34c115155f4d3cd0debe3f60a7edb3120981bbb @ d34c115155f4d3cd0debe3f60a7edb3120981bbb :: README: deterministic graph, blast, optional LSP; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md @ sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb :: THR-KNW-01 and THR-KNW-06",
+      "source_location": "https://github.com/trailhq/Graft/tree/d34c115155f4d3cd0debe3f60a7edb3120981bbb @ d34c115155f4d3cd0debe3f60a7edb3120981bbb :: README: deterministic graph, blast, optional LSP; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md @ sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb :: THR-KNW-01 and THR-KNW-06; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Section 2: Graft direction and unintegrated standing",
       "source_refs": [
         {
           "source_id": "S-graft",
@@ -2779,6 +3177,12 @@
           "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md",
           "span": "THR-KNW-01 and THR-KNW-06",
           "revision": "sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 2: Graft direction and unintegrated standing"
         }
       ],
       "status": "evaluated-not-integrated",
@@ -3012,7 +3416,7 @@
       "rationale": "The unmerged substrates need integrated temporal evidence before model and connector complexity increases",
       "record_kind": "decision",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Corrections accepted: synthetic trajectory; delivery sequence; docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md @ sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353 :: Retrieval and continuation; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Delivery sequence; docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md @ sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353 :: Responsibilities; Retrieval and continuation; Compatibility; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Data shape; Graphify projection; Limits; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Acceptance/evaluation; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md @ sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc :: Evaluation set",
+      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Corrections accepted: synthetic trajectory; delivery sequence; docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md @ sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353 :: Retrieval and continuation; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Delivery sequence; docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md @ sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353 :: Responsibilities; Retrieval and continuation; Compatibility; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Data shape; Graphify projection; Limits; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Acceptance/evaluation; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md @ sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc :: Evaluation set; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Sections 12 and 13: coverage distinctions, complete-task evaluation and unselected OCPP example",
       "source_refs": [
         {
           "source_id": "S-request",
@@ -3055,6 +3459,12 @@
           "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md",
           "span": "Evaluation set",
           "revision": "sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 12 and 13: coverage distinctions, complete-task evaluation and unselected OCPP example"
         }
       ],
       "status": "proposed",
@@ -3144,7 +3554,7 @@
       "rationale": "Latest user request settles responsibility split; keep existing lifecycle and one publication owner instead of duplicating state",
       "record_kind": "decision",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: User request and decisions; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md @ sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33 :: What is established and what is still a proposal; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Preserve standalone Python Registrar; https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/README.md @ 664144d17272697d68e045143f0ede0458ee6eca :: Supported boundary and gaps; docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md @ sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353 :: Reuse and selected design; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Two agents: Intake",
+      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: User request and decisions; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md @ sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33 :: What is established and what is still a proposal; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Preserve standalone Python Registrar; https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/README.md @ 664144d17272697d68e045143f0ede0458ee6eca :: Supported boundary and gaps; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Sections 2 and 4: component ownership and standalone deployment; docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md @ sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353 :: Reuse and selected design; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Two agents: Intake",
       "source_refs": [
         {
           "source_id": "S-request",
@@ -3169,6 +3579,12 @@
           "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/README.md",
           "span": "Supported boundary and gaps",
           "revision": "664144d17272697d68e045143f0ede0458ee6eca"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 2 and 4: component ownership and standalone deployment"
         },
         {
           "source_id": "S-workers",
@@ -3205,7 +3621,7 @@
       "rationale": "Archives, capture times, upstream watermarks/history availability, explicit gaps, extraction coverage and provenance bound recoverability to successfully captured retained versions; production requires exercised backup/restore of bytes, manifests, retained extraction outputs/provenance and access/retention state, hash and derived-view checks, current revocation/erasure enforcement and selected/tested RPO/RTO; semantic recall and authorized purge have separate limits",
       "record_kind": "decision",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Lossless contract; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md @ sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33 :: R1 and open questions; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/handoffs/persistent-knowledge-retrieval-reconciliation-2026-09-21.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Recommended next bounded work; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Suggested records and corrections; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md @ sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33 :: R5 and open questions; https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/ad30107c31c06aec8a7d5636e0d1058118604e6f/SPEC.md @ ad30107c31c06aec8a7d5636e0d1058118604e6f; spec v0.2 :: Concept format, identity and relationships; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Component roles",
+      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Lossless contract; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md @ sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33 :: R1 and open questions; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Sections 4, 5 and 10: source persistence, extraction anchors and investigation persistence; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/handoffs/persistent-knowledge-retrieval-reconciliation-2026-09-21.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Recommended next bounded work; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Suggested records and corrections; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Section 10: multidimensional freshness and non-atomic observations; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md @ sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33 :: R5 and open questions; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Sections 4 and 10: admitted scope, unavailable sources, revocation and retention; https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/ad30107c31c06aec8a7d5636e0d1058118604e6f/SPEC.md @ ad30107c31c06aec8a7d5636e0d1058118604e6f; spec v0.2 :: Concept format, identity and relationships; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Component roles; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Sections 2 and 8: representation and uncompleted generation export",
       "source_refs": [
         {
           "source_id": "S-request",
@@ -3220,6 +3636,12 @@
           "revision": "sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33"
         },
         {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 4, 5 and 10: source persistence, extraction anchors and investigation persistence"
+        },
+        {
           "source_id": "S-reconcile",
           "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/handoffs/persistent-knowledge-retrieval-reconciliation-2026-09-21.md",
           "span": "Recommended next bounded work",
@@ -3232,10 +3654,22 @@
           "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
         },
         {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 10: multidimensional freshness and non-atomic observations"
+        },
+        {
           "source_id": "S-memory",
           "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md",
           "span": "R5 and open questions",
           "revision": "sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 4 and 10: admitted scope, unavailable sources, revocation and retention"
         },
         {
           "source_id": "S-okf",
@@ -3248,6 +3682,12 @@
           "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
           "span": "Component roles",
           "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 2 and 8: representation and uncompleted generation export"
         }
       ],
       "status": "proposed",
@@ -3272,7 +3712,7 @@
       "rationale": "A simple DiGraph cannot hold parallel assertions; source-scoped IDs, qualified labels and exact readback prevent silent collapse",
       "record_kind": "decision",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "https://github.com/Graphify-Labs/graphify/blob/1cd9a36c0c57a661d2d2234bc3207e887e1ba104/graphify/build.py @ 1cd9a36c0c57a661d2d2234bc3207e887e1ba104 :: build_from_json; build deduplicate_entities call; pkg:pypi/graphifyy@0.9.49 @ installed distribution metadata 0.9.49; build.py sha256:6e181353a94a5547ceb8cfa0832b13228c2b98d4de96863337fec40c4099f511 :: build_from_json and export.to_json; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Graphify projection; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Data shape; Graphify projection; Limits; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Data shape: source/path/local keys; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Corrections accepted: concept IDs; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md @ sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb :: THR-KNW-03; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Suggested records; continual graph improvement; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md @ sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33 :: R3",
+      "source_location": "https://github.com/Graphify-Labs/graphify/blob/1cd9a36c0c57a661d2d2234bc3207e887e1ba104/graphify/build.py @ 1cd9a36c0c57a661d2d2234bc3207e887e1ba104 :: build_from_json; build deduplicate_entities call; pkg:pypi/graphifyy@0.9.49 @ installed distribution metadata 0.9.49; build.py sha256:6e181353a94a5547ceb8cfa0832b13228c2b98d4de96863337fec40c4099f511 :: build_from_json and export.to_json; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Graphify projection; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Sections 2 and 8: derived view, reified assertions and exact readback; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Data shape; Graphify projection; Limits; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Data shape: source/path/local keys; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Corrections accepted: concept IDs; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md @ sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb :: THR-KNW-03; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Section 8: source/path/local-key identity and same-label separation; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Suggested records; continual graph improvement; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md @ sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33 :: R3",
       "source_refs": [
         {
           "source_id": "S-graphify",
@@ -3291,6 +3731,12 @@
           "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
           "span": "Graphify projection",
           "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 2 and 8: derived view, reified assertions and exact readback"
         },
         {
           "source_id": "S-generations",
@@ -3315,6 +3761,12 @@
           "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md",
           "span": "THR-KNW-03",
           "revision": "sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 8: source/path/local-key identity and same-label separation"
         },
         {
           "source_id": "S-request",
@@ -3351,7 +3803,7 @@
       "rationale": "Source refresh and reviewed feedback improve candidates; usage and connectivity cannot certify truth",
       "record_kind": "decision",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Continual graph improvement; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md @ sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb :: THR-KNW-11; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Suggested records; continual graph improvement; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md @ sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33 :: R3; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Data shape: source/path/local keys; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Corrections accepted: concept IDs; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md @ sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb :: THR-KNW-03; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Acceptance/evaluation; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md @ sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc :: Evaluation set",
+      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Continual graph improvement; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md @ sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb :: THR-KNW-11; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Suggested records; continual graph improvement; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md @ sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33 :: R3; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Data shape: source/path/local keys; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Corrections accepted: concept IDs; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md @ sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb :: THR-KNW-03; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Section 8: source/path/local-key identity and same-label separation; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Acceptance/evaluation; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md @ sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc :: Evaluation set; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Sections 12 and 13: coverage distinctions, complete-task evaluation and unselected OCPP example",
       "source_refs": [
         {
           "source_id": "S-request",
@@ -3396,6 +3848,12 @@
           "revision": "sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb"
         },
         {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 8: source/path/local-key identity and same-label separation"
+        },
+        {
           "source_id": "S-request",
           "locator": "task:registrar-knowledge-design-20260929/research-brief",
           "span": "Acceptance/evaluation",
@@ -3406,6 +3864,12 @@
           "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md",
           "span": "Evaluation set",
           "revision": "sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 12 and 13: coverage distinctions, complete-task evaluation and unselected OCPP example"
         }
       ],
       "status": "proposed",
@@ -3503,7 +3967,7 @@
       "rationale": "Nx supplies project/task context; non-Nx structural code uses Graft; non-code remains Graphify even inside a code repository",
       "record_kind": "decision",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "https://nx.dev/docs/features/explore-graph @ official-docs observed 2026-09-29 :: Project Graph and Task Graph; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Primary external evidence: Nx; https://github.com/trailhq/Graft/tree/d34c115155f4d3cd0debe3f60a7edb3120981bbb @ d34c115155f4d3cd0debe3f60a7edb3120981bbb :: README: deterministic graph, blast, optional LSP; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md @ sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb :: THR-KNW-01 and THR-KNW-06; https://github.com/Graphify-Labs/graphify/blob/1cd9a36c0c57a661d2d2234bc3207e887e1ba104/graphify/build.py @ 1cd9a36c0c57a661d2d2234bc3207e887e1ba104 :: build_from_json; build deduplicate_entities call; pkg:pypi/graphifyy@0.9.49 @ installed distribution metadata 0.9.49; build.py sha256:6e181353a94a5547ceb8cfa0832b13228c2b98d4de96863337fec40c4099f511 :: build_from_json and export.to_json; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Graphify projection",
+      "source_location": "https://nx.dev/docs/features/explore-graph @ official-docs observed 2026-09-29 :: Project Graph and Task Graph; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Primary external evidence: Nx; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Section 2: Nx project graph boundary; https://github.com/trailhq/Graft/tree/d34c115155f4d3cd0debe3f60a7edb3120981bbb @ d34c115155f4d3cd0debe3f60a7edb3120981bbb :: README: deterministic graph, blast, optional LSP; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md @ sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb :: THR-KNW-01 and THR-KNW-06; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Section 2: Graft direction and unintegrated standing; https://github.com/Graphify-Labs/graphify/blob/1cd9a36c0c57a661d2d2234bc3207e887e1ba104/graphify/build.py @ 1cd9a36c0c57a661d2d2234bc3207e887e1ba104 :: build_from_json; build deduplicate_entities call; pkg:pypi/graphifyy@0.9.49 @ installed distribution metadata 0.9.49; build.py sha256:6e181353a94a5547ceb8cfa0832b13228c2b98d4de96863337fec40c4099f511 :: build_from_json and export.to_json; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Graphify projection; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Sections 2 and 8: derived view, reified assertions and exact readback",
       "source_refs": [
         {
           "source_id": "S-nx",
@@ -3518,6 +3982,12 @@
           "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
         },
         {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 2: Nx project graph boundary"
+        },
+        {
           "source_id": "S-graft",
           "locator": "https://github.com/trailhq/Graft/tree/d34c115155f4d3cd0debe3f60a7edb3120981bbb",
           "span": "README: deterministic graph, blast, optional LSP",
@@ -3528,6 +3998,12 @@
           "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md",
           "span": "THR-KNW-01 and THR-KNW-06",
           "revision": "sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 2: Graft direction and unintegrated standing"
         },
         {
           "source_id": "S-graphify",
@@ -3546,6 +4022,12 @@
           "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
           "span": "Graphify projection",
           "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 2 and 8: derived view, reified assertions and exact readback"
         }
       ],
       "status": "proposed-refinement-of-selected-tools",
@@ -3570,7 +4052,7 @@
       "rationale": "Repeated corpus and provider verification suggests targets, but current-original checks cannot disappear behind a cached receipt",
       "record_kind": "decision",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py @ dfdb9882f814df05354a74b7ab1f72d78d7acc2c :: _corpus; discover initial/final checks; read_document; https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/src/lib/registrar.ts @ 664144d17272697d68e045143f0ede0458ee6eca :: implementationDigest; pin; invoke; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Additional current-code performance finding; Efficiency; https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/README.md @ 664144d17272697d68e045143f0ede0458ee6eca :: Supported boundary and gaps; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Search/retrieval and corrections; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md @ sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc :: Retrieval and evaluation proposals; https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py @ dfdb9882f814df05354a74b7ab1f72d78d7acc2c :: discover coverage; docs/knowledge-system/sources/bm25-selection-2026-09-29.md @ sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291 :: User request (verbatim); https://sqlite.org/fts5.html#the_bm25_function @ official-docs observed 2026-09-29 :: 5.1.1 The bm25() function; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Acceptance/evaluation; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md @ sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc :: Evaluation set",
+      "source_location": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py @ dfdb9882f814df05354a74b7ab1f72d78d7acc2c :: _corpus; discover initial/final checks; read_document; https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/src/lib/registrar.ts @ 664144d17272697d68e045143f0ede0458ee6eca :: implementationDigest; pin; invoke; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Additional current-code performance finding; Efficiency; https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/README.md @ 664144d17272697d68e045143f0ede0458ee6eca :: Supported boundary and gaps; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Search/retrieval and corrections; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md @ sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc :: Retrieval and evaluation proposals; https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py @ dfdb9882f814df05354a74b7ab1f72d78d7acc2c :: discover coverage; docs/knowledge-system/sources/bm25-selection-2026-09-29.md @ sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291 :: User request (verbatim); https://sqlite.org/fts5.html#the_bm25_function @ official-docs observed 2026-09-29 :: 5.1.1 The bm25() function; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Sections 6 and 7: independent lanes, provenance, progressive reading and omissions; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Acceptance/evaluation; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md @ sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc :: Evaluation set; docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md @ sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6 :: Sections 12 and 13: coverage distinctions, complete-task evaluation and unselected OCPP example",
       "source_refs": [
         {
           "source_id": "S-retrieval",
@@ -3627,6 +4109,12 @@
           "span": "5.1.1 The bm25() function"
         },
         {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 6 and 7: independent lanes, provenance, progressive reading and omissions"
+        },
+        {
           "source_id": "S-request",
           "locator": "task:registrar-knowledge-design-20260929/research-brief",
           "span": "Acceptance/evaluation",
@@ -3637,6 +4125,12 @@
           "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md",
           "span": "Evaluation set",
           "revision": "sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 12 and 13: coverage distinctions, complete-task evaluation and unselected OCPP example"
         }
       ],
       "status": "proposed",
@@ -4563,6 +5057,106 @@
       "target": "A-046",
       "relation": "assertion_subject",
       "assertion_id": "A-046",
+      "confidence": "INFERRED",
+      "confidence_score": 0.55,
+      "source_file": "docs/knowledge-system/evidence.json",
+      "weight": 1.0
+    },
+    {
+      "source": "A-047",
+      "target": "P-two-agents",
+      "relation": "assertion_object",
+      "assertion_id": "A-047",
+      "confidence": "INFERRED",
+      "confidence_score": 0.55,
+      "source_file": "docs/knowledge-system/evidence.json",
+      "weight": 1.0
+    },
+    {
+      "source": "P-guide-lineage",
+      "target": "A-047",
+      "relation": "assertion_subject",
+      "assertion_id": "A-047",
+      "confidence": "INFERRED",
+      "confidence_score": 0.55,
+      "source_file": "docs/knowledge-system/evidence.json",
+      "weight": 1.0
+    },
+    {
+      "source": "A-048",
+      "target": "P-retrieval-flow",
+      "relation": "assertion_object",
+      "assertion_id": "A-048",
+      "confidence": "INFERRED",
+      "confidence_score": 0.55,
+      "source_file": "docs/knowledge-system/evidence.json",
+      "weight": 1.0
+    },
+    {
+      "source": "P-guide-lineage",
+      "target": "A-048",
+      "relation": "assertion_subject",
+      "assertion_id": "A-048",
+      "confidence": "INFERRED",
+      "confidence_score": 0.55,
+      "source_file": "docs/knowledge-system/evidence.json",
+      "weight": 1.0
+    },
+    {
+      "source": "A-049",
+      "target": "D-serving",
+      "relation": "assertion_object",
+      "assertion_id": "A-049",
+      "confidence": "INFERRED",
+      "confidence_score": 0.55,
+      "source_file": "docs/knowledge-system/evidence.json",
+      "weight": 1.0
+    },
+    {
+      "source": "P-bm25-receipt",
+      "target": "A-049",
+      "relation": "assertion_subject",
+      "assertion_id": "A-049",
+      "confidence": "INFERRED",
+      "confidence_score": 0.55,
+      "source_file": "docs/knowledge-system/evidence.json",
+      "weight": 1.0
+    },
+    {
+      "source": "A-050",
+      "target": "D-reconcile",
+      "relation": "assertion_object",
+      "assertion_id": "A-050",
+      "confidence": "INFERRED",
+      "confidence_score": 0.55,
+      "source_file": "docs/knowledge-system/evidence.json",
+      "weight": 1.0
+    },
+    {
+      "source": "P-investigation-checkpoints",
+      "target": "A-050",
+      "relation": "assertion_subject",
+      "assertion_id": "A-050",
+      "confidence": "INFERRED",
+      "confidence_score": 0.55,
+      "source_file": "docs/knowledge-system/evidence.json",
+      "weight": 1.0
+    },
+    {
+      "source": "A-051",
+      "target": "D-reconcile",
+      "relation": "assertion_object",
+      "assertion_id": "A-051",
+      "confidence": "INFERRED",
+      "confidence_score": 0.55,
+      "source_file": "docs/knowledge-system/evidence.json",
+      "weight": 1.0
+    },
+    {
+      "source": "P-guide-provider-reports",
+      "target": "A-051",
+      "relation": "assertion_subject",
+      "assertion_id": "A-051",
       "confidence": "INFERRED",
       "confidence_score": 0.55,
       "source_file": "docs/knowledge-system/evidence.json",

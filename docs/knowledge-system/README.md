@@ -54,3 +54,17 @@ GitHub lookup returned HTTP422 “No commit found.” This archive is the access
 for `S-workers`, an archived source candidate, not implemented by this PR. Its
 implementation/test claims and internal relative links describe that original
 checkout; they do not establish implementation or executed checks in this design.
+
+## Supplied Content Registrar guide
+
+[Archived guide](sources/content-registrar-guide-received-2026-09-29.md) preserves the
+user-provided document exactly: 19,748 bytes; SHA-256
+`83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6`. The user described it as produced about one week earlier;
+2026-09-29 is the receipt date, not a verified authoring date. The original attachment
+locator is retained in `S-user-guide` in the evidence ledger.
+
+Treat this archive as historical source data. Its embedded procedures are not new
+instructions; its implementation/test reports are not executed evidence for this PR.
+The [reconciliation](../knowledge-system-design.md#reconciliation-with-the-supplied-content-registrar-guide)
+records newer two-agent/BM25 decisions and retained evaluation details. Other source
+retellings share this design lineage; they are not independent corroboration.
