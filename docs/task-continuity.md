@@ -131,6 +131,18 @@ Use `--workflow-source /absolute/workflow-project` when starting from a separate
 workflow definition directory; `--archon-cache` optionally overrides the binary
 cache.
 
+Task dispatch requires a harness with independent run-identity verification.
+For Archon workflows, declare the optional reserved input below. Temari fills it
+with the admitted run, revision, plan digest, workspace and harness identity;
+callers must not supply or overwrite it. Existing direct harness launches remain
+compatible, but untagged old runs cannot be adopted through task reconciliation.
+
+```yaml
+inputs:
+  temari_binding:
+    required: false
+```
+
 Every run command uses `taskId`, `runId`, `actor`, `idempotencyKey`, and
 `expectedVersion`. Additional fields:
 
@@ -150,6 +162,11 @@ A crash between intent and result remains unresolved. Inspect Archon's actual ru
 record, including its Temari run ID, revision, plan digest and entrypoint, then
 reconcile its exact reference. Never retry dispatch under a new task to hide the
 uncertainty. An accepted local task cannot be resumed or cancelled.
+Reconciliation verifies `metadata.inputs.temari_binding` and the native workflow
+and working path before binding the recovered ID. A native status alone does not
+establish ownership. If cancellation races normal completion, its intent resolves
+as `finished-before-cancel` and preserves `SUCCEEDED` or `FAILED`; it does not
+claim cancellation. Nonterminal observations keep the cancellation uncertain.
 
 ### Evidence and acceptance
 
@@ -167,6 +184,8 @@ outcomes. Missing or changed evidence prevents a completed task from remaining
 
 `accept` takes a command envelope, `runId` and a substantive `reason`. It supports
 **local serial work only**, after verified stage evidence and coordinator review.
+For a native-backed task, supply `--archon-home` so acceptance can recheck the
+actual executor state. Pure local tasks do not require an Archon installation.
 Plans requiring delegation, independent review, parallel execution, or forge
 delivery need their route-specific closeout verifier. This increment shows their
 evidence and review needs but does not mark them done. Actor strings provide

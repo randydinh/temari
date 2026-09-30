@@ -213,12 +213,24 @@ function renderDetail() {
         run.runId === task.currentRunId ? 'Current run' : 'Previous run',
       ),
     );
-    if (run.nativeRef)
+    if (run.nativeSnapshot)
+      info.append(
+        el(
+          'span',
+          '',
+          `Observed ${relativeTime(run.nativeSnapshot.observedAt)}`,
+        ),
+      );
+    if (run.nativeRef && run.nativeSnapshot?.nativeProjectId)
       info.append(
         link(
           'Open run in Archon ↗',
-          `${state.archonBaseUrl}/console/r/${encodeURIComponent(run.nativeRef.externalRunId)}`,
+          `${state.archonBaseUrl}/console/p/${encodeURIComponent(run.nativeSnapshot.nativeProjectId)}/r/${encodeURIComponent(run.nativeRef.externalRunId)}`,
         ),
+      );
+    else if (run.nativeRef)
+      info.append(
+        link('Open Archon console ↗', `${state.archonBaseUrl}/console`),
       );
     card.append(
       top,
@@ -232,7 +244,7 @@ function renderDetail() {
       ),
     );
     for (const operation of run.operations.filter(
-      (o) => o.state !== 'CONFIRMED',
+      (o) => o.state !== 'CONFIRMED' || o.outcome === 'finished-before-cancel',
     ))
       card.append(
         el(
@@ -326,7 +338,7 @@ async function refresh() {
         state.tasks.find((t) => t.status !== 'DONE')?.taskId ??
         state.tasks[0].taskId;
     byId('archon-home').href = `${data.archonBaseUrl}/console`;
-    byId('connection').textContent = 'Read-only · up to date';
+    byId('connection').textContent = 'Read-only · refreshed';
     byId('error').hidden = true;
     renderList();
     renderDetail();

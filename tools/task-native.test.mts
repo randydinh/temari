@@ -17,6 +17,8 @@ import {
 } from '../libs/archon-harness/src/index.js';
 import { FileTaskStore, TaskRuntime } from '../libs/runtime/src/index.js';
 import { platformInfo } from '../packages/initializer/src/lib/platform.js';
+import { runTaskCommand } from './task-continuity.mjs';
+import type { TaskSnapshot } from '../libs/runtime/src/index.js';
 
 const runFile = promisify(execFile);
 const nativeOptions = { timeout: 120_000, skip: process.platform === 'win32' };
@@ -97,6 +99,7 @@ test(
       status: (ref) => harness.status(ref),
       resume: (ref) => harness.resume(ref),
       cancel: (ref) => harness.cancel(ref),
+      verifyRunIdentity: (ref) => harness.verifyRunIdentity(ref),
     };
     const storeRoot = join(root, 'tasks');
     const store = await FileTaskStore.create(storeRoot);
@@ -205,15 +208,28 @@ test(
     snapshot = await runtime.snapshot('native-proof');
     assert.equal(snapshot.status, 'NEEDS_REVIEW');
     assert.equal(snapshot.evidence.verified, true);
-    snapshot = await runtime.accept({
-      taskId: 'native-proof',
-      runId,
-      actor: 'temari',
-      idempotencyKey: 'accept',
-      expectedVersion: snapshot.version,
-      reason:
-        'Coordinator accepts only the deterministic six-stage fixture result.',
-    });
+    const acceptPath = join(root, 'accept.json');
+    await writeFile(
+      acceptPath,
+      JSON.stringify({
+        taskId: 'native-proof',
+        runId,
+        actor: 'temari',
+        idempotencyKey: 'accept',
+        expectedVersion: snapshot.version,
+        reason:
+          'Coordinator accepts only the deterministic six-stage fixture result.',
+      }),
+    );
+    snapshot = (await runTaskCommand([
+      'accept',
+      '--root',
+      storeRoot,
+      '--input',
+      acceptPath,
+      '--archon-home',
+      archonHome,
+    ])) as TaskSnapshot;
     assert.equal(snapshot.status, 'DONE');
     const reopened = await new TaskRuntime({
       store: await FileTaskStore.openExisting(storeRoot),
@@ -256,11 +272,11 @@ test(
     const prepareScript = `require('node:fs').writeFileSync(${JSON.stringify(join(root, 'completed-prepare'))}, 'retained', {flag:'wx'});process.stdout.write('prepare complete');`;
     await writeFile(
       join(workflowSource, '.archon', 'workflows', 'task-controls.yaml'),
-      `name: task-controls\ndescription: Deterministic task control fixture\nnodes:\n  - id: prepare\n    bash: ${JSON.stringify(`${quote(process.execPath)} -e ${quote(prepareScript)}`)}\n  - id: once\n    depends_on: [prepare]\n    bash: ${JSON.stringify(`${quote(process.execPath)} ${quote(script)}`)}\n`,
+      `name: task-controls\ndescription: Deterministic task control fixture\ninputs:\n  temari_binding:\n    required: false\nnodes:\n  - id: prepare\n    bash: ${JSON.stringify(`${quote(process.execPath)} -e ${quote(prepareScript)}`)}\n  - id: once\n    depends_on: [prepare]\n    bash: ${JSON.stringify(`${quote(process.execPath)} ${quote(script)}`)}\n`,
     );
     await writeFile(
       join(workflowSource, '.archon', 'workflows', 'task-cancel.yaml'),
-      `name: task-cancel\ndescription: Cancellable deterministic task fixture\nnodes:\n  - id: wait\n    bash: ${JSON.stringify(`${quote(process.execPath)} -e ${quote('setTimeout(()=>{},60000)')}`)}\n`,
+      `name: task-cancel\ndescription: Cancellable deterministic task fixture\ninputs:\n  temari_binding:\n    required: false\nnodes:\n  - id: wait\n    bash: ${JSON.stringify(`${quote(process.execPath)} -e ${quote('setTimeout(()=>{},60000)')}`)}\n`,
     );
     const harness = new ArchonHarness({
       runtime: native,
@@ -282,12 +298,30 @@ test(
       else console.error(`Native controls evidence retained: ${root}`);
     });
     const store = await FileTaskStore.create(join(root, 'tasks'));
+    let lostReference: HarnessRunRef | undefined;
+    const recoverableHarness: ExecutionHarness = {
+      id: harness.id,
+      version: harness.version,
+      async start(request) {
+        const reference = await harness.start(request);
+        if (request.runId === 'cancel-proof') {
+          lostReference = reference;
+          refs.push(reference);
+          throw new Error('Simulated response loss after native launch');
+        }
+        return reference;
+      },
+      status: (ref) => harness.status(ref),
+      verifyRunIdentity: (ref) => harness.verifyRunIdentity(ref),
+      resume: (ref) => harness.resume(ref),
+      cancel: (ref) => harness.cancel(ref),
+    };
     const runtime = new TaskRuntime({
       store,
       selection: {
-        hostHarness: null,
+        hostHarness: recoverableHarness,
         configuredHarness: null,
-        managedDefault: harness,
+        managedDefault: null,
       },
     });
     for (const [taskId, entrypoint] of [
@@ -313,7 +347,7 @@ test(
           plan: minimalPlan('investigation'),
         },
       });
-      let snapshot = await runtime.dispatch({
+      const dispatch = {
         taskId,
         runId: taskId,
         actor: 'temari',
@@ -321,9 +355,42 @@ test(
         expectedVersion: 2,
         entrypoint,
         inputs: {},
-      });
+      };
+      let snapshot: TaskSnapshot;
+      if (taskId === 'cancel-proof') {
+        await assert.rejects(
+          runtime.dispatch(dispatch),
+          /Simulated response loss/,
+        );
+        snapshot = await runtime.snapshot(taskId);
+        assert.equal(snapshot.status, 'BLOCKED');
+        assert(lostReference);
+        const recovery = {
+          taskId,
+          runId: taskId,
+          actor: 'temari',
+          expectedVersion: snapshot.version,
+          idempotencyKey: 'recover-exact-run',
+          reference: lostReference,
+        };
+        await assert.rejects(
+          runtime.reconcileNative({
+            ...recovery,
+            reference: {
+              ...lostReference,
+              externalRunId: refs[0]!.externalRunId,
+            },
+          }),
+          /binding|identity|provenance/i,
+        );
+        assert.equal((await runtime.snapshot(taskId)).runs[0]!.nativeRef, null);
+        snapshot = await runtime.reconcileNative(recovery);
+      } else {
+        snapshot = await runtime.dispatch(dispatch);
+      }
       const reference = snapshot.runs[0]!.nativeRef!;
-      refs.push(reference);
+      if (!refs.some((ref) => ref.externalRunId === reference.externalRunId))
+        refs.push(reference);
       let status = await harness.status(reference);
       if (taskId === 'resume-proof') {
         for (

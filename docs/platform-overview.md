@@ -153,11 +153,12 @@ deterministic scheduling, capture, review-boundary enforcement, and ordinary
 failed-node resume; it is migration evidence, not receipt parity for the new
 Nx engine.
 
-Durable scheduling, leases, retries, watchers, live host capability proofs,
-Windows workflow/process-tree verification, and canonical receipt parity for
-the new Archon lane remain gated or incomplete. The architecture keeps those concerns behind
-ports so they can be added without introducing a second coordinator or a
-second lifecycle.
+Local durable child leases/retries and the [task continuity inbox](task-continuity.md)
+now have executable checks. The source-workspace Archon bridge produces
+deterministic canonical evidence, and macOS smoke covers exact-run resume and
+cancellation. Recurring scheduling, watchers, live host capability proofs,
+Windows process-tree verification, and installed live Archon parity remain gated.
+These concerns stay behind ports with one coordinator and lifecycle.
 
 ## Continue reading
 

@@ -52,6 +52,8 @@ export interface TaskOperation {
   readonly commandId: string;
   readonly kind: 'dispatch' | 'resume' | 'cancel';
   readonly state: 'PENDING' | 'UNCERTAIN' | 'CONFIRMED';
+  /** CONFIRMED records a resolved intent; only cancelled confirms its effect. */
+  readonly outcome?: 'cancelled' | 'finished-before-cancel';
   readonly reason: string | null;
   readonly entrypoint?: string;
   readonly inputs?: Readonly<Record<string, string>>;
@@ -365,7 +367,14 @@ export function assertTaskNativeRef(
   );
 }
 function snapshot(value: HarnessRunSnapshot): void {
-  keys(value, ['status', 'observedAt', 'summary', 'rawLogPath']);
+  keys(value, [
+    'status',
+    'observedAt',
+    'summary',
+    'rawLogPath',
+    'nativeProjectId',
+  ]);
+  if (value.nativeProjectId !== undefined) assertTaskId(value.nativeProjectId);
   assert(
     [
       'QUEUED',
@@ -597,17 +606,30 @@ function apply(task: TaskRecord | undefined, event: TaskEvent): TaskRecord {
       text(change.operationId, 'operation ID');
       const op = operations.find((o) => o.commandId === change.operationId);
       assert(op, 'Control intent missing.');
+      const cancelled =
+        op.kind === 'cancel' && change.snapshot.status === 'CANCELLED';
+      const finishedBeforeCancel =
+        op.kind === 'cancel' &&
+        ['SUCCEEDED', 'FAILED'].includes(change.snapshot.status);
       const confirmed =
-        change.snapshot.status !== 'UNKNOWN' &&
-        (op.kind !== 'cancel' || change.snapshot.status === 'CANCELLED');
+        op.kind === 'cancel'
+          ? cancelled || finishedBeforeCancel
+          : change.snapshot.status !== 'UNKNOWN';
       operations = operations.map((o) =>
         o === op
           ? {
               ...o,
               state: confirmed ? 'CONFIRMED' : 'UNCERTAIN',
-              reason: confirmed
-                ? null
-                : 'Executor has not confirmed the requested action.',
+              ...(cancelled
+                ? { outcome: 'cancelled' as const }
+                : finishedBeforeCancel
+                  ? { outcome: 'finished-before-cancel' as const }
+                  : {}),
+              reason: finishedBeforeCancel
+                ? `Executor finished ${change.snapshot.status} before cancellation was confirmed.`
+                : confirmed
+                  ? null
+                  : 'Executor has not confirmed the requested action.',
             }
           : o,
       );

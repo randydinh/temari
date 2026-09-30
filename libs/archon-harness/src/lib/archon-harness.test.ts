@@ -309,3 +309,122 @@ test('cancellation does not accept a status response for a different run', async
     /returned a different native run ID/,
   );
 });
+
+test('recoverable launches retain reserved Temari identity and reject input overrides', async () => {
+  const calls: Array<{ args: readonly string[]; cwd: string }> = [];
+  const harness = new ArchonHarness({ runtime, commandRunner: commandRunner(calls) });
+  const request = {
+    runId: 'temari-recoverable',
+    revision: 'recovery-revision',
+    plan: minimalPlan('feature'),
+    workspaceRoot: '/workspace',
+    entrypoint: 'recovery-workflow',
+    inputs: { request: 'Do work' },
+  };
+  const reference = await harness.start({ ...request, recovery: 'required' });
+  const bindingArg = calls[0]?.args.find((arg) => arg.startsWith('temari_binding='));
+  assert.ok(bindingArg);
+  assert.deepEqual(JSON.parse(bindingArg.slice('temari_binding='.length)), {
+    schema: 1,
+    runId: request.runId,
+    revision: request.revision,
+    planSha256: reference.planSha256,
+    workspaceRoot: request.workspaceRoot,
+    entrypoint: request.entrypoint,
+    harnessId: 'archon',
+    harnessVersion: '0.10.1',
+  });
+  for (const recovery of [undefined, 'required'] as const) {
+    await assert.rejects(
+      harness.start({ ...request, recovery, inputs: { temari_binding: '{}' } }),
+      /temari_binding is reserved/,
+    );
+  }
+  assert.equal(calls.length, 1);
+});
+
+test('recovery verifies retained native identity rather than caller fields', async (t) => {
+  const workspaceRoot = await mkdtemp(join(tmpdir(), 'archon-native-identity-'));
+  t.after(() => rm(workspaceRoot, { recursive: true, force: true }));
+  const reference = runReference({ workspaceRoot });
+  const binding = {
+    schema: 1,
+    harnessId: 'archon',
+    harnessVersion: '0.10.1',
+    runId: reference.runId,
+    revision: reference.revision,
+    planSha256: reference.planSha256,
+    workspaceRoot,
+    entrypoint: reference.entrypoint,
+  };
+  let retained: Record<string, unknown> = {
+    id: reference.externalRunId,
+    workflow_name: reference.entrypoint,
+    working_path: workspaceRoot,
+    metadata: { inputs: { temari_binding: JSON.stringify(binding) } },
+  };
+  const original = retained;
+  const calls: Array<{ args: readonly string[]; cwd: string }> = [];
+  const harness = new ArchonHarness({
+    runtime,
+    commandRunner: {
+      async run(_executable, args, cwd) {
+        calls.push({ args, cwd });
+        return { exitCode: 0, stdout: JSON.stringify(retained), stderr: '' };
+      },
+    },
+  });
+  await harness.verifyRunIdentity(reference);
+  assert.deepEqual(calls[0], {
+    args: ['workflow', 'get', reference.externalRunId, '--json'],
+    cwd: workspaceRoot,
+  });
+
+  for (const changes of [
+    { runId: 'unrelated-temari-run' },
+    { revision: 'different-revision' },
+    { planSha256: 'e'.repeat(64) },
+    { workspaceRoot: '/another-workspace' },
+    { entrypoint: 'another-workflow' },
+    { harnessVersion: '0.11.0' },
+    { harnessId: 'another-harness' },
+  ]) {
+    retained = {
+      ...original,
+      metadata: { inputs: { temari_binding: JSON.stringify({ ...binding, ...changes }) } },
+    };
+    await assert.rejects(harness.verifyRunIdentity(reference), /native run identity does not match/);
+  }
+  for (const changes of [
+    { workflow_name: 'another-workflow' },
+    { working_path: tmpdir() },
+  ]) {
+    retained = { ...original, ...changes };
+    await assert.rejects(harness.verifyRunIdentity(reference), /native run identity does not match/);
+  }
+  retained = { ...original, id: 'another-native-id' };
+  await assert.rejects(harness.verifyRunIdentity(reference), /different native run ID/);
+  retained = { ...original, metadata: { inputs: {} } };
+  await assert.rejects(harness.verifyRunIdentity(reference), /no retained Temari identity binding/);
+  retained = { ...original, metadata: { inputs: { temari_binding: 'not json' } } };
+  await assert.rejects(harness.verifyRunIdentity(reference), /did not return valid JSON/);
+});
+
+test('native project links use only a safe observed codebase identity', async () => {
+  for (const codebaseId of ['project-123', '../other-project', 'project/child', 'project..child', 'project?tab=other', '', null]) {
+    const harness = new ArchonHarness({
+      runtime,
+      commandRunner: {
+        async run() {
+          return {
+            exitCode: 0,
+            stdout: JSON.stringify({ id: 'native-run-cancel', status: 'running', codebase_id: codebaseId }),
+            stderr: '',
+          };
+        },
+      },
+    });
+    const snapshot = await harness.status(runReference());
+    assert.equal(snapshot.nativeProjectId, codebaseId === 'project-123' ? 'project-123' : undefined);
+  }
+});

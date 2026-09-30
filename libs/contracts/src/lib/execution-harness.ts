@@ -18,6 +18,8 @@ export interface HarnessRunRequest {
   readonly workspaceRoot: string;
   readonly entrypoint: string;
   readonly inputs: Readonly<Record<string, string>>;
+  /** Require retained native identity metadata for uncertain-dispatch recovery. */
+  readonly recovery?: 'required';
 }
 
 /** Identity binding between a Temari run and a native harness run. */
@@ -39,6 +41,8 @@ export interface HarnessRunSnapshot {
   readonly observedAt: string;
   readonly summary: string;
   readonly rawLogPath: string | null;
+  /** Native project identity observed from the provider's run record. */
+  readonly nativeProjectId?: string;
 }
 
 /**
@@ -53,4 +57,6 @@ export interface ExecutionHarness {
   resume(reference: HarnessRunRef): Promise<HarnessRunSnapshot>;
   /** Request cancellation of this exact run and return its observed status. */
   cancel?(reference: HarnessRunRef): Promise<HarnessRunSnapshot>;
+  /** Match a recovered reference against independently retained native identity. */
+  verifyRunIdentity?(reference: HarnessRunRef): Promise<void>;
 }

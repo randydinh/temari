@@ -17,6 +17,7 @@ import {
   getExecutionHarnessStatus,
   resumeExecutionHarness,
   startExecutionHarness,
+  verifyExecutionHarnessRunIdentity,
 } from './harness-runtime.js';
 import {
   selectExecutionHarness,
@@ -224,6 +225,10 @@ export class TaskRuntime {
   ): Promise<TaskSnapshot> {
     const selection = this.requireSelection();
     const harness = selectExecutionHarness(selection);
+    assert(
+      harness.verifyRunIdentity,
+      'Task dispatch requires independent native identity verification support.',
+    );
     const started = await this.store.append(request, {
       type: 'dispatch-requested',
       runId: request.runId,
@@ -245,6 +250,7 @@ export class TaskRuntime {
         workspaceRoot: started.task.workspaceRoot,
         entrypoint: intent.entrypoint!,
         inputs: intent.inputs!,
+        recovery: 'required',
       });
       await this.finish(request, 'bound', {
         type: 'native-bound',
@@ -296,6 +302,10 @@ export class TaskRuntime {
       );
       return this.snapshot(request.taskId);
     }
+    await verifyExecutionHarnessRunIdentity(
+      this.requireSelection(),
+      request.reference,
+    );
     const observation = await getExecutionHarnessStatus(
       this.requireSelection(),
       request.reference,
@@ -321,7 +331,8 @@ export class TaskRuntime {
   }
 
   /** Status observation also resolves a pending resume/cancel, but only when
-   * the returned state actually confirms that operation (cancel => CANCELLED).
+   * the returned state resolves that operation. A naturally terminal run
+   * resolves cancel intent without claiming that cancellation took effect.
    */
   async observeNative(request: TaskRunCommand): Promise<TaskSnapshot> {
     const task = await this.requireTask(request.taskId);

@@ -46,7 +46,7 @@ immutable once attached. Native output locations can be discovered after start.
 start additionally carries entrypoint and inputs. reconcile carries reference.
 accept carries reason; independent-review/forge routes need their own verifier.
 
-Native controls require --archon-home ABSOLUTE_DIRECTORY. This must name the
+Native controls and native-backed accept require --archon-home ABSOLUTE_DIRECTORY. This must name the
 same Archon installation that owns the run. --workflow-source selects workflow
 definitions for start; --archon-cache optionally selects the pinned binary cache.
 serve accepts --port 3092 and --archon-url http://127.0.0.1:3091; configure the
@@ -125,7 +125,8 @@ export async function runTaskCommand(
       : await FileTaskStore.openExisting(root);
   let selection: HarnessSelection | undefined;
   if (
-    ['start', 'observe', 'reconcile', 'resume', 'cancel'].includes(command!)
+    ['start', 'observe', 'reconcile', 'resume', 'cancel'].includes(command!) ||
+    (command === 'accept' && values['archon-home'] !== undefined)
   ) {
     const archonHome = absolute(values['archon-home'], '--archon-home');
     const cacheDirectory = values['archon-cache']

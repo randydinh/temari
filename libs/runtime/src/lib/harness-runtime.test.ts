@@ -14,6 +14,7 @@ import {
   getExecutionHarnessStatus,
   resumeExecutionHarness,
   startExecutionHarness,
+  verifyExecutionHarnessRunIdentity,
 } from './harness-runtime.js';
 import type { HarnessSelection } from './harness-selector.js';
 
@@ -212,4 +213,54 @@ test('runtime reports unsupported cancellation without using resume or status', 
     /Execution harness host@1\.2\.3 does not support cancellation/,
   );
   assert.deepEqual(seen, ['host:start']);
+});
+
+test('runtime refuses a recoverable launch before side effects when native identity cannot be verified', async () => {
+  const seen: string[] = [];
+  const selection: HarnessSelection = {
+    hostHarness: mockHarness('host', seen),
+    configuredHarness: null,
+    managedDefault: null,
+  };
+  await assert.rejects(
+    startExecutionHarness(selection, { ...request(), recovery: 'required' }),
+    /does not support native run identity verification required for recovery/,
+  );
+  assert.deepEqual(seen, []);
+  const reference = await startExecutionHarness(selection, request());
+  await assert.rejects(
+    verifyExecutionHarnessRunIdentity(selection, reference),
+    /does not support native run identity verification required for recovery/,
+  );
+  assert.deepEqual(seen, ['host:start']);
+});
+
+test('runtime verifies recovered native identity through the matching implementation', async () => {
+  const seen: string[] = [];
+  const harness = mockHarness('host', seen);
+  const selection: HarnessSelection = {
+    hostHarness: harness,
+    configuredHarness: null,
+    managedDefault: null,
+  };
+  const reference = await startExecutionHarness(selection, request());
+  harness.verifyRunIdentity = async (received) => {
+    assert.equal(received, reference);
+    seen.push('host:verifyRunIdentity');
+  };
+  await verifyExecutionHarnessRunIdentity(selection, reference);
+  for (const changes of [{ harnessId: 'other' }, { harnessVersion: '9.9.9' }]) {
+    await assert.rejects(
+      verifyExecutionHarnessRunIdentity(selection, { ...reference, ...changes }),
+      /does not match the selected implementation/,
+    );
+  }
+  harness.verifyRunIdentity = async () => {
+    throw new Error('Retained native identity differs');
+  };
+  await assert.rejects(
+    verifyExecutionHarnessRunIdentity(selection, reference),
+    /Retained native identity differs/,
+  );
+  assert.deepEqual(seen, ['host:start', 'host:verifyRunIdentity']);
 });

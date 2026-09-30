@@ -53,6 +53,11 @@ export async function startExecutionHarness(
   request: HarnessRunRequest,
 ): Promise<HarnessRunRef> {
   const harness = selectExecutionHarness(selection);
+  if (request.recovery === 'required' && !harness.verifyRunIdentity) {
+    throw new Error(
+      `Execution harness ${harness.id}@${harness.version} does not support native run identity verification required for recovery.`,
+    );
+  }
   const reference = await harness.start(request);
   if (
     reference.runId !== request.runId ||
@@ -102,4 +107,19 @@ export async function cancelExecutionHarness(
     );
   }
   return harness.cancel(reference);
+}
+
+/** Verify a recovered reference against identity retained by the native executor. */
+export async function verifyExecutionHarnessRunIdentity(
+  selection: HarnessSelection,
+  reference: HarnessRunRef,
+): Promise<void> {
+  const harness = selectExecutionHarness(selection);
+  requireMatchingHarness(harness, reference);
+  if (!harness.verifyRunIdentity) {
+    throw new Error(
+      `Execution harness ${harness.id}@${harness.version} does not support native run identity verification required for recovery.`,
+    );
+  }
+  await harness.verifyRunIdentity(reference);
 }

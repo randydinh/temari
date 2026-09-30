@@ -93,6 +93,13 @@ async function fixture(t: TestContext, plan: ExecutionPlan = minimalPlan()) {
       );
       return observation();
     },
+    async verifyRunIdentity(ref) {
+      assert.deepEqual(
+        ref,
+        nativeRef,
+        'Executor rejects different native identity',
+      );
+    },
     async resume(ref) {
       assert.deepEqual(ref, nativeRef);
       resumes++;
@@ -403,6 +410,29 @@ test('crash window before native binding never auto-dispatches a replacement', a
   assert.equal((await fresh.snapshot('goal')).status, 'RUNNING');
 });
 
+test('reconciliation fails closed without independent harness identity verification', async (t) => {
+  const f = await fixture(t);
+  f.loseStart();
+  await assert.rejects(
+    f.runtime.dispatch({
+      ...(await f.command('dispatch')),
+      entrypoint: 'workflow.yml',
+      inputs: {},
+    }),
+    /Connection lost/,
+  );
+  delete f.harness.verifyRunIdentity;
+  await assert.rejects(
+    f.runtime.reconcileNative({
+      ...(await f.command('recover')),
+      reference: f.nativeRef,
+    }),
+    /identity|verif/i,
+  );
+  assert.equal((await f.runtime.snapshot('goal')).runs[0]!.nativeRef, null);
+  assert.equal(f.starts, 1);
+});
+
 test('retry/replan keeps one goal, distinct runs and prior native identities', async (t) => {
   const f = await fixture(t);
   await f.runtime.dispatch({
@@ -471,6 +501,17 @@ test('cancellation awaits actual executor confirmation and does not repeat reque
   assert.equal(f.cancels, 1);
   await f.runtime.cancel(cancel);
   assert.equal(f.cancels, 1);
+  for (const status of ['QUEUED', 'BLOCKED', 'UNKNOWN', 'RUNNING'] as const) {
+    f.setStatus(status);
+    const unresolved = await f.runtime.observeNative(
+      await f.command(`observe-${status}`),
+    );
+    assert.equal(unresolved.status, 'BLOCKED');
+    assert.equal(unresolved.runs[0]?.operations.at(-1)?.state, 'UNCERTAIN');
+    assert.equal(unresolved.runs[0]?.operations.at(-1)?.outcome, undefined);
+    await f.runtime.cancel(cancel);
+    assert.equal(f.cancels, 1);
+  }
   await assert.rejects(
     f.runtime.resume(await f.command('resume-while-cancelling')),
     /Reconcile pending/,
@@ -481,6 +522,67 @@ test('cancellation awaits actual executor confirmation and does not repeat reque
   );
   assert.equal(observed.status, 'CANCELLED');
   assert.equal(observed.runs[0]?.operations.at(-1)?.state, 'CONFIRMED');
+  assert.equal(observed.runs[0]?.operations.at(-1)?.outcome, 'cancelled');
+});
+
+test('native success racing cancellation resolves intent without claiming cancellation', async (t) => {
+  const f = await fixture(t);
+  await f.runtime.dispatch({
+    ...(await f.command('dispatch')),
+    entrypoint: 'workflow.yml',
+    inputs: {},
+  });
+  f.setCancelStatus('SUCCEEDED');
+  const cancel = await f.command('cancel');
+  const completed = await f.runtime.cancel(cancel);
+  assert.equal(completed.status, 'OPEN');
+  assert.equal(completed.runs[0]?.nativeSnapshot?.status, 'SUCCEEDED');
+  assert.equal(completed.runs[0]?.operations.at(-1)?.state, 'CONFIRMED');
+  assert.equal(
+    completed.runs[0]?.operations.at(-1)?.outcome,
+    'finished-before-cancel',
+  );
+  await f.runtime.cancel(cancel);
+  assert.equal(f.cancels, 1);
+  const replanned = await f.store.bindRun({
+    ...(await f.command('replan-after-finish')),
+    run: { runId: 'run-2', revision: 'rev-2', plan: minimalPlan() },
+  });
+  assert.equal(replanned.currentRunId, 'run-2');
+  assert.equal(replanned.runs[0]?.nativeSnapshot?.status, 'SUCCEEDED');
+  await f.runtime.cancel(cancel);
+  assert.equal(f.cancels, 1);
+});
+
+test('failed native run resolves a lost cancellation response and permits replan', async (t) => {
+  const f = await fixture(t);
+  await f.runtime.dispatch({
+    ...(await f.command('dispatch')),
+    entrypoint: 'workflow.yml',
+    inputs: {},
+  });
+  f.loseControl();
+  const cancel = await f.command('cancel');
+  await assert.rejects(f.runtime.cancel(cancel), /Cancel response lost/);
+  f.setStatus('FAILED');
+  const completed = await f.runtime.observeNative(
+    await f.command('observe-failure-after-cancel'),
+  );
+  assert.equal(completed.status, 'BLOCKED');
+  assert.equal(completed.runs[0]?.nativeSnapshot?.status, 'FAILED');
+  assert.equal(completed.runs[0]?.operations.at(-1)?.state, 'CONFIRMED');
+  assert.equal(
+    completed.runs[0]?.operations.at(-1)?.outcome,
+    'finished-before-cancel',
+  );
+  await f.runtime.cancel(cancel);
+  assert.equal(f.cancels, 1);
+  const replanned = await f.store.bindRun({
+    ...(await f.command('replan-after-failure')),
+    run: { runId: 'run-2', revision: 'rev-2', plan: minimalPlan() },
+  });
+  assert.equal(replanned.currentRunId, 'run-2');
+  assert.equal(replanned.runs[0]?.nativeSnapshot?.status, 'FAILED');
 });
 
 test('resume error retains uncertainty and duplicate control does not repeat side effect', async (t) => {

@@ -15,6 +15,7 @@ import type { ManagedArchonRuntime } from './managed-runtime.js';
 
 const EXPECTED_VERSION = '0.10.1';
 const EXPECTED_COMMIT = '9820785c';
+const TEMARI_BINDING_INPUT = 'temari_binding';
 
 export interface ArchonCommandResult {
   readonly exitCode: number;
@@ -94,6 +95,23 @@ function canonical(value: unknown): string {
 
 function sha256(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+function nativeBinding(reference: Omit<HarnessRunRef, 'externalRunId' | 'startedAt'>): Record<string, unknown> {
+  return {
+    schema: reference.schema,
+    harnessId: reference.harnessId,
+    harnessVersion: reference.harnessVersion,
+    runId: reference.runId,
+    revision: reference.revision,
+    planSha256: reference.planSha256,
+    workspaceRoot: reference.workspaceRoot,
+    entrypoint: reference.entrypoint,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function isSafeToken(value: unknown): value is string {
@@ -283,6 +301,19 @@ export class ArchonHarness implements ExecutionHarness {
         'Harness request requires a revision and absolute workspace path.',
       );
     }
+    if (Object.hasOwn(request.inputs, TEMARI_BINDING_INPUT)) {
+      throw new Error(`Workflow input ${TEMARI_BINDING_INPUT} is reserved for Temari run identity.`);
+    }
+    const identity = {
+      schema: 1 as const,
+      harnessId: this.id,
+      harnessVersion: this.version,
+      runId: request.runId,
+      revision: request.revision,
+      planSha256: sha256(canonical(request.plan)),
+      workspaceRoot: request.workspaceRoot,
+      entrypoint: request.entrypoint,
+    };
 
     const args = [
       'workflow',
@@ -302,6 +333,9 @@ export class ArchonHarness implements ExecutionHarness {
       }
       args.push('--input', `${key}=${value}`);
     }
+    if (request.recovery === 'required') {
+      args.push('--input', `${TEMARI_BINDING_INPUT}=${JSON.stringify(nativeBinding(identity))}`);
+    }
     args.push('--detach', '--json');
 
     const result = await this.execute(args, request.workspaceRoot, 60_000);
@@ -312,15 +346,8 @@ export class ArchonHarness implements ExecutionHarness {
       );
     }
     return {
-      schema: 1,
-      harnessId: this.id,
-      harnessVersion: this.version,
-      runId: request.runId,
-      revision: request.revision,
-      planSha256: sha256(canonical(request.plan)),
+      ...identity,
       externalRunId: output.runId,
-      workspaceRoot: request.workspaceRoot,
-      entrypoint: request.entrypoint,
       startedAt: new Date().toISOString(),
     };
   }
@@ -389,7 +416,38 @@ export class ArchonHarness implements ExecutionHarness {
       observedAt: new Date().toISOString(),
       summary,
       rawLogPath,
+      ...(isSafeToken(output.codebase_id) && !output.codebase_id.includes('/')
+        ? { nativeProjectId: output.codebase_id }
+        : {}),
     };
+  }
+
+  async verifyRunIdentity(reference: HarnessRunRef): Promise<void> {
+    assertReference(reference, this.options.runtime);
+    const result = await this.execute(
+      ['workflow', 'get', reference.externalRunId, '--json'],
+      reference.workspaceRoot,
+    );
+    const output = parseJson(result.stdout, 'Archon workflow identity');
+    if (output.id !== reference.externalRunId) {
+      throw new Error('Archon returned a different native run ID.');
+    }
+    const metadata = output.metadata;
+    const inputs = isRecord(metadata) ? metadata.inputs : undefined;
+    const rawBinding = isRecord(inputs) ? inputs[TEMARI_BINDING_INPUT] : undefined;
+    if (typeof rawBinding !== 'string') {
+      throw new Error('Archon native run has no retained Temari identity binding; recovery is unavailable.');
+    }
+    const binding = parseJson(rawBinding, 'Archon retained Temari identity');
+    if (
+      canonical(binding) !== canonical(nativeBinding(reference)) ||
+      output.workflow_name !== reference.entrypoint ||
+      typeof output.working_path !== 'string' ||
+      !isAbsolute(output.working_path) ||
+      (await realpath(output.working_path)) !== (await realpath(reference.workspaceRoot))
+    ) {
+      throw new Error('Archon native run identity does not match the Temari run, plan, workflow, or workspace.');
+    }
   }
 
   async resume(reference: HarnessRunRef): Promise<HarnessRunSnapshot> {
