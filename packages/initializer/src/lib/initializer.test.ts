@@ -14,6 +14,7 @@ import test from 'node:test';
 import {
   doctor,
   findExecutable,
+  formatInitialization,
   initialize,
   parseVersion,
   type CommandResult,
@@ -299,6 +300,10 @@ test('init runs locked installs and writes a receipt without shell-specific comm
     };
     assert.equal(stored.status, 'SUCCEEDED');
     assert.equal(result.receipt.status, 'SUCCEEDED');
+    assert.match(
+      formatInitialization(result),
+      /next=temari doctor --live --host <codex\|claude-code\|cursor>/,
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }

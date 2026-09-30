@@ -1074,5 +1074,8 @@ export function formatInitialization(result: InitializationResult): string {
   lines.push(
     `archon=${result.receipt.archon.status.toLowerCase()}${result.receipt.archon.version ? ` version=${result.receipt.archon.version}` : ''}`,
   );
+  if (result.receipt.status === 'SUCCEEDED') {
+    lines.push('next=temari doctor --live --host <codex|claude-code|cursor>');
+  }
   return `${lines.join('\n')}\n`;
 }
