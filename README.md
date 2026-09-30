@@ -12,7 +12,7 @@ and [component guide](docs/platform-components.md) for the full design. Use the
 [verification matrix](docs/verification-matrix.md) to trace claims to
 implementation and retained evidence.
 
-The [recommended next increment](docs/system-roles-and-responsibilities.md#final-recommendation-and-first-proof)
+The [approved next increment](docs/system-roles-and-responsibilities.md#final-recommendation-and-first-proof)
 uses Archon for execution and console integration, with Temari owning task
 continuity and closeout. The [boundary assessment](docs/system-roles-and-responsibilities.md#how-granular-are-the-boundaries-today)
 distinguishes documented roles from implemented enforcement.

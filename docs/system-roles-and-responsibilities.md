@@ -6,6 +6,12 @@ capabilities are still local proofs or proposals. It reflects the repository at
 `5af7b97` on 2026-09-30. **Implemented** means a code path exists; it does not
 mean unattended operation or production readiness.
 
+**Direction approved by the task owner on 2026-09-30:** Temari owns task
+continuity and acceptance, Archon is the preferred execution and console
+integration, Registrar owns source evidence, and Paperclip supplies selected UX
+patterns. The implementation sequence and acceptance cases below are approved
+design intent; their execution and verification remain pending.
+
 Read the [platform overview](platform-overview.md) for the intended architecture,
 the [component guide](platform-components.md) for detailed boundaries, and the
 [verification matrix](verification-matrix.md) before promoting a capability.
@@ -102,10 +108,10 @@ integration evidence.
 
 ## Useful improvements, in dependency order
 
-This review favors the existing Temari–Archon integration. The earlier list put
-the dashboard ahead of its evidence contract and treated run correlation as new
-work. The order below corrects both points. These are recommendations, not
-capabilities enabled by this documentation change.
+The approved sequence extends the existing Temari–Archon integration. Complete
+the evidence and control handoff before adding dashboard actions; reuse the
+existing run correlation. The table records implementation priorities and the
+evidence required to promote each capability.
 
 | Order | Final recommendation | Reuse, owner and observable result |
 | --- | --- | --- |
