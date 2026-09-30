@@ -5,15 +5,41 @@ Portable, host- and model-agnostic conversational engineering partner.
 This is the canonical Nx workspace (`randydinh/temari`). Legacy products
 are `temari-v1` … `temari-v4.1`. See [docs/lineage.md](docs/lineage.md)
 and [docs/architecture.md](docs/architecture.md).
-Start with the [Temari platform overview](docs/platform-overview.md), then
-read the [component guide](docs/platform-components.md) for responsibilities,
-decision paths, verification, and provenance. Use the [verification matrix](docs/verification-matrix.md)
-to trace design claims to implementation and retained evidence.
+Start with the [system roles and responsibilities matrix](docs/system-roles-and-responsibilities.md)
+to see decision owners, worker roles, knowledge boundaries, current status, and
+prioritized improvements. Then read the [platform overview](docs/platform-overview.md)
+and [component guide](docs/platform-components.md) for the full design. Use the
+[verification matrix](docs/verification-matrix.md) to trace claims to
+implementation and retained evidence.
+
+The [approved next increment](docs/system-roles-and-responsibilities.md#final-recommendation-and-first-proof)
+uses Archon for execution and console integration, with Temari owning task
+continuity and closeout. The [boundary assessment](docs/system-roles-and-responsibilities.md#how-granular-are-the-boundaries-today)
+distinguishes documented roles from implemented enforcement.
 
 Temari owns routing, plans, evidence, and closeout. The host (Cursor,
 Codex, Claude, Hermes, or serial fallback) owns tools, models, and
 credentials. Personal and OpConnect material is an overlay, not this
 tree — [docs/overlays.md](docs/overlays.md).
+
+## Agent starting points
+
+- **Route a request:** [Temari coordinator and worker contracts](docs/system-roles-and-responsibilities.md#decision-and-control-owners),
+  [one workflow](docs/workflow.md), and the packaged
+  [Temari](packages/workflow-runtime/assets/v4.1/skills/temari/SKILL.md) and
+  [Poteto](packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md)
+  entries.
+- **Use knowledge:** [archive admission and handoff](libs/knowledge/ARCHIVE.md),
+  [intake-to-search journey](libs/knowledge/JOURNEY.md), and the
+  [knowledge system design](docs/knowledge-system-design.md). Registrar owns
+  source versions; Temari owns the task and its assessment.
+- **Run or resume work:** [runtime ownership](docs/system-roles-and-responsibilities.md#decision-and-control-owners),
+  [shared-control proof status](libs/shared-control/README.md), and the
+  [Archon harness boundary](docs/platform-components.md#5-execution-harnesses-and-archon).
+- **Review evidence:** [provenance and logs](docs/platform-components.md#7-provenance-logs-and-security)
+  and the [verification matrix](docs/verification-matrix.md). Treat a
+  procedural receipt, a source citation, and a product-behavior verdict as
+  different claims.
 
 ## Layout
 
