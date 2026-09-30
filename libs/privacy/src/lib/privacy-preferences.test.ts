@@ -15,6 +15,8 @@ import { disposePrivacySession, mask } from './privacy.js';
 import {
   loadPrivacyPreferences,
   planPrivacySubmission,
+  recordPrivacyOverride,
+  resolvePrivacyOverride,
   savePrivacyPreferences,
   validatePrivacyPreferences,
   type PrivacyPreferences,
@@ -40,6 +42,15 @@ const addressZone: PrivacyRule = {
   value: '123 Synthetic Lane',
   action: 'substitute',
   substitute: 'service zone 7',
+};
+const oneTimeContact: PrivacyRule = {
+  id: 'remember-contact',
+  scope,
+  persistence: 'submission',
+  category: 'EMAIL',
+  value: 'contact@example.org',
+  action: 'allow',
+  basis: 'user-authorized',
 };
 const settings = (
   level: PrivacyPreferences['level'],
@@ -291,6 +302,90 @@ test('invalid public claims, conflicting rules, and unsafe substitutes refuse lo
   );
 });
 
+test('repeated one-time approval offers a saved rule and honors the answer', () => {
+  const first = recordPrivacyOverride(settings('balanced'), oneTimeContact);
+  assert.equal(first.offer, null);
+  assert(!JSON.stringify(first.preferences).includes('contact@example.org'));
+  assert.equal(
+    resolvePrivacyOverride(first.preferences, oneTimeContact, 'save').rules[0]
+      .persistence,
+    'saved',
+  );
+  const second = recordPrivacyOverride(first.preferences, oneTimeContact);
+  assert.deepEqual(second.offer, {
+    ruleId: oneTimeContact.id,
+    approvalCount: 2,
+  });
+  const later = resolvePrivacyOverride(
+    second.preferences,
+    oneTimeContact,
+    'not-now',
+  );
+  let state = later;
+  for (let approval = 3; approval < 5; approval++) {
+    const result = recordPrivacyOverride(state, oneTimeContact);
+    assert.equal(result.offer, null);
+    state = result.preferences;
+  }
+  const fifth = recordPrivacyOverride(state, oneTimeContact);
+  assert.equal(fifth.offer?.approvalCount, 5);
+  const saved = resolvePrivacyOverride(
+    fifth.preferences,
+    oneTimeContact,
+    'save',
+  );
+  assert.equal(saved.rules.length, 1);
+  assert.equal(saved.rules[0].persistence, 'saved');
+  const planned = planPrivacySubmission(
+    { email: 'contact@example.org' },
+    saved,
+    scope,
+  );
+  try {
+    assert(JSON.stringify(planned.payload).includes('contact@example.org'));
+  } finally {
+    disposePrivacySession(planned.session);
+  }
+  const strict = planPrivacySubmission(
+    { email: 'contact@example.org' },
+    { ...saved, level: 'strict' },
+    scope,
+  );
+  try {
+    assert(JSON.stringify(strict.payload).includes('contact@example.org'));
+  } finally {
+    disposePrivacySession(strict.session);
+  }
+  assert.equal(recordPrivacyOverride(saved, oneTimeContact).offer, null);
+});
+
+test('never-suggest suppresses future save offers for one exact scoped value', () => {
+  const first = recordPrivacyOverride(settings('balanced'), oneTimeContact);
+  const second = recordPrivacyOverride(first.preferences, oneTimeContact);
+  const declined = resolvePrivacyOverride(
+    second.preferences,
+    oneTimeContact,
+    'never-suggest',
+  );
+  let state = declined;
+  for (let count = 0; count < 8; count++) {
+    const result = recordPrivacyOverride(state, oneTimeContact);
+    assert.equal(result.offer, null);
+    state = result.preferences;
+  }
+  assert.equal(state.rules.length, 0);
+  const anotherScope = recordPrivacyOverride(state, {
+    ...oneTimeContact,
+    scope: { workspaceId: 'another-workspace' },
+  });
+  assert.equal(anotherScope.offer, null);
+  const repeatedElsewhere = recordPrivacyOverride(anotherScope.preferences, {
+    ...oneTimeContact,
+    scope: { workspaceId: 'another-workspace' },
+  });
+  assert.equal(repeatedElsewhere.offer?.approvalCount, 2);
+});
+
 test(
   'saved rules reload locally, submission-only decisions cannot persist, and symlinks refuse',
   {
@@ -306,6 +401,50 @@ test(
     await savePrivacyPreferences(path, saved);
     assert.deepEqual(await loadPrivacyPreferences(path), saved);
     assert.equal((await stat(path)).mode & 0o077, 0);
+    const oneTime = {
+      ...oneTimeContact,
+      value: 'one-time@example.org',
+    };
+    const firstApproval = recordPrivacyOverride(saved, oneTime);
+    await savePrivacyPreferences(path, firstApproval.preferences);
+    assert.deepEqual(
+      await loadPrivacyPreferences(path),
+      firstApproval.preferences,
+    );
+    assert(!(await readFile(path, 'utf8')).includes('one-time@example.org'));
+    const secondApproval = recordPrivacyOverride(
+      await loadPrivacyPreferences(path),
+      oneTime,
+    );
+    assert.equal(secondApproval.offer?.approvalCount, 2);
+    const promoted = resolvePrivacyOverride(
+      secondApproval.preferences,
+      oneTime,
+      'save',
+    );
+    await savePrivacyPreferences(path, promoted);
+    const reloaded = await loadPrivacyPreferences(path);
+    assert(
+      reloaded.rules.some((rule) => rule.value === 'one-time@example.org'),
+    );
+    const declinedRule = { ...oneTime, value: 'declined@example.org' };
+    const declinedFirst = recordPrivacyOverride(reloaded, declinedRule);
+    const declinedSecond = recordPrivacyOverride(
+      declinedFirst.preferences,
+      declinedRule,
+    );
+    const neverSuggest = resolvePrivacyOverride(
+      declinedSecond.preferences,
+      declinedRule,
+      'never-suggest',
+    );
+    await savePrivacyPreferences(path, neverSuggest);
+    const afterRestart = recordPrivacyOverride(
+      await loadPrivacyPreferences(path),
+      declinedRule,
+    );
+    assert.equal(afterRestart.offer, null);
+    await savePrivacyPreferences(path, saved);
     const bytes = await readFile(path, 'utf8');
     assert(!bytes.includes('synthetic-secret'));
     await assert.rejects(
