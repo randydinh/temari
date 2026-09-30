@@ -11,6 +11,16 @@ Temari has two Codex paths with different privacy coverage. The existing Archon 
 
 The protected transport is the intended host path for private application data, but live private use remains blocked until the selected driver and model egress are independently verified. The native pilot reports `explicit-request-only` because it masks only content that the host supplies at dispatch. It does not isolate the actor's filesystem, environment, network, or native tools. Use the pilot only with inputs already approved for model disclosure.
 
+## Disclosure settings and standing rules
+
+The Nx privacy library now exposes a local `planPrivacySubmission` API with three levels. **Strict** applies automatic identity and field-name detection. **Balanced** applies the same detection while honoring scoped, exact-value allow rules that cite a verified public source or record explicit user authorization. **Permissive** requires an explicit standing acknowledgement and skips ordinary automatic identity detection; credential patterns and credential fields still mask. None of these settings changes the Codex runtime-isolation gate, provider egress review, or operator approval for live private use.
+
+A rule applies to one workspace and optionally one source. It either allows an exact value or replaces it with a deterministic local substitute, such as a service zone calculated from an address. Rules can last for one submission or be saved for later submissions in the same scope. An uncertain claim of public status does not create an allow rule: a verified-public rule needs a local evidence reference that the host has verified, while a user-authorized rule records the user's explicit disclosure choice. Application-declared privacy literals and field rules take precedence over either rule type, and a saved allow cannot restore a credential already removed in an earlier batch.
+
+The plan returns the model-bound payload and a local preview with masked category counts, applied rule IDs and counts, likely losses such as location reasoning, and a flag when Permissive may disclose unclassified values. The preview contains no source values and can be shown without pausing every request. The opt-in Unix file store writes saved rules with owner-only permissions in a private directory; exact values are stored locally in plaintext. Submission-only rules cannot be persisted, and Windows hosts need their own approved store.
+
+This is a privacy-library increment. The current host adapters do not yet expose a settings UI, load saved rules, or apply this planner across prompts, files, screenshot text, and later tool results. A host integration must do that before treating a setting as active. The generated standalone Archon copy also needs synchronization after the authoritative source change. Until the selected driver passes its independent live-use gates, these settings are for synthetic and local planning only.
+
 ## Host integration
 
 `@temari/host-adapters` exposes the provider-neutral `ModelTransport` contract and `createProtectedModelTransport`. The host passes a trusted model driver and a fixed privacy policy. Each completion gets a separate local restoration scope.
