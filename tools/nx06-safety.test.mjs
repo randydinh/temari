@@ -22,6 +22,9 @@ const rehearsal = fileURLToPath(
 const drift = fileURLToPath(
   new URL('./nx06-matrix-drift.mjs', import.meta.url),
 );
+const evidenceIndex = fileURLToPath(
+  new URL('./nx06-evidence-index.mjs', import.meta.url),
+);
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
 async function fixture(t) {
@@ -172,4 +175,71 @@ test('release remains blocked when writable report JSON claims every proof passe
   assert.equal(verdict.release, 'BLOCKED');
   assert.equal(verdict.reason, 'external-proof-not-verified');
   assert.deepEqual(verdict.missingProof, ids);
+});
+
+test('evidence index binds the chosen candidate and keeps forged release claims pending', async (t) => {
+  const root = await fixture(t);
+  const reportPath = join(root, 'result.json');
+  const candidateSha = 'a'.repeat(40);
+  const reportBytes = Buffer.from(
+    JSON.stringify({
+      schemaVersion: 1,
+      candidateSha,
+      input: {
+        publicManifestSha256: '1'.repeat(64),
+        previousManifestSha256: '2'.repeat(64),
+        publicTreeSha256: '3'.repeat(64),
+        previousTreeSha256: '4'.repeat(64),
+      },
+      gates: {
+        localPreparatoryRehearsal: 'PASS',
+        qa: 'PASS',
+        cutover: 'PASS',
+      },
+      rowProofs: { 'V41-01': { status: 'PASS' } },
+      liveLanes: [{ number: 1, status: 'PASS' }],
+    }),
+  );
+  await writeFile(reportPath, reportBytes);
+  const args = [
+    evidenceIndex,
+    '--rehearsal',
+    reportPath,
+    '--expected-rehearsal-sha256',
+    sha(reportBytes),
+    '--expected-candidate-sha',
+    candidateSha,
+  ];
+  const result = spawnSync(process.execPath, args, { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  const index = JSON.parse(result.stdout);
+  assert.equal(index.candidateSha, candidateSha);
+  assert.equal(index.sourceRehearsal.sha256, sha(reportBytes));
+  assert.equal(index.sourceRehearsal.reportedLocalPreparatoryRehearsal, 'PASS');
+  assert.equal(index.release.status, 'BLOCKED');
+  assert.equal(Object.keys(index.compatibilityRows).length, 13);
+  assert.equal(index.liveLanes.length, 10);
+  assert(
+    Object.values(index.compatibilityRows).every(
+      (row) => row.status === 'PENDING' && row.evidence.length === 0,
+    ),
+  );
+  assert(
+    index.liveLanes.every(
+      (lane) => lane.status === 'PENDING' && lane.evidence.length === 0,
+    ),
+  );
+  assert.equal(index.externalGates.operatorCutoverApproval.status, 'PENDING');
+  assert.equal(index.externalGates.archonIfUsed.status, 'PENDING');
+
+  for (const [flag, replacement] of [
+    ['--expected-rehearsal-sha256', '0'.repeat(64)],
+    ['--expected-candidate-sha', 'b'.repeat(40)],
+  ]) {
+    const changed = [...args];
+    changed[changed.indexOf(flag) + 1] = replacement;
+    const refusal = spawnSync(process.execPath, changed, { encoding: 'utf8' });
+    assert.notEqual(refusal.status, 0);
+    assert.equal(refusal.stdout, '');
+  }
 });
