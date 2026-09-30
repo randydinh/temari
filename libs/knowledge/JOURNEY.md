@@ -64,6 +64,14 @@ pnpm nx run knowledge:demo -- journey-intake --input /absolute/intake-plan.json
 
 Keep the returned `handoffPath`. A blocked capture produces no handoff. Intake
 persists its attempts, publications and capability gaps in the task directory.
+For local PNG text extraction on macOS, install Registrar's optional
+`ocr-macos` extra and add `"ocrMode": "macos-vision"` to the selected intake.
+The mode is bound to that immutable capture request; ordinary intakes leave
+OCR off. The original image is retained, and OCR text keeps explicit
+unreviewed-transcription and unavailable-visual-meaning gaps. A bounded local
+pilot retrieved an image by OCR text and obtained a Jev shadow judgment, but
+this does not validate the diagram's meaning. PDF text remains unavailable on
+this host when the archive worker cannot establish its hard memory boundary.
 `structures` is optional. `nx` accepts the JSON from `pnpm nx graph --print`;
 `graft` accepts a Graft `.graph/wiring.json` generated from the selected
 non-Nx checkout. Provide only paths admitted in the source root. Temari checks

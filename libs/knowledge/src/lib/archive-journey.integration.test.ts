@@ -10,6 +10,37 @@ import { evaluateArchiveSearch, runArchiveIntake } from './archive-journey.js';
 import { loadArchivePublication } from './archive-intake.js';
 import { hash } from './codec.js';
 
+test('ACTUAL CLI: explicit OCR mode is retained in the archive publication', async () => {
+  const f = await actualFixture();
+  const task = {
+    id: 'ocr-intake-fixture',
+    directory: join(f.base, 'task'),
+    authorityRef: 'synthetic-local-admission',
+  };
+  const intake = await runArchiveIntake({
+    task,
+    intakes: [
+      {
+        task,
+        source: f.source,
+        readScope: 'source-root',
+        requestKey: 'ocr-v1',
+        ocrMode: 'macos-vision',
+        transport: {
+          python: f.config.python,
+          registrarSource: f.config.registrarSource,
+          workspace: join(f.base, 'state'),
+        },
+      },
+    ],
+  });
+  assert.equal(intake.status, 'published', JSON.stringify(intake.outcomes));
+  const publication = await loadArchivePublication(
+    intake.outcomes[0].publicationPath!,
+  );
+  assert.equal(publication.capabilities['ocr'], 'macos-vision-optional');
+});
+
 test('ACTUAL CLI: intake handoff through exact/BM25 search, pinned reads and Jev shadow gaps', async () => {
   const f = await actualFixture();
   const task = {
