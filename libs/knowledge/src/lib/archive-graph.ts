@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { join } from 'node:path';
 import type {
   KnowledgeGap,
   KnowledgeResult,
@@ -19,6 +20,7 @@ import {
   type ArchivePublication,
 } from './archive-intake.js';
 import { ArchiveFailure, archiveTransport } from './archive-transport.js';
+import { publishJson } from './durable.js';
 
 export interface ArchiveGraphOptions {
   readonly publications: readonly string[];
@@ -382,4 +384,80 @@ export async function createArchiveGraphReader(options: ArchiveGraphOptions) {
       }
     },
   });
+}
+
+export interface ArchiveGraphReview {
+  readonly publications: readonly string[];
+  readonly graphId: string;
+  readonly assertionIds: readonly string[];
+  /** Human/operator review identity, never inferred from a model judgment. */
+  readonly reviewerRef: string;
+  readonly reason: string;
+}
+
+/** Persist an explicit review receipt for a Registrar-backed graph retraction. */
+export async function retractArchiveGraph(review: ArchiveGraphReview) {
+  digest(review.graphId);
+  assert(review.publications.length >= 1 && review.publications.length <= 8);
+  assert(review.assertionIds.length >= 1 && review.assertionIds.length <= 100);
+  const ids = review.assertionIds.map(recordId).sort();
+  assert.equal(new Set(ids).size, ids.length);
+  assert(review.reviewerRef.trim() && review.reviewerRef.length <= 256);
+  assert(review.reason.trim() && review.reason.length <= 1024);
+  const publications = await Promise.all(
+    review.publications.map(loadArchivePublication),
+  );
+  assert.equal(new Set(publications.map((p) => p.source.id)).size, publications.length);
+  assert(publications.every((p) => canonical(p.transport) === canonical(publications[0].transport)));
+  assert(publications.every((p) => canonical(p.task) === canonical(publications[0].task)));
+  const scope = publications.map((p) => p.source);
+  const reader = await createArchiveGraphReader({
+    publications: review.publications,
+    readScope: 'source-root',
+  });
+  const parent = await reader.read({
+    graphId: review.graphId,
+    scope,
+    limit: 1,
+    maxBytes: 1_048_576,
+    cursor: null,
+  });
+  assert(parent.ok, 'Parent graph is outside the admitted archive selection');
+  const transport = await archiveTransport(publications[0].transport);
+  const result = await transport.invoke('graph-retract', [
+    review.graphId,
+    ...publications.flatMap((p) => ['--source', p.source.id]),
+    ...ids.flatMap((id) => ['--assertion', id]),
+  ]);
+  assert.equal(result['status'], 'complete');
+  assert.equal(result['parent_graph_id'], review.graphId);
+  assert.equal(canonical(result['retracted_assertion_ids']), canonical(ids));
+  const graphId = digest(result['graph_id']);
+  assert.notEqual(graphId, review.graphId);
+  const child = await reader.read({
+    graphId,
+    scope,
+    limit: 1,
+    maxBytes: 1_048_576,
+    cursor: null,
+  });
+  assert(child.ok, 'Retracted graph could not be read through admitted scope');
+  assert.equal(child.value.revisionSetId, parent.value.revisionSetId);
+  const receipt = {
+    schema: 1,
+    kind: 'temari-archive-graph-review',
+    parentGraphId: review.graphId,
+    graphId,
+    assertionIds: ids,
+    reviewerRef: review.reviewerRef,
+    reason: review.reason,
+    revisionSetId: parent.value.revisionSetId,
+    task: publications[0].task,
+  };
+  const receiptPath = join(
+    publications[0].task.directory,
+    `archive-graph-review-${hash(canonical(receipt))}.json`,
+  );
+  await publishJson(receiptPath, receipt);
+  return { graphId, receiptPath, retractedAssertionIds: ids };
 }

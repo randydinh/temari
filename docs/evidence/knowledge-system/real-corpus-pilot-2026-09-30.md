@@ -30,7 +30,13 @@ Registrar PR #4 added explicit on-device macOS Vision OCR for bounded PNG captur
 ## Verification
 
 The candidate passed `pnpm nx run knowledge:typecheck`, `knowledge:test` (36), `knowledge:integration` (29), and the direct four-test archive graph integration file. The real-corpus capture, exact/BM25 evaluation, TypeSafe responses, Nx graph import, and Graft import were executed separately against the pinned snapshots. Only the candidate-bound results above are claimed.
-The OCR follow-up passed the updated `knowledge:typecheck`, `knowledge:test` (36), and `knowledge:integration` (30) targets. Registrar's full suite passed 321 tests.
+The OCR follow-up passed the updated `knowledge:typecheck`, `knowledge:test` (36), and `knowledge:integration` (30) targets. Registrar's full suite passed 321 tests at that increment and 322 after the graph-review increment.
+
+## Retrieval and graph review follow-up
+
+An offline candidate combined whole-document BM25 with 1,600-character passage BM25 by reciprocal rank fusion. It found six of nine fixed expected files at top three, versus four for the current BM25 route. On a separate 11-question code set created after the first comparison, both routes found six expected files at top three. The fixed sample includes a PDF without extractable archive text on this macOS host and a PNG captured before the optional OCR mode. This is insufficient evidence to replace the current ranker, so no default changed.
+
+Registrar PR #5 added explicit assertion retraction against a pinned parent and source scope. A Temari integration test now exercises a reviewed retraction through the actual Registrar CLI, confirms the parent remains active and the child is retired, and verifies the child still reads after the original source directory is removed. This is a manual correction path; automatic graph feedback and a blind review loop remain future work.
 
 ## Next build order
 
