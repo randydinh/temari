@@ -13,7 +13,8 @@
       "reference_kind": "exact",
       "reference": "MASK",
       "split": "train",
-      "tags": ["privacy:credential"]
+      "tags": ["privacy:credential"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
     },
     {
       "id": "train-address-zone",
@@ -22,7 +23,8 @@
       "reference_kind": "exact",
       "reference": "SUBSTITUTE",
       "split": "train",
-      "tags": ["privacy:utility"]
+      "tags": ["privacy:utility"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
     },
     {
       "id": "train-repeat-exact",
@@ -31,7 +33,8 @@
       "reference_kind": "exact",
       "reference": "OFFER_SAVE",
       "split": "train",
-      "tags": ["privacy:prompt-frequency"]
+      "tags": ["privacy:prompt-frequency"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
     },
     {
       "id": "train-saved-exact",
@@ -40,7 +43,8 @@
       "reference_kind": "exact",
       "reference": "ALLOW_EXACT",
       "split": "train",
-      "tags": ["privacy:standing-rule"]
+      "tags": ["privacy:standing-rule"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
     },
     {
       "id": "train-consistent-group",
@@ -49,7 +53,8 @@
       "reference_kind": "exact",
       "reference": "PROPOSE_GROUP",
       "split": "train",
-      "tags": ["privacy:group-proposal"]
+      "tags": ["privacy:group-proposal"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
     },
     {
       "id": "train-conflicting-group",
@@ -58,7 +63,8 @@
       "reference_kind": "exact",
       "reference": "NO_CHANGE",
       "split": "train",
-      "tags": ["privacy:conflict"]
+      "tags": ["privacy:conflict"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
     },
     {
       "id": "val-unverified-public-address",
@@ -67,7 +73,8 @@
       "reference_kind": "exact",
       "reference": "MASK",
       "split": "val",
-      "tags": ["privacy:public-claim"]
+      "tags": ["privacy:public-claim"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
     },
     {
       "id": "val-photo-person",
@@ -76,7 +83,8 @@
       "reference_kind": "exact",
       "reference": "SUBSTITUTE",
       "split": "val",
-      "tags": ["privacy:image"]
+      "tags": ["privacy:image"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
     },
     {
       "id": "val-never-suggest",
@@ -85,7 +93,8 @@
       "reference_kind": "exact",
       "reference": "NO_CHANGE",
       "split": "val",
-      "tags": ["privacy:user-decision"]
+      "tags": ["privacy:user-decision"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
     },
     {
       "id": "test-strict-user-rule",
@@ -94,7 +103,8 @@
       "reference_kind": "exact",
       "reference": "ALLOW_EXACT",
       "split": "test",
-      "tags": ["privacy:strict-override"]
+      "tags": ["privacy:strict-override"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
     },
     {
       "id": "test-bearer-token",
@@ -103,7 +113,8 @@
       "reference_kind": "exact",
       "reference": "MASK",
       "split": "test",
-      "tags": ["privacy:credential"]
+      "tags": ["privacy:credential"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
     },
     {
       "id": "test-cross-scope-group",
@@ -112,7 +123,8 @@
       "reference_kind": "exact",
       "reference": "NO_CHANGE",
       "split": "test",
-      "tags": ["privacy:scope"]
+      "tags": ["privacy:scope"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
     }
   ]
 }

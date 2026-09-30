@@ -23,11 +23,11 @@ The HMAC key lives in the same owner-only local settings file as its fingerprint
 
 [`tasks.json`](experiments/privacy-learning/tasks.json) is a reviewed, synthetic SkillOpt-Sleep task file with six training, three validation, and three test cases. Its candidate [`SKILL.md`](experiments/privacy-learning/SKILL.md) is an offline seed; it is outside `.agents/skills` and cannot control live submissions. Cases cover saved exact overrides, repeated approvals, local substitutes, group conflicts, cross-workspace scope, unverified public claims, a visible face, and credentials.
 
-The fixture was checked against SkillOpt source commit `79124b37e9a6371e13b753f8bcd7adb1e493ade1`. A reproducible no-provider smoke run uses a disposable copy of the fixture so SkillOpt's local state also stays outside the repository:
+The fixture was checked against SkillOpt source commit `f02c6fce16e958c185b57ebb66e241a8ab2a7b76`. Every task has an explicit six-label output contract, including the held-out tasks. A reproducible no-provider smoke run uses a disposable copy of the fixture so SkillOpt's local state also stays outside the repository:
 
 ```sh
 git clone https://github.com/microsoft/SkillOpt.git /tmp/skillopt-privacy-eval
-git -C /tmp/skillopt-privacy-eval checkout 79124b37e9a6371e13b753f8bcd7adb1e493ade1
+git -C /tmp/skillopt-privacy-eval checkout f02c6fce16e958c185b57ebb66e241a8ab2a7b76
 mkdir -p /tmp/temari-privacy-skillopt/docs/experiments
 cp -R docs/experiments/privacy-learning /tmp/temari-privacy-skillopt/docs/experiments/
 PYTHONPATH=/tmp/skillopt-privacy-eval python3 -m skillopt_sleep dry-run \
@@ -39,5 +39,7 @@ PYTHONPATH=/tmp/skillopt-privacy-eval python3 -m skillopt_sleep dry-run \
 ```
 
 The smoke run loaded all 12 tasks and all three splits, then rejected an unchanged candidate at `0.0 → 0.0`. That score is expected from SkillOpt's generic mock backend and says nothing about privacy decision quality. Before a real backend experiment, enable `gate_no_regression`, add more held-out leakage and utility cases, and inspect every task sent to the provider.
+
+An isolated user-level install of the pinned source and its Codex skill wrapper was tested separately. SkillOpt's built-in deterministic researcher experiment improved its held-out score from `0.3333` to `1.0` and rejected a harmful edit. A four-case synthetic privacy dry run through the Codex backend returned actual model answers but made no edit: its two training cases passed, while the image validation case failed. A second run with a deliberately weak temporary skill proposed the invalid label `GENERALIZE`; the held-out gate rejected it. This demonstrates why the output contract and gate matter, but the tiny sample is not evidence that the privacy guidance is ready to deploy. Both Codex runs used disposable files and no real submissions or transcripts.
 
 The library now has a local explicit-decision event API and a group proposal type. It does not activate group defaults, inspect media, or connect to a host UI. The next increment is a host adapter that records explicit decisions and renders proposals, followed by a typed group rule that can be applied only after user approval. Connecting SkillOpt to real user decisions or transcripts requires a separate data-source decision and provider review.
