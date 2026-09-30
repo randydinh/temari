@@ -39,6 +39,8 @@ Rules name an exact value, workspace scope, optional source scope, and `submissi
 
 For repeated one-submission allows, call `recordPrivacyOverride` with the stored preferences and the approved submission rule, then save the returned preferences. It keeps only a keyed fingerprint of the value until the user chooses to save it. The UI may offer “save for this scope” with the first approval; on the second approval of the same value and scope, the returned `offer` tells the host to suggest it proactively. `resolvePrivacyOverride` accepts `save`, `not-now`, or `never-suggest`: saving converts the rule to a standing rule, declining postpones the next offer, and never-suggest suppresses that offer for the same value and scope. Save the resolved preferences. The library never promotes an approval on its own; the host must show the choice locally and apply the saved rule on later requests.
 
+`recordPrivacyLearningDecision` can retain an explicit allow or mask choice as a keyed fingerprint with workspace, source, and category metadata. After three distinct values receive the same choice in one scope, `suggestPrivacyGroupDefaults` returns a local group proposal. Conflicting choices and sensitive-category allows do not produce a proposal. `suppressPrivacyGroupProposal` persists the user's “never suggest” answer. These functions do not change masking or create an active group rule. The [SkillOpt experiment](../../docs/privacy-learning.md) exercises candidate guidance with synthetic cases before any real data source is connected.
+
 ## What it covers
 
 - explicit literals and JSON Pointer field rules

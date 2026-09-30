@@ -24,9 +24,18 @@ export {
   type PrivacyApprovalMemory,
   type PrivacyDecisionPreview,
   type PrivacyLevel,
+  type PrivacyLearningMemory,
   type PrivacyPersistenceChoice,
   type PrivacyPersistenceOffer,
   type PrivacyPreferences,
   type PrivacyRule,
   type PrivacyScope,
 } from './lib/privacy-preferences.js';
+
+export {
+  recordPrivacyLearningDecision,
+  suggestPrivacyGroupDefaults,
+  suppressPrivacyGroupProposal,
+  type PrivacyGroupProposal,
+  type PrivacyLearningDecision,
+} from './lib/privacy-learning.js';
