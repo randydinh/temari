@@ -1,8 +1,12 @@
-# Knowledge investigation
+# Knowledge intake, retrieval and investigation
+
+For explicit capture, immutable archive handoff, generic search/read and fresh-process
+resume, see the [local archive guide](ARCHIVE.md). The legacy local text adapter and
+structured investigation API below remain available.
 
 `investigateDesignUpdate({ brief, task, request, provider, assess, resumeFrom? })`
 returns `Promise<WorkerResult>`. Compose it inside the existing `runPlan` stage
-callback; the demo does this for the `investigate` stage. It creates no lifecycle,
+callback; the demo invokes the investigation operation directly. It creates no lifecycle,
 agent owner, model service, or source-maintenance operation.
 
 The reader callback is
@@ -83,8 +87,8 @@ sha256?}` inputs. It is demo/test support, absent from the product barrel and po
 
 ## Supported boundary and gaps
 
-This is one local POSIX Registrar source-root profile for bounded UTF-8 `.txt`,
-`.md`, and `.markdown` reads. Registrar may inspect every indexed document in the
+The legacy `createLocalRegistrar` profile supports bounded UTF-8 `.txt`,
+`.md`, and `.markdown` reads on local POSIX source roots. Registrar may inspect every indexed document in the
 admitted root and write extraction caches. Document-only access, a hostile-process
 OS sandbox, remote sources, semantic search/recall, automated dependency inference,
 archive retention/recovery, and access-revocation policy are unsupported.
