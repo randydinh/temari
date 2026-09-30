@@ -115,20 +115,35 @@ export async function evaluateArchiveGraphTrial(input: {
   const records = new Map(
     projection.value.nodes.map((node) => [node.id, node.attributes]),
   );
-  const seed = input.lexical[0];
-  const matchesSeed = (anchor: ArchiveGraphAnchor): boolean =>
-    anchor.source_id === seed.sourceId &&
-    anchor.path === seed.path &&
-    anchor.original_sha256 === seed.sha256;
-  const seedNodes = new Set(
+  const connected = new Set(
     [...records.values()]
       .filter(
         (record) =>
-          (record.kind === 'entity' || record.kind === 'mention') &&
-          record.anchors?.some(matchesSeed),
+          (record.kind === 'relationship' || record.kind === 'identity-link') &&
+          record.lifecycle === 'active',
       )
-      .map((record) => record.id),
+      .flatMap((record) => [record.subject, record.object]),
   );
+  const nodesFor = (candidate: RankedArchiveDocument): Set<string> =>
+    new Set(
+      [...records.values()]
+        .filter(
+          (record) =>
+            (record.kind === 'entity' || record.kind === 'mention') &&
+            connected.has(record.id) &&
+            record.anchors?.some(
+              (anchor: ArchiveGraphAnchor) =>
+                anchor.source_id === candidate.sourceId &&
+                anchor.path === candidate.path &&
+                anchor.original_sha256 === candidate.sha256,
+            ),
+        )
+        .map((record) => record.id),
+    );
+  const seed =
+    input.lexical.find((candidate) => nodesFor(candidate).size > 0) ??
+    input.lexical[0];
+  const seedNodes = nodesFor(seed);
   const scopedIds = new Set(input.scope.map((source) => source.id));
   const seen = new Set(input.lexical.map(identity));
   for (const relation of [...records.values()].sort((a, b) =>

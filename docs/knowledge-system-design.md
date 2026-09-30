@@ -75,11 +75,13 @@ Build order now:
    deletion remains a separate purge decision. An uninstall preference must
    survive upgrades. No silent model substitution is permitted.
 
-The current local pilot in merged PR #92 recovered 14/14 admitted originals
+The earlier local pilot in merged PR #92 recovered 14/14 admitted originals
 byte-for-byte and found the expected document in the top K for 6/8 annotated
-queries. PDF and image-text misses, separate Nx/Graft probes, lack of native
-Graphify non-code execution, and no live Jev validation remain open. These
-results do not certify lossless semantic retrieval or a production deployment.
+queries. The [2026-09-30 bounded real-corpus pilot](evidence/knowledge-system/real-corpus-pilot-2026-09-30.md)
+then exercised a pinned Nx snapshot, a non-Nx Python snapshot, six document
+formats, live Jev judgments, and source-anchored Nx/Graft graph imports.
+It found concrete retrieval and format gaps. Neither pilot certifies lossless
+semantic retrieval or a production deployment.
 
 The next increment adds bounded Nx and Graft artifact import to the intake
 authority. It converts admitted structural edges to pinned Registrar graph

@@ -9,6 +9,7 @@ import { prepareRegistrar } from '../support/prepare.js';
 import { captureArchive, loadArchivePublication } from './archive-intake.js';
 import { createArchiveRegistrar } from './archive-registrar.js';
 import { createArchiveGraphReader } from './archive-graph.js';
+import { evaluateArchiveGraphTrial } from './archive-graph-trial.js';
 import { publishArchiveStructure } from './archive-structure.js';
 import { evaluateArchiveSearch, runArchiveIntake } from './archive-journey.js';
 import { hash } from './codec.js';
@@ -413,6 +414,16 @@ test('actual Graft and Nx structure imports publish only archived, current sourc
       bytes: Buffer.from('{"name":"shared"}\n'),
     },
     {
+      path: 'apps/scoped/package.json',
+      bytes: Buffer.from(
+        '{"name":"@pilot/app","dependencies":{"@pilot/shared":"workspace:*"}}\n',
+      ),
+    },
+    {
+      path: 'libs/scoped/package.json',
+      bytes: Buffer.from('{"name":"@pilot/shared"}\n'),
+    },
+    {
       path: 'apps/packonly/project.json',
       bytes: Buffer.from('{"name":"packonly"}\n'),
     },
@@ -586,6 +597,15 @@ test('actual Graft and Nx structure imports publish only archived, current sourc
     maxEdges: 4,
   });
   assert.equal(graft.relationshipCount, 2);
+  const boundedGraft = await publishArchiveStructure({
+    publicationPath: capture.publicationPath,
+    artifactPath: graftPath,
+    kind: 'graft',
+    paths: ['src/Caller.swift', 'src/Target.swift'],
+    maxEdges: 1,
+  });
+  assert.equal(boundedGraft.relationshipCount, 1);
+  assert.equal(boundedGraft.skipped['edge-budget'], 1);
   const reader = await createArchiveGraphReader({
     publications: [capture.publicationPath],
     readScope: 'source-root',
@@ -646,6 +666,70 @@ test('actual Graft and Nx structure imports publish only archived, current sourc
     )?.attributes.support?.[0]?.quote,
     'shared',
   );
+  const scopedNxPath = join(f.base, 'scoped-nx.json');
+  await writeFile(
+    scopedNxPath,
+    JSON.stringify({
+      graph: {
+        nodes: {
+          'scoped-app': {
+            data: {
+              root: 'apps/scoped',
+              metadata: { js: { packageName: '@pilot/app' } },
+            },
+          },
+          'scoped-shared': {
+            data: {
+              root: 'libs/scoped',
+              metadata: { js: { packageName: '@pilot/shared' } },
+            },
+          },
+        },
+        dependencies: {
+          'scoped-app': [
+            { source: 'scoped-app', target: 'scoped-shared', type: 'static' },
+          ],
+          'scoped-shared': [],
+        },
+      },
+    }),
+  );
+  const scopedNx = await publishArchiveStructure({
+    publicationPath: capture.publicationPath,
+    artifactPath: scopedNxPath,
+    kind: 'nx',
+    paths: ['apps/scoped/package.json', 'libs/scoped/package.json'],
+    maxEdges: 4,
+  });
+  assert.equal(scopedNx.relationshipCount, 1);
+  const scopedTrial = await evaluateArchiveGraphTrial({
+    graphId: scopedNx.graphId,
+    publications: [capture.publicationPath],
+    scope: [f.source],
+    provider: await createArchiveRegistrar({
+      publications: [capture.publicationPath],
+      readScope: 'source-root',
+    }),
+    lexical: [
+      {
+        sourceId: f.source.id,
+        path: 'seed.txt',
+        sha256: hash('Synthetic fixture.\n'),
+      },
+      {
+        sourceId: f.source.id,
+        path: 'apps/scoped/package.json',
+        sha256: hash(
+          documents.find((item) => item.path === 'apps/scoped/package.json')!
+            .bytes,
+        ),
+      },
+    ],
+    expected: [{ sourceId: f.source.id, path: 'libs/scoped/package.json' }],
+    topK: 3,
+    taskDirectory: join(f.base, 'task'),
+  });
+  assert.equal(scopedTrial.expectedRecallAtK, 1);
   const falseImplicitPath = join(f.base, 'false-implicit-nx.json');
   await writeFile(
     falseImplicitPath,
