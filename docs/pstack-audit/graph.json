@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "scope": "Temari v4.1 bundled P-stack skills and playbooks, with adjacent ownership boundaries",
+  "scope": "Temari public entries and v4.1 bundled P-stack skills and playbooks, with adjacent ownership boundaries",
   "reviewedAt": "2026-09-30",
   "evidenceRule": "documented and source_reference edges describe checked source; review_recommendation edges are proposals, not current behavior",
   "nodes": [
@@ -364,6 +364,36 @@
       "label": "principle-type-system-discipline",
       "source": "packages/workflow-runtime/assets/v4.1/skills/principle-type-system-discipline/SKILL.md",
       "description": "Apply when designing types, reviewing a function signature, or writing code in any statically-typed language. Make illegal states unrepresentable, brand semantic primitives, parse external data at boundaries, refuse to lie to the compiler, exhaust variants, derive from authoritative schemas."
+    },
+    {
+      "id": "public-entry:closeout",
+      "kind": "public-entry",
+      "label": "closeout",
+      "source": "packages/workflow-runtime/public/skills/closeout/SKILL.md"
+    },
+    {
+      "id": "public-entry:poteto-mode",
+      "kind": "public-entry",
+      "label": "poteto-mode",
+      "source": "packages/workflow-runtime/public/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "id": "public-entry:temari",
+      "kind": "public-entry",
+      "label": "temari",
+      "source": "packages/workflow-runtime/public/skills/temari/SKILL.md"
+    },
+    {
+      "id": "public-skill:qa-review-verification",
+      "kind": "public-skill",
+      "label": "QA verification",
+      "source": "packages/workflow-runtime/public/skills/qa-review-verification/SKILL.md"
+    },
+    {
+      "id": "public:policy",
+      "kind": "admission",
+      "label": "Public admission policy",
+      "source": "packages/workflow-runtime/public/policy.json"
     },
     {
       "id": "skill:architect",
@@ -1339,6 +1369,55 @@
       "relation": "current_owner",
       "basis": "documented",
       "evidence": "docs/platform-overview.md"
+    },
+    {
+      "from": "public-entry:closeout",
+      "to": "skill:closeout",
+      "relation": "adapts_source_skill",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/skills/closeout/SKILL.md"
+    },
+    {
+      "from": "public-entry:poteto-mode",
+      "to": "skill:poteto-mode",
+      "relation": "adapts_source_skill",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "public-entry:temari",
+      "to": "skill:temari",
+      "relation": "adapts_source_skill",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/skills/temari/SKILL.md"
+    },
+    {
+      "from": "public-entry:temari",
+      "to": "public-skill:qa-review-verification",
+      "relation": "invokes_supporting_skill",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/skills/temari/SKILL.md"
+    },
+    {
+      "from": "public:policy",
+      "to": "public-entry:closeout",
+      "relation": "declares_entry",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/policy.json"
+    },
+    {
+      "from": "public:policy",
+      "to": "public-entry:poteto-mode",
+      "relation": "declares_entry",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/policy.json"
+    },
+    {
+      "from": "public:policy",
+      "to": "public-entry:temari",
+      "relation": "declares_entry",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/policy.json"
     },
     {
       "from": "skill:architect",

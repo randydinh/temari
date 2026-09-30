@@ -7,6 +7,12 @@ description: Use Temari as the current Nx conversational engineering entry point
 
 Temari is the conversational entry point for the current Nx workflow runtime.
 
+Temari owns standing-program intent and task continuity. The current public
+`policy.json` admits bounded engineering and QA routes, but no standing-program
+execution route. Classify such a request for planning and state the admission gap;
+do not start a legacy `orch` store or treat an Archon status as closeout. Poteto
+supplies the engineering method for each admitted bounded unit.
+
 When the requested output includes ticket verification notes, a QA evidence audit,
 or a release QA report, use the bundled
 [QA verification skill](../qa-review-verification/SKILL.md) for that deliverable.

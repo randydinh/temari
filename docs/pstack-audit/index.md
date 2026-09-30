@@ -3,7 +3,7 @@
 Reviewed 2026-09-30 against the bundled Temari v4.1 assets and the local
 `plugins` checkout at `15a8ba8` (P-stack 0.15.2). This is a source and scenario
 review, not evidence that every route ran against a live application, PR, or
-external service. The bundled tree has 52 skills, including 23 principles, and
+external service. The bundled v4.1 tree has 52 skills, including 23 principles, and
 24 playbooks. Before this ownership change, 42 skill entry files and 17 playbooks matched
 the local upstream checkout byte for byte. Temari adds five skills and
 Lightweight engineering, and adapts other entries. This branch additionally
@@ -13,9 +13,8 @@ The companion [knowledge graph](graph.json) records every bundled skill and
 playbook, source-linked references, the present ownership boundary, and
 explicitly labeled remaining recommendations. The [program ownership decision](../decisions/2026-09-30-temari-program-ownership.md)
 records the implemented route and the execution promotion gates. Run `python3 docs/pstack-audit/build_graph.py`
-to refresh it after a source change. The existing `graphify-out/graph.json` is
-a useful local code graph, but it is ignored by Git and is not this catalog's
-durable source.
+to refresh it after a source change. The workspace-root `graphify-out/graph.json` is a useful local code graph,
+but it is ignored by Git and is not this catalog's durable source.
 
 Graph edges distinguish `documented` or `source_reference` facts from
 `review_recommendation` proposals. For example,
@@ -23,6 +22,24 @@ Graph edges distinguish `documented` or `source_reference` facts from
 shows the Orchestrate route, Temari program ownership, Poteto method
 reference, and the legacy store relationship. Proposed mechanical changes
 remain labeled as recommendations.
+
+## Canonical public entries
+
+The installed public bundle is a separate admission surface from the v4.1
+source catalog below. Its [policy](../../packages/workflow-runtime/public/policy.json)
+names three callable entries. The [Temari entry](../../packages/workflow-runtime/public/skills/temari/SKILL.md)
+starts admitted engineering or QA work; the [Poteto Mode entry](../../packages/workflow-runtime/public/skills/poteto-mode/SKILL.md)
+supplies engineering method; [Closeout](../../packages/workflow-runtime/public/skills/closeout/SKILL.md)
+verifies a trusted invocation against the current candidate.
+[QA verification](../../packages/workflow-runtime/public/skills/qa-review-verification/SKILL.md)
+is a public supporting skill, invoked through Temari for QA deliverables rather
+than a fourth `policy.entries` key.
+
+The public policy currently admits lightweight engineering, host-proven full
+feature work, and versioned QA. It has no standing-program execution entry.
+The new typed `programKind` route records Temari ownership and is planning-only;
+it does not silently widen public admission. The legacy v4.1 skills remain
+source and compatibility material.
 
 ## Ownership model
 
@@ -37,8 +54,9 @@ remain labeled as recommendations.
 Temari submits engineering work to Poteto for method selection. Archon cannot
 decide what a request means, choose acceptance criteria, approve a merge, or
 turn a native status into a Temari completion receipt. The Nx Archon port is
-currently optional; receipt parity with the canonical stage engine is still a
-promotion gate. Those are current boundaries, not a proposed relabeling.
+currently optional. A model-free source-workspace conformance journey now
+produces a canonical receipt; installed and live-model parity remain promotion
+gates. Those are current boundaries, not a proposed relabeling.
 
 ```mermaid
 flowchart LR
@@ -162,28 +180,26 @@ it to a live task.
 
 ## Move, keep, and retire
 
-**Orchestrate is the main ownership overlap.** New program intent now routes
-to Temari through the skill and typed route table, and the serial runtime
-rejects that planning-only route before producing a receipt. The bundled
-legacy playbook still runs a second program store (`units.tsv`, `ledger.tsv`, `frontier.json`, `gates.md`)
-through `orch`, while the Nx runtime now has revision-bound receipts, a child
-task store, leases, and evidence. Archon owns native run control. The useful
-parts of Orchestrate are its program framing, briefs, pilot, queue discipline,
-verification ledger, and failure reconciliation. Temari now owns that program policy; the runtime and a selected harness must
-eventually provide the mechanics. Do not simply rename Orchestrate to Archon:
-Archon does not own semantic decisions. Do not delete `orch` yet: the packaged verifier exercises
-it, and the Nx Archon lane has not passed canonical receipt parity. First prove
-a migration journey with the same units, current-head verdicts, restart, and
-closeout; then remove the redundant store and route together.
+**Orchestrate is the main ownership overlap.** New program intent routes to
+Temari through the skill and typed route table. The serial runtime rejects that
+planning-only route before producing a receipt. The legacy playbook still runs a
+second program store (`units.tsv`, `ledger.tsv`, `frontier.json`, `gates.md`)
+through `orch`. The Nx runtime has revision-bound receipts, a child-task store,
+leases, and evidence; Archon owns native run control. Orchestrate's program
+framing, briefs, pilot, queue discipline, verification ledger, and failure
+reconciliation remain useful to Temari. Archon does not own those semantic
+decisions. Keep `orch` for recorded legacy programs while its packaged verifier
+uses it. Before retiring that store, prove installed and live-model Archon
+parity and a migration journey that preserves units, current-head verdicts,
+restart state, and closeout.
 
-**Other lifecycle moves.** Temari now selects `pause-safely`,
-`session-pickup`, and `closeout` across engineering domains. Their existing
-files remain callable mechanics during migration. `autopilot-full`,
-`autopilot-stack`, and `multi-phase-plan` are program policies rather than
-ordinary code playbooks. Temari owns the program decision; their engineering
-quality gates remain useful, while host/runtime mechanics require admission. Babysit and Shipping
-should retain human-readable quality rules while forge polling and merge
-queue state move behind host/runtime adapters.
+**Other lifecycle moves.** The Temari skill now selects `pause-safely`,
+`session-pickup`, and `closeout` across engineering domains. The existing
+playbook files remain callable mechanics during migration. `autopilot-full`,
+`autopilot-stack`, and `multi-phase-plan` are program policies; their
+engineering quality gates remain useful while host/runtime mechanics await
+admission. Babysit and Shipping keep human-readable quality rules while forge
+polling and merge queue state move behind host/runtime adapters.
 
 **Optional material.** `make-bot-ui` is a specific webhook product recipe;
 `setup-pstack` is host configuration; `automate-me` and `reflect` change

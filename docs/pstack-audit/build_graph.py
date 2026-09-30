@@ -14,7 +14,7 @@ PLAYBOOKS = SKILLS / "poteto-mode/playbooks"
 
 LIFECYCLE_SKILLS = {"temari", "closeout", "recall"}
 SPECIALIST_SKILLS = {"seq-log-review"}
-PROGRAM_PLAYBOOKS = {
+TEMARI_OWNED_PLAYBOOKS = {
     "autonomous-run",
     "orchestrate",
     "autopilot-full",
@@ -101,6 +101,17 @@ for identifier, label, url in (
 ):
     node(f"external:{identifier}", "external", label, upstream=url)
 
+public_root = ROOT / "packages/workflow-runtime/public"
+node("public:policy", "admission", "Public admission policy", source=relative(public_root / "policy.json"))
+for entry_name in ("temari", "poteto-mode", "closeout"):
+    entry_path = public_root / "skills" / entry_name / "SKILL.md"
+    node(f"public-entry:{entry_name}", "public-entry", entry_name, source=relative(entry_path))
+    edge("public:policy", f"public-entry:{entry_name}", "declares_entry", "documented", relative(public_root / "policy.json"))
+    edge(f"public-entry:{entry_name}", f"skill:{entry_name}", "adapts_source_skill", "documented", relative(entry_path))
+qa_public = public_root / "skills/qa-review-verification/SKILL.md"
+node("public-skill:qa-review-verification", "public-skill", "QA verification", source=relative(qa_public))
+edge("public-entry:temari", "public-skill:qa-review-verification", "invokes_supporting_skill", "documented", relative(public_root / "skills/temari/SKILL.md"))
+
 skill_files = sorted(SKILLS.glob("*/SKILL.md"))
 playbook_files = sorted(PLAYBOOKS.glob("*.md"))
 if len(skill_files) != 52 or len(playbook_files) != 24:
@@ -127,7 +138,7 @@ for path in playbook_files:
     title = text.splitlines()[0].lstrip("# ").strip()
     node(f"playbook:{name}", "playbook", title, source=source)
     edge(f"skill:poteto-mode", f"playbook:{name}", "routes_to", "documented", relative(SKILLS / "poteto-mode/SKILL.md"))
-    if name in PROGRAM_PLAYBOOKS:
+    if name in TEMARI_OWNED_PLAYBOOKS:
         edge(f"playbook:{name}", "owner:temari", "current_owner", "documented", relative(SKILLS / "temari/SKILL.md"))
         edge(f"playbook:{name}", "owner:poteto", "method_reference", "documented", relative(SKILLS / "poteto-mode/SKILL.md"))
     else:
@@ -180,7 +191,7 @@ for item in nodes.values():
 
 graph = {
     "schemaVersion": 1,
-    "scope": "Temari v4.1 bundled P-stack skills and playbooks, with adjacent ownership boundaries",
+    "scope": "Temari public entries and v4.1 bundled P-stack skills and playbooks, with adjacent ownership boundaries",
     "reviewedAt": "2026-09-30",
     "evidenceRule": "documented and source_reference edges describe checked source; review_recommendation edges are proposals, not current behavior",
     "nodes": sorted(nodes.values(), key=lambda item: item["id"]),

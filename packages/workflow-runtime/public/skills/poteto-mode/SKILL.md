@@ -7,6 +7,10 @@ description: Use the current Nx P-stack engineering workflow with pinned lightwe
 
 Poteto mode supplies the engineering workflow selected by Temari.
 
+Standing-program and task-lifecycle decisions return to Temari. This public
+entry admits only the routes named by `policy.json`; it does not create an
+Orchestrate store or promote a program from a bounded engineering request.
+
 For ticket verification notes, QA evidence audits, and release QA reports requested
 during verification or handoff, load the bundled
 [QA verification skill](../qa-review-verification/SKILL.md). Default ordinary ticket

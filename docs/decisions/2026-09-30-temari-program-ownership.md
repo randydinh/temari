@@ -10,8 +10,9 @@ briefs, PR-frontier control, verification records, and a plain-file `orch`
 store. Temari already has one semantic coordinator, a six-stage workflow,
 revision-bound receipts, a durable child-task store, and a replaceable
 `ExecutionHarness` port. Archon implements native start, status, and
-exact-run resume behind that port. Its native status has not passed canonical
-receipt parity.
+exact-run resume behind that port. A source-workspace, model-free conformance
+journey writes a canonical receipt, while installed and live-model parity remain
+unproven.
 
 Starting a new `orch` store alongside `.temari/runs/` would create two
 authorities for unit state, gates, and completion.
@@ -48,9 +49,12 @@ produce a false six-stage completion receipt. An existing legacy Orchestrate
 program can still use its recorded store and playbook. This is a temporary
 compatibility path, not a second canonical store for new work.
 
-The imported runtime package retains the legacy files and the verifier that
-exercises their bookkeeping. Each changed vendored file has an updated artifact
-hash and an explicit transformation explanation in `provenance.json`.
+The current public `policy.json` admits lightweight and full-feature engineering
+and QA, but has no program execution entry. The typed program route therefore
+does not expand installed public admission. The imported runtime package retains
+the legacy files and the verifier that exercises their bookkeeping. Each changed
+vendored file has an updated artifact hash and an explicit transformation
+explanation in `provenance.json`.
 
 ## Promotion gates
 
