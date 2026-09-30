@@ -7,6 +7,28 @@ description: Use Temari as the current Nx conversational engineering entry point
 
 Temari is the conversational entry point for the current Nx workflow runtime.
 
+## Full QA Review intent gate
+
+When the user asks to **perform, complete, or sign off QA Review** for a ticket,
+column, or release, treat it as a full QA assignment. Select the bundled ticket
+acceptance QA playbook and use `bin/temari.mjs qa` for each selected ticket's
+versioned assignment. Do this even when a fixture, product decision, deployed
+build identity, or project verifier is missing: record the required scenarios as
+blocked or not run and retain the independent evaluator's bounded disposition.
+Those gaps prevent a QA pass; they do not turn the user's full-review request into
+an evidence-only writing task. Do not substitute a Markdown report for the route
+or say the evaluator ran without its canonical result and review record.
+For a release-wide request without a ticket identity, use a supported full
+assignment if available; otherwise report that admission gap without inventing
+a ticket reference.
+
+Use evidence-only drafting when the user asks only for a draft note, historical
+evidence audit, or review of supplied results without a full QA disposition. If
+a legitimate full assignment or trusted invocation cannot be constructed, keep
+the full review open, record the exact missing input or rejected route, and hand
+back the useful partial evidence without claiming QA completion. Preserve any
+reviewer-label restriction before selecting tickets.
+
 When the requested output includes ticket verification notes, a QA evidence audit,
 or a release QA report, use the bundled
 [QA verification skill](../qa-review-verification/SKILL.md) for that deliverable.

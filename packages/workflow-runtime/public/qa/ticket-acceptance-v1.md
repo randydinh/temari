@@ -1,6 +1,14 @@
 # Ticket acceptance QA playbook v1
 
-Use this playbook for a full QA assignment with a named ticket, requirement revisions, candidate, and environment. Keep the canonical six-stage plan and review record.
+Use this playbook for a full QA assignment with a named ticket, requirement revisions, candidate, and either an environment or an explicit environment blocker. Keep the canonical six-stage plan and review record.
+
+A request to perform QA Review remains in this playbook when execution is blocked.
+Complete the available investigation and scenario inventory, mark each missing
+acceptance attempt honestly, and invoke the independent evaluator for a bounded
+disposition. A useful evidence note is a delivery view of that record, not the
+replacement for the review route. If assignment admission itself lacks a trusted
+ticket revision, candidate, or invocation digest, report the exact blocker instead
+of inventing one.
 
 1. Read the pinned product decision for every required outcome. Record conflicting or absent intent as unresolved; current implementation and existing tests do not establish the expected behavior.
 2. Derive scenarios from those outcomes, including required behavior absent from the candidate. Choose a check whose assertion would fail for a plausible wrong result. Retain the counterexample and the expectation source.

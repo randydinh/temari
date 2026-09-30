@@ -215,6 +215,50 @@ test('relocated QA entry runs the packaged evaluator without source-checkout acc
       qaOutput,
     );
 
+    const blockedAssignment = {
+      ...base.assignment,
+      missingEnvironmentBlocker: 'No owned nonproduction fixture is available',
+    };
+    delete blockedAssignment.environmentRef;
+    const blocked = {
+      ...base,
+      assignment: blockedAssignment,
+      invocation: {
+        ...base.invocation,
+        runId: 'synthetic-qa-environment-blocked',
+        runDirectory: join(root, 'blocked-run'),
+        evidenceRoot: join(root, 'blocked-run/evidence'),
+      },
+    };
+    await mkdir(blocked.invocation.evidenceRoot, { recursive: true });
+    const blockedRun = await invoke(blocked, 'blocked-environment');
+    const blockedOutput = JSON.parse(
+      blockedRun.stdout.trim().split('\n').at(-1),
+    );
+    assert.equal(blockedOutput.guidance.playbookId, 'ticket-acceptance-v1');
+    assert.match(
+      blockedOutput.guidance.playbook.text,
+      /request to perform QA Review remains in this playbook/i,
+    );
+    assert.match(
+      blockedOutput.guidance.evidenceSkill.text,
+      /Missing\s+fixtures[\s\S]*do \*\*not\*\* make the\s+request evidence-only/,
+    );
+    assert.equal(blockedOutput.guidance.execution, 'not-observed');
+    assert.equal(blockedOutput.record.evaluationRounds.length, 1);
+    assert.equal(
+      blockedOutput.record.evaluationRounds[0].evaluatorId,
+      'local-fresh-qa-evaluator-v1',
+    );
+    assert.equal(
+      blockedOutput.qaDisposition.disposition,
+      'BlockedOrIncomplete',
+    );
+    assert.equal(
+      blockedOutput.record.assignment.missingEnvironmentBlocker,
+      'No owned nonproduction fixture is available',
+    );
+
     await writeFile(
       join(candidate, 'package.json'),
       '{"name":"@temari/workspace"}\n',

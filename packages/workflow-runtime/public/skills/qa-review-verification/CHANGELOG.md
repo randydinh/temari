@@ -1,5 +1,12 @@
 # QA verification changes
 
+## 0.7.1 — 2026-09-30
+
+- Route an explicit full QA Review request through the ticket acceptance playbook
+  and installed evaluator even when acceptance fixtures or decisions are missing.
+- Keep an unadmitted route and its exact missing input visible; do not relabel a
+  full-review request as evidence-only drafting or imply an evaluator ran.
+
 ## 0.7.0 — 2026-09-29
 
 - Package the local QA evaluator and its worker in the installed Temari artifact.

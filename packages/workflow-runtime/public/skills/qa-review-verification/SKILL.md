@@ -2,7 +2,7 @@
 name: qa-review-verification
 description: Draft or review per-ticket QA verification notes and release QA reports from requirements, source reviews, and actual execution evidence. Use for QA Review closeout, verification handoffs, and evidence audits; not for authoring reusable test cases alone or generic code review.
 metadata:
-  version: '0.6.0'
+  version: '0.7.1'
 ---
 
 # QA Review verification
@@ -17,6 +17,15 @@ Use this supporting skill when the requested deliverable includes a ticket verif
 note, QA evidence audit, or release QA report. Test-case authoring alone, code review,
 implementation and defect repair stay with their existing owners.
 
+If the user requested full QA Review, enter Temari's ticket acceptance QA playbook
+and canonical `qa-review-v1` route before treating a note as the deliverable. Missing
+fixtures, unresolved product rules, absent deployed build evidence, or unavailable
+project verification keep required scenarios incomplete; they do **not** make the
+request evidence-only. Submit the honest blocked review to the installed evaluator
+when the trusted full assignment can be constructed, then write the note from its
+revision-bound disposition. If admission itself fails, preserve the exact route
+error and blocked obligations; do not imply that an evaluator ran.
+
 When a canonical QA review record exists, derive the prose from its assignment, candidate,
 scenario results, execution evidence and disposition. Preserve its revision/digest and link
 the record; never replace it with a Markdown document. Preserve Failed, BlockedOrIncomplete
@@ -27,8 +36,8 @@ evidence. Drafting does not admit a runtime route, create PASS receipts, change 
 disposition, or satisfy an independent-evaluator requirement. Full QA execution remains
 subject to the installed policy, a full versioned assignment, and canonical local evidence.
 The installed Temari route launches its packaged evaluator in a separate process and denies
-external writes. Report a blocked route as blocked
-even when a useful draft can be produced.
+external writes. Report a blocked route as blocked even when a useful draft can be
+produced.
 When the user requested full QA Review, do not present the resulting evidence-only note
 as completed verification; identify the exact unexecuted acceptance work and the route
 or prerequisite needed to finish it.
