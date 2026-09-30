@@ -22,6 +22,7 @@ Use the source IDs returned by registration in an intake plan:
     "directory": "/absolute/private-task",
     "authorityRef": "/absolute/private-source-manifest.json"
   },
+  "localOnlySourceIds": [],
   "intakes": [
     {
       "task": {
@@ -105,8 +106,7 @@ extracted from the source. Each case narrows the handoff to listed source IDs.
         { "sourceId": "REGISTERED_SOURCE_ID", "path": "relative/document.md" }
       ],
       "topK": 4,
-      "discoveryMode": "bm25",
-      "hostedTextApproved": false
+      "discoveryMode": "bm25"
     }
   ]
 }
@@ -126,11 +126,25 @@ alongside scores. A first-page continuation leaves `discoveryExhausted: false`.
 `timingMs` separates discovery, excerpt reads and Jev from total case time;
 compare modes on the same pinned handoff and budgets.
 
-Jev receives no text when `hostedTextApproved` is false. A true value authorizes
-the case's verified excerpts for the server-side `TYPESAFE_API_KEY` call and still
-produces shadow advice only. Do not set it for private corpora without an explicit
-sharing decision. The first live check should use synthetic text. Missing key,
-network or invalid response leaves judgments `unknown`.
+New intake handoffs use a standing TypeSafe policy: verified excerpts from
+registered sources can go to Jev without approval for every search. Mark a source
+local-only by adding its registered source ID to `localOnlySourceIds` in the intake
+plan. That choice is pinned in the immutable handoff and wins even if a later
+search case sets `hostedTextApproved: true`. For an individual search, set
+`hostedTextApproved: false` to keep that case local. Older handoffs without the
+standing policy still require the explicit per-case boolean. A Keychain entry or
+API key supplies credentials but does not change the source policy.
+
+The Jev request carries the query, candidate IDs and bounded, revalidated shortlist
+excerpts. The archive, full documents and local-only sources remain local. The report records
+`jevSharing` as `allowed`, `local-only`, or `case-opt-out`. Jev still produces
+shadow advice only. Missing key, network or invalid response leaves judgments
+`unknown`. For macOS local runs, load the saved key into the search process:
+
+```sh
+TYPESAFE_API_KEY="$(security find-generic-password -a "$USER" -s "temari-typesafe-jev" -w)" \
+  pnpm nx run knowledge:demo -- journey-search --input /absolute/search-plan.json
+```
 
 For an optional graph ablation, set `graphId` on a search case to a published
 Registrar graph ID covering the selected archive publications. A single-source
