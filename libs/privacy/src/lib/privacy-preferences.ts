@@ -1,7 +1,7 @@
 import { constants } from 'node:fs';
 import { lstat, open, realpath, rename, rm, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, join } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 import {
   assertJsonValue,
   disposePrivacySession,
@@ -37,7 +37,26 @@ export type PrivacyPreferences = {
   /** Required once when the user selects the broad disclosure setting. */
   readonly permissiveAcknowledged?: true;
   readonly rules: readonly PrivacyRule[];
+  /** Opaque local memory of repeated one-submission approvals. */
+  readonly approvalMemory?: PrivacyApprovalMemory;
 };
+
+export type PrivacyApprovalMemory = {
+  readonly key: string;
+  readonly entries: readonly {
+    readonly fingerprint: string;
+    readonly count: number;
+    /** Null means the user chose not to see this suggestion again. */
+    readonly nextOfferAt: number | null;
+  }[];
+};
+
+export type PrivacyPersistenceOffer = {
+  readonly ruleId: string;
+  readonly approvalCount: number;
+};
+
+export type PrivacyPersistenceChoice = 'save' | 'not-now' | 'never-suggest';
 
 export type PrivacyScope = {
   readonly workspaceId: string;
@@ -163,6 +182,40 @@ function checkRule(value: unknown): PrivacyRule {
   return value as PrivacyRule;
 }
 
+function checkApprovalMemory(value: unknown): void {
+  if (!record(value))
+    throw new PrivacyError('Invalid privacy approval memory.');
+  exactKeys(value, ['key', 'entries']);
+  if (
+    typeof value.key !== 'string' ||
+    !/^[A-Za-z0-9_-]{43}$/.test(value.key) ||
+    Buffer.from(value.key, 'base64url').length !== 32 ||
+    !Array.isArray(value.entries) ||
+    value.entries.length > 128
+  )
+    throw new PrivacyError('Invalid privacy approval memory.');
+  const fingerprints = new Set<string>();
+  for (const entry of value.entries) {
+    if (!record(entry))
+      throw new PrivacyError('Invalid privacy approval memory.');
+    exactKeys(entry, ['fingerprint', 'count', 'nextOfferAt']);
+    if (
+      typeof entry.fingerprint !== 'string' ||
+      !/^[a-f0-9]{64}$/.test(entry.fingerprint) ||
+      fingerprints.has(entry.fingerprint) ||
+      !Number.isSafeInteger(entry.count) ||
+      (entry.count as number) < 1 ||
+      (entry.count as number) > 1_000_000 ||
+      (entry.nextOfferAt !== null &&
+        (!Number.isSafeInteger(entry.nextOfferAt) ||
+          (entry.nextOfferAt as number) < 2 ||
+          (entry.nextOfferAt as number) > 1_000_000))
+    )
+      throw new PrivacyError('Invalid privacy approval memory.');
+    fingerprints.add(entry.fingerprint);
+  }
+}
+
 export function validatePrivacyPreferences(value: unknown): PrivacyPreferences {
   assertJsonValue(value);
   if (Buffer.byteLength(JSON.stringify(value)) > 1024 * 1024)
@@ -173,6 +226,7 @@ export function validatePrivacyPreferences(value: unknown): PrivacyPreferences {
     'level',
     'permissiveAcknowledged',
     'rules',
+    'approvalMemory',
   ]);
   if (
     value.schemaVersion !== 1 ||
@@ -187,7 +241,157 @@ export function validatePrivacyPreferences(value: unknown): PrivacyPreferences {
   const rules = value.rules.map(checkRule);
   if (new Set(rules.map((rule) => rule.id)).size !== rules.length)
     throw new PrivacyError('Duplicate privacy rule ID.');
+  if (value.approvalMemory !== undefined)
+    checkApprovalMemory(value.approvalMemory);
   return structuredClone(value) as PrivacyPreferences;
+}
+
+function storedPreferences(value: PrivacyPreferences): PrivacyPreferences {
+  const selected = validatePrivacyPreferences(value);
+  if (selected.rules.some((rule) => rule.persistence !== 'saved'))
+    throw new PrivacyError('Submission-only privacy rules cannot be saved.');
+  return selected;
+}
+
+function approvalFingerprint(key: string, rule: PrivacyRule): string {
+  return createHmac('sha256', Buffer.from(key, 'base64url'))
+    .update(
+      JSON.stringify([
+        rule.scope.workspaceId,
+        rule.scope.sourceId ?? null,
+        rule.category,
+        rule.value,
+      ]),
+    )
+    .digest('hex');
+}
+
+function overlappingScopes(left: PrivacyScope, right: PrivacyScope): boolean {
+  return (
+    left.workspaceId === right.workspaceId &&
+    (left.sourceId === undefined ||
+      right.sourceId === undefined ||
+      left.sourceId === right.sourceId)
+  );
+}
+
+/**
+ * Record an explicit one-submission allowance locally. The raw value is not
+ * stored until the user separately chooses `save`.
+ */
+export function recordPrivacyOverride(
+  preferences: PrivacyPreferences,
+  oneSubmissionRule: PrivacyRule,
+): {
+  readonly preferences: PrivacyPreferences;
+  readonly offer: PrivacyPersistenceOffer | null;
+} {
+  const selected = storedPreferences(preferences);
+  assertJsonValue(oneSubmissionRule);
+  const rule = checkRule(oneSubmissionRule);
+  if (
+    rule.persistence !== 'submission' ||
+    rule.action !== 'allow' ||
+    rule.basis !== 'user-authorized'
+  )
+    throw new PrivacyError('Only one-submission allow rules can be recorded.');
+  if (
+    selected.rules.some(
+      (saved) =>
+        overlappingScopes(saved.scope, rule.scope) &&
+        Object.is(saved.value, rule.value),
+    )
+  )
+    return { preferences: selected, offer: null };
+  const memory = selected.approvalMemory ?? {
+    key: randomBytes(32).toString('base64url'),
+    entries: [],
+  };
+  const fingerprint = approvalFingerprint(memory.key, rule);
+  const existing = memory.entries.find(
+    (entry) => entry.fingerprint === fingerprint,
+  );
+  const count = Math.min((existing?.count ?? 0) + 1, 1_000_000);
+  const nextOfferAt = existing?.nextOfferAt ?? (existing ? null : 2);
+  const offer = nextOfferAt !== null && count >= nextOfferAt;
+  const entry = {
+    fingerprint,
+    count,
+    nextOfferAt: offer
+      ? count >= 1_000_000
+        ? null
+        : Math.min(count + Math.max(3, count), 1_000_000)
+      : nextOfferAt,
+  };
+  const entries = [
+    ...memory.entries.filter((item) => item.fingerprint !== fingerprint),
+    entry,
+  ].slice(-128);
+  return {
+    preferences: validatePrivacyPreferences({
+      ...selected,
+      approvalMemory: { key: memory.key, entries },
+    }),
+    offer: offer ? { ruleId: rule.id, approvalCount: count } : null,
+  };
+}
+
+/** Apply the user's answer to a local save suggestion. No rule is saved implicitly. */
+export function resolvePrivacyOverride(
+  preferences: PrivacyPreferences,
+  oneSubmissionRule: PrivacyRule,
+  choice: PrivacyPersistenceChoice,
+): PrivacyPreferences {
+  const selected = storedPreferences(preferences);
+  assertJsonValue(oneSubmissionRule);
+  const rule = checkRule(oneSubmissionRule);
+  if (
+    rule.persistence !== 'submission' ||
+    rule.action !== 'allow' ||
+    rule.basis !== 'user-authorized' ||
+    !['save', 'not-now', 'never-suggest'].includes(choice)
+  )
+    throw new PrivacyError('Invalid privacy persistence choice.');
+  if (choice === 'not-now') return selected;
+  const memory = selected.approvalMemory;
+  const fingerprint = memory && approvalFingerprint(memory.key, rule);
+  const entry = memory?.entries.find(
+    (item) => item.fingerprint === fingerprint,
+  );
+  if (!memory || !entry)
+    throw new PrivacyError('Privacy approval has not been recorded.');
+  if (choice === 'never-suggest')
+    return validatePrivacyPreferences({
+      ...selected,
+      approvalMemory: {
+        ...memory,
+        entries: memory.entries.map((item) =>
+          item.fingerprint === fingerprint
+            ? { ...item, nextOfferAt: null }
+            : item,
+        ),
+      },
+    });
+  if (
+    selected.rules.some(
+      (saved) =>
+        saved.id === rule.id ||
+        (overlappingScopes(saved.scope, rule.scope) &&
+          Object.is(saved.value, rule.value)),
+    )
+  )
+    throw new PrivacyError('Conflicting saved privacy rule.');
+  const savedRule = { ...rule, persistence: 'saved' as const };
+  return validatePrivacyPreferences({
+    ...selected,
+    rules: [...selected.rules, savedRule],
+    approvalMemory: {
+      ...memory,
+      entries: memory.entries.filter(
+        (item) => item.fingerprint !== fingerprint,
+      ),
+    },
+  });
 }
 
 function activeRule(rule: PrivacyRule, scope: PrivacyScope): boolean {
@@ -318,10 +522,11 @@ export function planPrivacySubmission(
     byValue.set(key, rule);
   }
   const substitutions = active.filter((rule) => rule.action === 'substitute');
-  const allows =
-    selected.level === 'strict'
-      ? []
-      : active.filter((rule) => rule.action === 'allow');
+  const allows = active.filter(
+    (rule) =>
+      rule.action === 'allow' &&
+      (selected.level !== 'strict' || rule.basis === 'user-authorized'),
+  );
   const counts = new Map<string, number>();
   // App-declared denials and credential syntax are masked before a substitute
   // can remove their original bytes. The second pass inherits those tokens.
