@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { prepareRegistrar } from '../support/prepare.js';
 import { captureArchive, loadArchivePublication } from './archive-intake.js';
 import { createArchiveRegistrar } from './archive-registrar.js';
-import { createArchiveGraphReader } from './archive-graph.js';
+import { createArchiveGraphReader, retractArchiveGraph } from './archive-graph.js';
 import { evaluateArchiveGraphTrial } from './archive-graph-trial.js';
 import { publishArchiveStructure } from './archive-structure.js';
 import { evaluateArchiveSearch, runArchiveIntake } from './archive-journey.js';
@@ -248,8 +248,33 @@ test('actual archived graph reads and projection retain pinned source anchors an
   assert.equal(projection.value.nodes.length, 3);
   assert.equal(projection.value.edges.length, 2);
   assert.equal(projection.value.native.status, 'unavailable');
+  const review = await retractArchiveGraph({
+    publications: f.config.publications,
+    graphId: request.graphId,
+    assertionIds: ['3'.repeat(32)],
+    reviewerRef: 'synthetic-operator',
+    reason: 'Fixture relationship rejected after review',
+  });
+  const reviewReceipt = JSON.parse(await readFile(review.receiptPath, 'utf8'));
+  assert.equal(reviewReceipt.parentGraphId, request.graphId);
+  assert.equal(reviewReceipt.reason, 'Fixture relationship rejected after review');
+  assert.equal(reviewReceipt.revisionSetId, first.value.revisionSetId);
+  const child = await reader.read({ ...request, graphId: review.graphId, limit: 10 });
+  assert(child.ok);
+  assert.equal(child.value.records.at(-1)?.lifecycle, 'retracted');
+  const historical = await reader.read({ ...request, limit: 10 });
+  assert(historical.ok);
+  assert.equal(historical.value.records.at(-1)?.lifecycle, 'active');
+  await assert.rejects(() => retractArchiveGraph({
+    publications: f.config.publications,
+    graphId: review.graphId,
+    assertionIds: ['3'.repeat(32)],
+    reviewerRef: 'synthetic-operator',
+    reason: 'Duplicate review',
+  }));
   await rm(join(f.base, 'sources'), { recursive: true });
   assert((await reader.read(request)).ok);
+  assert((await reader.read({ ...request, graphId: review.graphId })).ok);
   const db = join(f.base, 'state/registry.sqlite3');
   await rename(db, `${db}.saved`);
   const denied = await reader.read({

@@ -37,8 +37,9 @@ opt-in SQLite FTS5 BM25 over the selected retained generations; exact remains th
 default. Temari can rebind an existing archived publication after a verified runtime
 upgrade, select BM25 discovery, and read graph pages/projections only when every
 RevisionSet generation and manifest matches its selected publications. A separate
-Jev adapter produces typed judgments in shadow mode from explicitly approved,
-bounded text. It does not change the evidence order used for decisions.
+Jev adapter produces typed judgments in shadow mode from bounded, verified text.
+Registered sources may use the TypeSafe key by default unless marked local-only.
+It does not change the evidence order used for decisions.
 
 Synthetic local checks cover Nx and ordinary repository layouts, text and Office
 documents, searchable and scanned PDFs, and images with explicit extraction gaps.
@@ -48,6 +49,14 @@ mocked Jev responses and no private corpus. Native Graphify execution, Graft cod
 navigation, OCR/visual interpretation, full graph relationship extraction and a
 measured complete-task gain remain unproven. These are material limits on any
 claim of lossless semantic recall or production readiness.
+
+The later [bounded real-corpus pilot](evidence/knowledge-system/real-corpus-pilot-2026-09-30.md)
+exercised an Nx repository, a non-Nx Python repository, selected documents,
+live TypeSafe Jev, Nx/Graft graph imports and optional on-device PNG OCR.
+An actual-CLI synthetic integration separately verified operator-reviewed
+graph retraction. These later measurements supersede the
+synthetic test counts above; the incomplete modalities and retrieval limits
+remain explicit in the pilot record.
 
 ## Delivery decision: complete the knowledge journey before plugin packaging
 
@@ -64,7 +73,7 @@ Build order now:
 1. Finish a useful admitted-source journey: captured originals, extraction
    accounting, exact/BM25 and graph-assisted retrieval, verified citations,
    explicit gaps and real task evaluation. Keep Jev as the only hosted model;
-   approved text is still required before a live call.
+   registered source text may be sent unless marked local-only.
 2. Validate Nx and non-Nx code structure and document modalities against
    pinned archives. Compare graph-assisted search with lexical ranking at the
    same candidate budget before changing the default ranker.

@@ -97,6 +97,13 @@ For a retained publication that already exists, use the separate
 `structure-publish --input /absolute/structure-plan.json` command with the
 same fields plus `publicationPath` instead of `sourceId`.
 
+An operator can retire an incorrect active graph assertion through
+`retractArchiveGraph` with the exact parent graph ID, its admitted publications,
+assertion IDs, reviewer reference and review reason. Registrar publishes a child
+generation; Temari saves an immutable task receipt with the reason. The parent
+and its original evidence remain readable. Search feedback or a Jev judgment
+may prompt review but cannot trigger retraction automatically.
+
 ## Search and score
 
 Write a separate search plan. Gold paths are explicit annotations, not text
