@@ -152,7 +152,8 @@ case automatically trials the graph recorded in its intake handoff when
 `graphId` is omitted. The report keeps
 `ranked` and `expectedRecallAtK` as the lexical baseline and adds `graph.ranked`,
 `graph.expectedRecallAtK`, relationship provenance and explicit gaps. The trial
-uses the first lexical hit as its seed and verifies at most `topK - 1` one-hop
+uses the first lexical hit with an active, archived graph relationship as its
+seed and verifies at most `topK - 1` one-hop
 related documents through the same archived provider. Its ordering is an
 experimental policy, not a default ranker or evidence of semantic correctness.
 No graph quotations or source excerpts enter the report; a private checkpoint
@@ -165,3 +166,5 @@ non-code extraction, image interpretation, a scheduled pair of autonomous
 agents and semantic answer quality remain separate
 capabilities to implement and evaluate. The archive preserves unsupported files
 with gaps rather than claiming their contents were understood.
+The [bounded real-corpus pilot](../../docs/evidence/knowledge-system/real-corpus-pilot-2026-09-30.md)
+records the latest measured coverage and remaining format/relationship gaps.

@@ -122,6 +122,15 @@ function candidates(
       const data = object(object(raw)['data']);
       const projectRoot = data['root'];
       if (typeof projectRoot !== 'string') continue;
+      const metadata = data['metadata'];
+      const js =
+        metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+          ? (metadata as Record<string, unknown>)['js']
+          : undefined;
+      const packageName =
+        js && typeof js === 'object' && !Array.isArray(js)
+          ? (js as Record<string, unknown>)['packageName']
+          : undefined;
       // Project metadata is the evidence for a project edge. A missing metadata
       // file stays a gap; a dependency is never anchored to an arbitrary source.
       for (const filename of ['project.json', 'package.json']) {
@@ -133,7 +142,12 @@ function candidates(
         nodes.set(`${id}:${filename}`, {
           id: `${id}:${filename}`,
           path,
-          label: id,
+          label:
+            filename === 'package.json' &&
+            typeof packageName === 'string' &&
+            packageName.length <= 512
+              ? packageName
+              : id,
         });
       }
     }
@@ -395,24 +409,37 @@ async function archivedAnchor(
   provider: KnowledgeProvider,
   publication: Awaited<ReturnType<typeof loadArchivePublication>>,
   node: CandidateNode,
+  textCache: Map<string, { body: string; first: KnowledgeEvidence } | null>,
 ): Promise<Anchor | null> {
-  let continuation: string | null = null;
-  let body = '';
-  let first: KnowledgeEvidence | null = null;
-  do {
-    const read = await provider.read({
-      document: { source: publication.source, path: node.path },
-      expectedSha256: first?.sha256 ?? null,
-      maxCodePoints: 8000,
-      maxBytes: 65536,
-      continuation,
-    });
-    if (!read.ok) return null;
-    if (!first) first = read.value.evidence;
-    body += read.value.evidence.excerpt;
-    if (Array.from(body).length > 65536) return null;
-    continuation = read.value.next;
-  } while (continuation);
+  if (!textCache.has(node.path)) {
+    let continuation: string | null = null;
+    let body = '';
+    let first: KnowledgeEvidence | null = null;
+    do {
+      const read = await provider.read({
+        document: { source: publication.source, path: node.path },
+        expectedSha256: first?.sha256 ?? null,
+        maxCodePoints: 8000,
+        maxBytes: 65536,
+        continuation,
+      });
+      if (!read.ok) {
+        textCache.set(node.path, null);
+        return null;
+      }
+      if (!first) first = read.value.evidence;
+      body += read.value.evidence.excerpt;
+      if (Array.from(body).length > 65536) {
+        textCache.set(node.path, null);
+        return null;
+      }
+      continuation = read.value.next;
+    } while (continuation);
+    textCache.set(node.path, first ? { body, first } : null);
+  }
+  const cached = textCache.get(node.path);
+  if (!cached) return null;
+  const { body, first } = cached;
   if (
     !first?.archive ||
     !first.excerpt ||
@@ -458,7 +485,7 @@ async function archivedAnchor(
 export async function publishArchiveStructure(plan: ArchiveStructurePlan) {
   assert(isAbsolute(plan.publicationPath) && isAbsolute(plan.artifactPath));
   assert(plan.kind === 'nx' || plan.kind === 'graft');
-  integer(plan.maxEdges, 1, 200);
+  integer(plan.maxEdges, 1, 500);
   assert(plan.paths.length >= 1 && plan.paths.length <= 200);
   const allowed = new Set(plan.paths.map(relativePath));
   assert.equal(allowed.size, plan.paths.length);
@@ -482,6 +509,10 @@ export async function publishArchiveStructure(plan: ArchiveStructurePlan) {
   });
   const anchors = new Map<string, Anchor>();
   const sourceTexts = new Map<string, string>();
+  const textCache = new Map<
+    string,
+    { body: string; first: KnowledgeEvidence } | null
+  >();
   const unavailable = new Set<string>();
   const skipped: Record<string, number> = {};
   const skip = (reason: string) => {
@@ -529,7 +560,12 @@ export async function publishArchiveStructure(plan: ArchiveStructurePlan) {
       } catch {
         continue;
       }
-      const anchor = await archivedAnchor(provider, publication, node);
+      const anchor = await archivedAnchor(
+        provider,
+        publication,
+        node,
+        textCache,
+      );
       if (!anchor || hash(current) !== anchor.original_sha256) {
         unavailable.add(node.id);
         continue;
@@ -726,8 +762,12 @@ export async function publishArchiveStructure(plan: ArchiveStructurePlan) {
         : null;
     return null;
   };
-  for (const edge of parsed.edges) {
-    if (assertions.length >= plan.maxEdges) break;
+  for (let edgeIndex = 0; edgeIndex < parsed.edges.length; edgeIndex++) {
+    if (assertions.length >= plan.maxEdges) {
+      skipped['edge-budget'] = parsed.edges.length - edgeIndex;
+      break;
+    }
+    const edge = parsed.edges[edgeIndex];
     if (edge.source === edge.target) {
       skip('self-edge');
       continue;
