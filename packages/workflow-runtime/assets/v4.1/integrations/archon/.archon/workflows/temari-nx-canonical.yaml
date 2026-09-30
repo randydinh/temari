@@ -1,0 +1,40 @@
+name: temari-nx-canonical
+description: Model-free six-stage Nx receipt conformance journey.
+inputs:
+  bridge:
+    required: true
+  finalizer:
+    required: true
+  spec:
+    required: true
+evidence_policy:
+  required: true
+nodes:
+  - id: investigate
+    mutates_checkout: false
+    bash: bun "$INPUTS_BRIDGE" capture --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --spec "$INPUTS_SPEC" --stage investigate
+  - id: plan
+    depends_on: [investigate]
+    mutates_checkout: false
+    bash: bun "$INPUTS_BRIDGE" capture --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --spec "$INPUTS_SPEC" --stage plan
+  - id: build
+    depends_on: [plan]
+    mutates_checkout: false
+    bash: bun "$INPUTS_BRIDGE" capture --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --spec "$INPUTS_SPEC" --stage build
+  - id: review
+    depends_on: [build]
+    mutates_checkout: false
+    bash: bun "$INPUTS_BRIDGE" capture --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --spec "$INPUTS_SPEC" --stage review
+  - id: verify
+    depends_on: [review]
+    mutates_checkout: false
+    bash: bun "$INPUTS_BRIDGE" capture --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --spec "$INPUTS_SPEC" --stage verify
+  - id: deliver
+    depends_on: [verify]
+    mutates_checkout: false
+    bash: bun "$INPUTS_BRIDGE" capture --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --spec "$INPUTS_SPEC" --stage deliver
+  - id: finalize
+    depends_on: [deliver]
+    always_run: true
+    mutates_checkout: false
+    bash: node --import @swc-node/register/esm-register "$INPUTS_FINALIZER" --bridge "$INPUTS_BRIDGE" --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --spec "$INPUTS_SPEC"
