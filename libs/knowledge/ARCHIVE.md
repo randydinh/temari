@@ -85,12 +85,69 @@ observation. Persistence failures throw `ArchivePersistenceError` rather than
 claiming durable completion. Do not delete failed receipts to make a retry appear
 clean.
 
+## Rebind after an implementation upgrade
+
+The archive reader pins its Registrar source, Python, protocol and Temari adapter
+implementation. After an implementation change, its old publication cannot be
+used by the new reader. Keep that publication and its pre-capture binding. To
+admit the **same retained generation** under the new implementation, an operator
+can create `/absolute/rebind.json`:
+
+```json
+{
+  "priorPublicationPath": "/absolute/task/archive-publication-OLD_BINDING.json",
+  "transport": {
+    "python": "/absolute/isolated/python",
+    "registrarSource": "/absolute/new-registrar-source",
+    "workspace": "/absolute/registrar-state"
+  }
+}
+```
+
+```sh
+pnpm nx run knowledge:demo -- rebind --input /absolute/rebind.json
+```
+
+The result gives a new `publicationPath` and an immutable `auditPath`. Rebind
+checks the old binding or prior rebind audit, current source registration and
+access, the exact generation and manifest, capture fingerprint, counts,
+preservation and capability gaps. It reads retained archive bytes through
+Registrar's `inspect` operation. It never calls capture or reads the current
+originals. Missing originals alone do not prevent it. Changed or disabled
+registration, a missing/corrupt manifest, or a changed capture receipt refuse
+publication. Replaying identical input is idempotent. Keep every older
+publication and audit; later upgrades can rebind the most recent publication.
+Use the new publication path for new retrieval checkpoints. Existing checkpoints
+remain pinned to their previous provider identity and cannot be resumed with a
+new publication.
+
 ## Search, select and checkpoint
 
 The read role receives publication paths, not a capture capability. Its provider
 has only `identity`, `discover`, `read`, and `revalidate`. It supports up to eight
 explicit publications in one workspace, one generation per source. No discovered
 source or path expands admission.
+
+The default `createArchiveRegistrar({ publications, readScope: 'source-root' })`
+uses exact lexical discovery. Set `discoveryMode: 'bm25'` in the reader config to
+ask Registrar to rank the **selected retained snapshot text** with SQLite FTS5
+BM25. The result keeps its original document hashes and explicit source pins;
+document order is the BM25 order, and applicability identifies it as a ranked
+candidate. Its continuation is bound to the selected publications, query, and
+mode. Changing mode requires a new reader identity and a fresh discovery pass.
+BM25 is an opt-in shortlist, not an evidence assertion or semantic recall proof.
+Registrar may refuse an overlarge selected corpus or an installation without FTS5.
+
+For a published archived graph generation, `createArchiveGraphReader` accepts the
+same publication paths and whole-root admission. Call `read({ graphId, scope,
+limit, maxBytes, cursor, nodeId? })` for bounded pages or a one-hop expansion.
+Call `projection(graphId, scope)` only when the complete directed projection fits
+the transport bound. The reader verifies publication identity and current source
+admission before every CLI call, requires the graph's exact RevisionSet scope,
+checks every returned anchor against the publication pins, and returns historical
+qualifiers. Graph nodes and assertions guide navigation; use the ordinary archive
+`read` method to retrieve and revalidate original source text. The projection
+reports `native-graphify-adapter-not-configured` until a native proof exists.
 
 Create `/absolute/search.json`:
 
@@ -238,6 +295,7 @@ outside this profile. Checkpoints are immutable local evidence, not authenticate
 statements about their author. Publication references do not implement backup,
 erasure, disaster recovery, semantic recall, or multiuser authorization.
 
-Nx project/AST navigation, Graft, Graphify generation, BM25, Jev judging, OCR,
-visual interpretation, remote connectors and SkillOpt remain future integrations.
+Nx project/AST navigation, Graft, native Graphify generation, Jev promotion beyond
+the mocked shadow adapter, OCR, visual interpretation and remote connectors remain
+future integrations. SkillOpt is deferred by the owner.
 Archive fixtures that resemble repositories do not certify those capabilities.

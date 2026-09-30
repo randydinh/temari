@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import {
+  constants,
   link,
   lstat,
   open,
@@ -59,11 +60,34 @@ export async function publishJson(path: string, value: unknown): Promise<void> {
   }
 }
 export async function readJson(path: string): Promise<unknown> {
+  return (await readJsonWithBytes(path)).value;
+}
+
+/** Read exact artifact bytes from one regular file descriptor with a hard byte cap. */
+export async function readJsonWithBytes(
+  path: string,
+): Promise<{ readonly value: unknown; readonly bytes: Buffer }> {
   assert(
     isAbsolute(path) && (await realpath(path)) === path,
     'Canonical artifact required',
   );
-  const stat = await lstat(path);
-  assert(stat.isFile() && stat.size <= 1_048_576, 'Artifact exceeds bound');
-  return JSON.parse(await readFile(path, 'utf8'));
+  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  try {
+    const stat = await file.stat();
+    assert(stat.isFile() && stat.size <= 1_048_576, 'Artifact exceeds bound');
+    const chunks: Buffer[] = [];
+    let size = 0;
+    for (;;) {
+      const next = Buffer.allocUnsafe(Math.min(65536, 1_048_577 - size));
+      const { bytesRead } = await file.read(next, 0, next.length, null);
+      if (bytesRead === 0) break;
+      size += bytesRead;
+      assert(size <= 1_048_576, 'Artifact exceeds bound');
+      chunks.push(next.subarray(0, bytesRead));
+    }
+    const bytes = Buffer.concat(chunks, size);
+    return { value: JSON.parse(bytes.toString('utf8')), bytes };
+  } finally {
+    await file.close();
+  }
 }

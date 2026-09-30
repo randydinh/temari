@@ -36,6 +36,8 @@ import {
 export interface ArchiveRegistrarOptions {
   readonly publications: readonly string[];
   readonly readScope: 'source-root';
+  /** Explicit opt-in. Exact lexical discovery remains the default. */
+  readonly discoveryMode?: 'exact' | 'bm25';
 }
 function path(value: unknown): string {
   const p = text(value);
@@ -76,6 +78,8 @@ export async function createArchiveRegistrar(
     'Whole selected source admission required',
   );
   assert(options.publications.length >= 1 && options.publications.length <= 8);
+  const discoveryMode = options.discoveryMode ?? 'exact';
+  assert(['exact', 'bm25'].includes(discoveryMode));
   const paths = [...options.publications];
   const pubs = await Promise.all(paths.map(loadArchivePublication));
   assert.equal(
@@ -100,7 +104,9 @@ export async function createArchiveRegistrar(
       'Publication protocol changed',
     );
   }
-  const configuration = hash(canonical(pubs));
+  const configuration = hash(
+    canonical(discoveryMode === 'exact' ? pubs : { pubs, discoveryMode }),
+  );
   const identity = Object.freeze({
     instance: `registrar-archive:${hash(pubs[0].transport.workspace)}`,
     implementation: transport.implementation,
@@ -341,6 +347,7 @@ export async function createArchiveRegistrar(
           canonical({
             scope: selected.map((p) => p.source),
             query: request.query,
+            mode: discoveryMode,
           }),
         );
         const prior =
@@ -361,10 +368,22 @@ export async function createArchiveRegistrar(
           '--max-bytes',
           String(request.maxBytes),
         ];
+        if (discoveryMode === 'bm25') args.push('--mode', 'bm25');
         if (prior) args.push('--cursor', text(prior['cursor']));
         const r = await transport.invoke('discover', args, request.maxBytes);
         historical(r);
         assert.equal(r['integrity'], 'verified');
+        if (discoveryMode === 'bm25') {
+          assert.equal(r['route'], 'archive-bm25');
+          assert.equal(r['ranker'], 'sqlite-fts5-bm25-v1');
+          assert.equal(r['tokenizer'], 'unicode61 remove_diacritics 0');
+          digest(r['index_digest']);
+          assert.equal(r['shortlist_truncated'], false);
+          text(r['sqlite_version']);
+        } else {
+          assert.equal(r['route'], undefined);
+          assert.equal(r['ranker'], undefined);
+        }
         const pins = list(r['snapshots']).map(object);
         assert.equal(pins.length, selected.length);
         for (const p of selected) {
@@ -385,7 +404,9 @@ export async function createArchiveRegistrar(
             document: { source: p.source, path: path(d['path']) },
             sha256: digest(d['sha256']),
             applicability:
-              'Exact lexical archive match; current originals not checked',
+              discoveryMode === 'bm25'
+                ? 'BM25-ranked archived text candidate; current originals not checked'
+                : 'Exact lexical archive match; current originals not checked',
             conflicts: [],
           };
         });

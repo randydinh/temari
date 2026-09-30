@@ -392,3 +392,4 @@ test('ACTUAL CLI: implementation files beyond retrieval.py and configuration are
 });
 
 import './archive.integration.test.js';
+import './archive-graph.integration.test.js';
