@@ -119,7 +119,7 @@ test('routes uncertain callers to a full playbook', () => {
   assert.equal(decision.playbook, null);
 });
 
-test('keeps a closed route table with one QA domain owner', () => {
+test('keeps a closed route table with QA and program owners', () => {
   validateTemariRouteTable();
   assert.deepEqual(
     TEMARI_ROUTE_TABLE.map(({ profileKind, route, owner }) => ({
@@ -135,7 +135,56 @@ test('keeps a closed route table with one QA domain owner', () => {
       },
       { profileKind: 'playbook', route: 'full-playbook', owner: 'poteto-mode' },
       { profileKind: 'domain', route: 'qa-review', owner: './qa-review' },
+      { profileKind: 'program', route: 'program', owner: 'temari' },
     ],
+  );
+});
+
+test('routes explicit program intent to Temari before engineering size', () => {
+  const decision = classifyTemariRoute({
+    workType: 'migration',
+    lightweight: LIGHTWEIGHT_EVIDENCE,
+    programKind: 'orchestrate',
+  });
+  assert.deepEqual(decision, {
+    profileKind: 'program',
+    route: 'program',
+    owner: 'temari',
+    requestScope: 'full',
+    programKind: 'orchestrate',
+    admission: 'planning-only',
+  });
+
+  const request = createRequestPlan({
+    workType: 'migration',
+    lightweight: LIGHTWEIGHT_EVIDENCE,
+    programKind: 'autopilot-stack',
+  });
+  assert.equal(request.route.profileKind, 'program');
+  assert.equal(request.plan.workType, 'migration');
+});
+
+test('rejects a program mixed with QA or nested under a bounded subtask', () => {
+  assert.throws(
+    () =>
+      classifyTemariRoute({
+        workType: 'qa',
+        lightweight: LIGHTWEIGHT_EVIDENCE,
+        programKind: 'orchestrate',
+        qaResponsibility: 'ticket-coverage',
+      }),
+    /cannot also declare QA/,
+  );
+  assert.throws(
+    () =>
+      classifyTemariRoute({
+        workType: 'migration',
+        lightweight: LIGHTWEIGHT_EVIDENCE,
+        programKind: 'orchestrate',
+        requestScope: 'bounded-subtask',
+        parentReviewId: 'review-1',
+      }),
+    /bounded subtask cannot start/,
   );
 });
 

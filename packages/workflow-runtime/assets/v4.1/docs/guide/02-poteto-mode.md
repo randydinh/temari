@@ -23,7 +23,7 @@ flowchart TD
     J --> K
 ```
 
-The diagram shows the common full routes. Clear, local, reversible work can use the [Lightweight engineering route](../../skills/poteto-mode/playbooks/lightweight-engineering.md). It keeps Poteto's investigate, plan, build, review, verify, and deliver lifecycle under one serial owner while omitting ceremony the risk does not justify. There are also playbooks for hillclimbing a metric, diagnosing runtime symptoms and captured traces, prototypes, visual parity, authoring and evaluating skills, autonomous runs, babysitting a PR or stack to merge-ready, shipping a verified stack, running a PR queue on autopilot, orchestrating project-scale programs, session pickup, pausing safely, multi-phase plans, and worktree cleanup. The [playbook directory](../../skills/poteto-mode/playbooks/) has the full set.
+The diagram shows the common full routes. Clear, local, reversible work can use the [Lightweight engineering route](../../skills/poteto-mode/playbooks/lightweight-engineering.md). It keeps Poteto's investigate, plan, build, review, verify, and deliver lifecycle under one serial owner while omitting ceremony the risk does not justify. There are also playbooks for hillclimbing a metric, diagnosing runtime symptoms and captured traces, prototypes, visual parity, authoring and evaluating skills, babysitting a PR or stack to merge-ready, shipping a verified stack, and worktree cleanup. Temari owns autonomous runs, PR-queue programs, project-scale orchestration, session pickup, pauses, and multi-phase programs; the files here remain method references for existing runs. The [playbook directory](../../skills/poteto-mode/playbooks/) has the full set.
 
 ## Say the goal, not the ceremony
 

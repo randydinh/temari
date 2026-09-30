@@ -21,14 +21,21 @@ Be the user's conversational entry point. Help them turn an incomplete request i
   Use explicit profile references and the native secret store supplied by the active
   Temari installation. Capturing a credential never expands existing permission.
 - When work depends on an external service, API, MCP server, connector, or authenticated application, read [`references/integration-discovery.md`](references/integration-discovery.md) and complete its inventory gate before planning, delegation, or implementation. Preserve the difference between a provider being mentioned, configured, exposed to the current session, authenticated, suitable, and live-verified. Use only the action derived by the checker; do not write the action into the receipt or propose a different one.
-- For every software engineering request, read the sibling [`poteto-mode`](../poteto-mode/SKILL.md) skill and let it classify the route. This includes trivial code, configuration, repository documentation, tests, investigation, design, implementation, debugging, refactoring, performance work, review, and delivery. Do not bypass poteto-mode because the work looks small. Poteto mode owns the lightweight-versus-full-workflow decision, engineering execution, and verification. Temari owns the dialogue and synthesis.
+- For engineering work inside a task, read the sibling [`poteto-mode`](../poteto-mode/SKILL.md) skill and let it choose the lightweight or full engineering method. This includes trivial code, configuration, repository documentation, tests, investigation, design, implementation, debugging, refactoring, performance work, review, and delivery. Do not bypass poteto-mode because the work looks small. Temari retains responsibility for program and task-lifecycle decisions.
 - Answer a small, direct request without poteto-mode only when it is not software engineering.
 - For an uncertain product idea, clarify the desired outcome and first useful increment, then let poteto-mode select the appropriate route.
 - For domain-specific work, use the relevant specialist instructions and project-owned evidence. Poteto mode may supply engineering rigor, but it does not replace domain authority.
 - For a review or investigation of logs or traces in Seq, read the sibling [`seq-log-review`](../seq-log-review/SKILL.md) skill and follow its bounded evidence contract.
 - For knowledge retrieval, use an available configured source provider. Respect its source boundaries and citations, and report incomplete coverage. No one knowledge backend is required for Temari to function.
 
-Do not duplicate poteto-mode's playbook catalog here. Temari delegates to that maintained source.
+## Program and task lifecycle
+
+- Temari owns the goal, standing orders, human gates, current evidence, and completion decision for a multi-phase program, autonomous run, or PR queue. Poteto supplies the technical method for each bounded engineering unit. The existing Orchestrate, Autopilot, and Multi-phase playbooks are method references; they do not create a second Temari authority.
+- Classify a new standing program as a Temari program. The current typed route is planning-only; the serial runtime refuses it before running stages or writing a completion receipt. Do not initialize the plain-file `orch` store as a second source of truth. The bundled Orchestrate playbook and `orch` remain available only to resume a program already recorded there. Report missing scheduling, recovery, or evidence capability instead of claiming program completion.
+- Archon owns native start, status, and exact-run resume through the execution-harness port. Its native status is not a Temari closeout receipt. Until canonical stage-receipt parity is proven, use the authoritative serial or host-supported path for completion and treat native Archon status as supporting evidence.
+- Temari owns pause, pickup, and closeout selection across tasks. Use Poteto's existing pause-safely and session-pickup playbooks for the mechanics of an engineering task, and the sibling [`closeout`](../closeout/SKILL.md) skill only for an explicit durable exit. An incomplete task pauses rather than closes.
+
+Do not duplicate poteto-mode's engineering playbook catalog here. Temari delegates bounded engineering units to that maintained source.
 
 ## Stay portable
 

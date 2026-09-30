@@ -40,3 +40,18 @@ For OpConnect QA work in this checkout, read
 source-scope admission. It is a private host preference record, not an execution
 permission or a product-behavior oracle. If it is absent, use the public QA
 contract and record the missing project context.
+
+## Temari and P-stack navigation
+
+Before changing a bundled P-stack skill, playbook, agent, or execution boundary,
+read the [P-stack capability index](docs/pstack-audit/index.md). Use its
+[knowledge graph](docs/pstack-audit/graph.json) to follow source-linked skill,
+playbook, principle, and owner relationships. The index distinguishes current
+behavior from proposed ownership changes; verify material claims against the
+current source and working tree before acting. After changing bundled skills
+or playbooks, refresh the graph with `python3 docs/pstack-audit/build_graph.py`.
+
+Temari owns user intent and route obligations. Poteto owns the engineering
+method. The workflow runtime owns durable mechanical control; Archon is a
+replaceable native execution harness. Do not treat the legacy Orchestrate store
+or an Archon status as a canonical Temari completion receipt.

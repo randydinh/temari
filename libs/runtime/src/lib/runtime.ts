@@ -849,6 +849,11 @@ export type ExecuteRequestPlanAndPersistRequest =
 export async function executeRequestPlanAndPersist(
   request: ExecuteRequestPlanAndPersistRequest,
 ): Promise<WorkflowReceipt> {
+  if (request.requestPlan.route.profileKind === 'program') {
+    throw new Error(
+      'Temari program route is planning-only until durable program execution and canonical receipt parity are admitted.',
+    );
+  }
   return executeAndPersist({
     ...request,
     plan: request.requestPlan.plan,
