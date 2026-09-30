@@ -56,6 +56,8 @@ export interface CodexExecWorkerOptions {
   readonly timeoutMs: number;
   readonly outputLimitBytes?: number;
   readonly signal?: AbortSignal;
+  /** For isolated synthetic read-only probes outside a Git checkout. */
+  readonly skipGitRepoCheck?: boolean;
 }
 
 interface ProcessEvidence {
@@ -159,6 +161,7 @@ async function executeCodexExecWorker(
     '--ephemeral',
     '--sandbox',
     sandbox,
+    ...(options.skipGitRepoCheck ? ['--skip-git-repo-check'] : []),
     '--cd',
     options.workspaceRoot,
     '--output-schema',
