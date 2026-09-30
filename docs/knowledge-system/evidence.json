@@ -1,0 +1,3162 @@
+{
+  "schema_version": 1,
+  "kind": "temari-knowledge-design-evidence",
+  "as_of": "2026-09-29",
+  "baseline": "664144d17272697d68e045143f0ede0458ee6eca",
+  "status": "design-only",
+  "scope": "Selected primary documentation, pinned local contracts, candidate designs and trusted task brief; no private corpus inventory",
+  "sources": [
+    {
+      "id": "S-request",
+      "locator": "task:registrar-knowledge-design-20260929/research-brief",
+      "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a",
+      "reading_status": "Read supplied brief in full; trusted task synthesis, not independent runtime verification",
+      "intended_influence": "Latest selected tool roles and two-agent flow; constraints, proposed lifecycle and open model-role decision"
+    },
+    {
+      "id": "S-memory",
+      "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md",
+      "revision": "sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33",
+      "reading_status": "Selected local historical record read; local byte hash is the observed revision; linked historical commit is navigational lineage",
+      "intended_influence": "Historical aspiration, formerly undecided agent ownership, retention and Jev limits"
+    },
+    {
+      "id": "S-recovered",
+      "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md",
+      "revision": "sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc",
+      "reading_status": "Selected local historical record read; local byte hash is the observed revision; linked historical commit is navigational lineage",
+      "intended_influence": "Historical exact/sparse/relationship retrieval and evaluation proposals"
+    },
+    {
+      "id": "S-history",
+      "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md",
+      "revision": "sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb",
+      "reading_status": "Selected local historical record read; local byte hash is the observed revision; linked historical commit is navigational lineage",
+      "intended_influence": "Historical Graft/Graphify/OKF split, provenance and non-destructive identity"
+    },
+    {
+      "id": "S-contract",
+      "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/contracts/src/lib/knowledge.ts",
+      "revision": "664144d17272697d68e045143f0ede0458ee6eca",
+      "reading_status": "Read knowledge interfaces directly at pinned checkout",
+      "intended_influence": "Preserve KnowledgeProvider and coverage semantics; extend rather than reinterpret"
+    },
+    {
+      "id": "S-adapter",
+      "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/src/lib/registrar.ts",
+      "revision": "664144d17272697d68e045143f0ede0458ee6eca",
+      "reading_status": "Directly inspected implementationDigest, pin and invoke; README supported-boundary sections read",
+      "intended_influence": "Provider integrity behavior, actual CLI integration and snapshot/currentness limits"
+    },
+    {
+      "id": "S-knowledge",
+      "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/README.md",
+      "revision": "664144d17272697d68e045143f0ede0458ee6eca",
+      "reading_status": "Read in full at pinned checkout",
+      "intended_influence": "Existing investigation, immutable checkpoints, exact UTF-8 evidence and explicit gaps"
+    },
+    {
+      "id": "S-retrieval",
+      "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py",
+      "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c",
+      "reading_status": "Read _corpus verification loop, discover and read_document via git show",
+      "intended_influence": "Pagination exists; consumed is enumeration progress; corpus rebuilding is a static cost finding"
+    },
+    {
+      "id": "S-registrar-status",
+      "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/IMPLEMENTATION_STATUS.md",
+      "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c",
+      "reading_status": "Reported in trusted research brief; not rerun or independently read in this increment",
+      "intended_influence": "Historical transitive required-context repair, six-tool MCP profile and inconclusive comparison; no performance proof"
+    },
+    {
+      "id": "S-workers",
+      "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
+      "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353",
+      "reading_status": "Read preserved byte-identical snapshot in full; 12239 bytes, SHA-256 9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353; originally git show a2c80bcf98442700289cea090d0ff90bdd59dd27:docs/knowledge-workers-design.md. Original commit is local-only/unpushed (controller reports GitHub HTTP422 No commit found); archived source candidate, not implemented by this PR; candidate tests not rerun",
+      "intended_influence": "Archived local-only/unpushed intake/publication and generic continuation candidate; combined integration remains proposed"
+    },
+    {
+      "id": "S-generations",
+      "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
+      "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11",
+      "reading_status": "Read full design via git show; implementation b56d8a8ee46c4d5139a9466753451d09cd10f9be and historical tests are reported",
+      "intended_influence": "Reuse immutable single-source records and reified projection; identify archive/multi-source/OKF gaps"
+    },
+    {
+      "id": "S-reconcile",
+      "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/handoffs/persistent-knowledge-retrieval-reconciliation-2026-09-21.md",
+      "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11",
+      "reading_status": "Read handoff via git show",
+      "intended_influence": "Preserve RevisionSet/Investigation direction while superseding undecided two-agent topology"
+    },
+    {
+      "id": "S-nx",
+      "locator": "https://nx.dev/docs/features/explore-graph",
+      "revision": "official-docs observed 2026-09-29",
+      "reading_status": "Official page opened; project/task graph sections inspected",
+      "intended_influence": "Nx is project/task navigation, not a complete symbol/behavior graph"
+    },
+    {
+      "id": "S-graft",
+      "locator": "https://github.com/trailhq/Graft/tree/d34c115155f4d3cd0debe3f60a7edb3120981bbb",
+      "revision": "d34c115155f4d3cd0debe3f60a7edb3120981bbb",
+      "reading_status": "Official repository README opened; revision from trusted research brief; no execution",
+      "intended_influence": "Deterministic structure versus optional summaries, language gaps, blast and LSP"
+    },
+    {
+      "id": "S-graphify",
+      "locator": "https://github.com/Graphify-Labs/graphify/blob/1cd9a36c0c57a661d2d2234bc3207e887e1ba104/graphify/build.py",
+      "revision": "1cd9a36c0c57a661d2d2234bc3207e887e1ba104",
+      "reading_status": "Official builder opened; installed builder API inspected directly; dedup URL failed, active call verified locally",
+      "intended_influence": "Directed simple graph, controlled canonical identity, reification and exact topology checks"
+    },
+    {
+      "id": "S-local-graphify",
+      "locator": "pkg:pypi/graphifyy@0.9.49",
+      "revision": "installed distribution metadata 0.9.49; build.py sha256:6e181353a94a5547ceb8cfa0832b13228c2b98d4de96863337fec40c4099f511",
+      "reading_status": "Inspected installed build_from_json and export.to_json; executed scoped projection separately",
+      "intended_influence": "Actual local artifact version; do not confuse with historical reported 0.9.63 roundtrip or upstream revision"
+    },
+    {
+      "id": "S-okf",
+      "locator": "https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/ad30107c31c06aec8a7d5636e0d1058118604e6f/SPEC.md",
+      "revision": "ad30107c31c06aec8a7d5636e0d1058118604e6f; spec v0.2",
+      "reading_status": "Official main spec opened; pinned observed revision supplied by brief",
+      "intended_influence": "Portable Markdown profile; path identity, required type, extension needed for immutable provenance"
+    },
+    {
+      "id": "S-jev",
+      "locator": "https://docs.typesafe.ai/introduction",
+      "revision": "official-docs observed 2026-09-29",
+      "reading_status": "Official page read; no provider request or local accuracy experiment",
+      "intended_influence": "Typed judgment rather than text generation"
+    },
+    {
+      "id": "S-jev-models",
+      "locator": "https://docs.typesafe.ai/models",
+      "revision": "official-docs observed 2026-09-29",
+      "reading_status": "Official page read; no provider request or local accuracy experiment",
+      "intended_influence": "Text-only input, resolved model version and alias behavior"
+    },
+    {
+      "id": "S-jev-confidence",
+      "locator": "https://docs.typesafe.ai/confidence",
+      "revision": "official-docs observed 2026-09-29",
+      "reading_status": "Official page read; no provider request or local accuracy experiment",
+      "intended_influence": "Choice/Score distribution-derived confidence; Noul has no separate confidence"
+    },
+    {
+      "id": "S-skill-config",
+      "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/skillopt_sleep/config.py",
+      "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1",
+      "reading_status": "Read DEFAULTS directly from pinned primary source; not executed",
+      "intended_influence": "test_fraction=0.0; gate_no_regression=false; default staging is not adequate evaluation"
+    },
+    {
+      "id": "S-skill-gate",
+      "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/skillopt_sleep/gate.py",
+      "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1",
+      "reading_status": "Read full evaluate_gate and select_gate_score from pinned primary source; not executed",
+      "intended_influence": "Strict aggregate improvement is not statistical or per-task non-regression proof"
+    },
+    {
+      "id": "S-skill-sleep",
+      "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/docs/sleep/README.md",
+      "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1",
+      "reading_status": "Read how-it-works, data boundary and handoff/version guidance from pinned primary source; not executed",
+      "intended_influence": "Preview status, manual adoption, provider-dependent data egress and generative session handoff"
+    },
+    {
+      "id": "S-skill-eval",
+      "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/docs/sleep/evalkit.md",
+      "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1",
+      "reading_status": "Read paired-evaluation purpose and inputs from pinned primary source; not executed",
+      "intended_influence": "Paired binary outcomes, bootstrap intervals and separation from nightly gate"
+    },
+    {
+      "id": "S-skill-env",
+      "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/skillopt/envs/base.py",
+      "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1",
+      "reading_status": "Read EnvAdapter lifecycle, rollout and reflection API sections from pinned primary source; not executed",
+      "intended_influence": "Temari custom task environments and real outcomes"
+    },
+    {
+      "id": "S-skill-backend",
+      "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/skillopt_sleep/backend.py",
+      "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1",
+      "reading_status": "Read Backend attempt_with_tools and handoff dispatch sections from pinned primary source; not executed",
+      "intended_influence": "Default tool intent marker is not real tool execution; generative reflection and backend boundaries"
+    },
+    {
+      "id": "S-jev-rerank",
+      "locator": "https://docs.typesafe.ai/cookbooks/rerank_typesafe",
+      "revision": "official-docs observed 2026-09-29",
+      "reading_status": "Opened official cookbook; method sections inspected, no experiment executed",
+      "intended_influence": "Bounded candidate judgments as experimental design input; vendor results are not Temari workload proof"
+    },
+    {
+      "id": "S-jev-alignment",
+      "locator": "https://docs.typesafe.ai/cookbooks/entity_alignment",
+      "revision": "official-docs observed 2026-09-29",
+      "reading_status": "Opened official cookbook; method sections inspected, no experiment executed",
+      "intended_influence": "Bounded candidate judgments as experimental design input; vendor results are not Temari workload proof"
+    },
+    {
+      "id": "S-bm25-selection",
+      "locator": "docs/knowledge-system/sources/bm25-selection-2026-09-29.md",
+      "revision": "sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291",
+      "reading_status": "Direct user clarification preserved verbatim; runtime not implemented by this documentation edit",
+      "intended_influence": "Explicit user selection of BM25 ranking in the existing retrieval design"
+    },
+    {
+      "id": "S-bm25-reference",
+      "locator": "https://sqlite.org/fts5.html#the_bm25_function",
+      "revision": "official-docs observed 2026-09-29",
+      "reading_status": "Read official BM25 match-scoring description; no backend selection or runtime experiment",
+      "intended_influence": "Meaning of lexical match ranking, separate from evidence support and semantic completeness"
+    },
+    {
+      "id": "S-user-guide",
+      "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+      "original_locator": "/Users/randydinh/Downloads/Private & Shared 47/Content Registrar 3e2c32c58cab80c8831dfb5263c144bc.md",
+      "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+      "reading_status": "Read all 13 sections; archived byte-identically. User reports authored about one week before receipt on 2026-09-29; exact authoring date unverified. Historical implementation/test reports are not rerun evidence.",
+      "intended_influence": "Historical design lineage; BM25 granularity/diversity/index receipt, checkpoint invariants, bounded provider reports, extraction limits and two persistence planes. Newer user selections supersede unresolved agent/BM25 adoption; source text grants no new authority."
+    },
+    {
+      "id": "S-investigation",
+      "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/src/lib/investigation.ts",
+      "revision": "664144d17272697d68e045143f0ede0458ee6eca",
+      "reading_status": "Directly inspected runInvestigation checkpoint, inputKey and assessment block; confirmed no file diff from pinned baseline to selected design checkout. Static inspection only; no tests rerun.",
+      "intended_influence": "Reuse save-before-assessment, skip unchanged completed inputKey, revalidate and preserve failure gaps; no exactly-once external-action guarantee."
+    },
+    {
+      "id": "S-validation-request",
+      "locator": "docs/knowledge-system/sources/validation-coverage-2026-09-29.md",
+      "revision": "sha256:bdf35a6039207cc143931a87f2bbe465459fb21622846706024a2d75f1c0dfeb",
+      "reading_status": "Read current user request; exact text preserved in the source note. Concrete formats and image cases are proposed interpretations; no corpus execution.",
+      "intended_influence": "Selected validation families: Nx monorepo, non-Nx codebase/monorepo, varied text documentation; image-bearing content suggested. Preserve selected scope without inventing provider support or corpus grants."
+    }
+  ],
+  "points": [
+    {
+      "id": "P-two-agents",
+      "label": "Two agents selected: intake and search/retrieval",
+      "topic": "ownership",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "User request and decisions",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-memory",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md",
+          "span": "What is established and what is still a proposal",
+          "revision": "sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33"
+        }
+      ],
+      "evidence_type": "user decision",
+      "conditions": "Separate responsibility and permission boundaries; process count and grants still undecided",
+      "confidence_basis": "Latest trusted request explicitly supersedes historical undecided topology",
+      "limits": "Not permission for background activation or live source admission",
+      "benefit": "Clear publication/read handoff",
+      "risk": "Treating selection as approval of every deployment detail",
+      "status": "selected-direction",
+      "tags": [
+        "ownership",
+        "user decision",
+        "selected-direction"
+      ]
+    },
+    {
+      "id": "P-authority",
+      "label": "Registrar authority remains separate from Temari orchestration",
+      "topic": "ownership",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Preserve standalone Python Registrar",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-knowledge",
+          "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/README.md",
+          "span": "Supported boundary and gaps",
+          "revision": "664144d17272697d68e045143f0ede0458ee6eca"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 2 and 4: component ownership and standalone deployment"
+        }
+      ],
+      "evidence_type": "engineering inference",
+      "conditions": "Versioned contracts; existing runtime owns tasks and persistence",
+      "confidence_basis": "Existing provider boundary supports release independence",
+      "limits": "No combined multi-source runtime verified",
+      "benefit": "Avoid duplicate source state and new scheduler",
+      "risk": "Contract drift across independent releases",
+      "status": "proposed",
+      "tags": [
+        "ownership",
+        "engineering inference",
+        "proposed"
+      ]
+    },
+    {
+      "id": "P-baseline",
+      "label": "Merged Temari has actual Registrar CLI and exact evidence",
+      "topic": "baseline",
+      "source_refs": [
+        {
+          "source_id": "S-adapter",
+          "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/src/lib/registrar.ts",
+          "span": "implementationDigest, invoke",
+          "revision": "664144d17272697d68e045143f0ede0458ee6eca"
+        },
+        {
+          "source_id": "S-contract",
+          "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/contracts/src/lib/knowledge.ts",
+          "span": "KnowledgeProvider, KnowledgeEvidence",
+          "revision": "664144d17272697d68e045143f0ede0458ee6eca"
+        },
+        {
+          "source_id": "S-knowledge",
+          "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/README.md",
+          "span": "Outcome and supported boundary",
+          "revision": "664144d17272697d68e045143f0ede0458ee6eca"
+        }
+      ],
+      "evidence_type": "current-code observation",
+      "conditions": "Local POSIX admitted source-root UTF-8 profile",
+      "confidence_basis": "Direct code and README inspection",
+      "limits": "No Jev, hostile-process sandbox or original archive guarantee",
+      "benefit": "Reuse verified byte/span and checkpoint boundaries",
+      "risk": "Mislabeling bounded investigation as general semantic memory",
+      "status": "implemented-at-pinned-base",
+      "tags": [
+        "baseline",
+        "current-code observation",
+        "implemented-at-pinned-base"
+      ]
+    },
+    {
+      "id": "P-pagination",
+      "label": "Registrar pagination exists; consumed counts enumeration",
+      "topic": "coverage",
+      "source_refs": [
+        {
+          "source_id": "S-retrieval",
+          "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py",
+          "span": "discover(): update(), _offset, _cursor",
+          "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c"
+        }
+      ],
+      "evidence_type": "current-code observation",
+      "conditions": "Cursor binds snapshot and query; remaining pages still require consumption",
+      "confidence_basis": "Code sets consumed = offset + len(documents)",
+      "limits": "Does not imply fetched passages or semantic assessment",
+      "benefit": "Preserve compatible API and avoid reimplementing pagination",
+      "risk": "False complete claims from overloaded consumed terminology",
+      "status": "implemented-in-registrar-main",
+      "tags": [
+        "coverage",
+        "current-code observation",
+        "implemented-in-registrar-main"
+      ]
+    },
+    {
+      "id": "P-context-repair",
+      "label": "Required-context repair and read-only MCP are existing baseline",
+      "topic": "baseline",
+      "source_refs": [
+        {
+          "source_id": "S-registrar-status",
+          "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/IMPLEMENTATION_STATUS.md",
+          "span": "Sep 17/9 entries as summarized in trusted brief",
+          "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c"
+        },
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Verified baseline and reuse",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        }
+      ],
+      "evidence_type": "source statement",
+      "conditions": "Registrar remote main at recorded revision",
+      "confidence_basis": "Trusted research reports current source inspection",
+      "limits": "Not independently tested here; MCP comparison inconclusive",
+      "benefit": "Reconcile candidate integration without duplicating fixes",
+      "risk": "Promoting historical test counts as this run evidence",
+      "status": "reported-implemented",
+      "tags": [
+        "baseline",
+        "source statement",
+        "reported-implemented"
+      ]
+    },
+    {
+      "id": "P-worker-candidate",
+      "label": "Publication-pinned generic workers are unmerged candidates",
+      "topic": "baseline",
+      "source_refs": [
+        {
+          "source_id": "S-workers",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
+          "span": "Responsibilities; Retrieval and continuation; Compatibility",
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
+        }
+      ],
+      "evidence_type": "source statement",
+      "conditions": "Explicitly admitted UTF-8 files and publication-pinned readers",
+      "confidence_basis": "Candidate design read via immutable commit",
+      "limits": "No combined concept-generation integration, broad corpus or retention proof",
+      "benefit": "Reuse intake and durable continuation",
+      "risk": "Blindly assuming branch-local implementation is merged/deployed",
+      "status": "candidate-unmerged",
+      "tags": [
+        "baseline",
+        "source statement",
+        "candidate-unmerged"
+      ]
+    },
+    {
+      "id": "P-generation-candidate",
+      "label": "Immutable generations already reify relationships in candidate",
+      "topic": "identity",
+      "source_refs": [
+        {
+          "source_id": "S-generations",
+          "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
+          "span": "Data shape; Graphify projection; Limits",
+          "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        }
+      ],
+      "evidence_type": "source statement",
+      "conditions": "One source and one contiguous anchor per record",
+      "confidence_basis": "Candidate design records exact topology/provenance checks",
+      "limits": "No all-original archive, multi-source generation, default retrieval or generation OKF export",
+      "benefit": "Reuse checked identity/topology substrate",
+      "risk": "Mistaking single-source record identity for stable cross-source Entity",
+      "status": "candidate-unmerged",
+      "tags": [
+        "identity",
+        "source statement",
+        "candidate-unmerged"
+      ]
+    },
+    {
+      "id": "P-nx",
+      "label": "Nx resolves projects and tasks, then scoped source resolves symbols",
+      "topic": "routing",
+      "source_refs": [
+        {
+          "source_id": "S-nx",
+          "locator": "https://nx.dev/docs/features/explore-graph",
+          "span": "Project Graph and Task Graph",
+          "revision": "official-docs observed 2026-09-29"
+        },
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Primary external evidence: Nx",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 2: Nx project graph boundary"
+        }
+      ],
+      "evidence_type": "engineering inference",
+      "conditions": "Nx repository; classify assets individually",
+      "confidence_basis": "Nx documents project/task graphs",
+      "limits": "No complete call or behavior graph established",
+      "benefit": "Cheap project-level narrowing",
+      "risk": "Missing symbol evidence if project edges are treated as semantics",
+      "status": "proposed",
+      "tags": [
+        "routing",
+        "engineering inference",
+        "proposed"
+      ]
+    },
+    {
+      "id": "P-graft",
+      "label": "Graft code structure differs from generated summaries",
+      "topic": "routing",
+      "source_refs": [
+        {
+          "source_id": "S-graft",
+          "locator": "https://github.com/trailhq/Graft/tree/d34c115155f4d3cd0debe3f60a7edb3120981bbb",
+          "span": "README: deterministic graph, blast, optional LSP",
+          "revision": "d34c115155f4d3cd0debe3f60a7edb3120981bbb"
+        },
+        {
+          "source_id": "S-history",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md",
+          "span": "THR-KNW-01 and THR-KNW-06",
+          "revision": "sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 2: Graft direction and unintegrated standing"
+        }
+      ],
+      "evidence_type": "source statement",
+      "conditions": "Non-Nx code route; pin version and test actual languages",
+      "confidence_basis": "Primary README and corrected historical record",
+      "limits": "Unsupported language fidelity and local performance unmeasured",
+      "benefit": "Structural navigation and documented diff impact",
+      "risk": "Initialization can change host config; summaries are interpretation",
+      "status": "evaluated-not-integrated",
+      "tags": [
+        "routing",
+        "source statement",
+        "evaluated-not-integrated"
+      ]
+    },
+    {
+      "id": "P-graphify",
+      "label": "Graphify directed simple graphs require assertion nodes",
+      "topic": "projection",
+      "source_refs": [
+        {
+          "source_id": "S-graphify",
+          "locator": "https://github.com/Graphify-Labs/graphify/blob/1cd9a36c0c57a661d2d2234bc3207e887e1ba104/graphify/build.py",
+          "span": "build_from_json; build deduplicate_entities call",
+          "revision": "1cd9a36c0c57a661d2d2234bc3207e887e1ba104"
+        },
+        {
+          "source_id": "S-local-graphify",
+          "locator": "pkg:pypi/graphifyy@0.9.49",
+          "span": "build_from_json and export.to_json",
+          "revision": "installed distribution metadata 0.9.49; build.py sha256:6e181353a94a5547ceb8cfa0832b13228c2b98d4de96863337fec40c4099f511"
+        },
+        {
+          "source_id": "S-generations",
+          "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
+          "span": "Graphify projection",
+          "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 2 and 8: derived view, reified assertions and exact readback"
+        }
+      ],
+      "evidence_type": "current-code observation",
+      "conditions": "Use directed=True; bypass full semantic extraction/dedup; verify post-build identities",
+      "confidence_basis": "Inspected API and local projection readback",
+      "limits": "Successful serialization is not semantic truth validation",
+      "benefit": "Preserve repeated endpoints and relationship direction",
+      "risk": "Uncontrolled dedup or rekey can conflate identity",
+      "status": "projection-executed-separately",
+      "tags": [
+        "projection",
+        "current-code observation",
+        "projection-executed-separately"
+      ]
+    },
+    {
+      "id": "P-okf",
+      "label": "OKF is portable representation, not archive or access authority",
+      "topic": "portability",
+      "source_refs": [
+        {
+          "source_id": "S-okf",
+          "locator": "https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/ad30107c31c06aec8a7d5636e0d1058118604e6f/SPEC.md",
+          "span": "Concept format, identity and relationships",
+          "revision": "ad30107c31c06aec8a7d5636e0d1058118604e6f; spec v0.2"
+        },
+        {
+          "source_id": "S-generations",
+          "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
+          "span": "Component roles",
+          "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 2 and 8: representation and uncompleted generation export"
+        }
+      ],
+      "evidence_type": "engineering inference",
+      "conditions": "Namespaced Registrar extension and validated manifest",
+      "confidence_basis": "Spec conventions do not supply immutable source revision semantics",
+      "limits": "Exporter/importer not implemented here",
+      "benefit": "Readable exchange with expandable originals",
+      "risk": "Path-only imports can lose stable identity and overtrust verified declarations",
+      "status": "proposed",
+      "tags": [
+        "portability",
+        "engineering inference",
+        "proposed"
+      ]
+    },
+    {
+      "id": "P-lossless",
+      "label": "Losslessness covers successfully captured retained bytes and visible gaps",
+      "topic": "preservation",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Lossless contract",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-memory",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md",
+          "span": "R1 and open questions",
+          "revision": "sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 4, 5 and 10: source persistence, extraction anchors and investigation persistence"
+        }
+      ],
+      "evidence_type": "engineering inference",
+      "conditions": "Explicit inventory and retention policy; track capture times, upstream watermarks, source history availability and gaps; backfill history only where supported",
+      "confidence_basis": "Separates recovery of successfully captured versions from unobserved upstream revisions and semantic recall; production requires exercised backup/restore",
+      "limits": "Versions between observations may be absent without history backfill; never promise recovery of uncaptured or purged versions; no semantic guarantee",
+      "benefit": "Recover exact captured prior originals after source change, subject to current access and retention",
+      "risk": "Summary-only storage loses original structure; untested backups or stale access/retention state can break recovery or resurrect erased material",
+      "status": "proposed",
+      "tags": [
+        "preservation",
+        "engineering inference",
+        "proposed"
+      ]
+    },
+    {
+      "id": "P-revisions",
+      "label": "RevisionSet declares multi-source versions and consistency gaps",
+      "topic": "revisions",
+      "source_refs": [
+        {
+          "source_id": "S-reconcile",
+          "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/handoffs/persistent-knowledge-retrieval-reconciliation-2026-09-21.md",
+          "span": "Recommended next bounded work",
+          "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        },
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Suggested records and corrections",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 10: multidimensional freshness and non-atomic observations"
+        }
+      ],
+      "evidence_type": "engineering inference",
+      "conditions": "One manifest per investigation with compatibility checks",
+      "confidence_basis": "Existing sequential checks cannot prove cross-system atomic snapshot",
+      "limits": "Remote capture may retain API representation rather than original binary",
+      "benefit": "Reproducible historical investigation and honest currentness",
+      "risk": "Mixed build/document/test versions can produce false conclusions",
+      "status": "proposed",
+      "tags": [
+        "revisions",
+        "engineering inference",
+        "proposed"
+      ]
+    },
+    {
+      "id": "P-identity",
+      "label": "Stable Entity and reversible IdentityLink sit above source records",
+      "topic": "identity",
+      "source_refs": [
+        {
+          "source_id": "S-generations",
+          "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
+          "span": "Data shape: source/path/local keys",
+          "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        },
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Corrections accepted: concept IDs",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-history",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md",
+          "span": "THR-KNW-03",
+          "revision": "sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 8: source/path/local-key identity and same-label separation"
+        }
+      ],
+      "evidence_type": "engineering inference",
+      "conditions": "Historical source-scoped IDs and anchors remain immutable",
+      "confidence_basis": "Path-bound IDs need distinct stable identity for rename reconciliation",
+      "limits": "Matching labels or model confidence do not establish equivalence",
+      "benefit": "Preserve same-name distinctions and reversible rename history",
+      "risk": "Destructive entity fusion spreads unsupported claims",
+      "status": "proposed",
+      "tags": [
+        "identity",
+        "engineering inference",
+        "proposed"
+      ]
+    },
+    {
+      "id": "P-assertions",
+      "label": "Assertions need multiple support and contradiction anchors",
+      "topic": "provenance",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Suggested records; continual graph improvement",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-memory",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md",
+          "span": "R3",
+          "revision": "sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33"
+        }
+      ],
+      "evidence_type": "engineering inference",
+      "conditions": "Separate origin, support status, freshness, relevance and utility",
+      "confidence_basis": "Cross-source conclusions cannot be supported by one arbitrary span",
+      "limits": "Relationship semantics require review beyond graph shape",
+      "benefit": "Trace conflicts, inference and lifecycle without erasing history",
+      "risk": "Connectivity mistaken for transitive support or test coverage",
+      "status": "proposed",
+      "tags": [
+        "provenance",
+        "engineering inference",
+        "proposed"
+      ]
+    },
+    {
+      "id": "P-intake",
+      "label": "Intake validates then atomically publishes one immutable manifest",
+      "topic": "lifecycle",
+      "source_refs": [
+        {
+          "source_id": "S-workers",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
+          "span": "Reuse and selected design",
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
+        },
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Two agents: Intake",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        }
+      ],
+      "evidence_type": "engineering inference",
+      "conditions": "One logical publisher; idempotent immutable partitions and CAS",
+      "confidence_basis": "Candidate publication design supports explicit handoff",
+      "limits": "Full archive and multi-source lifecycle still need implementation",
+      "benefit": "Crash-safe recoverable source processing",
+      "risk": "Out-of-order events or two writers can expose partial state",
+      "status": "proposed",
+      "tags": [
+        "lifecycle",
+        "engineering inference",
+        "proposed"
+      ]
+    },
+    {
+      "id": "P-retrieval-flow",
+      "label": "Retrieve with BM25 ranking, exact lookup and graph context",
+      "topic": "retrieval",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Search/retrieval and corrections",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-recovered",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md",
+          "span": "Retrieval and evaluation proposals",
+          "revision": "sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc"
+        },
+        {
+          "source_id": "S-retrieval",
+          "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py",
+          "span": "discover coverage",
+          "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c"
+        },
+        {
+          "source_id": "S-bm25-selection",
+          "locator": "docs/knowledge-system/sources/bm25-selection-2026-09-29.md",
+          "revision": "sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291",
+          "span": "User request (verbatim)"
+        },
+        {
+          "source_id": "S-bm25-reference",
+          "locator": "https://sqlite.org/fts5.html#the_bm25_function",
+          "revision": "official-docs observed 2026-09-29",
+          "span": "5.1.1 The bm25() function"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 6 and 7: independent lanes, provenance, progressive reading and omissions"
+        }
+      ],
+      "evidence_type": "engineering inference",
+      "conditions": "Quick lookup versus comprehensive investigation is explicit; BM25 is explicitly selected by the user and participates before conditional Jev reranking",
+      "confidence_basis": "Bounded continuation reuses current contracts while clarifying consumption; user clarification selects BM25, while lexical scoring does not establish claim support",
+      "limits": "No top-k or enumeration-exhausted semantic guarantee",
+      "benefit": "Less context bloat with resumable required-context work",
+      "risk": "Dropping low-ranked contradictions or dependencies biases results",
+      "status": "proposed",
+      "tags": [
+        "retrieval",
+        "engineering inference",
+        "proposed",
+        "bm25"
+      ]
+    },
+    {
+      "id": "P-cost",
+      "label": "Corpus rebuild and provider hashing are static cost hotspots",
+      "topic": "efficiency",
+      "source_refs": [
+        {
+          "source_id": "S-retrieval",
+          "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py",
+          "span": "_corpus; discover initial/final checks; read_document",
+          "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c"
+        },
+        {
+          "source_id": "S-adapter",
+          "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/src/lib/registrar.ts",
+          "span": "implementationDigest; pin; invoke",
+          "revision": "664144d17272697d68e045143f0ede0458ee6eca"
+        }
+      ],
+      "evidence_type": "current-code observation",
+      "conditions": "Current local mutable-source mode",
+      "confidence_basis": "Direct source inspection of repeated full-corpus and implementation work",
+      "limits": "No measured latency or speedup",
+      "benefit": "Targets optimization at actual work rather than model choice alone",
+      "risk": "Removing checks naively weakens evidence and executable integrity",
+      "status": "observed-not-benchmarked",
+      "tags": [
+        "efficiency",
+        "current-code observation",
+        "observed-not-benchmarked"
+      ]
+    },
+    {
+      "id": "P-serving",
+      "label": "Snapshot serving must expose its different currentness assurance",
+      "topic": "efficiency",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Additional current-code performance finding; Efficiency",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-knowledge",
+          "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/README.md",
+          "span": "Supported boundary and gaps",
+          "revision": "664144d17272697d68e045143f0ede0458ee6eca"
+        }
+      ],
+      "evidence_type": "engineering inference",
+      "conditions": "Immutable archive/provider artifact and explicit invalidation, or slower live mode",
+      "confidence_basis": "Retains checks under a clearly named assurance contract",
+      "limits": "Cannot pretend retained snapshot equals current original",
+      "benefit": "Precomputed postings, lazy reads and bounded model shortlist",
+      "risk": "Stale hashes cached for mutable paths masquerade as attestation",
+      "status": "proposed",
+      "tags": [
+        "efficiency",
+        "engineering inference",
+        "proposed"
+      ]
+    },
+    {
+      "id": "P-jev",
+      "label": "Jev supplies typed judgments and cannot generate skill prose",
+      "topic": "models",
+      "source_refs": [
+        {
+          "source_id": "S-jev",
+          "locator": "https://docs.typesafe.ai/introduction",
+          "span": "Typed decisions introduction",
+          "revision": "official-docs observed 2026-09-29"
+        },
+        {
+          "source_id": "S-jev-models",
+          "locator": "https://docs.typesafe.ai/models",
+          "span": "Current models and Customizing Jev",
+          "revision": "official-docs observed 2026-09-29"
+        },
+        {
+          "source_id": "S-jev-rerank",
+          "locator": "https://docs.typesafe.ai/cookbooks/rerank_typesafe",
+          "revision": "official-docs observed 2026-09-29",
+          "span": "How do we find one document in thousands?; What is re-ranking?"
+        },
+        {
+          "source_id": "S-jev-alignment",
+          "locator": "https://docs.typesafe.ai/cookbooks/entity_alignment",
+          "revision": "official-docs observed 2026-09-29",
+          "span": "Knowledge graph entity alignment example"
+        }
+      ],
+      "evidence_type": "source statement",
+      "conditions": "Text-only supplied state and bounded candidate options",
+      "confidence_basis": "Official documentation describes decision API",
+      "limits": "No open-ended extraction, OCR or private-corpus fine-tuning established",
+      "benefit": "Candidate relevance, support and equivalence review",
+      "risk": "Reranking cannot recover unseen evidence or write SkillOpt edits",
+      "status": "evaluated-not-integrated",
+      "tags": [
+        "models",
+        "source statement",
+        "evaluated-not-integrated"
+      ]
+    },
+    {
+      "id": "P-confidence",
+      "label": "Choice and Score confidence differs from Noul and local calibration",
+      "topic": "models",
+      "source_refs": [
+        {
+          "source_id": "S-jev-confidence",
+          "locator": "https://docs.typesafe.ai/confidence",
+          "span": "Confidence is derived from probabilities",
+          "revision": "official-docs observed 2026-09-29"
+        },
+        {
+          "source_id": "S-jev-models",
+          "locator": "https://docs.typesafe.ai/models",
+          "span": "Aliases",
+          "revision": "official-docs observed 2026-09-29"
+        }
+      ],
+      "evidence_type": "source statement",
+      "conditions": "Pin resolved model and rubric; Noul confidence remains absent",
+      "confidence_basis": "Official API documents distribution-derived confidence",
+      "limits": "Vendor confidence is not evidence of calibration on Temari tasks",
+      "benefit": "Threshold uncertainty and preserve abstention",
+      "risk": "Confident unsupported judgments or moving aliases break reproducibility",
+      "status": "evaluated-not-integrated",
+      "tags": [
+        "models",
+        "source statement",
+        "evaluated-not-integrated"
+      ]
+    },
+    {
+      "id": "P-model-fork",
+      "label": "Only Jev scope remains unresolved across Temari",
+      "topic": "models",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "User request and decisions",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        }
+      ],
+      "evidence_type": "user decision",
+      "conditions": "Conditional Jev Registrar judgments plus generative workers; strict alternative defers generative features",
+      "confidence_basis": "Trusted brief explicitly retains pending question",
+      "limits": "No assumed permission from a stored key",
+      "benefit": "Allows deterministic local increments while avoiding false approval",
+      "risk": "Starting semantic extraction or SkillOpt edits under ambiguous model authority",
+      "status": "open",
+      "tags": [
+        "models",
+        "user decision",
+        "open"
+      ]
+    },
+    {
+      "id": "P-quality",
+      "label": "Graph quality uses source refresh, reviewed feedback and blind audits",
+      "topic": "quality",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Continual graph improvement",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-history",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md",
+          "span": "THR-KNW-11",
+          "revision": "sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb"
+        }
+      ],
+      "evidence_type": "engineering inference",
+      "conditions": "Feedback creates candidates; independent anchors govern promotion",
+      "confidence_basis": "Source-only derivation and stale invalidation prevent circular evidence",
+      "limits": "Rare-domain recall and edge quality require measurement",
+      "benefit": "Improves missed links without popularity becoming truth",
+      "risk": "Self-confirming answer-to-graph feedback and neglected rare topics",
+      "status": "proposed",
+      "tags": [
+        "quality",
+        "engineering inference",
+        "proposed"
+      ]
+    },
+    {
+      "id": "P-skill-platform",
+      "label": "SkillOpt belongs to offline Temari procedure evolution",
+      "topic": "skillopt",
+      "source_refs": [
+        {
+          "source_id": "S-skill-sleep",
+          "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/docs/sleep/README.md",
+          "span": "How it works; Preview",
+          "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1"
+        },
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Primary external evidence: SkillOpt",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        }
+      ],
+      "evidence_type": "engineering inference",
+      "conditions": "Manual one-skill trial; existing lifecycle and policy retain authority",
+      "confidence_basis": "Text evolution can apply beyond Registrar retrieval",
+      "limits": "No runtime model weights, source facts or permission changes",
+      "benefit": "Reusable improvements to retrieval, planning and review",
+      "risk": "Optimizer becomes a duplicate scheduler or unauthorized fact writer",
+      "status": "proposed",
+      "tags": [
+        "skillopt",
+        "engineering inference",
+        "proposed"
+      ]
+    },
+    {
+      "id": "P-skill-gate",
+      "label": "Sleep defaults lack sealed test and per-task regression gate",
+      "topic": "skillopt",
+      "source_refs": [
+        {
+          "source_id": "S-skill-config",
+          "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/skillopt_sleep/config.py",
+          "span": "DEFAULTS test_fraction and gate_no_regression",
+          "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1"
+        },
+        {
+          "source_id": "S-skill-gate",
+          "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/skillopt_sleep/gate.py",
+          "span": "evaluate_gate",
+          "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1"
+        },
+        {
+          "source_id": "S-skill-eval",
+          "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/docs/sleep/evalkit.md",
+          "span": "Paired A/B evalkit introduction",
+          "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1"
+        }
+      ],
+      "evidence_type": "current-code observation",
+      "conditions": "Pinned SkillOpt source; stronger Temari gate proposed",
+      "confidence_basis": "Direct config and strict aggregate comparison inspected",
+      "limits": "Evalkit does not change nightly gate; no local benefit measured",
+      "benefit": "Makes admission requirements explicit before trials",
+      "risk": "Aggregate gain hides safety regressions and validation overfitting",
+      "status": "observed-not-executed",
+      "tags": [
+        "skillopt",
+        "current-code observation",
+        "observed-not-executed"
+      ]
+    },
+    {
+      "id": "P-skill-tools",
+      "label": "SkillOpt tool intent marker is not real replay execution",
+      "topic": "skillopt",
+      "source_refs": [
+        {
+          "source_id": "S-skill-backend",
+          "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/skillopt_sleep/backend.py",
+          "span": "Backend.attempt_with_tools lines 56-69",
+          "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1"
+        },
+        {
+          "source_id": "S-skill-env",
+          "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/skillopt/envs/base.py",
+          "span": "EnvAdapter.rollout and reflect",
+          "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1"
+        }
+      ],
+      "evidence_type": "current-code observation",
+      "conditions": "Temari adapter must run permitted real tools with receipts",
+      "confidence_basis": "Default method parses TOOL_CALL markers from text",
+      "limits": "Some backends override it; this does not claim all replay is fake",
+      "benefit": "Evaluate actual evidence consumption and scope",
+      "risk": "Text-only simulated success promoted as runtime improvement",
+      "status": "observed-not-executed",
+      "tags": [
+        "skillopt",
+        "current-code observation",
+        "observed-not-executed"
+      ]
+    },
+    {
+      "id": "P-skill-evaluation",
+      "label": "Skill promotion needs partitioned paired evaluation and review",
+      "topic": "evaluation",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "SkillOpt promotion requirements",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-skill-eval",
+          "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/docs/sleep/evalkit.md",
+          "span": "Paired outcomes and confidence intervals",
+          "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1"
+        },
+        {
+          "source_id": "S-skill-sleep",
+          "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/docs/sleep/README.md",
+          "span": "Data boundary",
+          "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1"
+        }
+      ],
+      "evidence_type": "engineering inference",
+      "conditions": "Sanitized admitted trajectories; separate tuning/validation/sealed final-test by family/time",
+      "confidence_basis": "Paired comparisons and independent review address gate weaknesses",
+      "limits": "Small samples may remain inconclusive; no benefit guaranteed",
+      "benefit": "Prevent leakage, citation/access regression and unreviewed deployment",
+      "risk": "Repeated final-test tuning contaminates evidence",
+      "status": "proposed",
+      "tags": [
+        "evaluation",
+        "engineering inference",
+        "proposed"
+      ]
+    },
+    {
+      "id": "P-access",
+      "label": "Deletion, unavailable source, revocation and purge differ",
+      "topic": "preservation",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Lossless contract",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-memory",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md",
+          "span": "R5 and open questions",
+          "revision": "sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 4 and 10: admitted scope, unavailable sources, revocation and retention"
+        }
+      ],
+      "evidence_type": "engineering inference",
+      "conditions": "Current authorization applies even to historical recovery and derived views",
+      "confidence_basis": "Recovery and erasure need distinct lifecycle states",
+      "limits": "Private account retention policy still open",
+      "benefit": "Honest recovery guarantees and access invalidation",
+      "risk": "Tombstone confused with purge, or old checkpoint leaks revoked evidence",
+      "status": "proposed",
+      "tags": [
+        "preservation",
+        "engineering inference",
+        "proposed"
+      ]
+    },
+    {
+      "id": "P-journey",
+      "label": "Synthetic v1/v2 journey must prove recovery, resume and currentness",
+      "topic": "evaluation",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Corrections accepted: synthetic trajectory; delivery sequence",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-workers",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
+          "span": "Retrieval and continuation",
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
+        }
+      ],
+      "evidence_type": "engineering inference",
+      "conditions": "Combine both candidates with explicit local archive first; exercise synthetic backup/restore of byte objects, manifests, retained extraction outputs/provenance and access/retention state; verify hashes, rebuild/check derived views and respect current revocation/erasure in a recovery receipt",
+      "confidence_basis": "Each proof isolates preservation, publication and temporal semantics; capture-gap cases prevent claims about unobserved versions; unsupported image interpretation records the omitted asset, known region gaps and explicitly unknown internal structure",
+      "limits": "No real connector or ranking/model proof in design increment",
+      "benefit": "Early end-to-end evidence before new ranking promotion",
+      "risk": "Unit-only checks hide integration and historical-currentness failures",
+      "status": "proposed-not-executed",
+      "tags": [
+        "evaluation",
+        "engineering inference",
+        "proposed-not-executed"
+      ]
+    },
+    {
+      "id": "P-metrics",
+      "label": "Evaluate required evidence and complete tasks, not graph size",
+      "topic": "evaluation",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Acceptance/evaluation",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-recovered",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md",
+          "span": "Evaluation set",
+          "revision": "sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc"
+        },
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 12 and 13: coverage distinctions, complete-task evaluation and unselected OCPP example"
+        }
+      ],
+      "evidence_type": "engineering inference",
+      "conditions": "Equal source/evidence budgets and frozen task cohorts; production preservation claims require an exercised recovery receipt and selected/tested RPO/RTO",
+      "confidence_basis": "Task outcomes separate byte, recall, support and operation quality",
+      "limits": "Numeric latency/cost SLOs await baseline; RPO/RTO must be selected and tested before production claims, with no numeric guarantee established here",
+      "benefit": "Measure actual knowledge-worker benefit",
+      "risk": "Edge counts, vendor benchmarks or one-hit recall hide omissions",
+      "status": "proposed",
+      "tags": [
+        "evaluation",
+        "engineering inference",
+        "proposed"
+      ]
+    },
+    {
+      "id": "P-order",
+      "label": "Delivery proceeds from preservation to lifecycle to serving and evolution",
+      "topic": "delivery",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Delivery sequence",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        }
+      ],
+      "evidence_type": "engineering inference",
+      "conditions": "Each increment has acceptance before dependent promotion; synthetic backup/restore starts in preservation work and the production preservation gate requires a recovery receipt with selected/tested RPO/RTO",
+      "confidence_basis": "Dependencies isolate unresolved policy from synthetic work",
+      "limits": "Named tool integrations remain roadmap, not complete now",
+      "benefit": "Reviewable increments with evidence from the first journey",
+      "risk": "Broad rollout before grants, archive or evaluation exists",
+      "status": "proposed",
+      "tags": [
+        "delivery",
+        "engineering inference",
+        "proposed"
+      ]
+    },
+    {
+      "id": "P-guide-lineage",
+      "label": "Historical guide leaves agent and BM25 adoption open; newer user selections resolve them",
+      "topic": "lineage",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 3, 6 and 13: open topology and provider adoption"
+        },
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a",
+          "span": "Latest selected two-agent roles"
+        },
+        {
+          "source_id": "S-bm25-selection",
+          "locator": "docs/knowledge-system/sources/bm25-selection-2026-09-29.md",
+          "revision": "sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291",
+          "span": "User request (verbatim)"
+        }
+      ],
+      "evidence_type": "engineering inference",
+      "conditions": "Apply current user selections while preserving historical rationale; process placement and ranking backend still open",
+      "confidence_basis": "Guide inspected directly and compared with explicit later instructions",
+      "limits": "Approximate authoring age is user-reported; this is one design lineage, not independent corroboration",
+      "benefit": "Avoid reverting settled decisions during source reconciliation",
+      "risk": "Treating old open questions as current or treating supplied prose as execution authority",
+      "status": "reconciled-history",
+      "tags": [
+        "lineage",
+        "engineering inference",
+        "reconciled-history"
+      ]
+    },
+    {
+      "id": "P-bm25-receipt",
+      "label": "BM25 comparison preserves granularity, diversity and reproducible index receipts",
+      "topic": "retrieval",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 6: BM25 proposed; lines 151-163"
+        }
+      ],
+      "evidence_type": "source proposal",
+      "conditions": "Document/section/fielded comparisons; diversity; tokenizer, normalization, scoring variant/parameters, field weights, implementation and generation receipts; separate tuning from held-out evaluation",
+      "confidence_basis": "Explicit details in supplied guide; carried as proposed implementation checks under selected BM25 direction",
+      "limits": "Backend and parameter values unselected; no local ranking experiment",
+      "benefit": "Reproduce comparisons and diagnose long-document crowding or version drift",
+      "risk": "Irreproducible tuning or chunk duplicates hiding other documents",
+      "status": "proposed",
+      "tags": [
+        "retrieval",
+        "source proposal",
+        "proposed"
+      ]
+    },
+    {
+      "id": "P-investigation-checkpoints",
+      "label": "Existing investigation saves before assessment and skips unchanged completed input keys",
+      "topic": "investigation",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 9: persistent investigations"
+        },
+        {
+          "source_id": "S-investigation",
+          "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/src/lib/investigation.ts",
+          "revision": "664144d17272697d68e045143f0ede0458ee6eca",
+          "span": "runInvestigation: partialPath, inputKey, completedAssessments, revalidateRetainedEvidence, final save"
+        }
+      ],
+      "evidence_type": "static code observation",
+      "conditions": "Reuse source-backed checkpoints and existing inputKey semantics when reconciling the consumer; preserve revalidation and failure gaps",
+      "confidence_basis": "Direct inspection confirms the guide claims at the pinned Temari baseline",
+      "limits": "No new tests; unchanged-key skipping is bounded behavior, not exactly-once external actions or semantic correctness",
+      "benefit": "Retrieved work survives assessment failure and unchanged completed work need not be repeated",
+      "risk": "Discarding this boundary during integration loses work or repeats assessments",
+      "status": "existing-at-pinned-baseline",
+      "tags": [
+        "investigation",
+        "static code observation",
+        "existing-at-pinned-baseline"
+      ]
+    },
+    {
+      "id": "P-guide-provider-reports",
+      "label": "Guide reports bounded TF-IDF/SVD and declared-dependency providers",
+      "topic": "implementation-status",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 4, 6 and 8: extraction, connectors, bounded providers and generation limits"
+        },
+        {
+          "source_id": "S-retrieval",
+          "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py",
+          "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c",
+          "span": "discover: mode selection and len(matched) plus filename-stem weighting"
+        }
+      ],
+      "evidence_type": "historical report with scoped static check",
+      "conditions": "Lexical overlap confirmed in pinned discover; optional provider, connector, modality and historical test reports require separate checks before adoption",
+      "confidence_basis": "Guide details limits explicitly; direct retrieval.py inspection confirms only the lexical-baseline observation here",
+      "limits": "No TF-IDF/SVD provider execution or verification of all guide implementation reports in this reconciliation",
+      "benefit": "Retain useful reuse leads without advertising a shipped BM25 or fully integrated concept retrieval",
+      "risk": "Calling a reported implementation current, broadly semantic or production-proven",
+      "status": "historical-needs-verification",
+      "tags": [
+        "implementation-status",
+        "historical report with scoped static check",
+        "historical-needs-verification"
+      ]
+    },
+    {
+      "id": "P-validation-corpus",
+      "label": "Validate Nx and non-Nx code, document formats and proposed image cases",
+      "topic": "evaluation",
+      "source_refs": [
+        {
+          "source_id": "S-validation-request",
+          "locator": "docs/knowledge-system/sources/validation-coverage-2026-09-29.md",
+          "revision": "sha256:bdf35a6039207cc143931a87f2bbe465459fb21622846706024a2d75f1c0dfeb",
+          "span": "User request (verbatim); Interpretation and limits"
+        }
+      ],
+      "evidence_type": "user decision with proposed test details",
+      "conditions": "Core families selected; concrete formats, real repository selection and image/OCR cases remain proposed. Synthetic fixtures first; separate preservation, extraction and visual-answer outcomes.",
+      "confidence_basis": "Explicit user request extends the existing evaluation scope; matrix operationalizes it without selecting new providers.",
+      "limits": "Planned/not run; no current multi-format, Graft, OCR or visual-understanding proof. Jev-only/model scope and corpus admission remain unchanged.",
+      "benefit": "Detect routing, extraction and cross-source retrieval failures concealed by one text-only sample.",
+      "risk": "Byte preservation or correct gap reporting could be mistaken for successful image understanding; repeated format exports could leak across evaluation partitions.",
+      "status": "selected-core-scope-proposed-fixtures",
+      "tags": [
+        "evaluation",
+        "user decision",
+        "proposed fixtures",
+        "not-run"
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D-ownership",
+      "label": "Use two agents with Registrar as evidence authority",
+      "status": "selected-direction-with-proposed-boundary",
+      "rationale": "Latest user request settles responsibility split; keep existing lifecycle and one publication owner instead of duplicating state",
+      "point_ids": [
+        "P-two-agents",
+        "P-authority",
+        "P-intake"
+      ],
+      "tags": [
+        "decision",
+        "selected-direction-with-proposed-boundary"
+      ]
+    },
+    {
+      "id": "D-reconcile",
+      "label": "Reconcile pinned main and candidates before extending runtime",
+      "status": "proposed",
+      "rationale": "Merged pagination and required-context repairs coexist with unmerged worker/generation substrates; preserve compatibility and verify combined behavior",
+      "point_ids": [
+        "P-baseline",
+        "P-pagination",
+        "P-context-repair",
+        "P-worker-candidate",
+        "P-generation-candidate"
+      ],
+      "tags": [
+        "decision",
+        "proposed"
+      ]
+    },
+    {
+      "id": "D-routing",
+      "label": "Route by asset type and repository structure",
+      "status": "proposed-refinement-of-selected-tools",
+      "rationale": "Nx supplies project/task context; non-Nx structural code uses Graft; non-code remains Graphify even inside a code repository",
+      "point_ids": [
+        "P-nx",
+        "P-graft",
+        "P-graphify"
+      ],
+      "tags": [
+        "decision",
+        "proposed-refinement-of-selected-tools"
+      ]
+    },
+    {
+      "id": "D-projection",
+      "label": "Preserve exact identity through directed reified Graphify view",
+      "status": "selected-approach-artifact-executed",
+      "rationale": "A simple DiGraph cannot hold parallel assertions; source-scoped IDs, qualified labels and exact readback prevent silent collapse",
+      "point_ids": [
+        "P-graphify",
+        "P-generation-candidate",
+        "P-identity",
+        "P-assertions"
+      ],
+      "tags": [
+        "decision",
+        "selected-approach-artifact-executed"
+      ]
+    },
+    {
+      "id": "D-preserve",
+      "label": "Define recoverability by successfully captured versions and explicit retention",
+      "status": "proposed",
+      "rationale": "Archives, capture times, upstream watermarks/history availability, explicit gaps, extraction coverage and provenance bound recoverability to successfully captured retained versions; production requires exercised backup/restore of bytes, manifests, retained extraction outputs/provenance and access/retention state, hash and derived-view checks, current revocation/erasure enforcement and selected/tested RPO/RTO; semantic recall and authorized purge have separate limits",
+      "point_ids": [
+        "P-lossless",
+        "P-revisions",
+        "P-access",
+        "P-okf"
+      ],
+      "tags": [
+        "decision",
+        "proposed"
+      ]
+    },
+    {
+      "id": "D-serving",
+      "label": "Optimize published snapshots while retaining explicit live assurance",
+      "status": "proposed",
+      "rationale": "Repeated corpus and provider verification suggests targets, but current-original checks cannot disappear behind a cached receipt",
+      "point_ids": [
+        "P-cost",
+        "P-serving",
+        "P-retrieval-flow",
+        "P-metrics"
+      ],
+      "tags": [
+        "decision",
+        "proposed"
+      ]
+    },
+    {
+      "id": "D-models",
+      "label": "Keep Jev as bounded judge with conditional generative roles",
+      "status": "conditional-open",
+      "rationale": "Jev cannot write prose; if only Jev applies everywhere defer generative extraction and SkillOpt optimization pending decision",
+      "point_ids": [
+        "P-jev",
+        "P-confidence",
+        "P-model-fork"
+      ],
+      "tags": [
+        "decision",
+        "conditional-open"
+      ]
+    },
+    {
+      "id": "D-quality",
+      "label": "Promote graph changes through evidence and held-out audits",
+      "status": "proposed",
+      "rationale": "Source refresh and reviewed feedback improve candidates; usage and connectivity cannot certify truth",
+      "point_ids": [
+        "P-quality",
+        "P-assertions",
+        "P-identity",
+        "P-metrics"
+      ],
+      "tags": [
+        "decision",
+        "proposed"
+      ]
+    },
+    {
+      "id": "D-evolution",
+      "label": "Trial SkillOpt as offline platform capability with stronger gate",
+      "status": "proposed-conditional",
+      "rationale": "Skill edits need a generative optimizer and real tool replay; default aggregate gate lacks required isolation and per-task protections",
+      "point_ids": [
+        "P-skill-platform",
+        "P-skill-gate",
+        "P-skill-tools",
+        "P-skill-evaluation",
+        "P-model-fork"
+      ],
+      "tags": [
+        "decision",
+        "proposed-conditional"
+      ]
+    },
+    {
+      "id": "D-increments",
+      "label": "Require synthetic preservation journey before ranking promotion",
+      "status": "proposed",
+      "rationale": "The unmerged substrates need integrated temporal evidence before model and connector complexity increases",
+      "point_ids": [
+        "P-journey",
+        "P-order",
+        "P-worker-candidate",
+        "P-generation-candidate",
+        "P-metrics"
+      ],
+      "tags": [
+        "decision",
+        "proposed"
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "id": "A-001",
+      "source": "P-two-agents",
+      "target": "D-ownership",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Latest user request settles responsibility split; keep existing lifecycle and one publication owner instead of duplicating state",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "User request and decisions",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-memory",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md",
+          "span": "What is established and what is still a proposal",
+          "revision": "sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33"
+        }
+      ]
+    },
+    {
+      "id": "A-002",
+      "source": "P-authority",
+      "target": "D-ownership",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Latest user request settles responsibility split; keep existing lifecycle and one publication owner instead of duplicating state",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Preserve standalone Python Registrar",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-knowledge",
+          "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/README.md",
+          "span": "Supported boundary and gaps",
+          "revision": "664144d17272697d68e045143f0ede0458ee6eca"
+        }
+      ]
+    },
+    {
+      "id": "A-003",
+      "source": "P-intake",
+      "target": "D-ownership",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Latest user request settles responsibility split; keep existing lifecycle and one publication owner instead of duplicating state",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-workers",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
+          "span": "Reuse and selected design",
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
+        },
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Two agents: Intake",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        }
+      ]
+    },
+    {
+      "id": "A-004",
+      "source": "P-baseline",
+      "target": "D-reconcile",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Merged pagination and required-context repairs coexist with unmerged worker/generation substrates; preserve compatibility and verify combined behavior",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-adapter",
+          "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/src/lib/registrar.ts",
+          "span": "implementationDigest, invoke",
+          "revision": "664144d17272697d68e045143f0ede0458ee6eca"
+        },
+        {
+          "source_id": "S-contract",
+          "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/contracts/src/lib/knowledge.ts",
+          "span": "KnowledgeProvider, KnowledgeEvidence",
+          "revision": "664144d17272697d68e045143f0ede0458ee6eca"
+        },
+        {
+          "source_id": "S-knowledge",
+          "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/README.md",
+          "span": "Outcome and supported boundary",
+          "revision": "664144d17272697d68e045143f0ede0458ee6eca"
+        }
+      ]
+    },
+    {
+      "id": "A-005",
+      "source": "P-pagination",
+      "target": "D-reconcile",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Merged pagination and required-context repairs coexist with unmerged worker/generation substrates; preserve compatibility and verify combined behavior",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-retrieval",
+          "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py",
+          "span": "discover(): update(), _offset, _cursor",
+          "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c"
+        }
+      ]
+    },
+    {
+      "id": "A-006",
+      "source": "P-context-repair",
+      "target": "D-reconcile",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Merged pagination and required-context repairs coexist with unmerged worker/generation substrates; preserve compatibility and verify combined behavior",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-registrar-status",
+          "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/IMPLEMENTATION_STATUS.md",
+          "span": "Sep 17/9 entries as summarized in trusted brief",
+          "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c"
+        },
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Verified baseline and reuse",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        }
+      ]
+    },
+    {
+      "id": "A-007",
+      "source": "P-worker-candidate",
+      "target": "D-reconcile",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Merged pagination and required-context repairs coexist with unmerged worker/generation substrates; preserve compatibility and verify combined behavior",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-workers",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
+          "span": "Responsibilities; Retrieval and continuation; Compatibility",
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
+        }
+      ]
+    },
+    {
+      "id": "A-008",
+      "source": "P-generation-candidate",
+      "target": "D-reconcile",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Merged pagination and required-context repairs coexist with unmerged worker/generation substrates; preserve compatibility and verify combined behavior",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-generations",
+          "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
+          "span": "Data shape; Graphify projection; Limits",
+          "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        }
+      ]
+    },
+    {
+      "id": "A-009",
+      "source": "P-nx",
+      "target": "D-routing",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Nx supplies project/task context; non-Nx structural code uses Graft; non-code remains Graphify even inside a code repository",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-nx",
+          "locator": "https://nx.dev/docs/features/explore-graph",
+          "span": "Project Graph and Task Graph",
+          "revision": "official-docs observed 2026-09-29"
+        },
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Primary external evidence: Nx",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        }
+      ]
+    },
+    {
+      "id": "A-010",
+      "source": "P-graft",
+      "target": "D-routing",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Nx supplies project/task context; non-Nx structural code uses Graft; non-code remains Graphify even inside a code repository",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-graft",
+          "locator": "https://github.com/trailhq/Graft/tree/d34c115155f4d3cd0debe3f60a7edb3120981bbb",
+          "span": "README: deterministic graph, blast, optional LSP",
+          "revision": "d34c115155f4d3cd0debe3f60a7edb3120981bbb"
+        },
+        {
+          "source_id": "S-history",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md",
+          "span": "THR-KNW-01 and THR-KNW-06",
+          "revision": "sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb"
+        }
+      ]
+    },
+    {
+      "id": "A-011",
+      "source": "P-graphify",
+      "target": "D-routing",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Nx supplies project/task context; non-Nx structural code uses Graft; non-code remains Graphify even inside a code repository",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-graphify",
+          "locator": "https://github.com/Graphify-Labs/graphify/blob/1cd9a36c0c57a661d2d2234bc3207e887e1ba104/graphify/build.py",
+          "span": "build_from_json; build deduplicate_entities call",
+          "revision": "1cd9a36c0c57a661d2d2234bc3207e887e1ba104"
+        },
+        {
+          "source_id": "S-local-graphify",
+          "locator": "pkg:pypi/graphifyy@0.9.49",
+          "span": "build_from_json and export.to_json",
+          "revision": "installed distribution metadata 0.9.49; build.py sha256:6e181353a94a5547ceb8cfa0832b13228c2b98d4de96863337fec40c4099f511"
+        },
+        {
+          "source_id": "S-generations",
+          "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
+          "span": "Graphify projection",
+          "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        }
+      ]
+    },
+    {
+      "id": "A-012",
+      "source": "P-graphify",
+      "target": "D-projection",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: A simple DiGraph cannot hold parallel assertions; source-scoped IDs, qualified labels and exact readback prevent silent collapse",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-graphify",
+          "locator": "https://github.com/Graphify-Labs/graphify/blob/1cd9a36c0c57a661d2d2234bc3207e887e1ba104/graphify/build.py",
+          "span": "build_from_json; build deduplicate_entities call",
+          "revision": "1cd9a36c0c57a661d2d2234bc3207e887e1ba104"
+        },
+        {
+          "source_id": "S-local-graphify",
+          "locator": "pkg:pypi/graphifyy@0.9.49",
+          "span": "build_from_json and export.to_json",
+          "revision": "installed distribution metadata 0.9.49; build.py sha256:6e181353a94a5547ceb8cfa0832b13228c2b98d4de96863337fec40c4099f511"
+        },
+        {
+          "source_id": "S-generations",
+          "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
+          "span": "Graphify projection",
+          "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        }
+      ]
+    },
+    {
+      "id": "A-013",
+      "source": "P-generation-candidate",
+      "target": "D-projection",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: A simple DiGraph cannot hold parallel assertions; source-scoped IDs, qualified labels and exact readback prevent silent collapse",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-generations",
+          "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
+          "span": "Data shape; Graphify projection; Limits",
+          "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        }
+      ]
+    },
+    {
+      "id": "A-014",
+      "source": "P-identity",
+      "target": "D-projection",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: A simple DiGraph cannot hold parallel assertions; source-scoped IDs, qualified labels and exact readback prevent silent collapse",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-generations",
+          "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
+          "span": "Data shape: source/path/local keys",
+          "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        },
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Corrections accepted: concept IDs",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-history",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md",
+          "span": "THR-KNW-03",
+          "revision": "sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb"
+        }
+      ]
+    },
+    {
+      "id": "A-015",
+      "source": "P-assertions",
+      "target": "D-projection",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: A simple DiGraph cannot hold parallel assertions; source-scoped IDs, qualified labels and exact readback prevent silent collapse",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Suggested records; continual graph improvement",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-memory",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md",
+          "span": "R3",
+          "revision": "sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33"
+        }
+      ]
+    },
+    {
+      "id": "A-016",
+      "source": "P-lossless",
+      "target": "D-preserve",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Archives, capture times, upstream watermarks/history availability, explicit gaps, extraction coverage and provenance bound recoverability to successfully captured retained versions; production requires exercised backup/restore of bytes, manifests, retained extraction outputs/provenance and access/retention state, hash and derived-view checks, current revocation/erasure enforcement and selected/tested RPO/RTO; semantic recall and authorized purge have separate limits",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Lossless contract",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-memory",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md",
+          "span": "R1 and open questions",
+          "revision": "sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33"
+        }
+      ]
+    },
+    {
+      "id": "A-017",
+      "source": "P-revisions",
+      "target": "D-preserve",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Archives, capture times, upstream watermarks/history availability, explicit gaps, extraction coverage and provenance bound recoverability to successfully captured retained versions; production requires exercised backup/restore of bytes, manifests, retained extraction outputs/provenance and access/retention state, hash and derived-view checks, current revocation/erasure enforcement and selected/tested RPO/RTO; semantic recall and authorized purge have separate limits",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-reconcile",
+          "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/handoffs/persistent-knowledge-retrieval-reconciliation-2026-09-21.md",
+          "span": "Recommended next bounded work",
+          "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        },
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Suggested records and corrections",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        }
+      ]
+    },
+    {
+      "id": "A-018",
+      "source": "P-access",
+      "target": "D-preserve",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Archives, capture times, upstream watermarks/history availability, explicit gaps, extraction coverage and provenance bound recoverability to successfully captured retained versions; production requires exercised backup/restore of bytes, manifests, retained extraction outputs/provenance and access/retention state, hash and derived-view checks, current revocation/erasure enforcement and selected/tested RPO/RTO; semantic recall and authorized purge have separate limits",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Lossless contract",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-memory",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md",
+          "span": "R5 and open questions",
+          "revision": "sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33"
+        }
+      ]
+    },
+    {
+      "id": "A-019",
+      "source": "P-okf",
+      "target": "D-preserve",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Archives, capture times, upstream watermarks/history availability, explicit gaps, extraction coverage and provenance bound recoverability to successfully captured retained versions; production requires exercised backup/restore of bytes, manifests, retained extraction outputs/provenance and access/retention state, hash and derived-view checks, current revocation/erasure enforcement and selected/tested RPO/RTO; semantic recall and authorized purge have separate limits",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-okf",
+          "locator": "https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/ad30107c31c06aec8a7d5636e0d1058118604e6f/SPEC.md",
+          "span": "Concept format, identity and relationships",
+          "revision": "ad30107c31c06aec8a7d5636e0d1058118604e6f; spec v0.2"
+        },
+        {
+          "source_id": "S-generations",
+          "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
+          "span": "Component roles",
+          "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        }
+      ]
+    },
+    {
+      "id": "A-020",
+      "source": "P-cost",
+      "target": "D-serving",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Repeated corpus and provider verification suggests targets, but current-original checks cannot disappear behind a cached receipt",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-retrieval",
+          "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py",
+          "span": "_corpus; discover initial/final checks; read_document",
+          "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c"
+        },
+        {
+          "source_id": "S-adapter",
+          "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/src/lib/registrar.ts",
+          "span": "implementationDigest; pin; invoke",
+          "revision": "664144d17272697d68e045143f0ede0458ee6eca"
+        }
+      ]
+    },
+    {
+      "id": "A-021",
+      "source": "P-serving",
+      "target": "D-serving",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Repeated corpus and provider verification suggests targets, but current-original checks cannot disappear behind a cached receipt",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Additional current-code performance finding; Efficiency",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-knowledge",
+          "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/README.md",
+          "span": "Supported boundary and gaps",
+          "revision": "664144d17272697d68e045143f0ede0458ee6eca"
+        }
+      ]
+    },
+    {
+      "id": "A-022",
+      "source": "P-retrieval-flow",
+      "target": "D-serving",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Repeated corpus and provider verification suggests targets, but current-original checks cannot disappear behind a cached receipt; the explicit BM25 selection is recorded in this existing candidate-retrieval path without changing runtime behavior",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Search/retrieval and corrections",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-recovered",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md",
+          "span": "Retrieval and evaluation proposals",
+          "revision": "sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc"
+        },
+        {
+          "source_id": "S-retrieval",
+          "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py",
+          "span": "discover coverage",
+          "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c"
+        },
+        {
+          "source_id": "S-bm25-selection",
+          "locator": "docs/knowledge-system/sources/bm25-selection-2026-09-29.md",
+          "revision": "sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291",
+          "span": "User request (verbatim)"
+        },
+        {
+          "source_id": "S-bm25-reference",
+          "locator": "https://sqlite.org/fts5.html#the_bm25_function",
+          "revision": "official-docs observed 2026-09-29",
+          "span": "5.1.1 The bm25() function"
+        }
+      ]
+    },
+    {
+      "id": "A-023",
+      "source": "P-metrics",
+      "target": "D-serving",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Repeated corpus and provider verification suggests targets, but current-original checks cannot disappear behind a cached receipt",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Acceptance/evaluation",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-recovered",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md",
+          "span": "Evaluation set",
+          "revision": "sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc"
+        }
+      ]
+    },
+    {
+      "id": "A-024",
+      "source": "P-jev",
+      "target": "D-models",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Jev cannot write prose; if only Jev applies everywhere defer generative extraction and SkillOpt optimization pending decision",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-jev",
+          "locator": "https://docs.typesafe.ai/introduction",
+          "span": "Typed decisions introduction",
+          "revision": "official-docs observed 2026-09-29"
+        },
+        {
+          "source_id": "S-jev-models",
+          "locator": "https://docs.typesafe.ai/models",
+          "span": "Current models and Customizing Jev",
+          "revision": "official-docs observed 2026-09-29"
+        },
+        {
+          "source_id": "S-jev-rerank",
+          "locator": "https://docs.typesafe.ai/cookbooks/rerank_typesafe",
+          "revision": "official-docs observed 2026-09-29",
+          "span": "How do we find one document in thousands?; What is re-ranking?"
+        },
+        {
+          "source_id": "S-jev-alignment",
+          "locator": "https://docs.typesafe.ai/cookbooks/entity_alignment",
+          "revision": "official-docs observed 2026-09-29",
+          "span": "Knowledge graph entity alignment example"
+        }
+      ]
+    },
+    {
+      "id": "A-025",
+      "source": "P-confidence",
+      "target": "D-models",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Jev cannot write prose; if only Jev applies everywhere defer generative extraction and SkillOpt optimization pending decision",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-jev-confidence",
+          "locator": "https://docs.typesafe.ai/confidence",
+          "span": "Confidence is derived from probabilities",
+          "revision": "official-docs observed 2026-09-29"
+        },
+        {
+          "source_id": "S-jev-models",
+          "locator": "https://docs.typesafe.ai/models",
+          "span": "Aliases",
+          "revision": "official-docs observed 2026-09-29"
+        }
+      ]
+    },
+    {
+      "id": "A-026",
+      "source": "P-model-fork",
+      "target": "D-models",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Jev cannot write prose; if only Jev applies everywhere defer generative extraction and SkillOpt optimization pending decision",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "User request and decisions",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        }
+      ]
+    },
+    {
+      "id": "A-027",
+      "source": "P-quality",
+      "target": "D-quality",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Source refresh and reviewed feedback improve candidates; usage and connectivity cannot certify truth",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Continual graph improvement",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-history",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md",
+          "span": "THR-KNW-11",
+          "revision": "sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb"
+        }
+      ]
+    },
+    {
+      "id": "A-028",
+      "source": "P-assertions",
+      "target": "D-quality",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Source refresh and reviewed feedback improve candidates; usage and connectivity cannot certify truth",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Suggested records; continual graph improvement",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-memory",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md",
+          "span": "R3",
+          "revision": "sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33"
+        }
+      ]
+    },
+    {
+      "id": "A-029",
+      "source": "P-identity",
+      "target": "D-quality",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Source refresh and reviewed feedback improve candidates; usage and connectivity cannot certify truth",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-generations",
+          "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
+          "span": "Data shape: source/path/local keys",
+          "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        },
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Corrections accepted: concept IDs",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-history",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/cutover-handover/thread-decisions/knowledge-graph-and-indexing.md",
+          "span": "THR-KNW-03",
+          "revision": "sha256:951cb2d89695aa4e549912cc58000d3685ffe590d586128bbb3255f734b05deb"
+        }
+      ]
+    },
+    {
+      "id": "A-030",
+      "source": "P-metrics",
+      "target": "D-quality",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Source refresh and reviewed feedback improve candidates; usage and connectivity cannot certify truth",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Acceptance/evaluation",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-recovered",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md",
+          "span": "Evaluation set",
+          "revision": "sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc"
+        }
+      ]
+    },
+    {
+      "id": "A-031",
+      "source": "P-skill-platform",
+      "target": "D-evolution",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Skill edits need a generative optimizer and real tool replay; default aggregate gate lacks required isolation and per-task protections",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-skill-sleep",
+          "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/docs/sleep/README.md",
+          "span": "How it works; Preview",
+          "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1"
+        },
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Primary external evidence: SkillOpt",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        }
+      ]
+    },
+    {
+      "id": "A-032",
+      "source": "P-skill-gate",
+      "target": "D-evolution",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Skill edits need a generative optimizer and real tool replay; default aggregate gate lacks required isolation and per-task protections",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-skill-config",
+          "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/skillopt_sleep/config.py",
+          "span": "DEFAULTS test_fraction and gate_no_regression",
+          "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1"
+        },
+        {
+          "source_id": "S-skill-gate",
+          "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/skillopt_sleep/gate.py",
+          "span": "evaluate_gate",
+          "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1"
+        },
+        {
+          "source_id": "S-skill-eval",
+          "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/docs/sleep/evalkit.md",
+          "span": "Paired A/B evalkit introduction",
+          "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1"
+        }
+      ]
+    },
+    {
+      "id": "A-033",
+      "source": "P-skill-tools",
+      "target": "D-evolution",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Skill edits need a generative optimizer and real tool replay; default aggregate gate lacks required isolation and per-task protections",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-skill-backend",
+          "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/skillopt_sleep/backend.py",
+          "span": "Backend.attempt_with_tools lines 56-69",
+          "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1"
+        },
+        {
+          "source_id": "S-skill-env",
+          "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/skillopt/envs/base.py",
+          "span": "EnvAdapter.rollout and reflect",
+          "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1"
+        }
+      ]
+    },
+    {
+      "id": "A-034",
+      "source": "P-skill-evaluation",
+      "target": "D-evolution",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Skill edits need a generative optimizer and real tool replay; default aggregate gate lacks required isolation and per-task protections",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "SkillOpt promotion requirements",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-skill-eval",
+          "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/docs/sleep/evalkit.md",
+          "span": "Paired outcomes and confidence intervals",
+          "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1"
+        },
+        {
+          "source_id": "S-skill-sleep",
+          "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/docs/sleep/README.md",
+          "span": "Data boundary",
+          "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1"
+        }
+      ]
+    },
+    {
+      "id": "A-035",
+      "source": "P-model-fork",
+      "target": "D-evolution",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: Skill edits need a generative optimizer and real tool replay; default aggregate gate lacks required isolation and per-task protections",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "User request and decisions",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        }
+      ]
+    },
+    {
+      "id": "A-036",
+      "source": "P-journey",
+      "target": "D-increments",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: The unmerged substrates need integrated temporal evidence before model and connector complexity increases",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Corrections accepted: synthetic trajectory; delivery sequence",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-workers",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
+          "span": "Retrieval and continuation",
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
+        }
+      ]
+    },
+    {
+      "id": "A-037",
+      "source": "P-order",
+      "target": "D-increments",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: The unmerged substrates need integrated temporal evidence before model and connector complexity increases",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Delivery sequence",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        }
+      ]
+    },
+    {
+      "id": "A-038",
+      "source": "P-worker-candidate",
+      "target": "D-increments",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: The unmerged substrates need integrated temporal evidence before model and connector complexity increases",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-workers",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
+          "span": "Responsibilities; Retrieval and continuation; Compatibility",
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
+        }
+      ]
+    },
+    {
+      "id": "A-039",
+      "source": "P-generation-candidate",
+      "target": "D-increments",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: The unmerged substrates need integrated temporal evidence before model and connector complexity increases",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-generations",
+          "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
+          "span": "Data shape; Graphify projection; Limits",
+          "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        }
+      ]
+    },
+    {
+      "id": "A-040",
+      "source": "P-metrics",
+      "target": "D-increments",
+      "type": "motivates",
+      "confidence": "INFERRED",
+      "basis": "Decision rationale: The unmerged substrates need integrated temporal evidence before model and connector complexity increases",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Acceptance/evaluation",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-recovered",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md",
+          "span": "Evaluation set",
+          "revision": "sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc"
+        }
+      ]
+    },
+    {
+      "id": "A-041",
+      "source": "P-two-agents",
+      "target": "P-model-fork",
+      "type": "does-not-resolve",
+      "confidence": "EXTRACTED",
+      "basis": "Selecting two responsibility boundaries does not resolve whether other Temari models may generate text",
+      "tags": [
+        "assertion",
+        "does-not-resolve",
+        "EXTRACTED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "User request and decisions",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-memory",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md",
+          "span": "What is established and what is still a proposal",
+          "revision": "sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33"
+        }
+      ]
+    },
+    {
+      "id": "A-042",
+      "source": "P-pagination",
+      "target": "P-retrieval-flow",
+      "type": "constrains",
+      "confidence": "INFERRED",
+      "basis": "Keep consumed enumeration semantics and add fetched/supplied/assessed sets",
+      "tags": [
+        "assertion",
+        "constrains",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-retrieval",
+          "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py",
+          "span": "discover(): update(), _offset, _cursor",
+          "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c"
+        }
+      ]
+    },
+    {
+      "id": "A-043",
+      "source": "P-generation-candidate",
+      "target": "P-lossless",
+      "type": "insufficient-for",
+      "confidence": "EXTRACTED",
+      "basis": "Immutable source-anchored generation does not archive all original bytes/history",
+      "tags": [
+        "assertion",
+        "insufficient-for",
+        "EXTRACTED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-generations",
+          "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
+          "span": "Data shape; Graphify projection; Limits",
+          "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        }
+      ]
+    },
+    {
+      "id": "A-044",
+      "source": "P-jev",
+      "target": "P-skill-platform",
+      "type": "constrains",
+      "confidence": "INFERRED",
+      "basis": "TypeSafe establishes that Jev supplies typed judgments without prose generation; pinned SkillOpt backend and Sleep documentation establish generative reflection/text edits. Together these imply that text-edit optimization requires a generative backend that Jev cannot provide; the broader model-role permission remains unresolved.",
+      "tags": [
+        "assertion",
+        "constrains",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-jev",
+          "locator": "https://docs.typesafe.ai/introduction",
+          "span": "Typed decisions introduction",
+          "revision": "official-docs observed 2026-09-29"
+        },
+        {
+          "source_id": "S-jev-models",
+          "locator": "https://docs.typesafe.ai/models",
+          "span": "Current models and Customizing Jev",
+          "revision": "official-docs observed 2026-09-29"
+        },
+        {
+          "source_id": "S-jev-rerank",
+          "locator": "https://docs.typesafe.ai/cookbooks/rerank_typesafe",
+          "revision": "official-docs observed 2026-09-29",
+          "span": "How do we find one document in thousands?; What is re-ranking?"
+        },
+        {
+          "source_id": "S-jev-alignment",
+          "locator": "https://docs.typesafe.ai/cookbooks/entity_alignment",
+          "revision": "official-docs observed 2026-09-29",
+          "span": "Knowledge graph entity alignment example"
+        },
+        {
+          "source_id": "S-skill-backend",
+          "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/skillopt_sleep/backend.py",
+          "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1",
+          "span": "Backend reflection and generative handoff dispatch"
+        },
+        {
+          "source_id": "S-skill-sleep",
+          "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/docs/sleep/README.md",
+          "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1",
+          "span": "How it works: reflection, proposed skill text edits and session handoff"
+        }
+      ]
+    },
+    {
+      "id": "A-045",
+      "source": "P-access",
+      "target": "P-lossless",
+      "type": "limits",
+      "confidence": "INFERRED",
+      "basis": "A deliberately purged version cannot continue to be advertised as recoverable",
+      "tags": [
+        "assertion",
+        "limits",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Lossless contract",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-memory",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md",
+          "span": "R5 and open questions",
+          "revision": "sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33"
+        }
+      ]
+    },
+    {
+      "id": "A-046",
+      "source": "P-graphify",
+      "target": "D-projection",
+      "type": "requires-readback",
+      "confidence": "INFERRED",
+      "basis": "Exact canonical identity and provenance comparisons are needed in addition to choosing a directed graph",
+      "tags": [
+        "assertion",
+        "requires-readback",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-graphify",
+          "locator": "https://github.com/Graphify-Labs/graphify/blob/1cd9a36c0c57a661d2d2234bc3207e887e1ba104/graphify/build.py",
+          "span": "build_from_json; build deduplicate_entities call",
+          "revision": "1cd9a36c0c57a661d2d2234bc3207e887e1ba104"
+        },
+        {
+          "source_id": "S-local-graphify",
+          "locator": "pkg:pypi/graphifyy@0.9.49",
+          "span": "build_from_json and export.to_json",
+          "revision": "installed distribution metadata 0.9.49; build.py sha256:6e181353a94a5547ceb8cfa0832b13228c2b98d4de96863337fec40c4099f511"
+        },
+        {
+          "source_id": "S-generations",
+          "locator": "https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md",
+          "span": "Graphify projection",
+          "revision": "3d593500783dadac09a9fd207dee342aa5ed2a11"
+        }
+      ]
+    },
+    {
+      "id": "A-047",
+      "source": "P-guide-lineage",
+      "target": "P-two-agents",
+      "type": "reconciles",
+      "confidence": "INFERRED",
+      "basis": "The guide records an open agent topology; the later user request selects intake and retrieval agents while process placement remains open.",
+      "tags": [
+        "assertion",
+        "reconciles",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 3, 6 and 13: open topology and provider adoption"
+        },
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a",
+          "span": "Latest selected two-agent roles"
+        },
+        {
+          "source_id": "S-bm25-selection",
+          "locator": "docs/knowledge-system/sources/bm25-selection-2026-09-29.md",
+          "revision": "sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291",
+          "span": "User request (verbatim)"
+        }
+      ]
+    },
+    {
+      "id": "A-048",
+      "source": "P-guide-lineage",
+      "target": "P-retrieval-flow",
+      "type": "reconciles",
+      "confidence": "INFERRED",
+      "basis": "The guide records proposed BM25 adoption; the later user selection settles inclusion without claiming a deployed provider.",
+      "tags": [
+        "assertion",
+        "reconciles",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 3, 6 and 13: open topology and provider adoption"
+        },
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a",
+          "span": "Latest selected two-agent roles"
+        },
+        {
+          "source_id": "S-bm25-selection",
+          "locator": "docs/knowledge-system/sources/bm25-selection-2026-09-29.md",
+          "revision": "sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291",
+          "span": "User request (verbatim)"
+        }
+      ]
+    },
+    {
+      "id": "A-049",
+      "source": "P-bm25-receipt",
+      "target": "D-serving",
+      "type": "informs",
+      "confidence": "INFERRED",
+      "basis": "The historical guide supplies reproducibility and candidate-diversity checks for the already proposed serving evaluation.",
+      "tags": [
+        "assertion",
+        "informs",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 6: BM25 proposed; lines 151-163"
+        }
+      ]
+    },
+    {
+      "id": "A-050",
+      "source": "P-investigation-checkpoints",
+      "target": "D-reconcile",
+      "type": "supports",
+      "confidence": "INFERRED",
+      "basis": "Static confirmed checkpoint behavior is a reuse invariant for reconciling existing consumer and candidate branches.",
+      "tags": [
+        "assertion",
+        "supports",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Section 9: persistent investigations"
+        },
+        {
+          "source_id": "S-investigation",
+          "locator": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/src/lib/investigation.ts",
+          "revision": "664144d17272697d68e045143f0ede0458ee6eca",
+          "span": "runInvestigation: partialPath, inputKey, completedAssessments, revalidateRetainedEvidence, final save"
+        }
+      ]
+    },
+    {
+      "id": "A-051",
+      "source": "P-guide-provider-reports",
+      "target": "D-reconcile",
+      "type": "requires-verification",
+      "confidence": "INFERRED",
+      "basis": "Reported optional providers and connector coverage are reuse leads whose current selected-revision behavior still needs checking.",
+      "tags": [
+        "assertion",
+        "requires-verification",
+        "INFERRED"
+      ],
+      "status": "design-link",
+      "source_refs": [
+        {
+          "source_id": "S-user-guide",
+          "locator": "docs/knowledge-system/sources/content-registrar-guide-received-2026-09-29.md",
+          "revision": "sha256:83b273765dbcafceb2da1894e56d16ece32be3e7290b8d9df7917e5cd03ca4c6",
+          "span": "Sections 4, 6 and 8: extraction, connectors, bounded providers and generation limits"
+        },
+        {
+          "source_id": "S-retrieval",
+          "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py",
+          "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c",
+          "span": "discover: mode selection and len(matched) plus filename-stem weighting"
+        }
+      ]
+    },
+    {
+      "id": "A-052",
+      "source": "P-validation-corpus",
+      "target": "D-routing",
+      "type": "constrains-evaluation",
+      "confidence": "INFERRED",
+      "basis": "The selected corpus families exercise the existing Nx/Graft/non-code routing boundary, including documents inside repositories.",
+      "status": "design-link",
+      "tags": [
+        "assertion",
+        "constrains-evaluation",
+        "INFERRED"
+      ],
+      "source_refs": [
+        {
+          "source_id": "S-validation-request",
+          "locator": "docs/knowledge-system/sources/validation-coverage-2026-09-29.md",
+          "revision": "sha256:bdf35a6039207cc143931a87f2bbe465459fb21622846706024a2d75f1c0dfeb",
+          "span": "User request (verbatim); Interpretation and limits"
+        }
+      ]
+    },
+    {
+      "id": "A-053",
+      "source": "P-validation-corpus",
+      "target": "D-increments",
+      "type": "constrains-evaluation",
+      "confidence": "INFERRED",
+      "basis": "The requested corpus scope adds explicit per-family checks across the already ordered preservation, relationship and ranking increments.",
+      "status": "design-link",
+      "tags": [
+        "assertion",
+        "constrains-evaluation",
+        "INFERRED"
+      ],
+      "source_refs": [
+        {
+          "source_id": "S-validation-request",
+          "locator": "docs/knowledge-system/sources/validation-coverage-2026-09-29.md",
+          "revision": "sha256:bdf35a6039207cc143931a87f2bbe465459fb21622846706024a2d75f1c0dfeb",
+          "span": "User request (verbatim); Interpretation and limits"
+        }
+      ]
+    }
+  ],
+  "conflicts": [
+    {
+      "id": "C-topology",
+      "earlier": "S-memory",
+      "later": "S-request",
+      "resolution": "Earlier undecided two-agent topology superseded by latest selected direction; deployment details remain open"
+    },
+    {
+      "id": "C-pagination",
+      "earlier": "S-recovered",
+      "later": "S-retrieval",
+      "resolution": "Earlier repair sequence is historical: pagination already exists; no claim that it must be invented"
+    },
+    {
+      "id": "C-models",
+      "earlier": "S-memory",
+      "later": "S-request",
+      "resolution": "Jev selected direction retains unresolved only-Jev scope; no inferred approval of generative roles"
+    },
+    {
+      "id": "C-graft-impact",
+      "earlier": "S-history",
+      "later": "S-graft",
+      "resolution": "Old missing-diff-impact comparison corrected; blast --base documented"
+    },
+    {
+      "id": "C-version",
+      "earlier": "S-generations",
+      "later": "S-local-graphify",
+      "resolution": "Historical reported 0.9.63 roundtrip differs from installed 0.9.49 metadata used here; installed build source hash is recorded"
+    }
+  ]
+}
