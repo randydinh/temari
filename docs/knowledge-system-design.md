@@ -81,15 +81,30 @@ queries. PDF and image-text misses, separate Nx/Graft probes, lack of native
 Graphify non-code execution, and no live Jev validation remain open. These
 results do not certify lossless semantic retrieval or a production deployment.
 
-This increment trials one-hop archived graph candidates alongside
-unchanged lexical ranking. It reports both top-K results, preserves the
-publication and source scope, verifies every added excerpt against the retained
-archive, and keeps graph evidence in private checkpoints. This tests the graph
-serving boundary; it does not yet import Nx or Graft structure or promote graph
-ranking by default. A private single-edge non-Nx code pilot used an inferred Graft
-link published by an operator: at K=2, lexical search missed the annotated related
-document and the graph trial found it. That one query is a feasibility check, not
-a quality estimate or evidence that Graft ingestion is automated.
+The next increment adds bounded Nx and Graft artifact import to the intake
+authority. It converts admitted structural edges to pinned Registrar graph
+assertions only when both endpoints can be found in retained archive text,
+the current source bytes match the retained originals, and the asserted edge
+is independently supported by those bytes. Graft call edges are published as
+`call-name-candidate`: the archived span fingerprint must match, and a Swift
+call spelling must occur outside comments in a Swift file with no string
+delimiter, slash/hash expression syntax or non-ASCII code. This conservative profile
+omits string interpolation and regex literals until a syntax parser is
+available. It does not resolve
+overloads or dynamic dispatch. Containment is limited to verified file spans.
+Nx dependencies cite the exact declaration entry. The bounded profile accepts
+these candidate calls, file containment and Nx declared dependencies;
+other relations are omitted with a reason. An optional intake-plan
+entry publishes the graph and places its ID in the immutable handoff; a
+single-source search case automatically trials that graph alongside unchanged
+BM25. The import does not generate Nx/Graft artifacts, schedule agents, or
+promote graph ranking by default. The private real Nx pilot published one
+project dependency edge; at K=2 the expected related package was absent from
+BM25 and present in graph-assisted results. The private curated Swift pilot
+published 32 source-anchored Graft edges in the earlier feasibility run; a
+targeted inferred call edge yielded
+the same 0-to-1 recall change for one query at K=2. These are feasibility checks,
+not quality estimates or proof of semantic correctness.
 
 ## Decisions, uncertainty and lineage
 
