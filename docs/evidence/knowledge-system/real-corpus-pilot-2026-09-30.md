@@ -46,6 +46,8 @@ All 18 fixed search cases completed with verified shortlists. At top three, exac
 
 This establishes a working local end-to-end pilot, not full document coverage or production readiness. The two selected PDFs still retained originals but had no searchable archive text on this macOS host because the worker could not establish its hard memory boundary. PNG OCR transcribes text without proving visual meaning. Graphify's available non-code semantic route requires a different hosted/host model and was not run under the Jev-only rule. Agent job ownership, durable scheduling, feedback-driven corrections, and plugin lifecycle are still absent.
 
+In a follow-up on the same pinned handoff, the Jev adapter resolved the existing `temari-typesafe-jev` macOS Keychain item directly with `TYPESAFE_API_KEY` unset. All six judgments again returned `judged`; the credential never appeared in the report. The adapter's 37-unit-test run includes a denial check showing that a denied request does not initiate credential lookup.
+
 ## Next build order
 
 1. Add a bounded PDF text path that works on macOS without dropping the hard worker boundary; test searchable, scanned and image-only PDFs, and keep unsupported pages explicit. Broaden image/Office asset accounting after that.

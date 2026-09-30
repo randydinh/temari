@@ -65,6 +65,24 @@ test('Jev shadow refuses unapproved text before transport', async () => {
   assert(result.judgments.every((j) => j.relevance === null && j.support === 'unknown'));
 });
 
+test('Jev shadow resolves a local credential only after the source grant', async () => {
+  let lookups = 0;
+  const options = {
+    keyResolver: async () => { lookups++; return 'keychain-test-secret'; },
+    fetcher: async (_url: unknown, init?: RequestInit) => {
+      assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer keychain-test-secret');
+      return reply(0.8, 'supported');
+    },
+  };
+  const denied = await judgeJevShadow({ ...request, hostedTextApproved: false }, options);
+  assert.equal(lookups, 0);
+  assert(denied.judgments.every((item) => item.gap === 'approval-required'));
+  const allowed = await judgeJevShadow({ ...request, candidates: [request.candidates[0]] }, options);
+  assert.equal(lookups, 1);
+  assert.equal(allowed.judgments[0].state, 'judged');
+  assert(!JSON.stringify(allowed).includes('keychain-test-secret'));
+});
+
 test('Jev shadow retries bounded overload and retains unknown on invalid resolved model', async () => {
   let calls = 0;
   const overload = await judgeJevShadow({ ...request, candidates: [request.candidates[0]] }, {

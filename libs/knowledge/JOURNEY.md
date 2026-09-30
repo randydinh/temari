@@ -106,6 +106,13 @@ may prompt review but cannot trigger retraction automatically.
 
 ## Search and score
 
+On macOS, Jev looks up the TypeSafe key in the current user's Keychain item
+`temari-typesafe-jev` when `TYPESAFE_API_KEY` is unset. The adapter reads it only
+after the registered-source sharing gate passes. An explicit server-side key or
+`TYPESAFE_API_KEY` takes precedence for deployments. The key is never included
+in task receipts or reports. A local-only source never reaches the lookup or
+TypeSafe. Vercel is not part of this path.
+
 Write a separate search plan. Gold paths are explicit annotations, not text
 extracted from the source. Each case narrows the handoff to listed source IDs.
 
