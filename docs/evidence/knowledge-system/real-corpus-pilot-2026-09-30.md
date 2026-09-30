@@ -38,10 +38,19 @@ An offline candidate combined whole-document BM25 with 1,600-character passage B
 
 Registrar PR #5 added explicit assertion retraction against a pinned parent and source scope. A Temari integration test now exercises a reviewed retraction through the actual Registrar CLI, confirms the parent remains active and the child is retired, and verifies the child still reads after the original source directory is removed. This is a manual correction path; automatic graph feedback and a blind review loop remain future work.
 
+## Merged-code end-to-end rerun
+
+After Registrar PRs #4–5 and Temari PRs #109, #111–112 merged, a fresh task captured all three selected source families under the current implementation identity: the pinned Temari Nx snapshot, the pinned non-Nx Python snapshot, and the selected document copies. The intake published three archive receipts and one Nx structure graph. A separate current-implementation Graft publication accepted 205 archived, source-anchored relationships, with 210 unresolved nodes and 537 unverified relationships omitted.
+
+All 18 fixed search cases completed with verified shortlists. At top three, exact found four of nine expected files and BM25 found five of nine; the additional hit in each route came from the explicitly enabled on-device PNG OCR representation. Four cases also produced graph trial results. A fresh three-case live TypeSafe run produced six typed `jev-1.13.0` judgments from verified excerpts, all in `judged` state. The key came from macOS Keychain service `temari-typesafe-jev` and was supplied only to the child process; no Vercel credential or other hosted model was used. The selected corpus and detailed receipts stayed in a private temporary workspace, outside version control.
+
+This establishes a working local end-to-end pilot, not full document coverage or production readiness. The two selected PDFs still retained originals but had no searchable archive text on this macOS host because the worker could not establish its hard memory boundary. PNG OCR transcribes text without proving visual meaning. Graphify's available non-code semantic route requires a different hosted/host model and was not run under the Jev-only rule. Agent job ownership, durable scheduling, feedback-driven corrections, and plugin lifecycle are still absent.
+
 ## Next build order
 
-1. Provide bounded OCR/PDF text adapters with explicit platform capability checks and preserve the current archive originals and omission receipts.
-2. Improve lexical candidate generation and compare exact, BM25, graph expansion, and Jev on held-out knowledge-worker questions at equal candidate budgets.
-3. Add conservative Python Graft call/import verification and a Jev-compatible non-code graph extraction path; retain rejected relationships as reviewable candidates.
-4. Connect intake and search as scheduled agents through the workflow runtime, with revision-bound feedback, human graph corrections, and regression checks.
-5. After the end-to-end journey passes, package the capability as a default Temari plugin with reversible disconnect, uninstall, and reinstall operations that preserve archives unless explicitly purged.
+1. Add a bounded PDF text path that works on macOS without dropping the hard worker boundary; test searchable, scanned and image-only PDFs, and keep unsupported pages explicit. Broaden image/Office asset accounting after that.
+2. Create a sealed, source-scoped question set across code and documents. Compare exact, whole-document BM25, passage challengers, graph expansion and conditional Jev at equal candidate and byte budgets; promote only measured gains without regression on a second cohort.
+3. Add conservative Python Graft call/import verification. For non-code, derive source-anchored candidates locally and use Jev only for bounded choice judgments; retain Graphify's useful projection/query role without invoking another hosted model.
+4. Route intake and search as separate runtime-owned jobs with leases, retries, immutable handoffs and revision-bound feedback. Feed missed evidence and reviewed relationship corrections into repeatable regression cases; keep model judgments separate from publication authority.
+5. Add operations for source refresh, archive retention/export, capability health and Keychain-backed TypeSafe configuration. Exercise source disable/local-only, recovery, and implementation upgrade paths on each supported host.
+6. After those journeys and regression gates pass, package Temari Knowledge as a default-installed optional plugin. Provide disconnect, uninstall and reinstall with preserved archives/audit history by default, explicit purge separately, upgrade-stable preferences, and no silent model substitution.
