@@ -3,6 +3,7 @@ lifecycle.ts
 lifecycle.test.ts
 bridge.ts
 canonical-bridge.ts
+canonical-bridge.test.ts
 bridge.test.ts
 smoke.ts
 live.ts
