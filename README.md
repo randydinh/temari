@@ -56,6 +56,9 @@ overlays/              Placeholder only — local files are gitignored
 ## Commands
 
 ```sh
+# Temari requires pnpm 11.25.0 (declared in package.json).
+pnpm --version
+
 # From a clean checkout: verify tools and lockfiles, then install everything.
 pnpm temari:init
 pnpm temari:doctor
@@ -68,6 +71,9 @@ pnpm exec nx graph
 # Shareable walkthrough.
 pnpm nx run workflow-engine:demo
 ```
+
+The repository requires pnpm 11.25.0 (declared in `package.json`), which must
+be installed before running the commands above. CI installs the same version.
 
 `temari:init` is the OS-agnostic dependency entry point. It uses Node APIs
 instead of shell-specific installers, installs the Nx workspace with the

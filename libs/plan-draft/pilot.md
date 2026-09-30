@@ -6,7 +6,7 @@ select a model service, prepare sources, or create write authority.
 
 ## Prepare the inputs
 
-1. Use Node 24.18.0 and pnpm 9.15.9 on a local POSIX host for the verified command
+1. Use Node 24.18.0 and pnpm 11.25.0 on a local POSIX host for the verified command
    paths below. Run them from the workspace root after installing its dependencies.
 2. Supply an existing isolated Registrar preparation and explicit Python and
    Registrar source paths. Admit the whole copied source root, not just selected

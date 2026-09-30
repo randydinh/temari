@@ -10,7 +10,7 @@
     "pnpm": {
       "command": "pnpm",
       "required": true,
-      "minimumMajor": 9
+      "minimumMajor": 11
     },
     "bun": {
       "command": "bun",
