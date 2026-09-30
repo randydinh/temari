@@ -1,5 +1,8 @@
-/** Server-side, shadow-only Jev judgments over explicitly approved archive excerpts. */
+/** Server-side, shadow-only Jev judgments over policy-admitted archive excerpts. */
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
+import { userInfo } from 'node:os';
+import { promisify } from 'node:util';
 import { canonical, hash } from './codec.js';
 
 const ENDPOINT = 'https://api.typesafe.ai/v1/systemone';
@@ -20,11 +23,30 @@ export interface JevShadowRequest {
   readonly candidates: readonly JevShadowCandidate[];
 }
 export interface JevShadowOptions {
-  /** Server-side only. Defaults to process.env.TYPESAFE_API_KEY. */
+  /** Server-side only. Environment takes precedence over macOS Keychain. */
   readonly apiKey?: string;
+  readonly keyResolver?: () => Promise<string | undefined>;
   readonly fetcher?: typeof fetch;
   readonly sleep?: (ms: number) => Promise<void>;
   readonly timeoutMs?: number;
+}
+
+async function keychainTypeSafeKey(): Promise<string | undefined> {
+  if (process.platform !== 'darwin') return undefined;
+  try {
+    const account = userInfo().username;
+    if (!account || account.length > 256) return undefined;
+    const { stdout } = await promisify(execFile)(
+      '/usr/bin/security',
+      ['find-generic-password', '-a', account, '-s', 'temari-typesafe-jev', '-w'],
+      { timeout: 3000, maxBuffer: 8192, encoding: 'utf8', windowsHide: true },
+    );
+    const key = stdout.trim();
+    return key && key.length <= 4096 && !/[\r\n\0]/.test(key) ? key : undefined;
+  } catch {
+    // Credential availability is an explicit missing-key gap in the caller.
+    return undefined;
+  }
 }
 export interface JevShadowJudgment {
   readonly candidateId: string;
@@ -217,7 +239,16 @@ export async function judgeJevShadow(
   const grant = selected.hostedTextApproved === true;
   assert(!grant || selected.denialReason === undefined,
     'Allowed Jev request cannot have a denial reason');
-  const apiKey = options.apiKey ?? process.env['TYPESAFE_API_KEY'];
+  let apiKey = options.apiKey ?? process.env['TYPESAFE_API_KEY'];
+  if (grant && !apiKey) {
+    try {
+      const resolved = await (options.keyResolver ?? keychainTypeSafeKey)();
+      if (resolved && resolved.length <= 4096 && !/[\r\n\0]/.test(resolved))
+        apiKey = resolved;
+    } catch {
+      // Keep the credential failure local; no source text is sent without a key.
+    }
+  }
   const judgments: JevShadowJudgment[] = [];
   for (const c of selected.candidates) {
     judgments.push(!grant ? unknown(c, selected.denialReason ?? 'approval-required') :
