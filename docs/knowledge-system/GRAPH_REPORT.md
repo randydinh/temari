@@ -5,8 +5,8 @@ Date: 2026-09-29. Temari base: `664144d17272697d68e045143f0ede0458ee6eca`.
 
 ## Corpus and provenance
 
-Canonical input is [evidence.json](evidence.json): **32 source records,
-35 points, 10 decisions and 51 relationship assertions**.
+Canonical input is [evidence.json](evidence.json): **33 source records,
+36 points, 10 decisions and 53 relationship assertions**.
 The corpus is bounded to the supplied research brief, selected historical design lineage,
 pinned Temari contracts/adapter, selected Registrar source, unmerged candidate designs,
 and official Nx, Graft, Graphify, OKF, TypeSafe and SkillOpt documentation/code.
@@ -18,7 +18,7 @@ SHA-256 are recorded in the [source provenance](README.md#archived-worker-source
 it remains a candidate source, not implementation delivered by this PR.
 No existing Temari code graph was changed or treated as current runtime proof.
 
-The actual projection contains **96 nodes and 102 directed edges**.
+The actual projection contains **99 nodes and 106 directed edges**.
 Every relationship becomes its own assertion node between subject and object. The two
 relationships from `P-graphify` to `D-projection` survive with distinct assertion IDs.
 Tags retain topic, evidence type, status and assertion provenance class. Here Graphify's
@@ -55,8 +55,8 @@ remains conditional. Regenerated readback checks that provenance as well as topo
 These are integrity checks; they do not establish that every claim is true or that a
 proposed runtime meets the design. No Temari/Registrar runtime tests were run here.
 
-- Evidence SHA-256: `53870a87211ba916a945fa8b28bd73fc0176bb3901fc3b7b6d0848a5bf71ab00`.
-- Graph SHA-256: `85fdefd02240a97808895a29b7aa5e78500a3908f37184598ecd87ba5f7567e7`.
+- Evidence SHA-256: `0ad914802db15b62ac5465486b2ff55afab7a2b03191c5f2257340067646e3ce`.
+- Graph SHA-256: `7d94cde9e6a375d0990a9caedabf87167be1596a21122d4070c653bfa0e866c7`.
 
 ## Query executed
 
@@ -92,7 +92,7 @@ Degree counts are structural navigation statistics, not truth or importance scor
 | `D-reconcile` | 6 | Reconcile pinned main and candidates before extending runtime |
 | `D-projection` | 5 | Preserve exact identity through directed reified Graphify view |
 | `D-evolution` | 5 | Trial SkillOpt as offline platform capability with stronger gate |
-| `D-increments` | 5 | Require synthetic preservation journey before ranking promotion |
+| `D-increments` | 6 | Require synthetic preservation journey before ranking promotion |
 | `P-generation-candidate` | 4 | Immutable generations already reify relationships in candidate |
 
 ## Useful cross-topic paths and open gaps
@@ -160,3 +160,23 @@ ledger passages were inspected directly, and the focused query above supplies th
 navigation witness. Exact source-byte comparison and the regenerated verifier receipt
 check archival and projection integrity. The documentation delta uses focused self-review;
 prior independent reviews stay bound to their original candidates.
+
+## Corpus validation scope
+
+The [preserved user request](sources/validation-coverage-2026-09-29.md) selects Nx and
+non-Nx codebases plus varied documentation and suggests images. `P-validation-corpus`
+records that scope; `A-052` and `A-053` connect it to the existing routing and increment
+plans as engineering inferences. The concrete format/fixture matrix is proposed and
+all application cases are not run. Existing decision records are unchanged.
+
+Image preservation, extracted text, OCR, visual meaning and answer support have separate
+outcomes. Correctly reporting unsupported visual processing is not visual-answer coverage.
+The initial graph query `synthetic tasks` returned all ten selected nodes/eight edges;
+its approximately 1,669 tokens exceeded the requested 1,400-token budget. This was bounded
+navigation, not exhaustive source coverage. The regenerated exact projection/readback
+checks documentation integrity only; no corpus or runtime evaluation is claimed.
+
+The focused query `graphify query 'formats' --budget 1600` returned five nodes and
+four edges with no truncation: the new corpus point, A-052/A-053 and D-routing/D-increments.
+Exact attributes/topology and preserved decisions were checked again. This clarification
+uses focused self-review; prior independent review remains bound to its original commit.

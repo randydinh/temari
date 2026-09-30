@@ -504,6 +504,58 @@ crowding, multiple sources, conflicts, Unicode/CRLF, tables/media gaps and no-an
 Measure enumeration, fetching, supplying and assessment independently. Report denominators,
 omissions and uncertainty; no arbitrary top-k result can claim full audit completion.
 
+### Corpus validation matrix
+
+The [user's validation request](knowledge-system/sources/validation-coverage-2026-09-29.md)
+selects Nx, non-Nx code and varied documentation coverage, with image-bearing documents
+suggested. The concrete fixtures below are proposed test cases. All are **planned / not
+run**; listing a format does not claim current extractor or provider support.
+
+| Case | Proposed fixture | What the implementation must demonstrate |
+| --- | --- | --- |
+| `EVAL-NX` | Small Nx monorepo with applications, shared libraries, cross-project imports, tests and in-repo Markdown | Nx resolves project/task dependencies; scoped code inspection resolves symbols and citations. Documentation still follows the non-code route. Detect a changed dependency without treating project edges as proof of calls or test coverage. |
+| `EVAL-GIT` | Ordinary Git monorepo with multiple packages and no Nx; add a standalone-repository variant | Graft provides supported structural navigation with source/commit anchors. Cross-package links and identical symbol names stay distinct; unsupported languages produce explicit gaps. The consumer works without assuming Nx metadata. |
+| `EVAL-DOC` | Markdown, plain text, HTML, searchable PDF, DOCX and ODT containing headings, tables, lists, code blocks and cross-references | Preserve exact originals, extract supported structures and report omissions. Retrieve rare identifiers and relevant sections with valid anchors. PDF/Office/normalized HTML offsets identify their extracted representation and mapping, never invented original-file line numbers. |
+| `EVAL-IMAGE` | PDF/DOCX with embedded screenshots, Markdown/HTML with linked PNG/JPEG files, scanned PDF pages, and a diagram/chart containing essential information | Account for each known asset and recover retained bytes. Separately assess available text, OCR and visual meaning. Include a question answerable only from the image, misleading captions, and a missing/out-of-scope linked image; never infer full visual coverage from captions or OCR text. |
+| `EVAL-MIX` | One synthetic requirement spread across documentation, implementation, a test assertion, execution evidence and an image | Retrieve all required sources, report contradictions and applicability, and expose any visual evidence gap. A source path through the graph must not manufacture requirement coverage or an execution result. |
+
+For image-bearing documents, report **preservation**, **text extraction**, **OCR**,
+**visual interpretation** and **retrieval/answer support** independently. A correct
+unsupported-capability report may pass the gap-reporting check while visual-answer
+coverage remains unsupported. Aggregate results must keep that gap in the denominator.
+Retaining the container proves recovery of embedded bytes; separately extracting each
+asset requires its own inventory/mapping check. Do not claim complete asset enumeration
+when internal structure is unknown. Linked assets require explicit admission; a link
+inside a document does not grant access or authorize a fetch.
+
+Jev's selected text-judgment role supplies neither OCR nor image understanding. Until
+separately admitted preprocessing exists, retain the original/image and return the visual
+gap. A caption is evidence for what the caption says, not proof of every fact in an image.
+This matrix selects no additional model or OCR dependency.
+
+Apply the existing v1/v2 recovery/resume/currentness journey to the core corpus families.
+Include edits, renames, duplicate names/content, unavailable versus deleted sources,
+revoked access, interrupted publication and assessment failure. Check that source changes
+invalidate affected relationships and cached current answers while permitted historical
+recovery still works. In a mixed query, a missing image-dependent fact remains a gap.
+
+Freeze fixture manifests and expected evidence before tuning: original hashes, source
+revisions, expected anchors/relationships, intentionally absent facts and known unsupported
+regions. Keep those expectations outside the retrievable corpus; variants of the same
+content, including exports to different formats, remain in one evaluation partition.
+Compare incumbent lexical, BM25, graph expansion and conditional Jev on the same permitted
+evidence budgets. Measure required-evidence and contradiction recall, citations, false
+gap reports, abstention, complete-task correctness, latency, context and model cost per
+family. Keep duplicate-document crowding and image-only answers visible in results.
+
+Start with controlled synthetic fixtures so expected answers are known. Then validate
+pinned snapshots of an admitted real Nx repository and non-Nx repository plus selected
+documents. Temari is a possible Nx pilot; a real non-Nx corpus remains to be selected.
+Real-corpus checks must not replace deterministic fixtures or silently expand source scope.
+The preservation and omission checks start in increment 1; structural/relationship checks
+complete as their adapters arrive, and ranking comparisons run in increment 3. Unsupported
+lanes remain explicit coverage gaps until implemented and evaluated.
+
 ## Example journey: a changed requirement and a resumable audit
 
 This is a synthetic acceptance scenario, not an executed customer investigation.
@@ -544,9 +596,10 @@ compare new ranking/model routes on the same journey.
 | 4 — one real connector | Selected admitted corpus with identity, freshness, retention and revocation decisions | Real end-to-end task, grants/withdrawal, capture watermarks/history availability, omissions and deletion/purge recovery; before production claims, satisfy the preservation gate with an exercised recovery receipt and selected/tested RPO/RTO; no broad corpus expansion by inference. |
 | 5 — offline evolution | One retrieval skill through custom SkillOpt adapter; depends on model-role decision and stable evaluation | Sanitized replay with real tools, sealed final test, reviewed patch and rollback; broaden across Temari only on evidence. |
 
-Evaluation starts in increment 1 and runs at every boundary; it is not postponed until
-all providers exist. Named tool roles remain roadmap obligations, even where unsupported
-modalities or integration gaps prevent implementation in the first local increment.
+Evaluation starts in increment 1 and runs at every boundary; the corpus matrix above
+tracks Nx, non-Nx, document and proposed image coverage through those increments.
+Named tool roles remain roadmap obligations, even where unsupported modalities or
+integration gaps prevent implementation in the first local increment.
 
 Open deployment decisions: Jev-only scope; generative extraction/optimization permission;
 first live corpus and modalities; per-agent grants; retention/erasure; original-currentness

@@ -230,6 +230,13 @@
       "revision": "664144d17272697d68e045143f0ede0458ee6eca",
       "reading_status": "Directly inspected runInvestigation checkpoint, inputKey and assessment block; confirmed no file diff from pinned baseline to selected design checkout. Static inspection only; no tests rerun.",
       "intended_influence": "Reuse save-before-assessment, skip unchanged completed inputKey, revalidate and preserve failure gaps; no exactly-once external-action guarantee."
+    },
+    {
+      "id": "S-validation-request",
+      "locator": "docs/knowledge-system/sources/validation-coverage-2026-09-29.md",
+      "revision": "sha256:bdf35a6039207cc143931a87f2bbe465459fb21622846706024a2d75f1c0dfeb",
+      "reading_status": "Read current user request; exact text preserved in the source note. Concrete formats and image cases are proposed interpretations; no corpus execution.",
+      "intended_influence": "Selected validation families: Nx monorepo, non-Nx codebase/monorepo, varied text documentation; image-bearing content suggested. Preserve selected scope without inventing provider support or corpus grants."
     }
   ],
   "points": [
@@ -1413,6 +1420,32 @@
         "implementation-status",
         "historical report with scoped static check",
         "historical-needs-verification"
+      ]
+    },
+    {
+      "id": "P-validation-corpus",
+      "label": "Validate Nx and non-Nx code, document formats and proposed image cases",
+      "topic": "evaluation",
+      "source_refs": [
+        {
+          "source_id": "S-validation-request",
+          "locator": "docs/knowledge-system/sources/validation-coverage-2026-09-29.md",
+          "revision": "sha256:bdf35a6039207cc143931a87f2bbe465459fb21622846706024a2d75f1c0dfeb",
+          "span": "User request (verbatim); Interpretation and limits"
+        }
+      ],
+      "evidence_type": "user decision with proposed test details",
+      "conditions": "Core families selected; concrete formats, real repository selection and image/OCR cases remain proposed. Synthetic fixtures first; separate preservation, extraction and visual-answer outcomes.",
+      "confidence_basis": "Explicit user request extends the existing evaluation scope; matrix operationalizes it without selecting new providers.",
+      "limits": "Planned/not run; no current multi-format, Graft, OCR or visual-understanding proof. Jev-only/model scope and corpus admission remain unchanged.",
+      "benefit": "Detect routing, extraction and cross-source retrieval failures concealed by one text-only sample.",
+      "risk": "Byte preservation or correct gap reporting could be mistaken for successful image understanding; repeated format exports could leak across evaluation partitions.",
+      "status": "selected-core-scope-proposed-fixtures",
+      "tags": [
+        "evaluation",
+        "user decision",
+        "proposed fixtures",
+        "not-run"
       ]
     }
   ],
@@ -3046,6 +3079,50 @@
           "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py",
           "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c",
           "span": "discover: mode selection and len(matched) plus filename-stem weighting"
+        }
+      ]
+    },
+    {
+      "id": "A-052",
+      "source": "P-validation-corpus",
+      "target": "D-routing",
+      "type": "constrains-evaluation",
+      "confidence": "INFERRED",
+      "basis": "The selected corpus families exercise the existing Nx/Graft/non-code routing boundary, including documents inside repositories.",
+      "status": "design-link",
+      "tags": [
+        "assertion",
+        "constrains-evaluation",
+        "INFERRED"
+      ],
+      "source_refs": [
+        {
+          "source_id": "S-validation-request",
+          "locator": "docs/knowledge-system/sources/validation-coverage-2026-09-29.md",
+          "revision": "sha256:bdf35a6039207cc143931a87f2bbe465459fb21622846706024a2d75f1c0dfeb",
+          "span": "User request (verbatim); Interpretation and limits"
+        }
+      ]
+    },
+    {
+      "id": "A-053",
+      "source": "P-validation-corpus",
+      "target": "D-increments",
+      "type": "constrains-evaluation",
+      "confidence": "INFERRED",
+      "basis": "The requested corpus scope adds explicit per-family checks across the already ordered preservation, relationship and ranking increments.",
+      "status": "design-link",
+      "tags": [
+        "assertion",
+        "constrains-evaluation",
+        "INFERRED"
+      ],
+      "source_refs": [
+        {
+          "source_id": "S-validation-request",
+          "locator": "docs/knowledge-system/sources/validation-coverage-2026-09-29.md",
+          "revision": "sha256:bdf35a6039207cc143931a87f2bbe465459fb21622846706024a2d75f1c0dfeb",
+          "span": "User request (verbatim); Interpretation and limits"
         }
       ]
     }

@@ -1822,6 +1822,66 @@
       "type": "informs"
     },
     {
+      "id": "A-053",
+      "label": "A-053 | P-validation-corpus constrains-evaluation D-increments",
+      "basis": "The requested corpus scope adds explicit per-family checks across the already ordered preservation, relationship and ranking increments.",
+      "community": null,
+      "confidence": "INFERRED",
+      "file_type": "concept",
+      "norm_label": "a-053 | p-validation-corpus constrains-evaluation d-increments",
+      "record_kind": "assertion",
+      "source": "P-validation-corpus",
+      "source_file": "docs/knowledge-system/evidence.json",
+      "source_location": "docs/knowledge-system/sources/validation-coverage-2026-09-29.md @ sha256:bdf35a6039207cc143931a87f2bbe465459fb21622846706024a2d75f1c0dfeb :: User request (verbatim); Interpretation and limits",
+      "source_refs": [
+        {
+          "source_id": "S-validation-request",
+          "locator": "docs/knowledge-system/sources/validation-coverage-2026-09-29.md",
+          "revision": "sha256:bdf35a6039207cc143931a87f2bbe465459fb21622846706024a2d75f1c0dfeb",
+          "span": "User request (verbatim); Interpretation and limits"
+        }
+      ],
+      "status": "design-link",
+      "tags": [
+        "assertion",
+        "constrains-evaluation",
+        "INFERRED"
+      ],
+      "target": "D-increments",
+      "title": "P-validation-corpus constrains-evaluation D-increments",
+      "type": "constrains-evaluation"
+    },
+    {
+      "id": "A-052",
+      "label": "A-052 | P-validation-corpus constrains-evaluation D-routing",
+      "basis": "The selected corpus families exercise the existing Nx/Graft/non-code routing boundary, including documents inside repositories.",
+      "community": null,
+      "confidence": "INFERRED",
+      "file_type": "concept",
+      "norm_label": "a-052 | p-validation-corpus constrains-evaluation d-routing",
+      "record_kind": "assertion",
+      "source": "P-validation-corpus",
+      "source_file": "docs/knowledge-system/evidence.json",
+      "source_location": "docs/knowledge-system/sources/validation-coverage-2026-09-29.md @ sha256:bdf35a6039207cc143931a87f2bbe465459fb21622846706024a2d75f1c0dfeb :: User request (verbatim); Interpretation and limits",
+      "source_refs": [
+        {
+          "source_id": "S-validation-request",
+          "locator": "docs/knowledge-system/sources/validation-coverage-2026-09-29.md",
+          "revision": "sha256:bdf35a6039207cc143931a87f2bbe465459fb21622846706024a2d75f1c0dfeb",
+          "span": "User request (verbatim); Interpretation and limits"
+        }
+      ],
+      "status": "design-link",
+      "tags": [
+        "assertion",
+        "constrains-evaluation",
+        "INFERRED"
+      ],
+      "target": "D-routing",
+      "title": "P-validation-corpus constrains-evaluation D-routing",
+      "type": "constrains-evaluation"
+    },
+    {
       "id": "A-044",
       "label": "A-044 | P-jev constrains P-skill-platform",
       "basis": "TypeSafe establishes that Jev supplies typed judgments without prose generation; pinned SkillOpt backend and Sleep documentation establish generative reflection/text edits. Together these imply that text-edit optimization requires a generative backend that Jev cannot provide; the broader model-role permission remains unresolved.",
@@ -2170,6 +2230,39 @@
       ],
       "title": "Intake validates then atomically publishes one immutable manifest",
       "topic": "lifecycle"
+    },
+    {
+      "id": "P-validation-corpus",
+      "label": "P-validation-corpus | Validate Nx and non-Nx code, document formats and proposed image cases",
+      "benefit": "Detect routing, extraction and cross-source retrieval failures concealed by one text-only sample.",
+      "community": null,
+      "conditions": "Core families selected; concrete formats, real repository selection and image/OCR cases remain proposed. Synthetic fixtures first; separate preservation, extraction and visual-answer outcomes.",
+      "confidence_basis": "Explicit user request extends the existing evaluation scope; matrix operationalizes it without selecting new providers.",
+      "evidence_type": "user decision with proposed test details",
+      "file_type": "concept",
+      "limits": "Planned/not run; no current multi-format, Graft, OCR or visual-understanding proof. Jev-only/model scope and corpus admission remain unchanged.",
+      "norm_label": "p-validation-corpus | validate nx and non-nx code, document formats and proposed image cases",
+      "record_kind": "point",
+      "risk": "Byte preservation or correct gap reporting could be mistaken for successful image understanding; repeated format exports could leak across evaluation partitions.",
+      "source_file": "docs/knowledge-system/evidence.json",
+      "source_location": "docs/knowledge-system/sources/validation-coverage-2026-09-29.md @ sha256:bdf35a6039207cc143931a87f2bbe465459fb21622846706024a2d75f1c0dfeb :: User request (verbatim); Interpretation and limits",
+      "source_refs": [
+        {
+          "source_id": "S-validation-request",
+          "locator": "docs/knowledge-system/sources/validation-coverage-2026-09-29.md",
+          "revision": "sha256:bdf35a6039207cc143931a87f2bbe465459fb21622846706024a2d75f1c0dfeb",
+          "span": "User request (verbatim); Interpretation and limits"
+        }
+      ],
+      "status": "selected-core-scope-proposed-fixtures",
+      "tags": [
+        "evaluation",
+        "user decision",
+        "proposed fixtures",
+        "not-run"
+      ],
+      "title": "Validate Nx and non-Nx code, document formats and proposed image cases",
+      "topic": "evaluation"
     },
     {
       "id": "P-journey",
@@ -5157,6 +5250,46 @@
       "target": "A-051",
       "relation": "assertion_subject",
       "assertion_id": "A-051",
+      "confidence": "INFERRED",
+      "confidence_score": 0.55,
+      "source_file": "docs/knowledge-system/evidence.json",
+      "weight": 1.0
+    },
+    {
+      "source": "A-052",
+      "target": "D-routing",
+      "relation": "assertion_object",
+      "assertion_id": "A-052",
+      "confidence": "INFERRED",
+      "confidence_score": 0.55,
+      "source_file": "docs/knowledge-system/evidence.json",
+      "weight": 1.0
+    },
+    {
+      "source": "P-validation-corpus",
+      "target": "A-052",
+      "relation": "assertion_subject",
+      "assertion_id": "A-052",
+      "confidence": "INFERRED",
+      "confidence_score": 0.55,
+      "source_file": "docs/knowledge-system/evidence.json",
+      "weight": 1.0
+    },
+    {
+      "source": "A-053",
+      "target": "D-increments",
+      "relation": "assertion_object",
+      "assertion_id": "A-053",
+      "confidence": "INFERRED",
+      "confidence_score": 0.55,
+      "source_file": "docs/knowledge-system/evidence.json",
+      "weight": 1.0
+    },
+    {
+      "source": "P-validation-corpus",
+      "target": "A-053",
+      "relation": "assertion_subject",
+      "assertion_id": "A-053",
       "confidence": "INFERRED",
       "confidence_score": 0.55,
       "source_file": "docs/knowledge-system/evidence.json",
