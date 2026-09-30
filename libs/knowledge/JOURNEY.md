@@ -73,10 +73,11 @@ delimiter, unmasked slash/hash syntax or non-ASCII code are omitted until a Swif
 parser handles interpolation and regex literals; accepted
 candidates publish as
 `call-name-candidate` because callee resolution is not proven. `contains` is
-limited to verified file spans. Nx dependencies require an exact archived
-package declaration or `implicitDependencies` entry. An implicit declaration
-with any exclusion is omitted until Nx normalization is reproduced. Accepted candidates cite
-the call spelling or declared dependency. Other relationships are skipped.
+limited to whole-file Graft fingerprints and fingerprinted child spans. Nx
+dependencies require an exact archived package declaration or
+`implicitDependencies` entry. An implicit declaration with any exclusion is
+omitted until Nx normalization is reproduced. Accepted candidates cite the call
+spelling or declared dependency. Other relationships are skipped.
 It then publishes a pinned Registrar graph and records skipped edges
 in a private receipt. A stale or unsupported endpoint is omitted. Structure
 artifacts are candidate navigation, not proof of a call at runtime or test

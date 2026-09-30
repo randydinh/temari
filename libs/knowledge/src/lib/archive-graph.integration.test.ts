@@ -445,6 +445,10 @@ test('actual Graft and Nx structure imports publish only archived, current sourc
       ),
     },
     {
+      path: 'src/BlockCommentCaller.swift',
+      bytes: Buffer.from('/*\n  func fakeCall() { target() }\n*/\n'),
+    },
+    {
       path: 'src/RawCaller.swift',
       bytes: Buffer.from(
         'class RawCaller {\n  func callTarget() { let example = #"before " target() " after"# }\n}\n',
@@ -532,6 +536,16 @@ test('actual Graft and Nx structure imports publish only archived, current sourc
       meta: { version: 1 },
       nodes: [
         {
+          id: 'src/Caller.swift',
+          path: 'src/Caller.swift',
+          name: 'Caller.swift',
+          span: 'L1-L4',
+          kind: 'file',
+          body_hash: hash(
+            documents.find((item) => item.path === 'src/Caller.swift')!.bytes,
+          ),
+        },
+        {
           id: 'src/Caller.swift#Caller.callTarget',
           path: 'src/Caller.swift',
           name: 'callTarget',
@@ -550,6 +564,12 @@ test('actual Graft and Nx structure imports publish only archived, current sourc
       ],
       edges: [
         {
+          source: 'src/Caller.swift',
+          target: 'src/Caller.swift#Caller.callTarget',
+          relation: 'contains',
+          confidence: 'extracted',
+        },
+        {
           source: 'src/Caller.swift#Caller.callTarget',
           target: 'src/Target.swift#Target.target',
           relation: 'calls',
@@ -565,20 +585,27 @@ test('actual Graft and Nx structure imports publish only archived, current sourc
     paths: ['src/Caller.swift', 'src/Target.swift'],
     maxEdges: 4,
   });
-  assert.equal(graft.relationshipCount, 1);
+  assert.equal(graft.relationshipCount, 2);
   const reader = await createArchiveGraphReader({
     publications: [capture.publicationPath],
     readScope: 'source-root',
   });
   const projection = await reader.projection(graft.graphId, [f.source]);
   assert(projection.ok, JSON.stringify(projection));
-  assert.equal(projection.value.nodes.length, 3);
-  assert.equal(projection.value.edges.length, 2);
-  assert.equal(
-    projection.value.nodes.find(
-      (node) => node.attributes.kind === 'relationship',
-    )?.attributes.support?.[0]?.quote,
-    'target',
+  assert.equal(projection.value.nodes.length, 5);
+  assert.equal(projection.value.edges.length, 4);
+  const relationships = projection.value.nodes.filter(
+    (node) => node.attributes.kind === 'relationship',
+  );
+  assert(
+    relationships.some(
+      (node) => node.attributes.support?.[0]?.quote === 'target',
+    ),
+  );
+  assert(
+    relationships.some(
+      (node) => node.attributes.support?.[0]?.quote === 'class Caller {',
+    ),
   );
 
   const nxPath = join(f.base, 'nx-project-graph.json');
@@ -762,6 +789,49 @@ test('actual Graft and Nx structure imports publish only archived, current sourc
       artifactPath: commentGraftPath,
       kind: 'graft',
       paths: ['src/CommentCaller.swift', 'src/Target.swift'],
+      maxEdges: 4,
+    }),
+    /No structure edges/,
+  );
+  const blockCommentGraftPath = join(f.base, 'block-comment-wiring.json');
+  await writeFile(
+    blockCommentGraftPath,
+    JSON.stringify({
+      meta: { version: 1 },
+      nodes: [
+        {
+          id: 'block-comment-caller',
+          path: 'src/BlockCommentCaller.swift',
+          name: 'fakeCall',
+          kind: 'method',
+          span: 'L2-L2',
+          body_hash: hash('  func fakeCall() { target() }'),
+        },
+        {
+          id: 'block-comment-target',
+          path: 'src/Target.swift',
+          name: 'target',
+          kind: 'method',
+          span: 'L2-L2',
+          body_hash: hash('  func target() {}'),
+        },
+      ],
+      edges: [
+        {
+          source: 'block-comment-caller',
+          target: 'block-comment-target',
+          relation: 'calls',
+          confidence: 'inferred',
+        },
+      ],
+    }),
+  );
+  await assert.rejects(
+    publishArchiveStructure({
+      publicationPath: capture.publicationPath,
+      artifactPath: blockCommentGraftPath,
+      kind: 'graft',
+      paths: ['src/BlockCommentCaller.swift', 'src/Target.swift'],
       maxEdges: 4,
     }),
     /No structure edges/,
@@ -1213,6 +1283,18 @@ test('actual Graft and Nx structure imports publish only archived, current sourc
   await writeFile(
     join(f.base, 'sources/src/Target.swift'),
     'class Target { changed }\n',
+  );
+  const partial = await publishArchiveStructure({
+    publicationPath: capture.publicationPath,
+    artifactPath: graftPath,
+    kind: 'graft',
+    paths: ['src/Caller.swift', 'src/Target.swift'],
+    maxEdges: 4,
+  });
+  assert.equal(partial.relationshipCount, 1);
+  await writeFile(
+    join(f.base, 'sources/src/Caller.swift'),
+    'class Caller { changed }\n',
   );
   await assert.rejects(
     publishArchiveStructure({

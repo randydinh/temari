@@ -90,8 +90,9 @@ is independently supported by those bytes. Graft call edges are published as
 call spelling must occur outside comments in a Swift file with no string
 delimiter, slash/hash expression syntax or non-ASCII code. This conservative profile
 omits string interpolation and regex literals until a syntax parser is
-available. It does not resolve
-overloads or dynamic dispatch. Containment is limited to verified file spans.
+available. It does not resolve overloads or dynamic dispatch. Containment
+requires the complete Graft file fingerprint and a matching child span
+fingerprint.
 Nx dependencies cite the exact declaration entry. The bounded profile accepts
 these candidate calls, file containment and Nx declared dependencies;
 other relations are omitted with a reason. An optional intake-plan
