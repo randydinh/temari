@@ -27,12 +27,20 @@ import {
   type ArchiveRegistrarOptions,
 } from './lib/archive-registrar.js';
 import { collectKnowledge, type RetrievalOptions } from './lib/retrieval.js';
+import {
+  evaluateArchiveSearch,
+  runArchiveIntake,
+  type ArchiveIntakePlan,
+  type ArchiveSearchPlan,
+} from './lib/archive-journey.js';
 
 const help = `Knowledge demo (explicit local files; no model or semantic approval):
   pnpm nx run knowledge:demo -- capture --input /absolute/intake.json
   pnpm nx run knowledge:demo -- rebind --input /absolute/rebind.json
   pnpm nx run knowledge:demo -- archive-collect --input /absolute/retrieval.json [--resume /absolute/retrieval-HASH.json]
   pnpm nx run knowledge:demo -- archive-assess --input /absolute/investigation.json --assessment /absolute/assessment.json
+  pnpm nx run knowledge:demo -- journey-intake --input /absolute/intake-plan.json
+  pnpm nx run knowledge:demo -- journey-search --input /absolute/search-plan.json
   pnpm nx run knowledge:demo -- --help
   pnpm nx run knowledge:demo -- prepare --manifest /absolute/selected-documents.json --python /absolute/python --registrar-source /absolute/registrar-repo
   pnpm nx run knowledge:demo -- collect --input /absolute/input.json [--resume /absolute/knowledge-HASH.json] [--assessment /absolute/assessment.json]
@@ -58,6 +66,24 @@ async function main(): Promise<void> {
     args.set(key, text(argv.shift()));
   }
   const arg = (key: string): string => text(args.get(key));
+  if (command === 'journey-intake') {
+    const input = JSON.parse(
+      await readFile(arg('--input'), 'utf8'),
+    ) as ArchiveIntakePlan;
+    process.stdout.write(
+      JSON.stringify(await runArchiveIntake(input), null, 2) + '\n',
+    );
+    return;
+  }
+  if (command === 'journey-search') {
+    const input = JSON.parse(
+      await readFile(arg('--input'), 'utf8'),
+    ) as ArchiveSearchPlan;
+    process.stdout.write(
+      JSON.stringify(await evaluateArchiveSearch(input), null, 2) + '\n',
+    );
+    return;
+  }
   if (command === 'capture') {
     const input = JSON.parse(
       await readFile(arg('--input'), 'utf8'),
