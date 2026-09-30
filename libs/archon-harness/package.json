@@ -23,13 +23,22 @@
       "test": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "node --import @swc-node/register/esm-register --test libs/archon-harness/src/lib/managed-runtime.test.ts libs/archon-harness/src/lib/archon-harness.test.ts",
+          "command": "node --import @swc-node/register/esm-register --test libs/archon-harness/src/lib/managed-runtime.test.ts libs/archon-harness/src/lib/archon-harness.test.ts libs/archon-harness/src/lib/canonical-finalize.test.ts",
+          "cwd": "{workspaceRoot}"
+        }
+      },
+      "canonical-native-journey": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test libs/archon-harness/src/lib/canonical-native.test.ts",
           "cwd": "{workspaceRoot}"
         }
       }
     }
   },
   "dependencies": {
-    "@temari/contracts": "workspace:*"
+    "@temari/contracts": "workspace:*",
+    "@temari/runtime": "workspace:^"
   }
 }

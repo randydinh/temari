@@ -94,6 +94,14 @@
       "nx06-safety-test": {
         "command": "node --test tools/nx06-safety.test.mjs",
         "cache": false
+      },
+      "canonical-bridge-test": {
+        "command": "bun test packages/workflow-runtime/assets/v4.1/integrations/archon/canonical-bridge.test.ts",
+        "cache": false
+      },
+      "archon-lifecycle-test": {
+        "command": "bun test packages/workflow-runtime/assets/v4.1/integrations/archon/lifecycle.test.ts",
+        "cache": false
       }
     }
   },
