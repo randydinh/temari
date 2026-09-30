@@ -192,7 +192,7 @@
     {
       "id": "A-016",
       "label": "A-016 | P-lossless motivates D-preserve",
-      "basis": "Decision rationale: Archives, extraction coverage and provenance establish recoverability; semantic recall and authorized purge have separate limits",
+      "basis": "Decision rationale: Archives, capture times, upstream watermarks/history availability, explicit gaps, extraction coverage and provenance bound recoverability to successfully captured retained versions; production requires exercised backup/restore of bytes, manifests, retained extraction outputs/provenance and access/retention state, hash and derived-view checks, current revocation/erasure enforcement and selected/tested RPO/RTO; semantic recall and authorized purge have separate limits",
       "community": null,
       "confidence": "INFERRED",
       "file_type": "concept",
@@ -228,7 +228,7 @@
     {
       "id": "A-017",
       "label": "A-017 | P-revisions motivates D-preserve",
-      "basis": "Decision rationale: Archives, extraction coverage and provenance establish recoverability; semantic recall and authorized purge have separate limits",
+      "basis": "Decision rationale: Archives, capture times, upstream watermarks/history availability, explicit gaps, extraction coverage and provenance bound recoverability to successfully captured retained versions; production requires exercised backup/restore of bytes, manifests, retained extraction outputs/provenance and access/retention state, hash and derived-view checks, current revocation/erasure enforcement and selected/tested RPO/RTO; semantic recall and authorized purge have separate limits",
       "community": null,
       "confidence": "INFERRED",
       "file_type": "concept",
@@ -264,7 +264,7 @@
     {
       "id": "A-018",
       "label": "A-018 | P-access motivates D-preserve",
-      "basis": "Decision rationale: Archives, extraction coverage and provenance establish recoverability; semantic recall and authorized purge have separate limits",
+      "basis": "Decision rationale: Archives, capture times, upstream watermarks/history availability, explicit gaps, extraction coverage and provenance bound recoverability to successfully captured retained versions; production requires exercised backup/restore of bytes, manifests, retained extraction outputs/provenance and access/retention state, hash and derived-view checks, current revocation/erasure enforcement and selected/tested RPO/RTO; semantic recall and authorized purge have separate limits",
       "community": null,
       "confidence": "INFERRED",
       "file_type": "concept",
@@ -300,7 +300,7 @@
     {
       "id": "A-019",
       "label": "A-019 | P-okf motivates D-preserve",
-      "basis": "Decision rationale: Archives, extraction coverage and provenance establish recoverability; semantic recall and authorized purge have separate limits",
+      "basis": "Decision rationale: Archives, capture times, upstream watermarks/history availability, explicit gaps, extraction coverage and provenance bound recoverability to successfully captured retained versions; production requires exercised backup/restore of bytes, manifests, retained extraction outputs/provenance and access/retention state, hash and derived-view checks, current revocation/erasure enforcement and selected/tested RPO/RTO; semantic recall and authorized purge have separate limits",
       "community": null,
       "confidence": "INFERRED",
       "file_type": "concept",
@@ -530,13 +530,13 @@
       "record_kind": "assertion",
       "source": "P-intake",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md @ a2c80bcf98442700289cea090d0ff90bdd59dd27 :: Reuse and selected design; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Two agents: Intake",
+      "source_location": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md @ sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353 :: Reuse and selected design; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Two agents: Intake",
       "source_refs": [
         {
           "source_id": "S-workers",
-          "locator": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
           "span": "Reuse and selected design",
-          "revision": "a2c80bcf98442700289cea090d0ff90bdd59dd27"
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
         },
         {
           "source_id": "S-request",
@@ -674,13 +674,13 @@
       "record_kind": "assertion",
       "source": "P-worker-candidate",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md @ a2c80bcf98442700289cea090d0ff90bdd59dd27 :: Responsibilities; Retrieval and continuation; Compatibility",
+      "source_location": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md @ sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353 :: Responsibilities; Retrieval and continuation; Compatibility",
       "source_refs": [
         {
           "source_id": "S-workers",
-          "locator": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
           "span": "Responsibilities; Retrieval and continuation; Compatibility",
-          "revision": "a2c80bcf98442700289cea090d0ff90bdd59dd27"
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
         }
       ],
       "status": "design-link",
@@ -1334,7 +1334,7 @@
       "record_kind": "assertion",
       "source": "P-journey",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Corrections accepted: synthetic trajectory; delivery sequence; https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md @ a2c80bcf98442700289cea090d0ff90bdd59dd27 :: Retrieval and continuation",
+      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Corrections accepted: synthetic trajectory; delivery sequence; docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md @ sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353 :: Retrieval and continuation",
       "source_refs": [
         {
           "source_id": "S-request",
@@ -1344,9 +1344,9 @@
         },
         {
           "source_id": "S-workers",
-          "locator": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
           "span": "Retrieval and continuation",
-          "revision": "a2c80bcf98442700289cea090d0ff90bdd59dd27"
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
         }
       ],
       "status": "design-link",
@@ -1400,13 +1400,13 @@
       "record_kind": "assertion",
       "source": "P-worker-candidate",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md @ a2c80bcf98442700289cea090d0ff90bdd59dd27 :: Responsibilities; Retrieval and continuation; Compatibility",
+      "source_location": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md @ sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353 :: Responsibilities; Retrieval and continuation; Compatibility",
       "source_refs": [
         {
           "source_id": "S-workers",
-          "locator": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
           "span": "Responsibilities; Retrieval and continuation; Compatibility",
-          "revision": "a2c80bcf98442700289cea090d0ff90bdd59dd27"
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
         }
       ],
       "status": "design-link",
@@ -1626,15 +1626,15 @@
     {
       "id": "A-044",
       "label": "A-044 | P-jev constrains P-skill-platform",
-      "basis": "Text-edit optimization requires a generative backend that Jev cannot provide",
+      "basis": "TypeSafe establishes that Jev supplies typed judgments without prose generation; pinned SkillOpt backend and Sleep documentation establish generative reflection/text edits. Together these imply that text-edit optimization requires a generative backend that Jev cannot provide; the broader model-role permission remains unresolved.",
       "community": null,
-      "confidence": "EXTRACTED",
+      "confidence": "INFERRED",
       "file_type": "concept",
       "norm_label": "a-044 | p-jev constrains p-skill-platform",
       "record_kind": "assertion",
       "source": "P-jev",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "https://docs.typesafe.ai/introduction @ official-docs observed 2026-09-29 :: Typed decisions introduction; https://docs.typesafe.ai/models @ official-docs observed 2026-09-29 :: Current models and Customizing Jev; https://docs.typesafe.ai/cookbooks/rerank_typesafe @ official-docs observed 2026-09-29 :: How do we find one document in thousands?; What is re-ranking?; https://docs.typesafe.ai/cookbooks/entity_alignment @ official-docs observed 2026-09-29 :: Knowledge graph entity alignment example",
+      "source_location": "https://docs.typesafe.ai/introduction @ official-docs observed 2026-09-29 :: Typed decisions introduction; https://docs.typesafe.ai/models @ official-docs observed 2026-09-29 :: Current models and Customizing Jev; https://docs.typesafe.ai/cookbooks/rerank_typesafe @ official-docs observed 2026-09-29 :: How do we find one document in thousands?; What is re-ranking?; https://docs.typesafe.ai/cookbooks/entity_alignment @ official-docs observed 2026-09-29 :: Knowledge graph entity alignment example; https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/skillopt_sleep/backend.py @ 79124b37e9a6371e13b753f8bcd7adb1e493ade1 :: Backend reflection and generative handoff dispatch; https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/docs/sleep/README.md @ 79124b37e9a6371e13b753f8bcd7adb1e493ade1 :: How it works: reflection, proposed skill text edits and session handoff",
       "source_refs": [
         {
           "source_id": "S-jev",
@@ -1659,13 +1659,25 @@
           "locator": "https://docs.typesafe.ai/cookbooks/entity_alignment",
           "revision": "official-docs observed 2026-09-29",
           "span": "Knowledge graph entity alignment example"
+        },
+        {
+          "source_id": "S-skill-backend",
+          "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/skillopt_sleep/backend.py",
+          "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1",
+          "span": "Backend reflection and generative handoff dispatch"
+        },
+        {
+          "source_id": "S-skill-sleep",
+          "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/docs/sleep/README.md",
+          "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1",
+          "span": "How it works: reflection, proposed skill text edits and session handoff"
         }
       ],
       "status": "design-link",
       "tags": [
         "assertion",
         "constrains",
-        "EXTRACTED"
+        "INFERRED"
       ],
       "target": "P-skill-platform",
       "title": "P-jev constrains P-skill-platform",
@@ -1881,13 +1893,13 @@
       "record_kind": "point",
       "risk": "Out-of-order events or two writers can expose partial state",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md @ a2c80bcf98442700289cea090d0ff90bdd59dd27 :: Reuse and selected design; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Two agents: Intake",
+      "source_location": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md @ sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353 :: Reuse and selected design; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Two agents: Intake",
       "source_refs": [
         {
           "source_id": "S-workers",
-          "locator": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
           "span": "Reuse and selected design",
-          "revision": "a2c80bcf98442700289cea090d0ff90bdd59dd27"
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
         },
         {
           "source_id": "S-request",
@@ -1910,8 +1922,8 @@
       "label": "P-journey | Synthetic v1/v2 journey must prove recovery, resume and currentness",
       "benefit": "Early end-to-end evidence before new ranking promotion",
       "community": null,
-      "conditions": "Combine both candidates with explicit local archive first",
-      "confidence_basis": "Each proof isolates preservation, publication and temporal semantics",
+      "conditions": "Combine both candidates with explicit local archive first; exercise synthetic backup/restore of byte objects, manifests, retained extraction outputs/provenance and access/retention state; verify hashes, rebuild/check derived views and respect current revocation/erasure in a recovery receipt",
+      "confidence_basis": "Each proof isolates preservation, publication and temporal semantics; capture-gap cases prevent claims about unobserved versions; unsupported image interpretation records the omitted asset, known region gaps and explicitly unknown internal structure",
       "evidence_type": "engineering inference",
       "file_type": "concept",
       "limits": "No real connector or ranking/model proof in design increment",
@@ -1919,7 +1931,7 @@
       "record_kind": "point",
       "risk": "Unit-only checks hide integration and historical-currentness failures",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Corrections accepted: synthetic trajectory; delivery sequence; https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md @ a2c80bcf98442700289cea090d0ff90bdd59dd27 :: Retrieval and continuation",
+      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Corrections accepted: synthetic trajectory; delivery sequence; docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md @ sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353 :: Retrieval and continuation",
       "source_refs": [
         {
           "source_id": "S-request",
@@ -1929,9 +1941,9 @@
         },
         {
           "source_id": "S-workers",
-          "locator": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
           "span": "Retrieval and continuation",
-          "revision": "a2c80bcf98442700289cea090d0ff90bdd59dd27"
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
         }
       ],
       "status": "proposed-not-executed",
@@ -2150,11 +2162,11 @@
       "label": "P-metrics | Evaluate required evidence and complete tasks, not graph size",
       "benefit": "Measure actual knowledge-worker benefit",
       "community": null,
-      "conditions": "Equal source/evidence budgets and frozen task cohorts",
+      "conditions": "Equal source/evidence budgets and frozen task cohorts; production preservation claims require an exercised recovery receipt and selected/tested RPO/RTO",
       "confidence_basis": "Task outcomes separate byte, recall, support and operation quality",
       "evidence_type": "engineering inference",
       "file_type": "concept",
-      "limits": "Numeric latency/cost SLOs await baseline",
+      "limits": "Numeric latency/cost SLOs await baseline; RPO/RTO must be selected and tested before production claims, with no numeric guarantee established here",
       "norm_label": "p-metrics | evaluate required evidence and complete tasks, not graph size",
       "record_kind": "point",
       "risk": "Edge counts, vendor benchmarks or one-hit recall hide omissions",
@@ -2463,17 +2475,17 @@
     },
     {
       "id": "P-lossless",
-      "label": "P-lossless | Losslessness covers admitted retained bytes and visible omissions",
-      "benefit": "Recover exact prior originals after source change",
+      "label": "P-lossless | Losslessness covers successfully captured retained bytes and visible gaps",
+      "benefit": "Recover exact captured prior originals after source change, subject to current access and retention",
       "community": null,
-      "conditions": "Explicit inventory and chosen retention policy",
-      "confidence_basis": "Separates byte recovery from semantic recall",
+      "conditions": "Explicit inventory and retention policy; track capture times, upstream watermarks, source history availability and gaps; backfill history only where supported",
+      "confidence_basis": "Separates recovery of successfully captured versions from unobserved upstream revisions and semantic recall; production requires exercised backup/restore",
       "evidence_type": "engineering inference",
       "file_type": "concept",
-      "limits": "No lifetime erasure/recovery contradiction can be hidden; no semantic guarantee",
-      "norm_label": "p-lossless | losslessness covers admitted retained bytes and visible omissions",
+      "limits": "Versions between observations may be absent without history backfill; never promise recovery of uncaptured or purged versions; no semantic guarantee",
+      "norm_label": "p-lossless | losslessness covers successfully captured retained bytes and visible gaps",
       "record_kind": "point",
-      "risk": "Summary-only storage loses attachments, tables and original structure",
+      "risk": "Summary-only storage loses original structure; untested backups or stale access/retention state can break recovery or resurrect erased material",
       "source_file": "docs/knowledge-system/evidence.json",
       "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Lossless contract; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md @ sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33 :: R1 and open questions",
       "source_refs": [
@@ -2496,7 +2508,7 @@
         "engineering inference",
         "proposed"
       ],
-      "title": "Losslessness covers admitted retained bytes and visible omissions",
+      "title": "Losslessness covers successfully captured retained bytes and visible gaps",
       "topic": "preservation"
     },
     {
@@ -2621,13 +2633,13 @@
       "record_kind": "point",
       "risk": "Blindly assuming branch-local implementation is merged/deployed",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md @ a2c80bcf98442700289cea090d0ff90bdd59dd27 :: Responsibilities; Retrieval and continuation; Compatibility",
+      "source_location": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md @ sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353 :: Responsibilities; Retrieval and continuation; Compatibility",
       "source_refs": [
         {
           "source_id": "S-workers",
-          "locator": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
           "span": "Responsibilities; Retrieval and continuation; Compatibility",
-          "revision": "a2c80bcf98442700289cea090d0ff90bdd59dd27"
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
         }
       ],
       "status": "candidate-unmerged",
@@ -2688,7 +2700,7 @@
       "label": "P-order | Delivery proceeds from preservation to lifecycle to serving and evolution",
       "benefit": "Reviewable increments with evidence from the first journey",
       "community": null,
-      "conditions": "Each increment has acceptance before dependent promotion",
+      "conditions": "Each increment has acceptance before dependent promotion; synthetic backup/restore starts in preservation work and the production preservation gate requires a recovery receipt with selected/tested RPO/RTO",
       "confidence_basis": "Dependencies isolate unresolved policy from synthetic work",
       "evidence_type": "engineering inference",
       "file_type": "concept",
@@ -2975,7 +2987,7 @@
       "rationale": "The unmerged substrates need integrated temporal evidence before model and connector complexity increases",
       "record_kind": "decision",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Corrections accepted: synthetic trajectory; delivery sequence; https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md @ a2c80bcf98442700289cea090d0ff90bdd59dd27 :: Retrieval and continuation; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Delivery sequence; https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md @ a2c80bcf98442700289cea090d0ff90bdd59dd27 :: Responsibilities; Retrieval and continuation; Compatibility; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Data shape; Graphify projection; Limits; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Acceptance/evaluation; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md @ sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc :: Evaluation set",
+      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Corrections accepted: synthetic trajectory; delivery sequence; docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md @ sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353 :: Retrieval and continuation; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Delivery sequence; docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md @ sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353 :: Responsibilities; Retrieval and continuation; Compatibility; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Data shape; Graphify projection; Limits; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Acceptance/evaluation; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md @ sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc :: Evaluation set",
       "source_refs": [
         {
           "source_id": "S-request",
@@ -2985,9 +2997,9 @@
         },
         {
           "source_id": "S-workers",
-          "locator": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
           "span": "Retrieval and continuation",
-          "revision": "a2c80bcf98442700289cea090d0ff90bdd59dd27"
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
         },
         {
           "source_id": "S-request",
@@ -2997,9 +3009,9 @@
         },
         {
           "source_id": "S-workers",
-          "locator": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
           "span": "Responsibilities; Retrieval and continuation; Compatibility",
-          "revision": "a2c80bcf98442700289cea090d0ff90bdd59dd27"
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
         },
         {
           "source_id": "S-generations",
@@ -3107,7 +3119,7 @@
       "rationale": "Latest user request settles responsibility split; keep existing lifecycle and one publication owner instead of duplicating state",
       "record_kind": "decision",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: User request and decisions; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md @ sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33 :: What is established and what is still a proposal; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Preserve standalone Python Registrar; https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/README.md @ 664144d17272697d68e045143f0ede0458ee6eca :: Supported boundary and gaps; https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md @ a2c80bcf98442700289cea090d0ff90bdd59dd27 :: Reuse and selected design; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Two agents: Intake",
+      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: User request and decisions; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md @ sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33 :: What is established and what is still a proposal; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Preserve standalone Python Registrar; https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/README.md @ 664144d17272697d68e045143f0ede0458ee6eca :: Supported boundary and gaps; docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md @ sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353 :: Reuse and selected design; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Two agents: Intake",
       "source_refs": [
         {
           "source_id": "S-request",
@@ -3135,9 +3147,9 @@
         },
         {
           "source_id": "S-workers",
-          "locator": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
           "span": "Reuse and selected design",
-          "revision": "a2c80bcf98442700289cea090d0ff90bdd59dd27"
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
         },
         {
           "source_id": "S-request",
@@ -3155,17 +3167,17 @@
     },
     {
       "id": "D-preserve",
-      "label": "D-preserve | Define recoverability by admitted versions and explicit retention",
+      "label": "D-preserve | Define recoverability by successfully captured versions and explicit retention",
       "community": null,
       "file_type": "concept",
-      "norm_label": "d-preserve | define recoverability by admitted versions and explicit retention",
+      "norm_label": "d-preserve | define recoverability by successfully captured versions and explicit retention",
       "point_ids": [
         "P-lossless",
         "P-revisions",
         "P-access",
         "P-okf"
       ],
-      "rationale": "Archives, extraction coverage and provenance establish recoverability; semantic recall and authorized purge have separate limits",
+      "rationale": "Archives, capture times, upstream watermarks/history availability, explicit gaps, extraction coverage and provenance bound recoverability to successfully captured retained versions; production requires exercised backup/restore of bytes, manifests, retained extraction outputs/provenance and access/retention state, hash and derived-view checks, current revocation/erasure enforcement and selected/tested RPO/RTO; semantic recall and authorized purge have separate limits",
       "record_kind": "decision",
       "source_file": "docs/knowledge-system/evidence.json",
       "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Lossless contract; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md @ sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33 :: R1 and open questions; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/handoffs/persistent-knowledge-retrieval-reconciliation-2026-09-21.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Recommended next bounded work; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Suggested records and corrections; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/content-registrar-memory-discussion-2026-09-20.md @ sha256:e03cb11233d2350d59a119998d421fac738ee18f402097c630bb04e92136ac33 :: R5 and open questions; https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/ad30107c31c06aec8a7d5636e0d1058118604e6f/SPEC.md @ ad30107c31c06aec8a7d5636e0d1058118604e6f; spec v0.2 :: Concept format, identity and relationships; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Component roles",
@@ -3218,7 +3230,7 @@
         "decision",
         "proposed"
       ],
-      "title": "Define recoverability by admitted versions and explicit retention"
+      "title": "Define recoverability by successfully captured versions and explicit retention"
     },
     {
       "id": "D-projection",
@@ -3394,7 +3406,7 @@
       "rationale": "Merged pagination and required-context repairs coexist with unmerged worker/generation substrates; preserve compatibility and verify combined behavior",
       "record_kind": "decision",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/src/lib/registrar.ts @ 664144d17272697d68e045143f0ede0458ee6eca :: implementationDigest, invoke; https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/contracts/src/lib/knowledge.ts @ 664144d17272697d68e045143f0ede0458ee6eca :: KnowledgeProvider, KnowledgeEvidence; https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/README.md @ 664144d17272697d68e045143f0ede0458ee6eca :: Outcome and supported boundary; https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py @ dfdb9882f814df05354a74b7ab1f72d78d7acc2c :: discover(): update(), _offset, _cursor; https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/IMPLEMENTATION_STATUS.md @ dfdb9882f814df05354a74b7ab1f72d78d7acc2c :: Sep 17/9 entries as summarized in trusted brief; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Verified baseline and reuse; https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md @ a2c80bcf98442700289cea090d0ff90bdd59dd27 :: Responsibilities; Retrieval and continuation; Compatibility; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Data shape; Graphify projection; Limits",
+      "source_location": "https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/src/lib/registrar.ts @ 664144d17272697d68e045143f0ede0458ee6eca :: implementationDigest, invoke; https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/contracts/src/lib/knowledge.ts @ 664144d17272697d68e045143f0ede0458ee6eca :: KnowledgeProvider, KnowledgeEvidence; https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/README.md @ 664144d17272697d68e045143f0ede0458ee6eca :: Outcome and supported boundary; https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py @ dfdb9882f814df05354a74b7ab1f72d78d7acc2c :: discover(): update(), _offset, _cursor; https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/IMPLEMENTATION_STATUS.md @ dfdb9882f814df05354a74b7ab1f72d78d7acc2c :: Sep 17/9 entries as summarized in trusted brief; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Verified baseline and reuse; docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md @ sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353 :: Responsibilities; Retrieval and continuation; Compatibility; https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md @ 3d593500783dadac09a9fd207dee342aa5ed2a11 :: Data shape; Graphify projection; Limits",
       "source_refs": [
         {
           "source_id": "S-adapter",
@@ -3434,9 +3446,9 @@
         },
         {
           "source_id": "S-workers",
-          "locator": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
           "span": "Responsibilities; Retrieval and continuation; Compatibility",
-          "revision": "a2c80bcf98442700289cea090d0ff90bdd59dd27"
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
         },
         {
           "source_id": "S-generations",
@@ -4464,8 +4476,8 @@
       "target": "P-skill-platform",
       "relation": "assertion_object",
       "assertion_id": "A-044",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
+      "confidence": "INFERRED",
+      "confidence_score": 0.55,
       "source_file": "docs/knowledge-system/evidence.json",
       "weight": 1.0
     },
@@ -4474,8 +4486,8 @@
       "target": "A-044",
       "relation": "assertion_subject",
       "assertion_id": "A-044",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
+      "confidence": "INFERRED",
+      "confidence_score": 0.55,
       "source_file": "docs/knowledge-system/evidence.json",
       "weight": 1.0
     },

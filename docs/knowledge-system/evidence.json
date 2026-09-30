@@ -71,10 +71,10 @@
     },
     {
       "id": "S-workers",
-      "locator": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md",
-      "revision": "a2c80bcf98442700289cea090d0ff90bdd59dd27",
-      "reading_status": "Read full design via git show; candidate tests not rerun",
-      "intended_influence": "Unmerged local intake/publication and generic continuation; combined integration remains proposed"
+      "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
+      "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353",
+      "reading_status": "Read preserved byte-identical snapshot in full; 12239 bytes, SHA-256 9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353; originally git show a2c80bcf98442700289cea090d0ff90bdd59dd27:docs/knowledge-workers-design.md. Original commit is local-only/unpushed (controller reports GitHub HTTP422 No commit found); archived source candidate, not implemented by this PR; candidate tests not rerun",
+      "intended_influence": "Archived local-only/unpushed intake/publication and generic continuation candidate; combined integration remains proposed"
     },
     {
       "id": "S-generations",
@@ -366,9 +366,9 @@
       "source_refs": [
         {
           "source_id": "S-workers",
-          "locator": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
           "span": "Responsibilities; Retrieval and continuation; Compatibility",
-          "revision": "a2c80bcf98442700289cea090d0ff90bdd59dd27"
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
         }
       ],
       "evidence_type": "source statement",
@@ -541,7 +541,7 @@
     },
     {
       "id": "P-lossless",
-      "label": "Losslessness covers admitted retained bytes and visible omissions",
+      "label": "Losslessness covers successfully captured retained bytes and visible gaps",
       "topic": "preservation",
       "source_refs": [
         {
@@ -558,11 +558,11 @@
         }
       ],
       "evidence_type": "engineering inference",
-      "conditions": "Explicit inventory and chosen retention policy",
-      "confidence_basis": "Separates byte recovery from semantic recall",
-      "limits": "No lifetime erasure/recovery contradiction can be hidden; no semantic guarantee",
-      "benefit": "Recover exact prior originals after source change",
-      "risk": "Summary-only storage loses attachments, tables and original structure",
+      "conditions": "Explicit inventory and retention policy; track capture times, upstream watermarks, source history availability and gaps; backfill history only where supported",
+      "confidence_basis": "Separates recovery of successfully captured versions from unobserved upstream revisions and semantic recall; production requires exercised backup/restore",
+      "limits": "Versions between observations may be absent without history backfill; never promise recovery of uncaptured or purged versions; no semantic guarantee",
+      "benefit": "Recover exact captured prior originals after source change, subject to current access and retention",
+      "risk": "Summary-only storage loses original structure; untested backups or stale access/retention state can break recovery or resurrect erased material",
       "status": "proposed",
       "tags": [
         "preservation",
@@ -676,9 +676,9 @@
       "source_refs": [
         {
           "source_id": "S-workers",
-          "locator": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
           "span": "Reuse and selected design",
-          "revision": "a2c80bcf98442700289cea090d0ff90bdd59dd27"
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
         },
         {
           "source_id": "S-request",
@@ -1109,14 +1109,14 @@
         },
         {
           "source_id": "S-workers",
-          "locator": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
           "span": "Retrieval and continuation",
-          "revision": "a2c80bcf98442700289cea090d0ff90bdd59dd27"
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
         }
       ],
       "evidence_type": "engineering inference",
-      "conditions": "Combine both candidates with explicit local archive first",
-      "confidence_basis": "Each proof isolates preservation, publication and temporal semantics",
+      "conditions": "Combine both candidates with explicit local archive first; exercise synthetic backup/restore of byte objects, manifests, retained extraction outputs/provenance and access/retention state; verify hashes, rebuild/check derived views and respect current revocation/erasure in a recovery receipt",
+      "confidence_basis": "Each proof isolates preservation, publication and temporal semantics; capture-gap cases prevent claims about unobserved versions; unsupported image interpretation records the omitted asset, known region gaps and explicitly unknown internal structure",
       "limits": "No real connector or ranking/model proof in design increment",
       "benefit": "Early end-to-end evidence before new ranking promotion",
       "risk": "Unit-only checks hide integration and historical-currentness failures",
@@ -1146,9 +1146,9 @@
         }
       ],
       "evidence_type": "engineering inference",
-      "conditions": "Equal source/evidence budgets and frozen task cohorts",
+      "conditions": "Equal source/evidence budgets and frozen task cohorts; production preservation claims require an exercised recovery receipt and selected/tested RPO/RTO",
       "confidence_basis": "Task outcomes separate byte, recall, support and operation quality",
-      "limits": "Numeric latency/cost SLOs await baseline",
+      "limits": "Numeric latency/cost SLOs await baseline; RPO/RTO must be selected and tested before production claims, with no numeric guarantee established here",
       "benefit": "Measure actual knowledge-worker benefit",
       "risk": "Edge counts, vendor benchmarks or one-hit recall hide omissions",
       "status": "proposed",
@@ -1171,7 +1171,7 @@
         }
       ],
       "evidence_type": "engineering inference",
-      "conditions": "Each increment has acceptance before dependent promotion",
+      "conditions": "Each increment has acceptance before dependent promotion; synthetic backup/restore starts in preservation work and the production preservation gate requires a recovery receipt with selected/tested RPO/RTO",
       "confidence_basis": "Dependencies isolate unresolved policy from synthetic work",
       "limits": "Named tool integrations remain roadmap, not complete now",
       "benefit": "Reviewable increments with evidence from the first journey",
@@ -1250,9 +1250,9 @@
     },
     {
       "id": "D-preserve",
-      "label": "Define recoverability by admitted versions and explicit retention",
+      "label": "Define recoverability by successfully captured versions and explicit retention",
       "status": "proposed",
-      "rationale": "Archives, extraction coverage and provenance establish recoverability; semantic recall and authorized purge have separate limits",
+      "rationale": "Archives, capture times, upstream watermarks/history availability, explicit gaps, extraction coverage and provenance bound recoverability to successfully captured retained versions; production requires exercised backup/restore of bytes, manifests, retained extraction outputs/provenance and access/retention state, hash and derived-view checks, current revocation/erasure enforcement and selected/tested RPO/RTO; semantic recall and authorized purge have separate limits",
       "point_ids": [
         "P-lossless",
         "P-revisions",
@@ -1419,9 +1419,9 @@
       "source_refs": [
         {
           "source_id": "S-workers",
-          "locator": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
           "span": "Reuse and selected design",
-          "revision": "a2c80bcf98442700289cea090d0ff90bdd59dd27"
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
         },
         {
           "source_id": "S-request",
@@ -1531,9 +1531,9 @@
       "source_refs": [
         {
           "source_id": "S-workers",
-          "locator": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
           "span": "Responsibilities; Retrieval and continuation; Compatibility",
-          "revision": "a2c80bcf98442700289cea090d0ff90bdd59dd27"
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
         }
       ]
     },
@@ -1773,7 +1773,7 @@
       "target": "D-preserve",
       "type": "motivates",
       "confidence": "INFERRED",
-      "basis": "Decision rationale: Archives, extraction coverage and provenance establish recoverability; semantic recall and authorized purge have separate limits",
+      "basis": "Decision rationale: Archives, capture times, upstream watermarks/history availability, explicit gaps, extraction coverage and provenance bound recoverability to successfully captured retained versions; production requires exercised backup/restore of bytes, manifests, retained extraction outputs/provenance and access/retention state, hash and derived-view checks, current revocation/erasure enforcement and selected/tested RPO/RTO; semantic recall and authorized purge have separate limits",
       "tags": [
         "assertion",
         "motivates",
@@ -1801,7 +1801,7 @@
       "target": "D-preserve",
       "type": "motivates",
       "confidence": "INFERRED",
-      "basis": "Decision rationale: Archives, extraction coverage and provenance establish recoverability; semantic recall and authorized purge have separate limits",
+      "basis": "Decision rationale: Archives, capture times, upstream watermarks/history availability, explicit gaps, extraction coverage and provenance bound recoverability to successfully captured retained versions; production requires exercised backup/restore of bytes, manifests, retained extraction outputs/provenance and access/retention state, hash and derived-view checks, current revocation/erasure enforcement and selected/tested RPO/RTO; semantic recall and authorized purge have separate limits",
       "tags": [
         "assertion",
         "motivates",
@@ -1829,7 +1829,7 @@
       "target": "D-preserve",
       "type": "motivates",
       "confidence": "INFERRED",
-      "basis": "Decision rationale: Archives, extraction coverage and provenance establish recoverability; semantic recall and authorized purge have separate limits",
+      "basis": "Decision rationale: Archives, capture times, upstream watermarks/history availability, explicit gaps, extraction coverage and provenance bound recoverability to successfully captured retained versions; production requires exercised backup/restore of bytes, manifests, retained extraction outputs/provenance and access/retention state, hash and derived-view checks, current revocation/erasure enforcement and selected/tested RPO/RTO; semantic recall and authorized purge have separate limits",
       "tags": [
         "assertion",
         "motivates",
@@ -1857,7 +1857,7 @@
       "target": "D-preserve",
       "type": "motivates",
       "confidence": "INFERRED",
-      "basis": "Decision rationale: Archives, extraction coverage and provenance establish recoverability; semantic recall and authorized purge have separate limits",
+      "basis": "Decision rationale: Archives, capture times, upstream watermarks/history availability, explicit gaps, extraction coverage and provenance bound recoverability to successfully captured retained versions; production requires exercised backup/restore of bytes, manifests, retained extraction outputs/provenance and access/retention state, hash and derived-view checks, current revocation/erasure enforcement and selected/tested RPO/RTO; semantic recall and authorized purge have separate limits",
       "tags": [
         "assertion",
         "motivates",
@@ -2373,9 +2373,9 @@
         },
         {
           "source_id": "S-workers",
-          "locator": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
           "span": "Retrieval and continuation",
-          "revision": "a2c80bcf98442700289cea090d0ff90bdd59dd27"
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
         }
       ]
     },
@@ -2417,9 +2417,9 @@
       "source_refs": [
         {
           "source_id": "S-workers",
-          "locator": "https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md",
+          "locator": "docs/knowledge-system/sources/knowledge-workers-design-a2c80bc.md",
           "span": "Responsibilities; Retrieval and continuation; Compatibility",
-          "revision": "a2c80bcf98442700289cea090d0ff90bdd59dd27"
+          "revision": "sha256:9c16a8e58894a674db10bd46ab23e8b9f25cea72fd3350d5f052c39f4377d353"
         }
       ]
     },
@@ -2550,12 +2550,12 @@
       "source": "P-jev",
       "target": "P-skill-platform",
       "type": "constrains",
-      "confidence": "EXTRACTED",
-      "basis": "Text-edit optimization requires a generative backend that Jev cannot provide",
+      "confidence": "INFERRED",
+      "basis": "TypeSafe establishes that Jev supplies typed judgments without prose generation; pinned SkillOpt backend and Sleep documentation establish generative reflection/text edits. Together these imply that text-edit optimization requires a generative backend that Jev cannot provide; the broader model-role permission remains unresolved.",
       "tags": [
         "assertion",
         "constrains",
-        "EXTRACTED"
+        "INFERRED"
       ],
       "status": "design-link",
       "source_refs": [
@@ -2582,6 +2582,18 @@
           "locator": "https://docs.typesafe.ai/cookbooks/entity_alignment",
           "revision": "official-docs observed 2026-09-29",
           "span": "Knowledge graph entity alignment example"
+        },
+        {
+          "source_id": "S-skill-backend",
+          "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/skillopt_sleep/backend.py",
+          "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1",
+          "span": "Backend reflection and generative handoff dispatch"
+        },
+        {
+          "source_id": "S-skill-sleep",
+          "locator": "https://github.com/microsoft/SkillOpt/blob/79124b37e9a6371e13b753f8bcd7adb1e493ade1/docs/sleep/README.md",
+          "revision": "79124b37e9a6371e13b753f8bcd7adb1e493ade1",
+          "span": "How it works: reflection, proposed skill text edits and session handoff"
         }
       ]
     },

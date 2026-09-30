@@ -12,6 +12,10 @@ pinned Temari contracts/adapter, selected Registrar source, unmerged candidate d
 and official Nx, Graft, Graphify, OKF, TypeSafe and SkillOpt documentation/code.
 This is not a broad repository graph, a private source inventory or an exhaustive literature
 review. Reading status distinguishes direct inspection from brief-reported observations.
+`S-workers` now resolves to the [byte-identical archived snapshot](sources/knowledge-workers-design-a2c80bc.md),
+not the unavailable GitHub commit. Its original local-only/unpushed ref and verified
+SHA-256 are recorded in the [source provenance](README.md#archived-worker-source);
+it remains a candidate source, not implementation delivered by this PR.
 No existing Temari code graph was changed or treated as current runtime proof.
 
 The actual projection contains **87 nodes and 92 directed edges**.
@@ -43,11 +47,16 @@ all canonical point/decision/assertion attributes, connector attributes, source 
 revisions, tags, and the repeated-endpoint witness. It re-imports the serialized graph
 through the installed builder and rechecks node attributes and directed edges.
 The task's separate artifact verifier also checks expected schema/identity/topology.
+The prior independent review returned **ISSUES** for A-044 provenance; that historical
+receipt remains ISSUES. This correction marks A-044 INFERRED and adds pinned SkillOpt
+backend/Sleep evidence alongside TypeSafe evidence. The cross-source rationale is that
+Jev cannot generate prose while SkillOpt editing requires generation; model-role permission
+remains conditional. Regenerated readback checks that provenance as well as topology.
 These are integrity checks; they do not establish that every claim is true or that a
 proposed runtime meets the design. No Temari/Registrar runtime tests were run here.
 
-- Evidence SHA-256: `d49e4e4e656893785d4012684b6228dd33e243a730d22de83d704f503a743230`.
-- Graph SHA-256: `593aa44d1d04c759881ceba0f28f867271c020f55223db5274549b6c244d075e`.
+- Evidence SHA-256: `a2d2607e7a467fc6605b21aff0fde92218507a466e13ba807a18aaa178e3e81d`.
+- Graph SHA-256: `4eb084058360b876add932e736353b486fde034d4a16ae064ca2e6e606d6f368`.
 
 ## Query executed
 
@@ -70,7 +79,8 @@ text. SkillOpt editing therefore needs a generative role whose permission remain
 The default aggregate gate is insufficient for promotion; real tool replay, separate
 held-out evaluation and review are required by the proposed Temari decision.
 `P-jev` cites TypeSafe introduction/models; `P-skill-gate` cites pinned Sleep config/gate;
-`P-model-fork` cites the dated trusted request. This is source navigation, not a product
+`P-model-fork` cites the dated trusted request. `A-044` joins the TypeSafe limitations
+to pinned `S-skill-backend` and `S-skill-sleep` editing evidence as an inference. This is source navigation, not a product
 benchmark. Query output was not re-ingested as fact or used to boost truth confidence.
 
 ## High-connectivity decisions
@@ -98,6 +108,10 @@ The whole graph is a reviewed-design input, not a semantically audited productio
 Open gaps include multi-source archive implementation, rename/alias lifecycle, real
 connector grants and retention, source-currentness policy, actual language/modality
 coverage, model-role approval, local Jev calibration and complete-task performance.
+Recovery covers successfully captured retained versions only; upstream history gaps remain
+explicit. Backup/restore of bytes, manifests, retained extraction outputs/provenance and
+access/retention state, hash and derived-view checks, current revocation/erasure enforcement,
+and selected/tested RPO/RTO remain proposed production gates, not executed infrastructure.
 Both candidate branches and their combined integration remain unmerged/unverified here.
 Historical tests and vendor examples do not fill those gaps. External unversioned web
 pages are dated observations; pinned commits or local byte hashes are recorded where available.

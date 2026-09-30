@@ -15,8 +15,8 @@ relationships, OKF for portable representations, and Jev for bounded judgments.
 The two agents are intake and search/retrieval; the existing runtime remains their
 execution and persistence owner. A second scheduler would create duplicate authority.
 
-The lossless objective means recovering the exact admitted original versions under
-an explicit retention policy, accounting for every admitted asset, and tracing every
+The lossless objective means recovering the exact successfully captured, admitted original
+versions under an explicit retention policy, accounting for every admitted asset, and tracing every
 derived assertion to evidence. It does not mean perfect recall of every possible
 meaning. Measure semantic retrieval and complete-task success separately.
 
@@ -63,14 +63,17 @@ A saved API key establishes neither integration nor permission for hosted data u
 | --- | --- | --- |
 | Temari knowledge adapter | Merged at the pinned baseline: `KnowledgeProvider`, actual Registrar CLI calls, exact evidence, bounded investigations and immutable checkpoints | Generic worker publication candidate is separate; no Jev call. |
 | Registrar remote main | `dfdb9882f814df05354a74b7ab1f72d78d7acc2c`: pagination, generation-bound cursors, coverage, transitive required-context repair and six-tool source-read-only MCP profile | Semantic recall and full consumer journeys still need evaluation. |
-| Temari worker candidate | Unmerged `a2c80bcf98442700289cea090d0ff90bdd59dd27`: explicit UTF-8 intake/publication, pinned reader, generic bounded retrieval and continuation | Not deployed or integrated with persistent concept generations. |
+| Temari worker candidate | Local-only/unpushed, unmerged `a2c80bcf98442700289cea090d0ff90bdd59dd27`: explicit UTF-8 intake/publication, pinned reader, generic bounded retrieval and continuation | Not deployed or integrated with persistent concept generations. |
 | Registrar generation candidate | Unmerged `3d593500783dadac09a9fd207dee342aa5ed2a11`, implementation `b56d8a8ee46c4d5139a9466753451d09cd10f9be`: immutable concepts/assertions and checked Graphify projection | One source and contiguous anchor per record; no all-version byte archive, default retrieval integration or generation OKF export. |
 | This increment | Design, ledger, local Graphify projection and artifact readback | Runtime behavior below is proposed unless explicitly identified above. |
 
 Read the merged [knowledge contract](../libs/contracts/src/lib/knowledge.ts),
 [adapter](../libs/knowledge/src/lib/registrar.ts), and [knowledge README](../libs/knowledge/README.md).
-Candidate records are the [worker design](https://github.com/randydinh/temari/blob/a2c80bcf98442700289cea090d0ff90bdd59dd27/docs/knowledge-workers-design.md)
+Candidate records are the [archived worker design](knowledge-system/sources/knowledge-workers-design-a2c80bc.md)
 and [generation design](https://github.com/randydinh/content-registrar/blob/3d593500783dadac09a9fd207dee342aa5ed2a11/docs/design/persistent-knowledge-generations.md).
+The worker snapshot is an archived source candidate, not implemented by this PR; its
+original commit is local-only/unpushed and unavailable on GitHub. See the
+[snapshot provenance](knowledge-system/README.md#archived-worker-source).
 Characterize compatibility before combining them; do not blindly cherry-pick repairs
 already present in Registrar main. Historical test counts and a prior Graphify 0.9.63
 roundtrip are reported history, not tests run on this combined design. The earlier
@@ -149,6 +152,10 @@ A separate graph database or vector service is justified only by measured needs.
 The admitted universe is an explicit manifest, not “everything accessible to this host.”
 Record asset identity, expected inventory, source scope and acquisition permission.
 Capture original bytes before extraction; retain upstream version and byte digest.
+The recovery guarantee covers successfully captured versions only. Upstream revisions
+between observations may be absent unless the connector can backfill source history.
+Track capture times, upstream watermarks, history availability and explicit capture gaps;
+never imply recovery of versions never observed or captured through backfill.
 For remote sources whose original binary is unavailable, state exactly what representation
 was captured; do not claim original-byte preservation from a normalized API response.
 
@@ -158,11 +165,19 @@ Preserve raw bytes even when OCR, table structure or media extraction is unavail
 Store a format-aware extraction coverage receipt: pages/regions, sheets/cells, tracks/time
 ranges, errors and lossy transformations. Extracted text alone cannot certify completeness.
 
-Recovering version v1 means reproducing its byte hash after v2 is published, without
-requiring the original source to still exist. Preserve extraction recipes and identities;
+Recovering a successfully captured, retained version v1 means reproducing its byte hash
+after v2 is published, without requiring the original source to still exist. Preserve extraction recipes and identities;
 deterministic views must rebuild equivalently. For model-derived views retain exact
 outputs, prompts/configuration hashes and provenance: regeneration may not be identical.
 Compact summaries are expandable entry points and never substitutes for retained originals.
+
+Before production claims, require backups of original byte objects, publication/revision
+manifests, retained extraction outputs and provenance, and access/retention state. Restore
+must verify hashes, rebuild and check derived views, and reconcile current revocation and
+erasure so stale backups cannot restore forbidden access or erased material. Exercise
+backup/restore and retain a recovery receipt covering those checks. Select and test recovery
+point and recovery time objectives (RPO/RTO) before production claims; this design supplies
+no numeric guarantee. These are proposed requirements, not executed infrastructure.
 
 Retention is a deployment decision. Proposed synthetic/local pilot policy: no automatic
 purge of admitted fixtures. This does not select an account-wide private retention policy.
@@ -419,7 +434,7 @@ Use synthetic fixtures first, then a specifically admitted representative task c
 
 | Gate | Observable requirement |
 | --- | --- |
-| Preservation | Every admitted retained original roundtrips byte/hash exactly; unsupported assets and deliberate purge are visible. |
+| Preservation | Every successfully captured, admitted retained original roundtrips byte/hash exactly; capture times, upstream watermarks/history availability, capture gaps, unsupported assets and deliberate purge are visible. Before production claims, exercise backup/restore of bytes, manifests, extraction outputs/provenance and access/retention state; retain hash, derived-view and current revocation/erasure checks in a recovery receipt, with selected and tested RPO/RTO. |
 | Identity/provenance | All anchors resolve; equal names stay separate; repeated and reversed assertions survive projection/export. |
 | Access/lifecycle | No unauthorized disclosure; revoke, delete, rename, stale, unavailable and purge are distinct; dependent caches obey changes. |
 | Publication/recovery | Crash, replay and concurrent publish cannot expose partial generations; v1 resumes after v2 without false currentness. |
@@ -458,18 +473,20 @@ A current-original request starts a new compatible RevisionSet and cannot silent
 A's old verdict. A revoked source cannot be read through A's historical checkpoint.
 
 The acceptance receipt must separately prove v1 recovery, v2 publication/invalidation,
-historical resume and currentness reporting. Record exact omitted image regions and
-unassessed evidence. Only then compare new ranking/model routes on the same journey.
+historical resume and currentness reporting. Record the asset omitted from image
+interpretation and any known region gaps; mark unknown internal structure explicitly
+instead of claiming to enumerate it. Record unassessed evidence separately. Only then
+compare new ranking/model routes on the same journey.
 
 ## Ordered implementation increments
 
 | Order | Deliverable and dependency | Acceptance and stopping condition |
 | --- | --- | --- |
 | 0 — this increment | Design, reconciliation inventory, ledger and separate Graphify projection | Artifact readback/query and diff checks; no runtime readiness claim. |
-| 1 — local preservation journey | Reconcile main plus both candidates behind versioned contracts; add explicit local revision archive and synthetic fixture workflow | Compatibility tests plus the four-part v1/v2/resume/currentness receipt above; scope stays deterministic/local while policy is unresolved. |
+| 1 — local preservation journey | Reconcile main plus both candidates behind versioned contracts; add explicit local revision archive and synthetic fixture workflow | Compatibility tests plus the four-part v1/v2/resume/currentness receipt above and explicit capture-gap cases; exercise synthetic backup/restore with hash, derived-view and revocation/erasure checks; scope stays deterministic/local while policy is unresolved. |
 | 2 — relationship lifecycle | Multi-anchor/cross-source RevisionSet, reversible identity, invalidation, checked projection and OKF profile | Same-name/rename/conflict fixtures, exact topology/provenance and OKF roundtrip; failed publish rollback. |
 | 3 — serving and judgment trial | Published-snapshot indexing, exact/BM25/graph ablations and conditional Jev adapter in shadow | Preserve assurance modes, required evidence and citations; measured complete-task benefit before default promotion. |
-| 4 — one real connector | Selected admitted corpus with identity, freshness, retention and revocation decisions | Real end-to-end task, grants/withdrawal, omissions and deletion/purge recovery; no broad corpus expansion by inference. |
+| 4 — one real connector | Selected admitted corpus with identity, freshness, retention and revocation decisions | Real end-to-end task, grants/withdrawal, capture watermarks/history availability, omissions and deletion/purge recovery; before production claims, satisfy the preservation gate with an exercised recovery receipt and selected/tested RPO/RTO; no broad corpus expansion by inference. |
 | 5 — offline evolution | One retrieval skill through custom SkillOpt adapter; depends on model-role decision and stable evaluation | Sanitized replay with real tools, sealed final test, reviewed patch and rollback; broaden across Temari only on evidence. |
 
 Evaluation starts in increment 1 and runs at every boundary; it is not postponed until
