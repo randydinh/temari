@@ -18,6 +18,10 @@ import {
   evaluateArchiveGraphTrial,
   type ArchiveGraphTrial,
 } from './archive-graph-trial.js';
+import {
+  publishArchiveStructure,
+  type ArchiveStructurePlan,
+} from './archive-structure.js';
 import { canonical, checkBasis, hash, integer, object, text } from './codec.js';
 import { publishJson, readJson } from './durable.js';
 import {
@@ -30,6 +34,10 @@ import { collectKnowledge, loadRetrieval } from './retrieval.js';
 export interface ArchiveIntakePlan {
   readonly task: InvestigationTask;
   readonly intakes: readonly ArchiveIntakeOptions[];
+  readonly structures?: readonly (Omit<
+    ArchiveStructurePlan,
+    'publicationPath'
+  > & { sourceId: string })[];
 }
 export interface ArchiveIntakeHandoff {
   readonly schema: 1;
@@ -43,11 +51,17 @@ export interface ArchiveIntakeHandoff {
     preservation: string;
     gapCount: number;
   }[];
+  readonly structures?: readonly {
+    sourceId: string;
+    graphId: string;
+    receiptPath: string;
+  }[];
 }
 export interface ArchiveIntakeBatchResult {
   readonly status: 'published' | 'blocked';
   readonly handoffPath: string | null;
   readonly outcomes: readonly ArchiveIntakeOutcome[];
+  readonly structures?: ArchiveIntakeHandoff['structures'];
 }
 export interface ArchiveEvaluationCase {
   readonly id: string;
@@ -139,6 +153,34 @@ export async function runArchiveIntake(
     return { status: 'blocked', handoffPath: null, outcomes };
   const publications = outcomes.map((item) => item.publicationPath!);
   const loaded = await Promise.all(publications.map(loadArchivePublication));
+  const structures: {
+    sourceId: string;
+    graphId: string;
+    receiptPath: string;
+  }[] = [];
+  assert((selected.structures?.length ?? 0) <= 8);
+  for (const structure of selected.structures ?? []) {
+    const index = loaded.findIndex(
+      (item) => item.source.id === structure.sourceId,
+    );
+    assert(index >= 0, 'Structure source outside intake');
+    assert(
+      !structures.some((item) => item.sourceId === structure.sourceId),
+      'One structural graph per source',
+    );
+    const published = await publishArchiveStructure({
+      publicationPath: publications[index],
+      artifactPath: structure.artifactPath,
+      kind: structure.kind,
+      paths: structure.paths,
+      maxEdges: structure.maxEdges,
+    });
+    structures.push({
+      sourceId: structure.sourceId,
+      graphId: published.graphId,
+      receiptPath: published.receiptPath,
+    });
+  }
   const handoff: ArchiveIntakeHandoff = {
     schema: 1,
     kind: 'temari-archive-intake-handoff',
@@ -151,13 +193,19 @@ export async function runArchiveIntake(
       preservation: item.preservation,
       gapCount: item.gaps.length,
     })),
+    ...(structures.length ? { structures } : {}),
   };
   const handoffPath = join(
     selected.task.directory,
     `archive-handoff-${hash(canonical(handoff))}.json`,
   );
   await publishJson(handoffPath, handoff);
-  return { status: 'published', handoffPath, outcomes };
+  return {
+    status: 'published',
+    handoffPath,
+    outcomes,
+    ...(structures.length ? { structures } : {}),
+  };
 }
 
 async function loadHandoff(path: string): Promise<ArchiveIntakeHandoff> {
@@ -176,6 +224,34 @@ async function loadHandoff(path: string): Promise<ArchiveIntakeHandoff> {
       value.publications.length <= 8,
   );
   assert.equal(value.sources.length, value.publications.length);
+  if (value.structures !== undefined) {
+    assert(
+      Array.isArray(value.structures) &&
+        value.structures.length <= value.sources.length,
+    );
+    assert.equal(
+      new Set(value.structures.map((item) => item.sourceId)).size,
+      value.structures.length,
+    );
+    for (const item of value.structures) {
+      assert(value.sources.some((source) => source.id === item.sourceId));
+      assert(/^[a-f0-9]{64}$/.test(item.graphId));
+      assert(
+        isAbsolute(item.receiptPath) &&
+          dirname(item.receiptPath) === value.task.directory,
+      );
+      const receipt = object(await readJson(item.receiptPath));
+      assert.equal(
+        basename(item.receiptPath),
+        `archive-structure-${hash(canonical(receipt))}.json`,
+      );
+      assert.equal(receipt['graphId'], item.graphId);
+      assert.equal(receipt['sourceId'], item.sourceId);
+      const pin = value.sources.find((source) => source.id === item.sourceId)!;
+      assert.equal(receipt['generation'], pin.generation);
+      assert.equal(receipt['manifestSha256'], pin.manifestSha256);
+    }
+  }
   const loaded = await Promise.all(
     value.publications.map(loadArchivePublication),
   );
@@ -417,11 +493,17 @@ export async function evaluateArchiveSearch(
         jevMs = Math.max(0, Math.round(performance.now() - jevStarted));
       }
     }
+    const selectedGraphId =
+      c.graphId ??
+      (c.sourceIds.length === 1
+        ? handoff.structures?.find((item) => item.sourceId === c.sourceIds[0])
+            ?.graphId
+        : undefined);
     const graph =
-      c.graphId === undefined
+      selectedGraphId === undefined
         ? undefined
         : await evaluateArchiveGraphTrial({
-            graphId: c.graphId,
+            graphId: selectedGraphId,
             publications: selectedPublications,
             scope,
             provider,

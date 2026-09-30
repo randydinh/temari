@@ -42,6 +42,15 @@ Use the source IDs returned by registration in an intake plan:
       },
       "requestKey": "corpus-v1"
     }
+  ],
+  "structures": [
+    {
+      "sourceId": "REGISTERED_SOURCE_ID",
+      "artifactPath": "/absolute/pinned-nx-project-graph-or-graft-wiring.json",
+      "kind": "nx",
+      "paths": ["libs/knowledge/package.json", "libs/contracts/package.json"],
+      "maxEdges": 64
+    }
   ]
 }
 ```
@@ -54,6 +63,29 @@ pnpm nx run knowledge:demo -- journey-intake --input /absolute/intake-plan.json
 
 Keep the returned `handoffPath`. A blocked capture produces no handoff. Intake
 persists its attempts, publications and capability gaps in the task directory.
+`structures` is optional. `nx` accepts the JSON from `pnpm nx graph --print`;
+`graft` accepts a Graft `.graph/wiring.json` generated from the selected
+non-Nx checkout. Provide only paths admitted in the source root. Temari checks
+each structural endpoint against the retained archive text and the current
+source file hash. Graft call candidates require matching AST span hashes and
+a Swift call spelling outside comments. Files containing any Swift string
+delimiter, unmasked slash/hash syntax or non-ASCII code are omitted until a Swift expression
+parser handles interpolation and regex literals; accepted
+candidates publish as
+`call-name-candidate` because callee resolution is not proven. `contains` is
+limited to verified file spans. Nx dependencies require an exact archived
+package declaration or `implicitDependencies` entry. An implicit declaration
+with any exclusion is omitted until Nx normalization is reproduced. Accepted candidates cite
+the call spelling or declared dependency. Other relationships are skipped.
+It then publishes a pinned Registrar graph and records skipped edges
+in a private receipt. A stale or unsupported endpoint is omitted. Structure
+artifacts are candidate navigation, not proof of a call at runtime or test
+coverage. Generate artifacts from the same source revision as the capture;
+the relationship checks also refuse stale artifact edges that no longer occur
+in retained text.
+For a retained publication that already exists, use the separate
+`structure-publish --input /absolute/structure-plan.json` command with the
+same fields plus `publicationPath` instead of `sourceId`.
 
 ## Search and score
 
@@ -100,7 +132,9 @@ sharing decision. The first live check should use synthetic text. Missing key,
 network or invalid response leaves judgments `unknown`.
 
 For an optional graph ablation, set `graphId` on a search case to a published
-Registrar graph ID covering the selected archive publications. The report keeps
+Registrar graph ID covering the selected archive publications. A single-source
+case automatically trials the graph recorded in its intake handoff when
+`graphId` is omitted. The report keeps
 `ranked` and `expectedRecallAtK` as the lexical baseline and adds `graph.ranked`,
 `graph.expectedRecallAtK`, relationship provenance and explicit gaps. The trial
 uses the first lexical hit as its seed and verifies at most `topK - 1` one-hop
@@ -111,7 +145,8 @@ retains verified graph evidence. A missing/stale graph leaves lexical results
 available and records a gap.
 
 This loop measures local archive, exact/BM25 ranking and bounded evidence reads.
-Native Graft structure, Graphify non-code extraction, image interpretation, a
-scheduled pair of autonomous agents and semantic answer quality remain separate
+Graft and Nx artifact generation remain operator-owned. Native Graphify
+non-code extraction, image interpretation, a scheduled pair of autonomous
+agents and semantic answer quality remain separate
 capabilities to implement and evaluate. The archive preserves unsupported files
 with gaps rather than claiming their contents were understood.
