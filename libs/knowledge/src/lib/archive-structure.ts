@@ -195,6 +195,10 @@ function findAnchor(
 function spanBody(body: string, node: CandidateNode): string | null {
   if (!node.line || !node.endLine || node.endLine < node.line) return null;
   const lines = body.split('\n');
+  // Graft fingerprints file nodes over the complete source bytes, including
+  // the final newline. Its file span names every line in that same text.
+  if (node.kind === 'file')
+    return node.line === 1 && node.endLine === lines.length ? body : null;
   if (node.endLine > lines.length) return null;
   return lines.slice(node.line - 1, node.endLine).join('\n');
 }
@@ -416,7 +420,26 @@ async function archivedAnchor(
     first.representation.method !== 'utf-8-text'
   )
     return null;
-  const found = findAnchor(body, node.label, node.line);
+  // A file node is named for its path, which need not occur in its contents.
+  // Cite a short excerpt from that exact archived file instead.
+  const found =
+    node.kind === 'file'
+      ? (() => {
+          const characters = Array.from(body);
+          const start = characters.findIndex((char) => !/\s/u.test(char));
+          if (start < 0) return null;
+          const endOfLine = characters.findIndex(
+            (char, index) => index >= start && char === '\n',
+          );
+          const end = Math.min(
+            start + 64,
+            endOfLine < 0 ? characters.length : endOfLine,
+          );
+          return end > start
+            ? { start, quote: characters.slice(start, end).join('') }
+            : null;
+        })()
+      : findAnchor(body, node.label, node.line);
   if (!found) return null;
   return {
     source_id: publication.source.id,
