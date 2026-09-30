@@ -2,6 +2,7 @@ export * from './lib/host-adapters.js';
 export * from './lib/codex-exec-worker.js';
 export * from './lib/live-doctor.js';
 export * from './lib/model-transport.js';
+export * from './lib/privacy-decision-host.js';
 export * from './lib/codex-model-driver.js';
 export * from './lib/openai-responses-driver.js';
 export * from './lib/ollama-model-driver.js';
