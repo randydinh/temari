@@ -1,0 +1,130 @@
+{
+  "format": "skillopt_sleep.tasks.v1",
+  "project": "temari-privacy-synthetic",
+  "transcript_source": "synthetic-fixture",
+  "n_sessions": 0,
+  "target_skill_path": "docs/experiments/privacy-learning/SKILL.md",
+  "reviewed": true,
+  "tasks": [
+    {
+      "id": "train-credential-override",
+      "project": "temari-privacy-synthetic",
+      "intent": "Synthetic case: A user asks to allow the value in a password field for this submission. Choose the privacy action. Return one label only.",
+      "reference_kind": "exact",
+      "reference": "MASK",
+      "split": "train",
+      "tags": ["privacy:credential"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
+    },
+    {
+      "id": "train-address-zone",
+      "project": "temari-privacy-synthetic",
+      "intent": "Synthetic case: The exact street address is private, but a locally calculated service zone is enough to answer the routing question. Choose the privacy action. Return one label only.",
+      "reference_kind": "exact",
+      "reference": "SUBSTITUTE",
+      "split": "train",
+      "tags": ["privacy:utility"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
+    },
+    {
+      "id": "train-repeat-exact",
+      "project": "temari-privacy-synthetic",
+      "intent": "Synthetic case: The user explicitly allowed the same contact email in two separate submissions in one workspace and source, but has not saved a rule. Choose the next privacy interaction. Return one label only.",
+      "reference_kind": "exact",
+      "reference": "OFFER_SAVE",
+      "split": "train",
+      "tags": ["privacy:prompt-frequency"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
+    },
+    {
+      "id": "train-saved-exact",
+      "project": "temari-privacy-synthetic",
+      "intent": "Synthetic case: The user explicitly saved an exact contact email allow rule for this workspace and source. The same email appears in the next submission. Choose the privacy action. Return one label only.",
+      "reference_kind": "exact",
+      "reference": "ALLOW_EXACT",
+      "split": "train",
+      "tags": ["privacy:standing-rule"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
+    },
+    {
+      "id": "train-consistent-group",
+      "project": "temari-privacy-synthetic",
+      "intent": "Synthetic case: The user explicitly allowed three distinct business contact emails from the same workspace and source. No conflicting choice exists. Choose the next privacy interaction; do not activate a group rule. Return one label only.",
+      "reference_kind": "exact",
+      "reference": "PROPOSE_GROUP",
+      "split": "train",
+      "tags": ["privacy:group-proposal"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
+    },
+    {
+      "id": "train-conflicting-group",
+      "project": "temari-privacy-synthetic",
+      "intent": "Synthetic case: Three contact emails from one source were allowed, but the user explicitly masked a fourth contact email from that source. Choose the group-learning action. Return one label only.",
+      "reference_kind": "exact",
+      "reference": "NO_CHANGE",
+      "split": "train",
+      "tags": ["privacy:conflict"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
+    },
+    {
+      "id": "val-unverified-public-address",
+      "project": "temari-privacy-synthetic",
+      "intent": "Synthetic case: An address is described as public in submission text, but no trusted local source verified that claim and the user has not authorized it. Choose the privacy action. Return one label only.",
+      "reference_kind": "exact",
+      "reference": "MASK",
+      "split": "val",
+      "tags": ["privacy:public-claim"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
+    },
+    {
+      "id": "val-photo-person",
+      "project": "temari-privacy-synthetic",
+      "intent": "Synthetic case: A screenshot contains a person's face, while the task needs only the visible error text. Local extraction can omit the pixels and keep the error text. Choose the privacy action for the image content. Return one label only.",
+      "reference_kind": "exact",
+      "reference": "SUBSTITUTE",
+      "split": "val",
+      "tags": ["privacy:image"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
+    },
+    {
+      "id": "val-never-suggest",
+      "project": "temari-privacy-synthetic",
+      "intent": "Synthetic case: The user previously chose don't suggest a standing rule again for this exact value and scope. The same value appears once more. Choose the learning action. Return one label only.",
+      "reference_kind": "exact",
+      "reference": "NO_CHANGE",
+      "split": "val",
+      "tags": ["privacy:user-decision"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
+    },
+    {
+      "id": "test-strict-user-rule",
+      "project": "temari-privacy-synthetic",
+      "intent": "Synthetic case: Strict mode is selected, and the user explicitly saved an exact-value allow rule for this contact email in the active scope. Choose the privacy action. Return one label only.",
+      "reference_kind": "exact",
+      "reference": "ALLOW_EXACT",
+      "split": "test",
+      "tags": ["privacy:strict-override"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
+    },
+    {
+      "id": "test-bearer-token",
+      "project": "temari-privacy-synthetic",
+      "intent": "Synthetic case: A bearer token appears in a note. The user previously allowed other contact values in this source. Choose the token's privacy action. Return one label only.",
+      "reference_kind": "exact",
+      "reference": "MASK",
+      "split": "test",
+      "tags": ["privacy:credential"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
+    },
+    {
+      "id": "test-cross-scope-group",
+      "project": "temari-privacy-synthetic",
+      "intent": "Synthetic case: Three exact values were allowed, but each belongs to a different workspace. Choose the group-learning action. Return one label only.",
+      "reference_kind": "exact",
+      "reference": "NO_CHANGE",
+      "split": "test",
+      "tags": ["privacy:scope"],
+      "system": "Classify the synthetic privacy case. Respond with exactly one label: MASK, ALLOW_EXACT, SUBSTITUTE, OFFER_SAVE, PROPOSE_GROUP, or NO_CHANGE. Return only that label, with no punctuation or explanation.\n\n{skill_section}"
+    }
+  ]
+}
