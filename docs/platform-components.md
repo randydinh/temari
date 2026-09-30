@@ -338,10 +338,13 @@ currently has only an x64 asset. A Windows workflow containing Archon's `bash:` 
 requires Git for Windows; the adapter chooses known Git Bash locations or an
 explicit `ARCHON_BASH_PATH`, not an arbitrary `bash.exe` found on `PATH`.
 
-The current Nx port proves harness replacement and native run identity, but it
-does not yet map Archon's node outcomes into canonical six-stage Temari
-receipts. The existing packaged deterministic check proves behavior in the
-legacy v4.1 lane; it does not prove this adapter's live model work, Windows
+The Nx conformance workflow maps six model-free native Archon nodes into a
+persisted Temari receipt with ordered stage evidence. A local macOS journey
+compares its revision-bound summaries and output bytes with a serial receipt.
+This source-workspace journey does not establish installed-package parity or
+promote Archon to the canonical completion path. The existing packaged
+deterministic check proves behavior in the legacy v4.1 lane; neither check
+proves this adapter's live model work, Windows
 workflow/process-tree behavior, hard-crash recovery, host identity
 authentication, sandboxing, or a general production scheduler. Callers choose
 the native-harness dispatch API explicitly; ordinary `executeAndPersist`
@@ -350,9 +353,9 @@ current actor identities are host-reported.
 
 Selection order is host-injected harness, explicitly configured alternate,
 then managed Archon. No missing explicit implementation is silently replaced.
-Promote Archon to the canonical Nx completion path only after the same frozen
-plan produces equivalent revision-bound stage receipts in both Archon and
-serial conformance journeys.
+Promote Archon to the canonical Nx completion path only after installed native
+execution and the same frozen plan produce equivalent revision-bound stage
+receipts across supported hosts and failure paths.
 
 ## 6. Verification
 

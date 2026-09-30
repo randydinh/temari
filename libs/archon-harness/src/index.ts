@@ -1,4 +1,5 @@
 export * from './lib/archon-harness.js';
+export * from './lib/canonical-finalize.js';
 export {
   archonAssetFor,
   installArchonRuntime,
