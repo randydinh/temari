@@ -1,0 +1,90 @@
+{
+  "verified": true,
+  "sources": 28,
+  "points": 31,
+  "decisions": 10,
+  "relationships": 46,
+  "graph_nodes": 87,
+  "graph_edges": 92,
+  "exact_attributes": true,
+  "exact_topology": true,
+  "repeated_endpoints": true,
+  "evidence_sha256": "d49e4e4e656893785d4012684b6228dd33e243a730d22de83d704f503a743230",
+  "graph_sha256": "593aa44d1d04c759881ceba0f28f867271c020f55223db5274549b6c244d075e",
+  "query": {
+    "question": "Why can Jev not replace SkillOpt editing, and what gates are required?",
+    "expanded_terms": [
+      "jev",
+      "skillopt",
+      "gate"
+    ],
+    "method": "directed successor BFS; explicit topic seed IDs; depth 2",
+    "seeds": [
+      "P-jev",
+      "P-skill-gate",
+      "P-model-fork"
+    ],
+    "nodes": [
+      "A-024",
+      "A-026",
+      "A-032",
+      "A-035",
+      "A-044",
+      "D-evolution",
+      "D-models",
+      "P-jev",
+      "P-model-fork",
+      "P-skill-gate",
+      "P-skill-platform"
+    ],
+    "edges": [
+      [
+        "A-024",
+        "D-models"
+      ],
+      [
+        "A-026",
+        "D-models"
+      ],
+      [
+        "A-032",
+        "D-evolution"
+      ],
+      [
+        "A-035",
+        "D-evolution"
+      ],
+      [
+        "A-044",
+        "P-skill-platform"
+      ],
+      [
+        "P-jev",
+        "A-024"
+      ],
+      [
+        "P-jev",
+        "A-044"
+      ],
+      [
+        "P-model-fork",
+        "A-026"
+      ],
+      [
+        "P-model-fork",
+        "A-035"
+      ],
+      [
+        "P-skill-gate",
+        "A-032"
+      ]
+    ],
+    "answer": "Jev supplies typed judgments but cannot generate skill prose. SkillOpt needs a generative optimizer, real tool replay and a stronger held-out gate. The only-Jev scope remains open.",
+    "citation_points": [
+      "P-jev",
+      "P-skill-gate",
+      "P-model-fork"
+    ],
+    "limits": "Scoped design navigation only; no semantic validation, model call or runtime evaluation."
+  }
+}
