@@ -103,7 +103,17 @@ const FINDING: QaEvaluationFinding = {
 };
 
 test('builds an evaluator allowlist without author or write controls', () => {
-  const record = createQaReviewRecord(BASE_RECORD);
+  const record = createQaReviewRecord({
+    ...BASE_RECORD,
+    intentSources: [
+      {
+        requirementRef: 'requirement-1',
+        revision: 'requirement-revision-2',
+        authorityRef: 'ticket://ticket-123',
+        expectedOutcome: 'the request is persisted once',
+      },
+    ],
+  });
   const input = createQaEvaluationInput(record);
 
   assert.equal(input.frozenReview.reviewRevision, 'review-revision-1');
@@ -115,6 +125,10 @@ test('builds an evaluator allowlist without author or write controls', () => {
   ]);
   assert.equal(input.priorRounds.length, 1);
   assert.equal(input.priorRounds[0]?.verdict, 'BLOCKED');
+  assert.equal(
+    input.frozenReview.intentSources[0]?.expectedOutcome,
+    'the request is persisted once',
+  );
 });
 
 test('validates an unevaluated draft without retaining a made-up round', () => {
@@ -187,6 +201,7 @@ test('passes only when no important finding remains open', () => {
       authorId: 'author-1',
       evaluatorId: 'evaluator-1',
       freshContext: 'proven',
+      productAssessment: 'proven',
       round: 2,
       findings: [
         { ...FINDING, severity: 'Minor', status: 'Open' },
@@ -194,6 +209,23 @@ test('passes only when no important finding remains open', () => {
       ],
     }).verdict,
     'PASS',
+  );
+});
+
+test('a fresh procedural evaluator cannot approve product intent or weak assertions', () => {
+  assert.deepEqual(
+    deriveQaEvaluatorDecision({
+      authorId: 'author-1',
+      evaluatorId: 'evaluator-1',
+      freshContext: 'proven',
+      round: 1,
+      findings: [],
+    }),
+    {
+      verdict: 'BLOCKED',
+      reason: 'product-intent-assessment-unavailable',
+      unresolvedFindingIds: [],
+    },
   );
 });
 
@@ -247,6 +279,50 @@ test('identifies a failed required scenario as blocking', () => {
 
   assert.equal(findings.at(-1)?.findingId, 'scenario-scenario-1-failed');
   assert.equal(findings.at(-1)?.severity, 'Blocking');
+});
+
+test('a passed scenario without pinned intent is an evidence gap', () => {
+  const record = createQaReviewRecord({
+    ...BASE_RECORD,
+    scenarios: [
+      {
+        ...BASE_RECORD.scenarios[0],
+        executions: [
+          {
+            attemptId: 'attempt-1',
+            candidateRef: 'commit-abc123',
+            environmentRef: 'staging-build-7',
+            fixtureRefs: ['fixture-1'],
+            correlationRef: null,
+            boundedObservation: 'readback matched the submitted value',
+            assertions: ['saved record exists'],
+            observations: ['saved record exists'],
+            evidenceRefs: [
+              {
+                schema: 1,
+                runId: 'qa-assignment-1',
+                revision: 'commit-abc123',
+                kind: 'verification',
+                sha256: 'a'.repeat(64),
+                bytes: 12,
+              },
+            ],
+            state: 'Executed',
+          },
+        ],
+        result: 'Passed',
+      },
+    ],
+  });
+  const findings = deriveQaEvidenceFindings(createQaEvaluationInput(record));
+  assert.equal(
+    findings.some(
+      (finding) =>
+        finding.findingId === 'scenario-scenario-1-intent-source-missing' &&
+        finding.severity === 'Important',
+    ),
+    true,
+  );
 });
 
 test('blocks rounds outside the three-round evaluation bound', () => {

@@ -124,6 +124,24 @@ test('creates and validates a digest-bound full review record', () => {
   assert.doesNotThrow(() => assertQaReviewRecord(record));
 });
 
+test('pinned intent source must match the assigned requirement revision', () => {
+  const record = createQaReviewRecord({
+    ...BASE_INPUT,
+    intentSources: [
+      {
+        requirementRef: 'requirement-1',
+        revision: 'stale-revision',
+        authorityRef: 'ticket://ticket-123',
+        expectedOutcome: 'persist the request once',
+      },
+    ],
+  });
+  assert.match(
+    validateQaReviewRecord(record).join(' '),
+    /must match an assigned requirement and revision/,
+  );
+});
+
 test('a full Passed record rejects unexecuted required work and unresolved evaluation', () => {
   const notRun = createQaReviewRecord({
     ...BASE_INPUT,

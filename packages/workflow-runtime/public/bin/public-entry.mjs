@@ -579,14 +579,32 @@ async function startQa(request, requestSha256, policy) {
       isAbsolute(request.invocation.evidenceRoot),
     'Installed QA requires absolute local run and evidence paths.',
   );
-  exactFields(request.review, [
-    'reviewRevision',
-    'authorId',
-    'plan',
-    'areaDecisions',
-    'scenarios',
-    'residualRisks',
-  ]);
+  exactFields(
+    request.review,
+    [
+      'reviewRevision',
+      'authorId',
+      'plan',
+      'areaDecisions',
+      'scenarios',
+      'residualRisks',
+    ],
+    ['projectVerifierId', 'intentSources'],
+  );
+  if (request.review.intentSources !== undefined) {
+    assert(
+      Array.isArray(request.review.intentSources) &&
+        request.review.intentSources.length <= 64,
+    );
+    request.review.intentSources.forEach((source) =>
+      exactFields(source, [
+        'requirementRef',
+        'revision',
+        'authorityRef',
+        'expectedOutcome',
+      ]),
+    );
+  }
   exactFields(
     request.assignment,
     [
@@ -664,6 +682,48 @@ async function startQa(request, requestSha256, policy) {
     request.invocation.revision,
     'QA candidate must match the invocation revision.',
   );
+  const loadGuidance = async (path) => {
+    const content = await readBoundedFile(join(root, path), 64 * 1024);
+    return {
+      path,
+      sha256: sha256(content),
+      text: utf8.decode(content),
+    };
+  };
+  const playbook = await loadGuidance('qa/ticket-acceptance-v1.md');
+  const evidenceSkill = await loadGuidance(
+    'skills/qa-review-verification/SKILL.md',
+  );
+  let projectVerifier = {
+    status: 'missing-project-profile',
+    execution: 'not-observed',
+  };
+  if (request.review.projectVerifierId !== undefined) {
+    assert.equal(
+      request.review.projectVerifierId,
+      'temari-public-v1',
+      'Unsupported QA project verifier.',
+    );
+    const marker = JSON.parse(
+      utf8.decode(
+        await readBoundedFile(
+          join(request.invocation.candidate.root, 'package.json'),
+          16 * 1024,
+        ),
+      ),
+    );
+    assert.equal(
+      marker.name,
+      '@temari/workspace',
+      'QA project profile differs from the candidate.',
+    );
+    projectVerifier = {
+      status: 'loaded-for-handoff',
+      execution: 'not-observed',
+      id: 'temari-public-v1',
+      ...(await loadGuidance('qa/verify-temari-public-v1.md')),
+    };
+  }
   assert(
     Array.isArray(request.assignment.authority.allowedActions) &&
       request.assignment.authority.allowedActions.every((action) =>
@@ -723,6 +783,9 @@ async function startQa(request, requestSha256, policy) {
       reviewRevision: request.review.reviewRevision,
       parentRevision: null,
       authorId: request.review.authorId,
+      ...(request.review.intentSources === undefined
+        ? {}
+        : { intentSources: request.review.intentSources }),
       assignment: request.assignment,
       plan: request.review.plan,
       areaDecisions: request.review.areaDecisions,
@@ -740,6 +803,13 @@ async function startQa(request, requestSha256, policy) {
     schemaVersion: 1,
     route: route.route,
     plan: route.plan,
+    guidance: {
+      playbookId: 'ticket-acceptance-v1',
+      playbook,
+      evidenceSkill,
+      projectVerifier,
+      execution: 'not-observed',
+    },
     evaluator,
     qaDisposition: evaluator.qaDisposition,
     record: evaluator.record,

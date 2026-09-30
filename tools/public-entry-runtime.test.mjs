@@ -182,6 +182,14 @@ test('relocated QA entry runs the packaged evaluator without source-checkout acc
     const result = await invoke(base, 'valid');
     const qaOutput = JSON.parse(result.stdout.trim().split('\n').at(-1));
     assert.equal(qaOutput.route.route, 'qa-review');
+    assert.equal(qaOutput.guidance.playbookId, 'ticket-acceptance-v1');
+    assert.match(qaOutput.guidance.playbook.text, /pinned product decision/);
+    assert.match(qaOutput.guidance.evidenceSkill.text, /QA/);
+    assert.equal(
+      qaOutput.guidance.projectVerifier.status,
+      'missing-project-profile',
+    );
+    assert.equal(qaOutput.guidance.execution, 'not-observed');
     assert.deepEqual(qaOutput.plan.stages, [
       'investigate',
       'plan',
@@ -205,6 +213,40 @@ test('relocated QA entry runs the packaged evaluator without source-checkout acc
     assert.deepEqual(
       JSON.parse(await readFile(join(root, 'run/config/qa-result.json'))),
       qaOutput,
+    );
+
+    await writeFile(
+      join(candidate, 'package.json'),
+      '{"name":"@temari/workspace"}\n',
+    );
+    const verifierRequest = {
+      ...base,
+      review: { ...base.review, projectVerifierId: 'temari-public-v1' },
+      invocation: {
+        ...base.invocation,
+        runId: 'verifier-handoff',
+        runDirectory: join(root, 'verifier-handoff'),
+      },
+    };
+    const verifierResult = await invoke(verifierRequest, 'verifier-handoff');
+    const verifierOutput = JSON.parse(
+      verifierResult.stdout.trim().split('\n').at(-1),
+    );
+    assert.equal(
+      verifierOutput.guidance.projectVerifier.status,
+      'loaded-for-handoff',
+    );
+    assert.equal(
+      verifierOutput.guidance.projectVerifier.execution,
+      'not-observed',
+    );
+    assert.match(
+      verifierOutput.guidance.projectVerifier.text,
+      /Verify Temari public CLI v1/,
+    );
+    assert.equal(
+      verifierOutput.qaDisposition.disposition,
+      'BlockedOrIncomplete',
     );
 
     for (const [name, change] of [

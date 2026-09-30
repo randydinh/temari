@@ -1,5 +1,13 @@
 # Installed QA route and host evidence
 
+## Current-main QA follow-up (2026-09-30)
+
+This follow-up started from `5af7b97` in an isolated worktree. The packaged QA route now has a separate local evaluator process, but that worker derives procedural evidence findings. This increment makes the boundary explicit: a procedurally clean round remains `BLOCKED` with `product-intent-assessment-unavailable`. Pinned `intentSources` can carry the assigned requirement revision and expected outcome into the frozen evaluator input; their presence is not an independent judgment of authority or assertion strength.
+
+The installed entry loads `ticket-acceptance-v1` and the QA evidence skill with SHA-256 identities. It loads the `temari-public-v1` verifier text only when that profile is requested and the candidate carries the matching workspace package marker. The result labels this as a handoff with `execution: not-observed`; loading guidance does not run a project verifier. The relocated synthetic journey remained `BlockedOrIncomplete`. A separate fresh-context plain-language attempt also stopped before `qa`: its supplied candidate contained only a text fixture, with no category-search behavior, governing requirement revision, or runnable control surface.
+
+Focused uncached Nx `temari-core` typecheck/test, `workflow-runtime:public-entry-test`, and `workflow-runtime:qa-installed-journey` are the verification scope for this change. The remaining admission work is a trusted independent semantic assessor that reviews pinned intent and assertion counterexamples, plus an actual project verifier and candidate-bound observations. This dirty-worktree artifact is development evidence and is not a clean release candidate.
+
 The installed temari qa command accepts a versioned full QA assignment and unexecuted review draft. It routes through the ./qa-review domain owner and the existing six-stage engine. On the selected experimental-local-host, the result is BlockedOrIncomplete because the host bridge cannot launch a separate evaluator context. The workflow receipt is independently BLOCKED with a capability-gap. No evaluator round, finding, or PASS is invented.
 
 ## Boundary

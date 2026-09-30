@@ -133,6 +133,7 @@ export async function runQaEvaluator({
     authorId: draft.authorId,
     evaluatorId: output.evaluatorId,
     freshContext: 'proven',
+    productAssessment: 'unavailable',
     round: 1,
     findings: output.findings,
   });

@@ -5,6 +5,7 @@ import {
   createQaReviewRecord,
   type QaAreaDecision,
   type QaEvaluationRound,
+  type QaIntentSource,
   type QaReviewPlan,
   type QaReviewRecord,
   type QaScenarioRecord,
@@ -33,6 +34,7 @@ export interface QaFrozenReviewSnapshot {
   readonly parentRevision: string | null;
   readonly digest: string;
   readonly assignment: QaEvaluationAssignment;
+  readonly intentSources: readonly QaIntentSource[];
   readonly plan: QaReviewPlan;
   readonly areaDecisions: readonly QaAreaDecision[];
   readonly scenarios: readonly QaScenarioRecord[];
@@ -55,6 +57,7 @@ export interface QaReviewDraft {
   readonly parentRevision: string | null;
   readonly authorId: string;
   readonly assignment: QaAssignment;
+  readonly intentSources?: readonly QaIntentSource[];
   readonly plan: QaReviewPlan;
   readonly areaDecisions: readonly QaAreaDecision[];
   readonly scenarios: readonly QaScenarioRecord[];
@@ -83,9 +86,17 @@ export interface QaEvaluatorDecision {
     | 'evaluator-not-independent'
     | 'round-limit'
     | 'unresolved-important-finding'
+    | 'product-intent-assessment-unavailable'
     | 'no-open-important-findings';
   readonly unresolvedFindingIds: readonly string[];
 }
+
+/**
+ * Semantic review must be supplied by a separately launched, trusted agent
+ * that received the pinned intent and actual observations. A procedural
+ * evidence scan cannot set this status to proven.
+ */
+export type QaProductAssessmentStatus = 'proven' | 'unavailable';
 
 /**
  * Review the frozen QA evidence independently of the author. This is deliberately
@@ -113,6 +124,28 @@ export function deriveQaEvidenceFindings(
   }
   for (const scenario of input.frozenReview.scenarios) {
     if (scenario.obligation !== 'Required') continue;
+    if (
+      scenario.result === 'Passed' &&
+      !scenario.requirementRefs.every((ref) =>
+        input.frozenReview.intentSources.some(
+          (source) =>
+            source.requirementRef === ref &&
+            source.revision === scenario.sourceRevision,
+        ),
+      )
+    ) {
+      findings.push({
+        findingId: `scenario-${scenario.scenarioId}-intent-source-missing`,
+        severity: 'Important',
+        evidenceRefs: scenario.executions.flatMap(
+          (execution) => execution.evidenceRefs,
+        ),
+        reason: `Required scenario ${scenario.scenarioId} lacks a pinned product-intent source for its passed conclusion.`,
+        minimumCorrection:
+          'Pin the authoritative outcome and revision, then reassess the assertion.',
+        status: 'Open',
+      });
+    }
     if (scenario.result === 'Passed') continue;
     const severity = scenario.result === 'Failed' ? 'Blocking' : 'Important';
     findings.push({
@@ -201,6 +234,7 @@ export function createQaEvaluationInput(
       parentRevision: record.parentRevision,
       digest: record.digest,
       assignment: evaluationAssignment(record),
+      intentSources: record.intentSources ?? [],
       plan: record.plan,
       areaDecisions: record.areaDecisions,
       scenarios: record.scenarios,
@@ -247,6 +281,7 @@ export function deriveQaEvaluatorDecision(input: {
   readonly authorId: string;
   readonly evaluatorId: string;
   readonly freshContext: QaFreshContextStatus;
+  readonly productAssessment?: QaProductAssessmentStatus;
   readonly round: number;
   readonly findings: readonly QaEvaluationFinding[];
 }): QaEvaluatorDecision {
@@ -284,6 +319,14 @@ export function deriveQaEvaluatorDecision(input: {
       verdict: 'REVISE',
       reason: 'unresolved-important-finding',
       unresolvedFindingIds,
+    };
+  }
+
+  if (input.productAssessment !== 'proven') {
+    return {
+      verdict: 'BLOCKED',
+      reason: 'product-intent-assessment-unavailable',
+      unresolvedFindingIds: [],
     };
   }
 

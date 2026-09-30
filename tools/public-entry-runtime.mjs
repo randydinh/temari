@@ -78,6 +78,14 @@ const publicFiles = [
   ],
   ['packages/workflow-runtime/public/bin/closeout.mjs', 'bin/closeout.mjs'],
   [
+    'packages/workflow-runtime/public/qa/ticket-acceptance-v1.md',
+    'qa/ticket-acceptance-v1.md',
+  ],
+  [
+    'packages/workflow-runtime/public/qa/verify-temari-public-v1.md',
+    'qa/verify-temari-public-v1.md',
+  ],
+  [
     'packages/workflow-runtime/public/skills/temari/SKILL.md',
     'skills/temari/SKILL.md',
   ],
