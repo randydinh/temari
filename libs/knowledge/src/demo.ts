@@ -16,8 +16,20 @@ import {
 import { investigateDesignUpdate } from './lib/investigation.js';
 import { prepareRegistrar } from './support/prepare.js';
 import { object, text } from './lib/codec.js';
+import {
+  captureArchive,
+  type ArchiveIntakeOptions,
+} from './lib/archive-intake.js';
+import {
+  createArchiveRegistrar,
+  type ArchiveRegistrarOptions,
+} from './lib/archive-registrar.js';
+import { collectKnowledge, type RetrievalOptions } from './lib/retrieval.js';
 
 const help = `Knowledge demo (explicit local files; no model or semantic approval):
+  pnpm nx run knowledge:demo -- capture --input /absolute/intake.json
+  pnpm nx run knowledge:demo -- archive-collect --input /absolute/retrieval.json [--resume /absolute/retrieval-HASH.json]
+  pnpm nx run knowledge:demo -- archive-assess --input /absolute/investigation.json --assessment /absolute/assessment.json
   pnpm nx run knowledge:demo -- --help
   pnpm nx run knowledge:demo -- prepare --manifest /absolute/selected-documents.json --python /absolute/python --registrar-source /absolute/registrar-repo
   pnpm nx run knowledge:demo -- collect --input /absolute/input.json [--resume /absolute/knowledge-HASH.json] [--assessment /absolute/assessment.json]
@@ -43,6 +55,29 @@ async function main(): Promise<void> {
     args.set(key, text(argv.shift()));
   }
   const arg = (key: string): string => text(args.get(key));
+  if (command === 'capture') {
+    const input = JSON.parse(
+      await readFile(arg('--input'), 'utf8'),
+    ) as ArchiveIntakeOptions;
+    process.stdout.write(
+      JSON.stringify(await captureArchive(input), null, 2) + '\n',
+    );
+    return;
+  }
+  if (command === 'archive-collect') {
+    const input = JSON.parse(await readFile(arg('--input'), 'utf8')) as Omit<
+      RetrievalOptions,
+      'provider'
+    > & { config: ArchiveRegistrarOptions };
+    const provider = await createArchiveRegistrar(input.config);
+    const result = await collectKnowledge({
+      ...input,
+      provider,
+      resumeFrom: args.get('--resume') ?? input.resumeFrom,
+    });
+    process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+    return;
+  }
   if (command === 'prepare') {
     const manifest = object(
       JSON.parse(await readFile(arg('--manifest'), 'utf8')),
@@ -159,14 +194,20 @@ async function main(): Promise<void> {
     );
     return;
   }
-  assert.equal(command, 'collect', 'Expected prepare or collect');
+  assert(
+    ['collect', 'archive-assess'].includes(command ?? ''),
+    'Expected prepare, capture, collect, archive-collect or archive-assess',
+  );
   const input = JSON.parse(await readFile(arg('--input'), 'utf8')) as {
-    config: LocalRegistrarOptions;
+    config: LocalRegistrarOptions & ArchiveRegistrarOptions;
     task: InvestigationTask;
     brief: WorkerBrief;
     request: InvestigationRequest;
   };
-  const provider = await createLocalRegistrar(input.config);
+  const provider =
+    command === 'archive-assess'
+      ? await createArchiveRegistrar(input.config)
+      : await createLocalRegistrar(input.config);
   const result: WorkerResult = await investigateDesignUpdate({
     ...input,
     provider,

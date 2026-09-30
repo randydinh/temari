@@ -13,6 +13,16 @@ export interface KnowledgeEvidence {
   readonly id: string;
   readonly document: KnowledgeDocument;
   readonly sha256: string;
+  readonly archive?: {
+    readonly schema: 1;
+    readonly generation: string;
+    readonly manifestSha256: string;
+    readonly representationSha256: string;
+    readonly extractorSettingsSha256: string;
+    readonly coordinateSpace: 'extracted-text';
+    readonly currentOriginal: 'not-checked';
+    readonly omissions: readonly KnowledgeGap[];
+  };
   readonly representation: {
     readonly method: string;
     readonly signature: string;
@@ -85,6 +95,7 @@ export interface KnowledgeRead {
   readonly next: string | null;
 }
 export interface KnowledgeCheck {
+  readonly basis?: 'archive-snapshot' | 'current-source';
   readonly evidenceId: string;
   readonly state: 'unchanged' | 'changed' | 'unavailable' | 'unknown';
   readonly detail: string;

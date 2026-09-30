@@ -4,6 +4,7 @@ import type {
   InvestigationCheckpoint,
   InvestigationRequest,
   KnowledgeAssessment,
+  KnowledgeCheck,
   KnowledgeDiscovery,
   KnowledgeEvidence,
   KnowledgeGap,
@@ -148,6 +149,42 @@ export function evidence(value: unknown): asserts value is KnowledgeEvidence {
   const repr = object(r['representation']);
   text(repr['method']);
   text(repr['signature']);
+  if (r['archive'] !== undefined) {
+    const a = object(r['archive']);
+    assert.deepEqual(
+      Object.keys(a).sort(),
+      [
+        'schema',
+        'generation',
+        'manifestSha256',
+        'representationSha256',
+        'extractorSettingsSha256',
+        'coordinateSpace',
+        'currentOriginal',
+        'omissions',
+      ].sort(),
+    );
+    assert.equal(a['schema'], 1);
+    assert(/^[a-f0-9]{32}$/.test(text(a['generation'])));
+    digest(a['manifestSha256']);
+    digest(a['representationSha256']);
+    digest(a['extractorSettingsSha256']);
+    assert.equal(a['coordinateSpace'], 'extracted-text');
+    assert.equal(a['currentOriginal'], 'not-checked');
+    const omissions = list(a['omissions']);
+    assert(
+      omissions.length <= 32 && Buffer.byteLength(canonical(omissions)) <= 8192,
+    );
+    for (const omission of omissions) {
+      knowledgeGap(omission);
+      assert.deepEqual(Object.keys(omission).sort(), [
+        'detail',
+        'kind',
+        'subject',
+      ]);
+      assert(omission.subject.length <= 4096 && omission.detail.length <= 512);
+    }
+  }
   const span = object(r['span']);
   assert.equal(span['unit'], 'unicode-codepoint');
   const start = integer(span['start'], 0, 8 * 1024 * 1024);
@@ -155,6 +192,22 @@ export function evidence(value: unknown): asserts value is KnowledgeEvidence {
   assert.equal(Array.from(text(r['excerpt'])).length, end - start);
   const { id, ...body } = r;
   assert.equal(digest(id), hash(canonical(body)), 'Evidence identity mismatch');
+}
+/** Archive checks never imply live-original currency. */
+export function checkBasis(
+  check: KnowledgeCheck,
+  item: KnowledgeEvidence,
+): void {
+  assert(
+    check.basis === undefined ||
+      ['archive-snapshot', 'current-source'].includes(check.basis),
+  );
+  if (item.archive && check.state === 'unchanged')
+    assert.equal(
+      check.basis,
+      'archive-snapshot',
+      'Archive unchanged check requires archive-snapshot basis',
+    );
 }
 export function request(value: unknown): asserts value is InvestigationRequest {
   const r = object(value);
@@ -392,6 +445,10 @@ export function checkpoint(
     );
     text(r['detail']);
     text(r['checkedAt']);
+    checkBasis(
+      entry as KnowledgeCheck,
+      (items as KnowledgeEvidence[]).find((e) => e.id === r['evidenceId'])!,
+    );
   }
   list(c['gaps']).forEach(knowledgeGap);
   for (const entry of list(c['pendingReads'])) {

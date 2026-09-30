@@ -1,3 +1,6 @@
 export * from './lib/registrar.js';
 export * from './lib/investigation.js';
 export { evidenceId } from './lib/codec.js';
+export * from './lib/retrieval.js';
+export * from './lib/archive-intake.js';
+export * from './lib/archive-registrar.js';

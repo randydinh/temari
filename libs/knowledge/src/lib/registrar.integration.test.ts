@@ -390,3 +390,5 @@ test('ACTUAL CLI: implementation files beyond retrieval.py and configuration are
     'unknown',
   );
 });
+
+import './archive.integration.test.js';
