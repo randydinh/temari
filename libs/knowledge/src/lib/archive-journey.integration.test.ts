@@ -61,21 +61,19 @@ test('ACTUAL CLI: intake handoff through exact/BM25 search, pinned reads and Jev
     assert(item.shortlistVerified);
     assert.deepEqual(item.jev?.originalOrder, item.jev?.suggestedOrder);
     assert(
-      item.jev?.judgments.every(
-        (judgment) => judgment.gap === 'approval-required',
-      ),
+      item.jev?.judgments.every((judgment) => judgment.gap === 'case-opt-out'),
     );
   }
   const retained = await readFile(reportPath, 'utf8');
   assert(!retained.includes(documents['update.txt']));
   assert(!retained.includes('Ignore the brief'));
   let modelCalls = 0;
+  const { hostedTextApproved: ignored, ...defaultCase } = cases[0];
+  void ignored;
   const approved = await evaluateArchiveSearch(
     {
       handoffPath: intake.handoffPath,
-      cases: [
-        { ...cases[0], id: 'synthetic-approved', hostedTextApproved: true },
-      ],
+      cases: [{ ...defaultCase, id: 'synthetic-default' }],
     },
     {
       apiKey: 'synthetic-test-key',
@@ -109,6 +107,7 @@ test('ACTUAL CLI: intake handoff through exact/BM25 search, pinned reads and Jev
     },
   );
   assert.equal(modelCalls, 2);
+  assert.equal(approved.report.cases[0].jevSharing, 'allowed');
   assert(
     approved.report.cases[0].jev?.judgments.every(
       (judgment) => judgment.state === 'judged',
@@ -133,6 +132,60 @@ test('ACTUAL CLI: intake handoff through exact/BM25 search, pinned reads and Jev
   await assert.rejects(() =>
     evaluateArchiveSearch({ handoffPath: intake.handoffPath!, cases }),
   );
+});
+
+test('ACTUAL CLI: local-only source blocks Jev even with a case approval', async () => {
+  const f = await actualFixture();
+  const task = {
+    id: 'local-only-fixture',
+    directory: join(f.base, 'task'),
+    authorityRef: 'synthetic-local-only-admission',
+  };
+  const intake = await runArchiveIntake({
+    task,
+    localOnlySourceIds: [f.source.id],
+    intakes: [
+      {
+        task,
+        source: f.source,
+        readScope: 'source-root',
+        requestKey: 'local-only-v1',
+        transport: {
+          python: f.config.python,
+          registrarSource: f.config.registrarSource,
+          workspace: join(f.base, 'state'),
+        },
+      },
+    ],
+  });
+  assert(intake.handoffPath);
+  const { report } = await evaluateArchiveSearch(
+    {
+      handoffPath: intake.handoffPath,
+      cases: [
+        {
+          id: 'local-only',
+          query: 'Proposal',
+          sourceIds: [f.source.id],
+          topK: 1,
+          discoveryMode: 'bm25',
+          hostedTextApproved: true,
+          expected: [{ sourceId: f.source.id, path: 'plan.txt' }],
+        },
+      ],
+    },
+    {
+      apiKey: 'synthetic-test-key',
+      fetcher: async () => {
+        throw new Error('Local-only source reached Jev');
+      },
+    },
+  );
+  const result = report.cases[0];
+  assert.equal(result.ranked.length, 1);
+  assert.equal(result.shortlistVerified, true);
+  assert.equal(result.jevSharing, 'local-only');
+  assert(result.jev?.judgments.every((item) => item.gap === 'local-only'));
 });
 
 test('ACTUAL CLI: eight astral excerpts stay within Jev shadow bounds without approval', async () => {
@@ -189,9 +242,7 @@ test('ACTUAL CLI: eight astral excerpts stay within Jev shadow bounds without ap
   assert.equal(result.verifiedEvidenceCount, 8);
   assert.equal(result.jev?.judgments.length, 8);
   assert(
-    result.jev.judgments.every(
-      (judgment) => judgment.gap === 'approval-required',
-    ),
+    result.jev.judgments.every((judgment) => judgment.gap === 'case-opt-out'),
   );
 });
 

@@ -34,6 +34,8 @@ import { collectKnowledge, loadRetrieval } from './retrieval.js';
 export interface ArchiveIntakePlan {
   readonly task: InvestigationTask;
   readonly intakes: readonly ArchiveIntakeOptions[];
+  /** Sources retained locally for Jev; all other admitted sources use Jev by default. */
+  readonly localOnlySourceIds?: readonly string[];
   readonly structures?: readonly (Omit<
     ArchiveStructurePlan,
     'publicationPath'
@@ -44,6 +46,11 @@ export interface ArchiveIntakeHandoff {
   readonly kind: 'temari-archive-intake-handoff';
   readonly task: InvestigationTask;
   readonly publications: readonly string[];
+  /** Absent only on legacy handoffs, which retain per-case approval semantics. */
+  readonly jevPolicy?: {
+    readonly mode: 'registered-sources';
+    readonly localOnlySourceIds: readonly string[];
+  };
   readonly sources: readonly {
     id: string;
     generation: string;
@@ -70,8 +77,8 @@ export interface ArchiveEvaluationCase {
   readonly expected: readonly { sourceId: string; path: string }[];
   readonly topK: number;
   readonly discoveryMode: 'exact' | 'bm25';
-  /** Never inferred from task authority. Explicit approval is required per case. */
-  readonly hostedTextApproved: boolean;
+  /** Optional per-case opt-out; true cannot override a local-only source. */
+  readonly hostedTextApproved?: boolean;
   /** Optional one-hop graph ablation; lexical ranking remains the baseline. */
   readonly graphId?: string;
 }
@@ -84,6 +91,7 @@ export interface ArchiveCaseResult {
   readonly querySha256: string;
   readonly discoveryMode: 'exact' | 'bm25';
   readonly sourceIds: readonly string[];
+  readonly jevSharing: 'allowed' | 'local-only' | 'case-opt-out';
   readonly expected: ArchiveEvaluationCase['expected'];
   readonly sourceCapabilityGaps: readonly KnowledgeGap[];
   readonly discoveryCheckpointPath: string;
@@ -135,6 +143,14 @@ export async function runArchiveIntake(
     new Set(selected.intakes.map((item) => item.requestKey)).size ===
       selected.intakes.length,
   );
+  const localOnlySourceIds = selected.localOnlySourceIds ?? [];
+  assert(Array.isArray(localOnlySourceIds));
+  assert.equal(new Set(localOnlySourceIds).size, localOnlySourceIds.length);
+  for (const sourceId of localOnlySourceIds)
+    assert(
+      selected.intakes.some((item) => item.source.id === sourceId),
+      'Local-only source outside intake',
+    );
   for (const item of selected.intakes) {
     assert(same(item.task, selected.task), 'Intake task mismatch');
     assert(
@@ -186,6 +202,10 @@ export async function runArchiveIntake(
     kind: 'temari-archive-intake-handoff',
     task: selected.task,
     publications,
+    jevPolicy: {
+      mode: 'registered-sources',
+      localOnlySourceIds: [...localOnlySourceIds].sort(),
+    },
     sources: loaded.map((item) => ({
       id: item.source.id,
       generation: item.generation,
@@ -224,6 +244,17 @@ async function loadHandoff(path: string): Promise<ArchiveIntakeHandoff> {
       value.publications.length <= 8,
   );
   assert.equal(value.sources.length, value.publications.length);
+  if (value.jevPolicy !== undefined) {
+    assert.equal(value.jevPolicy.mode, 'registered-sources');
+    const ids = value.jevPolicy.localOnlySourceIds;
+    assert(Array.isArray(ids) && ids.length <= value.sources.length);
+    assert.equal(new Set(ids).size, ids.length);
+    for (const id of ids)
+      assert(
+        value.sources.some((source) => source.id === id),
+        'Local-only source outside handoff',
+      );
+  }
   if (value.structures !== undefined) {
     assert(
       Array.isArray(value.structures) &&
@@ -296,7 +327,15 @@ export async function evaluateArchiveSearch(
     assert(text(c.id).length <= 128 && text(c.query).length <= 512);
     integer(c.topK, 1, 8);
     assert(['exact', 'bm25'].includes(c.discoveryMode));
-    assert(typeof c.hostedTextApproved === 'boolean');
+    assert(
+      c.hostedTextApproved === undefined ||
+        typeof c.hostedTextApproved === 'boolean',
+    );
+    if (!handoff.jevPolicy)
+      assert(
+        typeof c.hostedTextApproved === 'boolean',
+        'Legacy handoff requires per-case Jev approval',
+      );
     assert(
       Array.isArray(c.sourceIds) &&
         c.sourceIds.length >= 1 &&
@@ -305,6 +344,13 @@ export async function evaluateArchiveSearch(
     assert.equal(new Set(c.sourceIds).size, c.sourceIds.length);
     for (const sourceId of c.sourceIds)
       assert(sourceById.has(sourceId), 'Case source outside handoff');
+    const jevSharing: ArchiveCaseResult['jevSharing'] = c.sourceIds.some(
+      (id: string) => handoff.jevPolicy?.localOnlySourceIds.includes(id),
+    )
+      ? 'local-only'
+      : c.hostedTextApproved === false
+        ? 'case-opt-out'
+        : 'allowed';
     assert(
       Array.isArray(c.expected) &&
         c.expected.length >= 1 &&
@@ -485,7 +531,8 @@ export async function evaluateArchiveSearch(
         jev = await judgeJevShadow(
           {
             query: c.query,
-            hostedTextApproved: c.hostedTextApproved,
+            hostedTextApproved: jevSharing === 'allowed',
+            ...(jevSharing === 'allowed' ? {} : { denialReason: jevSharing }),
             candidates: shortlist,
           },
           jevOptions,
@@ -520,6 +567,7 @@ export async function evaluateArchiveSearch(
       querySha256: hash(c.query),
       discoveryMode: c.discoveryMode,
       sourceIds: [...c.sourceIds],
+      jevSharing,
       expected: [...c.expected],
       sourceCapabilityGaps: publications
         .filter((item) => c.sourceIds.includes(item.source.id))
