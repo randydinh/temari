@@ -128,6 +128,15 @@ They define the required preconditions, exact commands, retained evidence, and
 gotchas for routing, playbook coverage, workflow conformance, Archon, and
 closeout.
 
+## Local task continuity increment
+
+The [2026-09-30 evaluation](../evaluations/task-continuity/README.md) retains
+runtime and compiled-distribution logs for the first task inbox. It also records
+native evidence joins, CLI acceptance, exact-run recovery/cancellation, browser
+checks and independent review. These checks establish a local read-only task
+view and model-free native control; live provider execution, recurring scheduling,
+automatic chat capture and full feature closeout remain separate gates.
+
 ## Known gaps at this revision
 
 The matrix intentionally leaves these as incomplete or gated:

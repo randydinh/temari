@@ -213,6 +213,9 @@ these retained fields.
 
 ## Verification and current limits
 
+The [2026-09-30 evaluation](../evaluations/task-continuity/README.md) records the
+reviewed candidate, observed checks, retained logs, and proof boundaries.
+
 ```sh
 pnpm exec nx run runtime:task-test
 pnpm exec nx run runtime:task-typecheck

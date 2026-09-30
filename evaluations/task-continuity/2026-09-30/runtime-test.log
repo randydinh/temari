@@ -1,0 +1,364 @@
+
+> nx run runtime:test
+
+> node --import @swc-node/register/esm-register --test --test-concurrency=1 libs/runtime/src/lib/runtime.test.ts libs/runtime/src/lib/run-store.test.ts libs/runtime/src/lib/child-task-store.test.ts libs/runtime/src/lib/parallel-runtime.test.ts libs/runtime/src/lib/harness-selector.test.ts libs/runtime/src/lib/harness-runtime.test.ts libs/runtime/src/lib/archon-receipt-parity.test.ts libs/runtime/src/lib/v4-1-route-replay.test.ts libs/runtime/src/lib/migration-acceptance.test.ts libs/runtime/src/lib/stage-evidence.test.ts libs/runtime/src/lib/candidate.test.ts libs/runtime/src/lib/nx05-control-conformance.test.ts libs/runtime/src/lib/nx05-dispatch-contract.test.ts libs/runtime/src/lib/task-store.test.ts libs/runtime/src/lib/task-runtime.test.ts
+
+(node:54983) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:54999) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:54999) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:54999) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ compares two persisted six-stage deterministic receipts and retains native reference (174.431125ms)
+▶ refuses missing, duplicated, reordered, or stale persisted stage evidence
+  ✔ missing (2.708917ms)
+  ✔ duplicated (2.084834ms)
+  ✔ reordered (1.773166ms)
+  ✔ staleRevision (1.360833ms)
+  ✔ missingEvidence (1.631792ms)
+  ✔ swappedEvidence (1.779333ms)
+✔ refuses missing, duplicated, reordered, or stale persisted stage evidence (136.0095ms)
+✔ refuses changed persisted evidence bytes and different stage output (278.249917ms)
+(node:55031) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:55031) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:55031) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ candidate identity uses copied globally sorted path/content/mode tuples and unchanged manifest order (14.580208ms)
+✔ candidate identity includes nine regular-file permission bits (4.957791ms)
+✔ candidate build changes A to B without rewriting history (204.908625ms)
+✔ candidate build may preserve A (155.423ms)
+✔ candidate resumes exact 0-stage durable prefix (181.870208ms)
+✔ candidate resumes exact 3-stage durable prefix (149.892042ms)
+✔ candidate resumes exact 6-stage durable prefix (150.199541ms)
+✔ changed unacknowledged build is rejected before handler or receipt on resume (53.665083ms)
+✔ orphan manifest refuses the next unacknowledged stage before engine effects (28.966125ms)
+✔ candidate reader rejects stale expectation, changed tree, malformed receipt and evidence; restoration succeeds (169.296ms)
+✔ reader expectation is independent of a store mutating the caller object (161.467542ms)
+✔ candidate reader requires every verification service before contacting storage (3.209167ms)
+✔ candidate evidence readback does not trust a store-mutated reference (169.410333ms)
+▶ candidate reader strictly rejects successor wire corruption and broken observation chains
+  ✔ oldSchema (7.413833ms)
+  ✔ unknownSchema (6.681375ms)
+  ✔ extraField (6.877917ms)
+  ✔ badIdentity (5.979333ms)
+  ✔ missingIdentity (5.65875ms)
+  ✔ changedBinding (6.025083ms)
+  ✔ brokenChain (5.739792ms)
+  ✔ nonBuildMutation (8.171ms)
+✔ candidate reader strictly rejects successor wire corruption and broken observation chains (245.09525ms)
+✔ strict profile and binding dispatch on 0-stage checkpoints (11.828209ms)
+✔ strict profile and binding dispatch on 3-stage checkpoints (77.295209ms)
+✔ strict profile and binding dispatch on 6-stage checkpoints (194.5395ms)
+▶ initial save failure, readback substitution and candidate mutation invoke zero handlers
+  ✔ save (6.451083ms)
+  ✔ substitution (16.027042ms)
+  ✔ candidate (15.1645ms)
+✔ initial save failure, readback substitution and candidate mutation invoke zero handlers (38.08375ms)
+✔ invalid plans write no checkpoint and capability BLOCKED precedes initial hook (11.862709ms)
+▶ only build may change the candidate and handler-authored bindings never become evidence
+  ✔ mutation (14.872291ms)
+  ✔ raw-reference (14.907542ms)
+✔ only build may change the candidate and handler-authored bindings never become evidence (30.311708ms)
+✔ publication mutation after build observation refuses PASS checkpoint while preserving prior prefix (70.819791ms)
+✔ stage save readback substitution is detected against independent expectation (33.164917ms)
+✔ malformed present candidate options and missing services fail before effects (3.02625ms)
+▶ terminal receipt mutation and substitution are detected against independent expectation
+  ✔ mutation (155.141083ms)
+  ✔ substitution (175.94425ms)
+✔ terminal receipt mutation and substitution are detected against independent expectation (331.4185ms)
+✔ post-checkpoint mutation at stage 4 never publishes PASS and retains acknowledged history (108.974667ms)
+✔ post-checkpoint mutation at stage 6 never publishes PASS and retains acknowledged history (163.314792ms)
+✔ execution snapshots caller configuration and callback checkpoints (157.561417ms)
+✔ candidate root policy rejects both containment directions, stage overlap and declared writes (6.496792ms)
+✔ candidate root policy rejects static ancestor aliases and changed resolution during execution (41.843584ms)
+✔ scheduled legacy control retains its selected profile (127.31775ms)
+✔ scheduled candidate control retains its selected profile (203.611958ms)
+✔ scheduled create cannot replace the initially selected candidate (57.710167ms)
+✔ scheduled claim cannot replace the initially selected candidate (57.061333ms)
+✔ scheduled appendEvent cannot replace the initially selected candidate (55.787ms)
+✔ scheduled create cannot downgrade profile or replace forwarding configuration (200.764917ms)
+✔ scheduled now cannot downgrade profile or replace forwarding configuration (197.754625ms)
+✔ scheduled candidate service admission runs before callbacks and mechanical writes (3.241167ms)
+✔ scheduled prelude rejects a changed root alias before handler dispatch (56.361709ms)
+(node:55114) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:55114) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:55114) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ creates child tasks idempotently and binds their parent graph (28.81875ms)
+✔ persists immutable child task group membership idempotently (9.996417ms)
+✔ persists FAILED child outcomes without synthetic worker evidence (40.616583ms)
+✔ requeues mechanical failures with an append-only retry event (87.566ms)
+✔ durably cancels queued work and fences an active lease until it expires (53.53875ms)
+✔ active cancellation wins completion and is replayed with the original request (54.604541ms)
+✔ completed work wins a later request while an expired requested child is never reclaimed (94.804709ms)
+✔ group capacity does not delay finalizing an expired cancellation request (83.36275ms)
+✔ reconciles an interrupted active cancellation request without losing intent (176.302125ms)
+✔ preserves semantic BLOCKED as a normal worker result (38.31925ms)
+✔ gates claims on successful dependencies and records a durable join trail (64.472417ms)
+✔ serializes concurrent claims so only one owner receives a child lease (35.3695ms)
+✔ serializes cyclic dependency claims without lock inversion (38.441083ms)
+✔ increments fencing epochs after expiry and rejects stale completion (40.33125ms)
+✔ renews active child leases idempotently and rejects expired or fenced renewals (55.091541ms)
+✔ replays an idempotent completion but rejects a changed payload (43.482792ms)
+✔ reconstructs a stable ready frontier for a run revision (39.278833ms)
+✔ repairs every transaction interruption boundary idempotently (167.966167ms)
+✔ fails closed on partial JSONL, event-ahead state, and missing state (14.608ms)
+(node:55130) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:55130) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+✔ runtime dispatch selects an injected host and resumes by the same identity (8.248959ms)
+✔ runtime rejects a stale reference after harness selection changes (0.332708ms)
+✔ runtime rejects a selected harness returning a different run identity (0.111792ms)
+✔ runtime cancellation preserves the exact reference and observed status (0.132958ms)
+✔ runtime cancellation rejects mismatched and malformed references before dispatch (0.182042ms)
+✔ runtime reports unsupported cancellation without using resume or status (0.116292ms)
+✔ runtime refuses a recoverable launch before side effects when native identity cannot be verified (0.16775ms)
+✔ runtime verifies recovered native identity through the matching implementation (0.179125ms)
+(node:55130) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:55133) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:55133) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+✔ host-provided execution harness can replace configured Archon (0.439083ms)
+✔ an explicitly configured alternative replaces the managed default (0.075792ms)
+✔ the managed Archon harness is used only as the default (0.054ms)
+✔ selection fails closed when no implementation is available (0.188208ms)
+(node:55133) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:55137) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:55137) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:55137) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ migration acceptance: a fresh process resumes the persisted build prefix and verifies closeout bytes (628.2685ms)
+✔ migration acceptance: QA without subagents is blocked before any handler writes (263.888041ms)
+✔ migration acceptance: resume rejects altered acknowledged workspace bytes before more handlers run (561.133042ms)
+✔ migration acceptance: resume rejects a mismatched revision before more handlers run (562.10675ms)
+✔ migration acceptance: missing evidence bytes reject closeout before readiness is evaluated (868.451875ms)
+✔ migration acceptance: tampered evidence bytes reject closeout before readiness is evaluated (879.573541ms)
+(node:55194) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:55194) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:55194) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+NX05 process restart {"parentClaimPid":55206,"parentRestartPid":55213,"parentAttempt":2,"childClaimPid":55226,"childRestartPid":55252,"childEpoch":2}
+✔ separate processes serialize parent and child claims, then fence stale owners after restart (3607.629833ms)
+✔ separate claimers enforce one child group concurrency limit (1748.305333ms)
+✔ cancellation and artifact hashes survive a new process (3319.729542ms)
+NX05 crash recovery {"stages":4,"stores":["parent","child"],"restartObservations":8}
+✔ a new process reconciles each interrupted parent and child commit boundary (7867.529875ms)
+✔ a stale parent cannot append an event after another process takes its lease (1203.772209ms)
+✔ a parent idempotency key rejects a replay that omits the committed marker (1211.275208ms)
+✔ file child completion admits a missing artifact, so shared publication remains blocked (983.001959ms)
+(node:55541) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:55541) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+✔ parent dispatch carries a complete immutable group and verified assignment (9.209042ms)
+✔ parent dispatch refuses duplicate IDs, undeclared dependencies, and cycles (0.467ms)
+✔ parent dispatch rejects a terminal parent or invalid concurrency bound (0.306042ms)
+(node:55541) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:55544) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:55544) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:55544) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+▶ renews a child lease while a long-running worker is executing
+  ✔ durable renewals carry the child beyond its initial lease (233.563125ms)
+  ✔ a missed logical deadline leaves the child incomplete (87.31575ms)
+✔ renews a child lease while a long-running worker is executing (321.59325ms)
+✔ keeps a larger restartable batch within its declared concurrency bound (614.95375ms)
+✔ resumes a bounded child batch and joins terminal results in declaration order (149.134792ms)
+✔ retains a thrown handler as FAILED mechanics and a blocked semantic receipt (50.994667ms)
+▶ persists bounded diagnostics for blank and oversized worker failures
+  ✔ empty Error (50.292667ms)
+  ✔ whitespace Error (50.150625ms)
+  ✔ oversized Error (50.571958ms)
+  ✔ combined oversized Error (59.698292ms)
+  ✔ unprintable thrown value (53.99125ms)
+✔ persists bounded diagnostics for blank and oversized worker failures (265.564167ms)
+✔ an oversized first failure remains retryable under the attempt bound (91.393125ms)
+✔ retries mechanical child failures within an explicit attempt bound (90.33775ms)
+✔ stops mechanical retries at the declared attempt bound (88.213666ms)
+✔ durably cancels queued assignments and keeps the join incomplete (72.715125ms)
+✔ an active child cancellation blocks the join even when its handler returns PASS (61.196833ms)
+✔ publishes and verifies a workspace manifest for every completed child (108.425583ms)
+✔ publishes portable worker evidence and refuses replay when the artifact is missing (56.638125ms)
+✔ refuses a partial join while another owner holds a child lease (94.168708ms)
+✔ recovers one expired child through a second independent coordinator (394.62175ms)
+✔ takeover barrier propagates evidence and drains the held child (348.033708ms)
+✔ takeover barrier propagates completion and drains the held child (343.846917ms)
+✔ takeover barrier propagates readback and drains the held child (353.4475ms)
+✔ takeover barrier propagates missing-signal and drains the held child (1032.402417ms)
+✔ takeover barrier propagates failed-drain and drains the held child (345.362709ms)
+✔ takeover barrier propagates slow-held-start and drains the held child (830.789834ms)
+✔ repairs an interrupted completion without rerunning the handler (56.356375ms)
+✔ refuses receipt replay when an expected child state is missing (49.724083ms)
+✔ concurrent receipt publication converges on one persisted winner (8.500833ms)
+(node:55609) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:55609) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:55609) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ claims a queued run once and records an append-only event trail (51.517ms)
+✔ expires a lease before another worker can resume the same revision (38.740375ms)
+✔ renews an active lease with an append-only witness and idempotent replay (39.021708ms)
+✔ cancels queued runs and durably requests cancellation for active runs (75.350292ms)
+✔ serializes concurrent claims so one owner receives the lease (35.586834ms)
+✔ replaying an idempotency key returns the original event (26.578709ms)
+✔ repairs every parent transaction interruption boundary idempotently (171.214333ms)
+✔ repairs an event-only append after an interrupted publication (25.565083ms)
+✔ fails closed on partial JSONL, event-ahead state, and missing state (15.13625ms)
+(node:55617) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:55617) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:55617) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ persists and reloads a revision-bound receipt idempotently (23.069459ms)
+✔ executes a coordinator-produced serial request through the persisted engine (12.744625ms)
+✔ stops a coordinator-produced QA request before serial execution lacks review capability (5.543292ms)
+✔ persists blocked capability gaps instead of losing the reason (5.657083ms)
+✔ rejects a different receipt for an existing run ID (11.795167ms)
+✔ executes a revision through the run lease and closes with a receipt status (57.618792ms)
+✔ renews the parent lease while a scheduled revision is still executing (214.878041ms)
+✔ honors a durable active-run cancellation request at completion (69.000875ms)
+✔ does not start a duplicate while a lease is active (26.966042ms)
+✔ stores immutable content-addressed evidence and verifies it on reload (10.236375ms)
+✔ resumes from durable stage checkpoints after final receipt publication fails (30.128458ms)
+✔ publishes serial stage manifests and verifies them before checkpoint resume (67.777333ms)
+✔ captures, persists, reloads, and verifies a portable workspace manifest (7.665875ms)
+✔ refuses a conflicting workspace manifest for the same run subject (10.64175ms)
+(node:55631) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:55631) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:55631) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ publishes all six distinct stage payloads and verifies via new store instances (100.064792ms)
+✔ identical payload bytes across stages remain legitimate with distinct attestations (86.681833ms)
+▶ rejects malformed persisted coverage, identities, profile and contextual bindings
+  ✔ missingStage (1.197958ms)
+  ✔ duplicateStage (1.164875ms)
+  ✔ unsupportedProfile (0.419542ms)
+  ✔ absentProfile (0.697208ms)
+  ✔ unsupportedSchema (0.327875ms)
+  ✔ wrongRun (0.3675ms)
+  ✔ wrongRevision (0.384084ms)
+  ✔ missingBinding (0.405709ms)
+  ✔ unsupportedBinding (0.306792ms)
+  ✔ swappedBinding (0.442583ms)
+  ✔ badDigest (0.272375ms)
+  ✔ badSize (0.293791ms)
+  ✔ nonPass (0.290959ms)
+  ✔ changedSummary (0.506708ms)
+  ✔ changedManifest (0.404584ms)
+  ✔ badTimestamp (0.606167ms)
+  ✔ badPaths (0.24875ms)
+  ✔ badPlan (0.37225ms)
+  ✔ failure (0.2535ms)
+  ✔ nullStage (0.313875ms)
+✔ rejects malformed persisted coverage, identities, profile and contextual bindings (98.298042ms)
+▶ strictly decodes contextual attestations and each payload reference
+  ✔ version (5.078708ms)
+  ✔ wrongRun (5.167375ms)
+  ✔ wrongRevision (4.759833ms)
+  ✔ wrongStage (5.111208ms)
+  ✔ wrongStatus (5.067291ms)
+  ✔ missingPayload (4.538708ms)
+  ✔ duplicateName (5.140875ms)
+  ✔ extraField (5.008916ms)
+  ✔ payloadExtra (4.786084ms)
+  ✔ payloadVersion (4.983417ms)
+  ✔ payloadRun (4.859834ms)
+  ✔ payloadRevision (4.938833ms)
+  ✔ payloadKind (5.570583ms)
+  ✔ payloadName (4.139209ms)
+  ✔ payloadSize (5.076292ms)
+✔ strictly decodes contextual attestations and each payload reference (159.65575ms)
+✔ missing and same-length modified attestation or payload fails, restoration succeeds (89.841083ms)
+▶ runtime rejects duplicate payload names and handler-supplied bindings before acknowledgment
+  ✔ duplicate (5.876375ms)
+  ✔ raw (5.904083ms)
+  ✔ missing (5.994959ms)
+✔ runtime rejects duplicate payload names and handler-supplied bindings before acknowledgment (18.119833ms)
+▶ partial and complete resume reverify evidence before handlers or final publication
+  ✔ 3 acknowledged stages (86.084583ms)
+  ✔ 6 acknowledged stages (89.150042ms)
+✔ partial and complete resume reverify evidence before handlers or final publication (175.587792ms)
+✔ engine rejects profile upgrades, downgrades, unknown versions and mixed completed prefixes (83.187667ms)
+✔ payload count and aggregate size are bounded before publication or payload loading (109.174458ms)
+✔ final publication rechecks earlier acknowledged evidence after later handlers (79.156459ms)
+▶ publication refuses store-substituted payloads, kinds, and attestations before acknowledgment
+  ✔ payload (11.756334ms)
+  ✔ kind (10.679708ms)
+  ✔ attestation (18.100333ms)
+  ✔ mutated-input (9.961625ms)
+✔ publication refuses store-substituted payloads, kinds, and attestations before acknowledgment (51.006083ms)
+✔ invalid verifier identity is rejected before contacting the receipt store (1.09175ms)
+(node:55645) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:55645) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:55645) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ native success remains open until canonical evidence and explicit acceptance (233.166458ms)
+✔ native output locations may be attached after exact run identity is known (209.262167ms)
+✔ concurrent duplicate dispatch has one side effect and retains intent first (89.851417ms)
+✔ lost dispatch response survives reopen and requires exact native reconciliation (98.74225ms)
+✔ crash window before native binding never auto-dispatches a replacement (97.785125ms)
+✔ reconciliation fails closed without independent harness identity verification (65.803875ms)
+✔ retry/replan keeps one goal, distinct runs and prior native identities (135.839709ms)
+✔ cancellation awaits actual executor confirmation and does not repeat requests (193.63825ms)
+✔ native success racing cancellation resolves intent without claiming cancellation (111.9455ms)
+✔ failed native run resolves a lost cancellation response and permits replan (121.5175ms)
+✔ resume error retains uncertainty and duplicate control does not repeat side effect (109.270792ms)
+✔ stale revision or changed plan cannot supply closeout evidence (250.0385ms)
+✔ tampered evidence revokes the DONE projection and acceptance cannot reuse it (146.482834ms)
+✔ local stage-only closeout cannot satisfy independent review or forge obligations (42.726583ms)
+✔ child projections retain successful sibling and failed assignment (139.202917ms)
+(node:55670) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:55670) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:55670) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ stale lock reports its owner and is never automatically taken over (1128.327042ms)
+✔ missing persisted ledger is an error for existing readers and initializers (44.314083ms)
+✔ concurrent initialization persists one empty ledger and preserves later work (104.146583ms)
+✔ one native identity cannot be attached to two Temari runs (106.731083ms)
+✔ deferred evidence roots attach once to the exact existing run (69.8815ms)
+✔ reopens one goal, immutable history and distinct run revisions (53.720416ms)
+✔ commands are idempotent but changed payload, actor and reused run IDs fail (79.435875ms)
+✔ concurrent metadata updates compare versions without losing either command (68.582083ms)
+✔ rejects unsafe IDs, unbounded metadata, invalid plans and corrupt ledgers visibly (38.30325ms)
+(node:55713) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:55713) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:55713) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ persists and reloads a v4.1 route projection without the old checkout (41.636208ms)
+✔ rejects a mismatched route before appending a runtime event (16.627833ms)
+✔ rejects a changed projection under an existing idempotency key (27.771125ms)
+ℹ tests 245
+ℹ suites 0
+ℹ pass 245
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 44686.61425
+
+
+
+ NX   Successfully ran target test for project runtime
+
+
+  Run duration:      44.7s
+  Cache:             0/1 hit (0%)
+  Critical path:     44.7s (1 task)
+  Recoverable time:  <1ms
+
+  Recommendations:
+    - Drastically reduce your run duration by sharing a cache across your team and CI → https://cloud.nx.app/get-started?utm_source=nx-cli&utm_medium=cli&utm_campaign=performance-report&utm_content=remote-cache.
+    - Speed up or split the longest tasks on the critical path:
+        runtime:test    44.7s

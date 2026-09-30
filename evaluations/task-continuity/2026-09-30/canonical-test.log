@@ -1,0 +1,38 @@
+
+> nx run workflow-runtime:canonical-test
+
+> node --test tools/canonical-runtime.test.mjs
+
+(node:54957) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:54958) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ canonical artifact contains only compiled production packages and verifies after relocation (1036.361833ms)
+✔ relocated stock Node resumes an acknowledged prefix and verifies bytes with isolated readback (790.147584ms)
+✔ canonical inventory rejects missing and same-size tampered dependency bytes (72.561709ms)
+✔ compiled candidate build changes A to B, resumes exact history and refuses stale closeout (1124.280208ms)
+✔ compiled candidate recovery retains empty initial intent before any handler (581.177583ms)
+✔ compiled complete candidate checkpoint revalidates without replaying handlers (594.403416ms)
+✔ compiled pre-acknowledgment build crash cannot silently adopt changed candidate (306.634125ms)
+✔ compiled candidate recovery refuses an orphan manifest even when candidate bytes match (273.051166ms)
+✔ canonical inventory rejects unknown files and links (63.310125ms)
+✔ canonical inventory rejects escaping paths and rewritten manifests (60.414916ms)
+✔ packaging refuses to replace an existing destination (49.812667ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5160.418708
+
+
+
+ NX   Successfully ran target canonical-test for project workflow-runtime
+
+
+  Run duration:      5.2s
+  Cache:             0/1 hit (0%)
+  Critical path:     5.2s (1 task)
+  Recoverable time:  <1ms
