@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { provenCapabilities } from '@temari/contracts';
+import {
+  HOST_CAPABILITIES,
+  missingCapabilities,
+  missingOrUnprovenCapabilities,
+  provenCapabilities,
+} from '@temari/contracts';
 
 import { adapterFor, cursorAdapter, genericAdapter } from './host-adapters.js';
 
@@ -19,6 +24,24 @@ test('unknown hosts use the honest serial fallback', () => {
 test('records adapter declarations as unproven until a host journey supplies evidence', () => {
   const report = cursorAdapter.capabilities();
 
+  assert.deepEqual(report.available, []);
+  assert.deepEqual(report.missing, HOST_CAPABILITIES);
   assert.deepEqual(provenCapabilities(report), []);
-  assert.equal(report.provenance?.parallelism?.status, 'unproven');
+  for (const capability of HOST_CAPABILITIES) {
+    assert.equal(report.provenance?.[capability]?.status, 'unproven');
+    assert.deepEqual(missingCapabilities([capability], report.available), [
+      capability,
+    ]);
+    assert.deepEqual(missingOrUnprovenCapabilities([capability], report), [
+      capability,
+    ]);
+  }
+});
+
+test('Cursor and generic reports permit serial work with no required capability', () => {
+  for (const adapter of [cursorAdapter, genericAdapter]) {
+    const report = adapter.capabilities();
+    assert.deepEqual(missingCapabilities([], report.available), []);
+    assert.deepEqual(missingOrUnprovenCapabilities([], report), []);
+  }
 });
