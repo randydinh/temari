@@ -4,6 +4,9 @@ For explicit capture, immutable archive handoff, generic search/read and fresh-p
 resume, see the [local archive guide](ARCHIVE.md). The legacy local text adapter and
 structured investigation API below remain available.
 
+For the operator-run intake, retrieval and scored local corpus loop, see the
+[evaluation journey](JOURNEY.md).
+
 `investigateDesignUpdate({ brief, task, request, provider, assess, resumeFrom? })`
 returns `Promise<WorkerResult>`. Compose it inside the existing `runPlan` stage
 callback; the demo invokes the investigation operation directly. It creates no lifecycle,
