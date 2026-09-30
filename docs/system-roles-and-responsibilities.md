@@ -55,7 +55,7 @@ decision, not a substitute for it. See the
 | Contracts and workflow engine | Define stage order, host requirements, worker briefs/results and stable joins. Run serial stages or bounded independent assignments. | Meaning of the user's request or durable external scheduling. | **Implemented** in [contracts](../libs/contracts/src/lib/execution-plan.ts) and [workflow engine](../libs/workflow-engine/src/lib/workflow-engine.ts). Required independent review derives `subagents`; concurrent fan-out derives `parallelism`; PR delivery derives `forge`. |
 | Mechanical runtime | Persists receipts, route events and immutable evidence; claims and fences child work; handles bounded retry, checkpoints, cancellation requests and resume rules. | Semantic review or permission to widen a task. | **Local implementation** in [runtime](../libs/runtime/src/lib/runtime.ts) and [parallel runtime](../libs/runtime/src/lib/parallel-runtime.ts). [Shared control](../libs/shared-control/README.md) adds local service and restart proofs, not a production cross-host control plane. |
 | Host adapter and execution host | Reports tools, models, permissions, credentials, worktree and forge facilities; executes an admitted assignment. | Reclassifying work or inventing a missing capability. | [Adapters](../libs/host-adapters/src/lib/host-adapters.ts) include a serial generic fallback and Cursor declarations. Declared capabilities are marked unproven until the actual host journey checks them. |
-| Archon execution harness | Starts, observes and resumes a native workflow; returns its run identity and status. Its run/node logs can support task traceability. | Temari's plan, source authority or canonical six-stage closeout. | **Optional managed adapter** pinned to Archon 0.10.1 in [archon-harness](../libs/archon-harness/src/lib/archon-harness.ts). Native outcomes are not yet canonical Nx stage receipts. See the [harness decision](decisions/2026-09-22-archon-harness.md). |
+| Archon execution harness | Starts, observes, resumes and cancels a native workflow; returns its run identity and status. Its run/node logs can support task traceability. | Temari's plan, source authority or canonical six-stage closeout. | **Optional managed adapter** pinned to Archon 0.10.1 in [archon-harness](../libs/archon-harness/src/lib/archon-harness.ts). The canonical bridge produces deterministic six-stage evidence; a native status alone still cannot close a task. Exact-run cancellation is supported. See the [harness decision](decisions/2026-09-22-archon-harness.md). |
 | Distribution and initializer | Package public skills and playbooks; install frozen dependencies and the pinned optional Archon executable; retain install and provenance receipts. | Running an agent or silently activating a schedule. | **Implemented packaging** in [workflow-runtime](../packages/workflow-runtime/README.md) and [initializer](../packages/initializer/README.md). |
 
 ## Assigned worker roles
@@ -87,8 +87,8 @@ assignments. They do not each need a permanent process or another coordinator.
 | --- | --- | --- |
 | Assignment authority | `WorkerBrief` carries goal, context, textual scope, acceptance criteria, verification and forbidden actions. Its generic validator checks completeness. The [local write-worker runner](../tools/run-codex-write-workers.mts) additionally checks typed path ownership and rejects out-of-scope changes. | Reuse those checks across supported hosts. Bind each assignment to an actor, admitted tools and sources, writable paths, candidate revision and escalation conditions. A role label alone must not be advertised as a permission boundary. |
 | Independent judgment | The QA evaluator binds a frozen review and distinguishes evaluator identity; packaged engineering review also has independence requirements. | Carry actor and candidate identity through the harness result. Verify independence for each admitted route rather than assuming a differently named role proves it. |
-| Execution ownership | The local runtime has child leases, retries and cancellation gates. The [harness port](../libs/contracts/src/lib/execution-harness.ts) exposes `start`, `status` and `resume`; cancellation and scheduling are not portable operations on that port yet. | Name one execution owner for each dispatched unit. In the proposed Archon route, Archon owns its native node execution and recovery; Temari records the result and reconciles acceptance. A nested retry must have an explicit shared attempt bound. Define how cancellation reaches the owner and when it is actually complete. |
-| Trace identity | `HarnessRunRef` already binds Temari run ID, revision and plan digest to the Archon run ID and version. Knowledge work has task bindings and pinned handoffs. | Extend the existing join to logical task, stage, assignment, attempt, logs and Registrar publication. Retain one logical task across retries and replans so the inbox shows all unfinished work. |
+| Execution ownership | The local runtime has child leases, retries and cancellation gates. The [harness port](../libs/contracts/src/lib/execution-harness.ts) exposes `start`, `status`, `resume` and optional `cancel`. The Archon adapter confirms exact-run cancellation; recurring scheduling remains outside this port. | Name one execution owner for each dispatched unit. In the proposed Archon route, Archon owns its native node execution and recovery; Temari records the result and reconciles acceptance. A nested retry must have an explicit shared attempt bound. Define how cancellation reaches the owner and when it is actually complete. |
+| Trace identity | `HarnessRunRef` already binds Temari run ID, revision and plan digest to the Archon run ID and version. Knowledge work has task bindings and pinned handoffs. | The [local task ledger and inbox](task-continuity.md) now retain one logical task across runs, source/publication references, canonical stage evidence and child-store links. Host entry capture and authenticated actor/tool/path enforcement remain follow-up work. |
 | Operational limits | `ExecutionPlan.parallelism` sets concurrent work; local runtime retry policy bounds attempts. | Add a total child count, elapsed-time limit and provider-supported spend limits. Record whether a limit is enforced or advisory, and report unavailable usage as unknown. |
 
 The useful increase in granularity is an enforceable assignment and handoff
@@ -104,7 +104,7 @@ integration evidence.
 | Content Registrar | Own registered source identity, retained original bytes, archive generations, indexes, graph assertions and source-backed citation checks. | **External Python authority**, consumed through Temari's [archive adapter](../libs/knowledge/ARCHIVE.md). Temari retains task bindings and assessments; it should not copy Registrar's source lifecycle into the workflow engine. |
 | Nx, Graft, Graphify and OKF | Nx maps workspace projects and targets. Graft can derive code structure. Graphify and OKF are graph/projection and exchange views. | Nx is present. The [knowledge design](knowledge-system-design.md) selects the other roles, but native Graft/Graphify execution and visual/semantic interpretation remain separate evaluation work. A projection is not an authority for source bytes. |
 | Jev | Give typed, bounded relevance or support judgments on an approved shortlist. | **Shadow-only adapter** in the [knowledge journey](../libs/knowledge/JOURNEY.md). Private excerpts are not sent unless that case explicitly authorizes hosted text. It cannot recover a candidate that discovery missed, perform OCR, or write an answer. |
-| Evidence and closeout | Bind plan, revision, stage/worker attempts, host identity, source hashes, logs and checks to a durable result or resumable blocker. | **Partial across engine and runtime**. The [component guide](platform-components.md#7-provenance-logs-and-security) lists the needed record. Archon-to-canonical receipt parity and provider log capture are still open. |
+| Evidence and closeout | Bind plan, revision, stage/worker attempts, host identity, source hashes, logs and checks to a durable result or resumable blocker. | **Partial across engine and runtime**. The [component guide](platform-components.md#7-provenance-logs-and-security) lists the needed record. Deterministic source-workspace Archon-to-canonical evidence is tested; installed live routes and provider log capture still need their own proof. |
 
 ## Useful improvements, in dependency order
 
@@ -168,8 +168,9 @@ itself proof that Temari owns the resulting plan and closeout.
 
 The lowest-overhead first increment is one local project, the current pinned
 harness, existing console links and a read-only task summary. Use synthetic
-fixtures for failures before paying for a small live host check. The acceptance
-cases below are proposed tests, not results from this documentation review:
+fixtures for failures before paying for a small live host check. The [first increment guide](task-continuity.md#verification-and-current-limits) now records
+implemented behavior and executable checks. The cases below remain the broader
+acceptance targets; local fixtures do not prove an unattended live host journey:
 
 1. **One goal to one retained result:** resolve the task, plan revision, Archon
    run, stage evidence and any Registrar citation from either end of the link.
@@ -180,7 +181,7 @@ cases below are proposed tests, not results from this documentation review:
 3. **Restart and control:** reload the task without losing its state; resume the
    intended run without repeating accepted work. Verify cancellation against the
    executor, including a crash during dispatch that must remain uncertain until
-   reconciled. The current port needs an extension before claiming this case.
+   reconciled. The current adapter now supports cancellation; model-free macOS smoke tests cover exact-run resume and confirmed cancellation.
 4. **Return without searching chats:** a fresh Temari session finds the same open
    task and its next action; the console still opens the original logs and
    artifacts. A new run or replan stays attached to that task.
@@ -190,6 +191,9 @@ workflow and the knowledge map. This recommendation preserves Archon's existing
 UI and execution value while targeting the user's actual loss of task continuity.
 
 ## Where to go next
+
+- For the implemented inbox, task commands, recovery and proof limits, read
+  [task continuity](task-continuity.md).
 
 - For request routing and roles, read [platform components](platform-components.md),
   the [plan and worker contracts](../libs/contracts/src/index.ts), and the

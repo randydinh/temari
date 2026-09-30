@@ -88,3 +88,18 @@ export async function resumeExecutionHarness(
   requireMatchingHarness(harness, reference);
   return harness.resume(reference);
 }
+
+/** Cancel an exact native run through the same harness identity and version. */
+export async function cancelExecutionHarness(
+  selection: HarnessSelection,
+  reference: HarnessRunRef,
+): Promise<HarnessRunSnapshot> {
+  const harness = selectExecutionHarness(selection);
+  requireMatchingHarness(harness, reference);
+  if (!harness.cancel) {
+    throw new Error(
+      `Execution harness ${harness.id}@${harness.version} does not support cancellation.`,
+    );
+  }
+  return harness.cancel(reference);
+}

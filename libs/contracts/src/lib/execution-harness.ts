@@ -51,4 +51,6 @@ export interface ExecutionHarness {
   start(request: HarnessRunRequest): Promise<HarnessRunRef>;
   status(reference: HarnessRunRef): Promise<HarnessRunSnapshot>;
   resume(reference: HarnessRunRef): Promise<HarnessRunSnapshot>;
+  /** Request cancellation of this exact run and return its observed status. */
+  cancel?(reference: HarnessRunRef): Promise<HarnessRunSnapshot>;
 }

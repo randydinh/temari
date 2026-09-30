@@ -10,6 +10,7 @@ import {
   type HarnessRunSnapshot,
 } from '@temari/contracts';
 import {
+  cancelExecutionHarness,
   getExecutionHarnessStatus,
   resumeExecutionHarness,
   startExecutionHarness,
@@ -142,4 +143,73 @@ test('runtime rejects a selected harness returning a different run identity', as
     ),
     /different Temari run, revision, or plan/,
   );
+});
+
+test('runtime cancellation preserves the exact reference and observed status', async () => {
+  const seen: string[] = [];
+  const harness = mockHarness('host', seen);
+  const selection: HarnessSelection = {
+    hostHarness: harness,
+    configuredHarness: null,
+    managedDefault: null,
+  };
+  const reference = await startExecutionHarness(selection, request());
+  const snapshot: HarnessRunSnapshot = {
+    status: 'RUNNING',
+    observedAt: new Date(0).toISOString(),
+    summary: 'Cancellation requested; native run is still active',
+    rawLogPath: '/workspace/run.log',
+  };
+  harness.cancel = async (received) => {
+    assert.equal(received, reference);
+    seen.push('host:cancel');
+    return snapshot;
+  };
+
+  assert.equal(await cancelExecutionHarness(selection, reference), snapshot);
+  assert.deepEqual(seen, ['host:start', 'host:cancel']);
+});
+
+test('runtime cancellation rejects mismatched and malformed references before dispatch', async () => {
+  const seen: string[] = [];
+  const harness = mockHarness('host', seen);
+  const selection: HarnessSelection = {
+    hostHarness: harness,
+    configuredHarness: null,
+    managedDefault: null,
+  };
+  const reference = await startExecutionHarness(selection, request());
+  harness.cancel = async () => {
+    seen.push('host:cancel');
+    throw new Error('must not dispatch');
+  };
+
+  for (const changes of [
+    { harnessId: 'replacement' },
+    { harnessVersion: '9.9.9' },
+    { externalRunId: '' },
+    { planSha256: 'tampered' },
+  ]) {
+    await assert.rejects(
+      cancelExecutionHarness(selection, { ...reference, ...changes }),
+      /does not match the selected implementation/,
+    );
+  }
+  assert.deepEqual(seen, ['host:start']);
+});
+
+test('runtime reports unsupported cancellation without using resume or status', async () => {
+  const seen: string[] = [];
+  const selection: HarnessSelection = {
+    hostHarness: mockHarness('host', seen),
+    configuredHarness: null,
+    managedDefault: null,
+  };
+  const reference = await startExecutionHarness(selection, request());
+
+  await assert.rejects(
+    cancelExecutionHarness(selection, reference),
+    /Execution harness host@1\.2\.3 does not support cancellation/,
+  );
+  assert.deepEqual(seen, ['host:start']);
 });

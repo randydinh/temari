@@ -407,4 +407,16 @@ export class ArchonHarness implements ExecutionHarness {
     );
     return this.status(reference);
   }
+
+  async cancel(reference: HarnessRunRef): Promise<HarnessRunSnapshot> {
+    assertReference(reference, this.options.runtime);
+    if (reference.externalRunId.toLowerCase() === 'latest') {
+      throw new Error('Cancellation requires an exact native run ID.');
+    }
+    await this.execute(
+      ['workflow', 'cancel', reference.externalRunId, '--json'],
+      reference.workspaceRoot,
+    );
+    return this.status(reference);
+  }
 }

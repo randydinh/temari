@@ -12,9 +12,9 @@ and [component guide](docs/platform-components.md) for the full design. Use the
 [verification matrix](docs/verification-matrix.md) to trace claims to
 implementation and retained evidence.
 
-The [approved next increment](docs/system-roles-and-responsibilities.md#final-recommendation-and-first-proof)
-uses Archon for execution and console integration, with Temari owning task
-continuity and closeout. The [boundary assessment](docs/system-roles-and-responsibilities.md#how-granular-are-the-boundaries-today)
+The [task continuity guide](docs/task-continuity.md) covers the first local inbox:
+durable goals, run history, evidence, next actions, and exact-run Archon controls.
+Start there to pick up unfinished work. The [boundary assessment](docs/system-roles-and-responsibilities.md#how-granular-are-the-boundaries-today)
 distinguishes documented roles from implemented enforcement.
 
 Temari owns routing, plans, evidence, and closeout. The host (Cursor,
@@ -24,6 +24,9 @@ tree — [docs/overlays.md](docs/overlays.md).
 
 ## Agent starting points
 
+- **Pick up unfinished work:** [task continuity and recovery](docs/task-continuity.md).
+  List the local task store before creating a new task, reuse the matching goal,
+  and retain its next action before ending a session.
 - **Route a request:** [Temari coordinator and worker contracts](docs/system-roles-and-responsibilities.md#decision-and-control-owners),
   [one workflow](docs/workflow.md), and the packaged
   [Temari](packages/workflow-runtime/assets/v4.1/skills/temari/SKILL.md) and
@@ -67,6 +70,10 @@ pnpm exec nx graph
 
 # Shareable walkthrough.
 pnpm nx run workflow-engine:demo
+
+# Retained task inbox (create the first task using the guide above).
+pnpm exec nx run runtime:tasks -- list
+pnpm exec nx run runtime:tasks -- serve
 ```
 
 `temari:init` is the OS-agnostic dependency entry point. It uses Node APIs

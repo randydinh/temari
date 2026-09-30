@@ -21,10 +21,45 @@
       "type:runtime"
     ],
     "targets": {
+      "tasks": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --import @swc-node/register/esm-register tools/task-continuity.mts",
+          "cwd": "{workspaceRoot}"
+        }
+      },
+      "task-test": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 libs/runtime/src/lib/task-store.test.ts libs/runtime/src/lib/task-runtime.test.ts tools/task-view.test.mts tools/task-continuity.test.mts",
+          "cwd": "{workspaceRoot}"
+        }
+      },
+      "task-typecheck": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "dependsOn": [
+          "typecheck"
+        ],
+        "options": {
+          "command": "tsc --ignoreConfig --noEmit --module nodenext --moduleResolution nodenext --target es2022 --types node --strict --skipLibCheck tools/task-view.mts tools/task-continuity.mts tools/task-view.test.mts tools/task-continuity.test.mts tools/task-native.test.mts",
+          "cwd": "{workspaceRoot}"
+        }
+      },
+      "task-native-test": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 tools/task-native.test.mts",
+          "cwd": "{workspaceRoot}"
+        }
+      },
       "test": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 libs/runtime/src/lib/runtime.test.ts libs/runtime/src/lib/run-store.test.ts libs/runtime/src/lib/child-task-store.test.ts libs/runtime/src/lib/parallel-runtime.test.ts libs/runtime/src/lib/harness-selector.test.ts libs/runtime/src/lib/harness-runtime.test.ts libs/runtime/src/lib/archon-receipt-parity.test.ts libs/runtime/src/lib/v4-1-route-replay.test.ts libs/runtime/src/lib/migration-acceptance.test.ts libs/runtime/src/lib/stage-evidence.test.ts libs/runtime/src/lib/candidate.test.ts libs/runtime/src/lib/nx05-control-conformance.test.ts libs/runtime/src/lib/nx05-dispatch-contract.test.ts",
+          "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 libs/runtime/src/lib/runtime.test.ts libs/runtime/src/lib/run-store.test.ts libs/runtime/src/lib/child-task-store.test.ts libs/runtime/src/lib/parallel-runtime.test.ts libs/runtime/src/lib/harness-selector.test.ts libs/runtime/src/lib/harness-runtime.test.ts libs/runtime/src/lib/archon-receipt-parity.test.ts libs/runtime/src/lib/v4-1-route-replay.test.ts libs/runtime/src/lib/migration-acceptance.test.ts libs/runtime/src/lib/stage-evidence.test.ts libs/runtime/src/lib/candidate.test.ts libs/runtime/src/lib/nx05-control-conformance.test.ts libs/runtime/src/lib/nx05-dispatch-contract.test.ts libs/runtime/src/lib/task-store.test.ts libs/runtime/src/lib/task-runtime.test.ts",
           "cwd": "{workspaceRoot}"
         }
       },

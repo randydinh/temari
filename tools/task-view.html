@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Temari · Tasks</title>
+    <link rel="stylesheet" href="/task-view.css" />
+    <script src="/task-view.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Temari tasks"
+        ><span class="brand-mark">T</span> Temari</a
+      >
+      <span class="workspace-label">Workspace / Tasks</span>
+      <div class="top-actions">
+        <span id="connection" role="status">Loading…</span
+        ><button id="refresh" class="quiet">Refresh</button
+        ><a id="archon-home" class="quiet" target="_blank" rel="noreferrer"
+          >Open Archon ↗</a
+        >
+      </div>
+    </header>
+    <main class="workspace">
+      <aside class="inbox" aria-label="Task inbox">
+        <div class="inbox-heading">
+          <span class="eyebrow">YOUR WORK</span>
+          <h1>Tasks <span id="task-count" class="count">0</span></h1>
+          <p>Pick up where you left off.</p>
+        </div>
+        <label class="search"
+          ><span class="sr-only">Find a task</span
+          ><input
+            id="search"
+            type="search"
+            placeholder="Find a task…"
+            autocomplete="off"
+        /></label>
+        <div class="filters" role="group" aria-label="Filter tasks">
+          <button data-filter="open" aria-pressed="true">
+            Open <span id="open-count">0</span></button
+          ><button data-filter="all" aria-pressed="false">All</button
+          ><button data-filter="done" aria-pressed="false">Done</button>
+        </div>
+        <div id="task-list" class="task-list" aria-live="polite"></div>
+        <footer class="inbox-footer">
+          <span class="live-dot"></span> State stays with the task
+        </footer>
+      </aside>
+      <section class="detail" id="detail" aria-label="Task details">
+        <div class="empty-state">
+          <span class="empty-symbol">◎</span>
+          <h2>Your work, in one place</h2>
+          <p>Select a task to see its next action, runs, and evidence.</p>
+        </div>
+      </section>
+    </main>
+    <div id="error" class="error-banner" role="alert" hidden></div>
+  </body>
+</html>

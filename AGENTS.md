@@ -22,6 +22,15 @@
 
 <!-- nx configuration end-->
 
+## Task continuity
+
+Read [docs/task-continuity.md](docs/task-continuity.md) when starting or resuming
+tracked work. List the configured local task store, reuse a matching logical task,
+and retain a next action or blocker before handing off. Use a new run binding for
+a new candidate; preserve prior run history. A missing/corrupt store is a visible
+recovery issue. Native success alone does not satisfy Temari closeout, and the
+local inbox's acceptance command does not verify full feature/forge obligations.
+
 ## Local Codex parallel batches
 
 At the Temari/poteto throughput checkpoint, prepare an existing read-only or write request JSON for an independent, homogeneous batch. From the workspace root, invoke the router with one positional request path:

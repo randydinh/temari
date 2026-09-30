@@ -1,0 +1,249 @@
+import { readFile, stat } from 'node:fs/promises';
+import { isAbsolute, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { parseArgs } from 'node:util';
+import {
+  ArchonHarness,
+  installArchonRuntime,
+} from '../libs/archon-harness/src/index.js';
+import {
+  FileTaskStore,
+  TaskRuntime,
+  type HarnessSelection,
+} from '../libs/runtime/src/index.js';
+import { platformInfo } from '../packages/initializer/src/lib/platform.js';
+import { startTaskViewServer } from './task-view.mjs';
+
+export const taskHelp = `Temari tasks — keep a goal and its evidence across runs
+
+Usage: pnpm exec nx run runtime:tasks -- COMMAND [--root ABSOLUTE_DIRECTORY] [options]
+
+Storage defaults to TEMARI_TASK_ROOT or the platform's Temari data directory
+under tasks, so a fresh session can find the same work.
+
+Commands:
+  create      Create a logical task from --input JSON
+  update      Record nextAction/blocker metadata from --input JSON
+  bind        Attach an immutable plan and run binding from --input JSON
+  link-evidence Attach receipt/evidence locations once the executor publishes them
+  list        Show all retained task snapshots (JSON)
+  show        Show one task with --task ID (JSON)
+  start       Persist intent, then dispatch the bound run through Archon
+  observe     Record the exact bound native run's current status
+  reconcile   Bind an exact native reference after interrupted dispatch
+  resume      Resume the exact bound run; requires --input command JSON
+  cancel      Request cancellation of the exact bound native run
+  verify      Verify the bound canonical receipt and stage evidence
+  accept      Record explicit coordinator acceptance of eligible local work
+  serve       Open a read-only local task view
+
+Mutation commands require --input ABSOLUTE_JSON with taskId, actor and
+idempotencyKey. All except create also require expectedVersion from show.
+Run commands require runId. create also requires title, goal, workspaceRoot.
+bind carries run:{runId,revision,plan,receiptRoot?,evidenceRoot?,...}.
+link-evidence carries runId, receiptRoot and evidenceRoot; those locations become
+immutable once attached. Native output locations can be discovered after start.
+start additionally carries entrypoint and inputs. reconcile carries reference.
+accept carries reason; independent-review/forge routes need their own verifier.
+
+Native controls require --archon-home ABSOLUTE_DIRECTORY. This must name the
+same Archon installation that owns the run. --workflow-source selects workflow
+definitions for start; --archon-cache optionally selects the pinned binary cache.
+serve accepts --port 3092 and --archon-url http://127.0.0.1:3091; configure the
+console URL for that same installation. No mutation endpoint is exposed.
+See docs/task-continuity.md for full examples and recovery rules.
+`;
+
+function absolute(value: string | undefined, flag: string): string {
+  if (!value || !isAbsolute(value))
+    throw new Error(`${flag} requires an absolute path.`);
+  return value;
+}
+async function inputFile(
+  value: string | undefined,
+): Promise<Record<string, unknown>> {
+  const path = absolute(value, '--input');
+  const info = await stat(path);
+  if (!info.isFile() || info.size > 1024 * 1024)
+    throw new Error(
+      'Task command input must be a regular JSON file no larger than 1 MiB.',
+    );
+  const data: unknown = JSON.parse(await readFile(path, 'utf8'));
+  if (!data || typeof data !== 'object' || Array.isArray(data))
+    throw new Error('Task command must be a JSON object.');
+  return data as Record<string, unknown>;
+}
+
+/** One-shot commands are the writable boundary; the browser is a projection. */
+export async function runTaskCommand(
+  args: readonly string[],
+): Promise<unknown> {
+  const { positionals, values } = parseArgs({
+    args: [...args],
+    allowPositionals: true,
+    options: {
+      root: { type: 'string' },
+      input: { type: 'string' },
+      task: { type: 'string' },
+      'archon-home': { type: 'string' },
+      'archon-cache': { type: 'string' },
+      'workflow-source': { type: 'string' },
+      'archon-url': { type: 'string' },
+      port: { type: 'string' },
+      help: { type: 'boolean', short: 'h' },
+    },
+  });
+  if (values.help || !positionals.length) return { help: taskHelp };
+  const [command] = positionals;
+  const supported = [
+    'create',
+    'update',
+    'bind',
+    'link-evidence',
+    'list',
+    'show',
+    'start',
+    'observe',
+    'reconcile',
+    'resume',
+    'cancel',
+    'verify',
+    'accept',
+    'serve',
+  ];
+  if (positionals.length !== 1 || !supported.includes(command!))
+    throw new Error('Unknown task command. Use --help.');
+  const root = absolute(
+    values.root ??
+      process.env.TEMARI_TASK_ROOT ??
+      resolve(platformInfo().dataDirectory, 'tasks'),
+    '--root',
+  );
+  const store =
+    command === 'create'
+      ? await FileTaskStore.create(root)
+      : await FileTaskStore.openExisting(root);
+  let selection: HarnessSelection | undefined;
+  if (
+    ['start', 'observe', 'reconcile', 'resume', 'cancel'].includes(command!)
+  ) {
+    const archonHome = absolute(values['archon-home'], '--archon-home');
+    const cacheDirectory = values['archon-cache']
+      ? absolute(values['archon-cache'], '--archon-cache')
+      : platformInfo().cacheDirectory;
+    const runtime = await installArchonRuntime({
+      cacheDirectory,
+      platform: process.platform,
+      arch: process.arch,
+    });
+    const harness = new ArchonHarness({
+      runtime,
+      environment: { ARCHON_HOME: archonHome },
+      ...(values['workflow-source']
+        ? {
+            workflowSource: absolute(
+              values['workflow-source'],
+              '--workflow-source',
+            ),
+          }
+        : {}),
+    });
+    await harness.verifyRuntime();
+    selection = {
+      hostHarness: null,
+      configuredHarness: null,
+      managedDefault: harness,
+    };
+  }
+  const runtime = new TaskRuntime({
+    store,
+    ...(selection ? { selection } : {}),
+  });
+  if (command === 'list') return runtime.listSnapshots();
+  if (command === 'show') {
+    if (!values.task) throw new Error('show requires --task ID.');
+    return runtime.snapshot(values.task);
+  }
+  if (command === 'serve') {
+    const server = await startTaskViewServer({
+      runtime,
+      archonBaseUrl: values['archon-url'] ?? 'http://127.0.0.1:3091',
+      port: values.port ? Number(values.port) : 3092,
+    });
+    for (const signal of ['SIGINT', 'SIGTERM'] as const)
+      process.once(signal, () => {
+        server.closeAllConnections();
+        server.close();
+      });
+    const port = (server.address() as { port: number }).port;
+    return { url: `http://127.0.0.1:${port}`, root, mode: 'read-only' };
+  }
+  const input = await inputFile(values.input);
+  // Runtime validators own payload shape and durable invariants; the CLI adds
+  // neither status shortcuts nor implicit actor/version/idempotency values.
+  switch (command) {
+    case 'create':
+      return store.createTask(
+        input as unknown as Parameters<FileTaskStore['createTask']>[0],
+      );
+    case 'update':
+      return store.updateTask(
+        input as unknown as Parameters<FileTaskStore['updateTask']>[0],
+      );
+    case 'bind':
+      return store.bindRun(
+        input as unknown as Parameters<FileTaskStore['bindRun']>[0],
+      );
+    case 'link-evidence':
+      return store.attachEvidenceRoots(
+        input as unknown as Parameters<FileTaskStore['attachEvidenceRoots']>[0],
+      );
+    case 'start':
+      return runtime.dispatch(
+        input as unknown as Parameters<TaskRuntime['dispatch']>[0],
+      );
+    case 'observe':
+      return runtime.observeNative(
+        input as unknown as Parameters<TaskRuntime['observeNative']>[0],
+      );
+    case 'reconcile':
+      return runtime.reconcileNative(
+        input as unknown as Parameters<TaskRuntime['reconcileNative']>[0],
+      );
+    case 'resume':
+      return runtime.resume(
+        input as unknown as Parameters<TaskRuntime['resume']>[0],
+      );
+    case 'cancel':
+      return runtime.cancel(
+        input as unknown as Parameters<TaskRuntime['cancel']>[0],
+      );
+    case 'verify':
+      return runtime.verifyEvidence(
+        input as unknown as Parameters<TaskRuntime['verifyEvidence']>[0],
+      );
+    case 'accept':
+      return runtime.accept(
+        input as unknown as Parameters<TaskRuntime['accept']>[0],
+      );
+    default:
+      throw new Error('Unhandled task command.');
+  }
+}
+
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href
+) {
+  try {
+    const result = await runTaskCommand(process.argv.slice(2));
+    console.log(
+      result && typeof result === 'object' && 'help' in result
+        ? result.help
+        : JSON.stringify(result, null, 2),
+    );
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
+}
