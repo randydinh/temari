@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "kind": "temari-knowledge-design-evidence",
-  "as_of": "2026-09-29",
+  "as_of": "2026-09-30",
   "baseline": "664144d17272697d68e045143f0ede0458ee6eca",
   "status": "design-only",
   "scope": "Selected primary documentation, pinned local contracts, candidate designs and trusted task brief; no private corpus inventory",
@@ -237,6 +237,13 @@
       "revision": "sha256:bdf35a6039207cc143931a87f2bbe465459fb21622846706024a2d75f1c0dfeb",
       "reading_status": "Read current user request; exact text preserved in the source note. Concrete formats and image cases are proposed interpretations; no corpus execution.",
       "intended_influence": "Selected validation families: Nx monorepo, non-Nx codebase/monorepo, varied text documentation; image-bearing content suggested. Preserve selected scope without inventing provider support or corpus grants."
+    },
+    {
+      "id": "S-plugin-order-request",
+      "locator": "docs/knowledge-system/sources/plugin-order-2026-09-30.md",
+      "revision": "sha256:0563872086f36b761e85ec123dc766b992035afdf1329afcc927201e89ed42eb",
+      "reading_status": "Read current owner decision; statement retained with interpretation separated.",
+      "intended_influence": "Sequence a functional knowledge journey before plugin packaging while retaining future replacement and uninstall goals."
     }
   ],
   "points": [
@@ -1447,6 +1454,31 @@
         "proposed fixtures",
         "not-run"
       ]
+    },
+    {
+      "id": "P-plugin-order",
+      "label": "Build and measure the knowledge journey before plugin refactor",
+      "topic": "delivery-order",
+      "source_refs": [
+        {
+          "source_id": "S-plugin-order-request",
+          "locator": "docs/knowledge-system/sources/plugin-order-2026-09-30.md",
+          "revision": "sha256:0563872086f36b761e85ec123dc766b992035afdf1329afcc927201e89ed42eb",
+          "span": "Owner statement and interpretation"
+        }
+      ],
+      "evidence_type": "user decision",
+      "conditions": "Plugin packaging follows a working, measured knowledge flow; no live private-text grant follows from this choice.",
+      "confidence_basis": "Explicit owner instruction in the active conversation.",
+      "limits": "Does not waive future modularity or choose install mechanics, retention, hosted-text approval or production readiness.",
+      "benefit": "Stabilizes the workflow and contracts around observed usage before extracting extension seams.",
+      "risk": "Direct dependencies can accumulate; keep the existing provider boundary and revisit packaging at the stated trigger.",
+      "status": "selected",
+      "tags": [
+        "delivery-order",
+        "user decision",
+        "selected"
+      ]
     }
   ],
   "decisions": [
@@ -1608,6 +1640,19 @@
       "tags": [
         "decision",
         "proposed"
+      ]
+    },
+    {
+      "id": "D-plugin-order",
+      "label": "Defer installable knowledge plugin until the journey works",
+      "status": "selected",
+      "rationale": "The owner chose functional end-to-end knowledge behavior and evaluation before a plugin lifecycle refactor; future uninstall/reinstall remains a requirement.",
+      "point_ids": [
+        "P-plugin-order"
+      ],
+      "tags": [
+        "decision",
+        "selected"
       ]
     }
   ],
@@ -3123,6 +3168,50 @@
           "locator": "docs/knowledge-system/sources/validation-coverage-2026-09-29.md",
           "revision": "sha256:bdf35a6039207cc143931a87f2bbe465459fb21622846706024a2d75f1c0dfeb",
           "span": "User request (verbatim); Interpretation and limits"
+        }
+      ]
+    },
+    {
+      "id": "A-054",
+      "source": "P-plugin-order",
+      "target": "D-plugin-order",
+      "type": "selects",
+      "confidence": "EXTRACTED",
+      "basis": "The owner explicitly chose this delivery order.",
+      "status": "design-link",
+      "tags": [
+        "assertion",
+        "selects",
+        "EXTRACTED"
+      ],
+      "source_refs": [
+        {
+          "source_id": "S-plugin-order-request",
+          "locator": "docs/knowledge-system/sources/plugin-order-2026-09-30.md",
+          "revision": "sha256:0563872086f36b761e85ec123dc766b992035afdf1329afcc927201e89ed42eb",
+          "span": "Owner statement and interpretation"
+        }
+      ]
+    },
+    {
+      "id": "A-055",
+      "source": "D-plugin-order",
+      "target": "D-increments",
+      "type": "reorders",
+      "confidence": "INFERRED",
+      "basis": "The new decision keeps the existing knowledge increments but moves plugin packaging after a measured working journey.",
+      "status": "design-link",
+      "tags": [
+        "assertion",
+        "reorders",
+        "INFERRED"
+      ],
+      "source_refs": [
+        {
+          "source_id": "S-plugin-order-request",
+          "locator": "docs/knowledge-system/sources/plugin-order-2026-09-30.md",
+          "revision": "sha256:0563872086f36b761e85ec123dc766b992035afdf1329afcc927201e89ed42eb",
+          "span": "Owner statement and interpretation"
         }
       ]
     }

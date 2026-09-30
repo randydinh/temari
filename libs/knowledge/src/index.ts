@@ -6,4 +6,5 @@ export * from './lib/archive-intake.js';
 export * from './lib/archive-registrar.js';
 export * from './lib/jev.js';
 export * from './lib/archive-graph.js';
+export * from './lib/archive-graph-trial.js';
 export * from './lib/archive-journey.js';
