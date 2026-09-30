@@ -70,6 +70,25 @@ references. The coordinator validates the evidence and decides what follows.
 | `judge` | Supply a bounded judgment when the plan defines criteria and admissible evidence. | The type exists; there is no universal judge service. Jev shadow scores are advisory and cannot replace cited support. |
 | `integrator` | Reconcile disjoint worker outputs into one candidate and surface conflicts. | Preserve each child's evidence and rerun combined checks before accepting the integrated candidate. |
 
+### How granular are the boundaries today?
+
+This matrix makes existing responsibilities explicit. It does not add worker
+types, running agents, permissions or enforcement. The seven worker roles describe
+assignments; intake and retrieval are domain responsibilities that may use those
+assignments. They do not each need a permanent process or another coordinator.
+
+| Boundary | Existing detail | Recommended next detail |
+| --- | --- | --- |
+| Assignment authority | `WorkerBrief` carries goal, context, textual scope, acceptance criteria, verification and forbidden actions. Its generic validator checks completeness. The [local write-worker runner](../tools/run-codex-write-workers.mts) additionally checks typed path ownership and rejects out-of-scope changes. | Reuse those checks across supported hosts. Bind each assignment to an actor, admitted tools and sources, writable paths, candidate revision and escalation conditions. A role label alone must not be advertised as a permission boundary. |
+| Independent judgment | The QA evaluator binds a frozen review and distinguishes evaluator identity; packaged engineering review also has independence requirements. | Carry actor and candidate identity through the harness result. Verify independence for each admitted route rather than assuming a differently named role proves it. |
+| Execution ownership | The local runtime has child leases, retries and cancellation gates. The [harness port](../libs/contracts/src/lib/execution-harness.ts) exposes `start`, `status` and `resume`; cancellation and scheduling are not portable operations on that port yet. | Name one execution owner for each dispatched unit. In the proposed Archon route, Archon owns its native node execution and recovery; Temari records the result and reconciles acceptance. A nested retry must have an explicit shared attempt bound. Define how cancellation reaches the owner and when it is actually complete. |
+| Trace identity | `HarnessRunRef` already binds Temari run ID, revision and plan digest to the Archon run ID and version. Knowledge work has task bindings and pinned handoffs. | Extend the existing join to logical task, stage, assignment, attempt, logs and Registrar publication. Retain one logical task across retries and replans so the inbox shows all unfinished work. |
+| Operational limits | `ExecutionPlan.parallelism` sets concurrent work; local runtime retry policy bounds attempts. | Add a total child count, elapsed-time limit and provider-supported spend limits. Record whether a limit is enforced or advisory, and report unavailable usage as unknown. |
+
+The useful increase in granularity is an enforceable assignment and handoff
+contract. Additional job titles would not resolve the missing host and harness
+integration evidence.
+
 ## Knowledge and tool responsibilities
 
 | Role or tool | Owns and produces | Current standing and boundary |
@@ -83,29 +102,86 @@ references. The coordinator validates the evidence and decides what follows.
 
 ## Useful improvements, in dependency order
 
-| Priority | Improvement and why it helps | Reuse and acceptance boundary |
+This review favors the existing Temari–Archon integration. The earlier list put
+the dashboard ahead of its evidence contract and treated run correlation as new
+work. The order below corrects both points. These are recommendations, not
+capabilities enabled by this documentation change.
+
+| Order | Final recommendation | Reuse, owner and observable result |
 | --- | --- | --- |
-| 1 | **One task view with a durable timeline and open-work inbox.** The user should see the parent goal, stage and child status, blockers, decisions, evidence, logs and resume handle without searching chats. | Project the existing run, child, checkpoint and archive identities into a read-only view first. The UI must label missing logs rather than infer success. Do not create a second task authority. |
-| 2 | **Pin a cross-system trace identity.** An Archon run, Temari stage/child, Registrar generation and knowledge checkpoint need navigable links. | Add an explicit correlation contract and verify one complete journey from request to source citation and closeout. The current Archon adapter reports native IDs but does not produce canonical stage parity. |
-| 3 | **Make recurring starts a reviewed trigger, not another coordinator.** This enables maintenance and unattended follow-up while keeping Temari's semantic policy intact. | The runtime has `executeScheduledAndPersist`, which is an execution wrapper rather than a recurring timer. Temari pins Archon 0.10.1; Archon [introduced native macOS schedules and GitHub triggers in 0.11.0](https://github.com/coleam00/Archon/blob/dev/CHANGELOG.md). Test a pinned upgrade, resource overlap, missed starts and receipt parity before relying on it. |
-| 4 | **Expose bounded parallel work as a task tree.** Show each assignment's owner, dependency, concurrency bound, result and evidence; preserve sibling failures. | The Nx engine and local runtime already support bounded fan-out and restartable child records. Prove live host capabilities and provider log capture before presenting this as a general agent swarm. Archon child fan-out is a candidate execution surface, not a replacement for Temari's plan. |
-| 5 | **Add a read-only knowledge map.** Group admitted source paths, revisions, graph assertions and query trails; click an edge to see its exact supporting anchors and gaps. | Build from Registrar's pinned publications and graph pages. Label inferred, disputed, stale and unsupported links. Do not draw a complete relationship graph from a file inventory alone. |
-| 6 | **Measure the missing knowledge paths.** The current local journey identifies text and Office material but records PDF/image extraction gaps and does not merge native code structure with BM25 results. | Compare OCR/visual extraction, Graft and Graphify candidates on the same held-out tasks before promoting them. Keep exact/BM25 baselines and Jev shadow results separate. |
-| 7 | **Refresh older overview claims.** Some platform and workflow prose still describes earlier serial-only or pre-archive slices. | Use this matrix and the package guides as navigation, then update those summaries when a capability's end-to-end verification and release status are known. |
+| 1 | **Complete the Temari–Archon evidence and control handoff.** This is the foundation for trustworthy status and recovery. | Extend the existing `HarnessRunRef` binding into stage, child, attempt and source evidence; retain a stable logical task above runs. Temari owns task meaning and closeout. The selected executor owns its execution units. A native success with missing required evidence remains unresolved in Temari. Prove exact-run recovery and cancellation before enabling those actions in a combined task view. |
+| 2 | **Use Archon's console and add a small Temari task view.** Keep the familiar chat, runs and logs, while making unfinished goals visible across runs. | Archon's [console](https://archon.diy/adapters/web/) already exposes project chat, run events, artifacts and run actions. Begin with a read-only task summary and links to those existing screens. Add only the missing inbox fields: goal, current stage, next action, blocker, last meaningful activity and evidence completeness. If a console extension is needed, keep it small and backed by Temari's API. “Done” requires Temari closeout. |
+| 3 | **Prove bounded parallel work and limits on one real host.** Reuse the existing role vocabulary and independent-review policy. | Temari supplies assignment scope and acceptance; one selected executor dispatches the batch. Start with two independent workers and retain both outcomes when one fails. Bound total children, concurrency, attempts and time. Capture provider-reported usage and apply supported spend controls before making execution routine. |
+| 4 | **Admit Archon's native triggers after an explicit pinned upgrade and the preceding proofs.** Keep one schedule owner. | The adapter currently pins 0.10.1. Evaluate a specific release with [native triggers](https://archon.diy/guides/workflow-triggers/), starting with one maintenance task. Verify duplicate delivery, overlapping starts, restart and stopped-host behavior. `executeScheduledAndPersist` is not a recurring clock. Show last actual run and the applicable queue/skip policy in the task view. |
+| 5 | **Add the Registrar knowledge map as a separate view.** This can follow the first useful task dashboard. | Display admitted paths, generations and supported relationships from pinned publications. Every relationship opens its anchors; absent, stale or inferred evidence remains visible. Begin with existing graph reads and source inventory, then add richer projections when their evidence exists. |
+| 6 | **Evaluate new extraction only against observed retrieval gaps.** Keep this independent from the dashboard delivery. | Use the existing exact/BM25 journey as the baseline. Evaluate OCR, Graft or Graphify only for an admitted task that needs the missing capability; retain Jev's advisory status. Measure retrieval and answer support separately. |
+
+Update outdated platform summaries alongside each delivered increment and link
+its retained evidence. Documentation repair belongs in each increment's completion
+criteria rather than a final standalone project.
+
+Two limits affect the proposed rollout. Archon's [fan-out documentation](https://archon.diy/guides/authoring-workflows/)
+states that `max_parallel` limits simultaneous children, not their total count.
+Its [provider matrix](https://archon.diy/reference/provider-capabilities/) lists
+Codex token reporting, but no `costUsd` reporting or `maxBudgetUsd` enforcement;
+inline `agents` and per-call tool restrictions also vary by provider. A hard
+dollar ceiling therefore needs a proven enforcement path. Admission caps and
+elapsed-time limits should remain available independently of cost reporting.
+The [trigger guide](https://archon.diy/guides/workflow-triggers/) also makes macOS
+schedules dependent on the user's login session and does not promise replay of
+missed intervals. These upstream capabilities must be checked against the exact
+release admitted by Temari.
 
 ### Patterns worth borrowing from Paperclip
 
-Paperclip's [task board](https://github.com/paperclipai/paperclip/blob/master/docs/guides/board-operator/managing-tasks.md)
-surfaces stale work, and its [agent pages](https://github.com/paperclipai/paperclip-docs/blob/main/docs/guides/org/agents.md)
-combine run status, activity, assigned issues and cost. Those are useful models
-for priorities 1 and 4: a single place to find an unfinished Temari task and
-inspect its child work. Paperclip also documents [spend budgets and automatic
-pauses](https://github.com/paperclipai/paperclip/blob/master/docs/guides/board-operator/costs-and-budgets.md).
-Temari should add per-task and per-host cost limits before unattended scheduled
-or parallel runs become routine. These are product patterns to evaluate, not
-evidence that Paperclip's company hierarchy should become Temari's control
-plane. Temari's plan, receipt and source-admission boundaries remain the
-acceptance criteria.
+Borrow three interaction patterns without adding a Paperclip service dependency:
+
+| Pattern | How it should fit Temari | Limit to preserve |
+| --- | --- | --- |
+| Open-work inbox and stale-work indicators | Show unfinished tasks, next action and last meaningful progress. Paperclip's [task guide](https://github.com/paperclipai/paperclip/blob/master/docs/guides/board-operator/managing-tasks.md) is a useful UX reference. | Derive status from Temari's task and evidence records. A long-running healthy job or an intentional wait needs its own explanation; age alone is not failure. |
+| Task activity and run drill-down | Put concise decisions, handoffs and blockers on the task timeline, then link to Archon's existing run events and artifacts. | Preserve native IDs and evidence locations. Avoid maintaining a second run log or agent-management hierarchy. |
+| Visible usage and operational limits | Adapt Paperclip's [budget visibility and pause pattern](https://github.com/paperclipai/paperclip/blob/master/docs/guides/board-operator/costs-and-budgets.md) to task and host limits. | Show measured, estimated and unavailable values distinctly. Stop admitting more work at a limit; only claim active work is stopped once the executor confirms it. |
+
+Paperclip's company hierarchy, task store and heartbeat orchestration would add
+ownership and synchronization work to this design. The selected scope is UX
+inspiration. Temari keeps task authority, Archon supplies the preferred execution
+and console integration, and Registrar keeps source authority.
+
+## Final recommendation and first proof
+
+Build a **Temari-managed task experience on Archon**, with Registrar supplying
+the knowledge evidence. Keep the seven assignment roles and two knowledge
+responsibilities. Spend the next increment on enforceable handoffs and one
+visible task journey, rather than introducing more autonomous roles.
+
+The desired user flow is: tell Temari the goal, see one task appear, inspect its
+plan and workers when useful, respond only to a meaningful blocker, and return
+later to the same task with its evidence and next action intact. Project chat
+must enter the Temari route for this to work; an ordinary Archon chat is not by
+itself proof that Temari owns the resulting plan and closeout.
+
+The lowest-overhead first increment is one local project, the current pinned
+harness, existing console links and a read-only task summary. Use synthetic
+fixtures for failures before paying for a small live host check. The acceptance
+cases below are proposed tests, not results from this documentation review:
+
+1. **One goal to one retained result:** resolve the task, plan revision, Archon
+   run, stage evidence and any Registrar citation from either end of the link.
+   Missing required evidence leaves the task open.
+2. **Two workers, one failure:** retain the successful sibling, show the failed
+   assignment and its next action, and require any independent review specified
+   by the plan. Confirm the configured concurrency and child-count bounds.
+3. **Restart and control:** reload the task without losing its state; resume the
+   intended run without repeating accepted work. Verify cancellation against the
+   executor, including a crash during dispatch that must remain uncertain until
+   reconciled. The current port needs an extension before claiming this case.
+4. **Return without searching chats:** a fresh Temari session finds the same open
+   task and its next action; the console still opens the original logs and
+   artifacts. A new run or replan stays attached to that task.
+
+Once these pass, evaluate the pinned Archon upgrade, one scheduled maintenance
+workflow and the knowledge map. This recommendation preserves Archon's existing
+UI and execution value while targeting the user's actual loss of task continuity.
 
 ## Where to go next
 
