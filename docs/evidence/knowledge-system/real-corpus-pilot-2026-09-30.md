@@ -23,9 +23,14 @@ The pilot exposed two implementation defects, reproduced before repair: Nx proje
 - The Graft adapter validates file containment and narrowly supported calls; Python cross-file calls/imports still need a conservative, source-anchored verifier. Native Graphify semantic extraction was not run because the available path uses Gemini or the host model for non-code content, while this system is limited to Jev for hosted model work.
 - Intake and search have a durable handoff, but automatic agent scheduling, reviewed relationship correction, query feedback, and default plugin install/disconnect/uninstall/reinstall are not implemented yet.
 
+## Optional PNG OCR follow-up
+
+Registrar PR #4 added explicit on-device macOS Vision OCR for bounded PNG captures. On the same selected document copies, it retained the image original, stored a 751-character OCR representation, and BM25 found the PNG at rank 1 for a term present in the diagram. Temari intake published the OCR-mode handoff; the selected excerpt passed archive revalidation and received one live `jev-1.13.0` shadow judgment. The receipt still marked visual meaning unavailable and the transcription unreviewed. The initial pilot numbers above describe the ordinary capture mode and remain unchanged. The on-device Vision run needed macOS permissions outside this agent's filesystem sandbox; the behavior is not yet proven on other hosts.
+
 ## Verification
 
 The candidate passed `pnpm nx run knowledge:typecheck`, `knowledge:test` (36), `knowledge:integration` (29), and the direct four-test archive graph integration file. The real-corpus capture, exact/BM25 evaluation, TypeSafe responses, Nx graph import, and Graft import were executed separately against the pinned snapshots. Only the candidate-bound results above are claimed.
+The OCR follow-up passed the updated `knowledge:typecheck`, `knowledge:test` (36), and `knowledge:integration` (30) targets. Registrar's full suite passed 321 tests.
 
 ## Next build order
 
