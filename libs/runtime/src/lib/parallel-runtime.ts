@@ -515,6 +515,7 @@ function pendingForRecord(
   record: ChildTaskRecord,
   assignmentId: string,
   leaseLost: boolean,
+  cancellationRequested: boolean,
 ): RestartableParallelPendingTask | null {
   if (record.status === 'QUEUED') {
     return { taskId: record.taskId, assignmentId, reason: 'queued' };
@@ -523,7 +524,11 @@ function pendingForRecord(
     return {
       taskId: record.taskId,
       assignmentId,
-      reason: leaseLost ? 'lease-lost' : 'active-lease',
+      reason: cancellationRequested
+        ? 'cancellation-gated'
+        : leaseLost
+          ? 'lease-lost'
+          : 'active-lease',
     };
   }
   if (record.status === 'CANCELLED') {
@@ -1042,6 +1047,9 @@ export async function executeRestartableParallelWorkers(
         record,
         assignment.id,
         leaseLost.has(taskId),
+        record.status === 'RUNNING'
+          ? await request.childStore.cancellationRequested(taskId)
+          : false,
       );
       if (pendingTask) pending.push(pendingTask);
       if (pendingTask) continue;

@@ -66,6 +66,7 @@ export type ChildTaskEventType =
   | 'task-created'
   | 'task-claimed'
   | 'task-lease-renewed'
+  | 'task-cancellation-requested'
   | 'task-completed'
   | 'task-retried'
   | 'task-cancelled';
@@ -188,6 +189,7 @@ export interface ChildTaskStore {
   complete(request: CompleteChildTaskRequest): Promise<ChildTaskRecord>;
   retry(request: RetryChildTaskRequest): Promise<ChildTaskRecord>;
   cancel(request: CancelChildTaskRequest): Promise<ChildTaskRecord>;
+  cancellationRequested(taskId: string): Promise<boolean>;
   listReady(
     request: ListReadyChildTasksRequest,
   ): Promise<readonly ChildTaskRecord[]>;
@@ -500,6 +502,7 @@ function parseEvent(value: unknown): ChildTaskEvent {
     event.type === 'task-created' ||
       event.type === 'task-claimed' ||
       event.type === 'task-lease-renewed' ||
+      event.type === 'task-cancellation-requested' ||
       event.type === 'task-completed' ||
       event.type === 'task-retried' ||
       event.type === 'task-cancelled',
@@ -585,9 +588,14 @@ function assertEventHistory(
   let retries = 0;
   let latestClaim: ChildTaskEvent | null = null;
   let latestTerminal: ChildTaskEvent | null = null;
+  let cancellationRequested = false;
   for (const event of events.slice(1)) {
     if (event.type === 'task-claimed') {
       assert(status === 'QUEUED' || status === 'RUNNING');
+      assert(
+        !cancellationRequested,
+        'A child with requested cancellation cannot be claimed.',
+      );
       attempts += 1;
       assert.equal(event.payload.attempt, attempts);
       assert(Number.isInteger(event.payload.fencingEpoch));
@@ -599,6 +607,10 @@ function assertEventHistory(
     }
     if (event.type === 'task-lease-renewed') {
       assert.equal(status, 'RUNNING');
+      assert(
+        !cancellationRequested,
+        'A child with requested cancellation cannot renew its lease.',
+      );
       assert(latestClaim, 'A lease renewal requires an active claim.');
       assert.equal(event.payload.attempt, attempts);
       assert.equal(
@@ -611,8 +623,23 @@ function assertEventHistory(
       latestClaim = event;
       continue;
     }
+    if (event.type === 'task-cancellation-requested') {
+      assert.equal(status, 'RUNNING');
+      assert(!cancellationRequested, 'Child cancellation was requested twice.');
+      assert.equal(event.payload.attempt, attempts);
+      assert.equal(
+        event.payload.fencingEpoch,
+        latestClaim?.payload.fencingEpoch,
+      );
+      cancellationRequested = true;
+      continue;
+    }
     if (event.type === 'task-completed') {
       assert.equal(status, 'RUNNING');
+      if (cancellationRequested) {
+        assert.equal(event.payload.to, 'CANCELLED');
+        assert.equal(event.payload.cancellationRequested, true);
+      }
       assert.equal(event.payload.from, 'RUNNING');
       assert(
         typeof event.payload.to === 'string' &&
@@ -646,8 +673,16 @@ function assertEventHistory(
   const leaseRenewals = events.filter(
     (event) => event.type === 'task-lease-renewed',
   ).length;
+  const cancellationRequests = events.filter(
+    (event) => event.type === 'task-cancellation-requested',
+  ).length;
   const expectedLength =
-    1 + record.attempt + leaseRenewals + terminalEvents + retries;
+    1 +
+    record.attempt +
+    leaseRenewals +
+    cancellationRequests +
+    terminalEvents +
+    retries;
   assert(
     events.length <= expectedLength,
     'Child task event log is ahead of state.',
@@ -658,6 +693,9 @@ function assertEventHistory(
   );
   assert.equal(attempts, record.attempt);
   assert.equal(status, record.status);
+  if (cancellationRequested && isTerminal(record.status)) {
+    assert.equal(record.status, 'CANCELLED');
+  }
   if (record.status === 'RUNNING') {
     assert(record.lease, 'Running task lease is missing.');
     assert(latestClaim);
@@ -939,6 +977,16 @@ export class FileChildTaskStore implements ChildTaskStore {
               activeLeases >= request.maxConcurrency ||
               isTerminal(existing.status)
             ) {
+              if (
+                existing.status === 'RUNNING' &&
+                existing.lease !== null &&
+                Date.parse(existing.lease.expiresAt) <= now.getTime() &&
+                (await this.readEvents(taskId, existing.revision)).some(
+                  (event) => event.type === 'task-cancellation-requested',
+                )
+              ) {
+                return this.claimLocked(requestForTask(request, taskId, now));
+              }
               return { claimed: false, record: existing };
             }
             return this.claimLocked(requestForTask(request, taskId, now));
@@ -958,6 +1006,50 @@ export class FileChildTaskStore implements ChildTaskStore {
     );
   }
 
+  private async cancelLocked(
+    record: ChildTaskRecord,
+    events: readonly ChildTaskEvent[],
+    actor: string,
+    idempotencyKey: string,
+    reason: 'explicit' | 'lease-expired',
+    now: Date,
+  ): Promise<ChildTaskRecord> {
+    const next: ChildTaskRecord = {
+      ...record,
+      status: 'CANCELLED',
+      updatedAt: now.toISOString(),
+      lease: null,
+      result: null,
+      error: null,
+    };
+    const event = this.createEvent({
+      taskId: record.taskId,
+      sequence: events.length + 1,
+      runId: record.runId,
+      revision: record.revision,
+      actor,
+      type: 'task-cancelled',
+      idempotencyKey,
+      payload: {
+        from: record.status,
+        to: 'CANCELLED',
+        attempt: record.attempt,
+        resultDigest: digest(null),
+        error: null,
+        reason,
+      },
+      now,
+    });
+    await this.commitTransitionLocked({
+      taskId: record.taskId,
+      baseState: record,
+      baseEvents: events,
+      nextState: next,
+      nextEvents: [...events, event],
+    });
+    return next;
+  }
+
   private async claimLocked(
     request: ClaimChildTaskRequest,
   ): Promise<ClaimChildTaskResult> {
@@ -970,6 +1062,22 @@ export class FileChildTaskStore implements ChildTaskStore {
       assert(record.lease);
       if (Date.parse(record.lease.expiresAt) > nowMs) {
         return { claimed: false, record };
+      }
+      const events = await this.readEvents(request.taskId, record.revision);
+      if (
+        events.some((event) => event.type === 'task-cancellation-requested')
+      ) {
+        return {
+          claimed: false,
+          record: await this.cancelLocked(
+            record,
+            events,
+            request.owner,
+            `cancel-finalize:${randomUUID()}`,
+            'lease-expired',
+            now,
+          ),
+        };
       }
     }
     if (!(await this.dependenciesSucceeded(record))) {
@@ -1075,6 +1183,10 @@ export class FileChildTaskStore implements ChildTaskStore {
           assert.equal(existing.payload.attempt, record.attempt);
           return record;
         }
+        assert(
+          !events.some((event) => event.type === 'task-cancellation-requested'),
+          'Child task cancellation was requested; lease renewal is refused.',
+        );
         assert.equal(
           record.status,
           'RUNNING',
@@ -1157,9 +1269,25 @@ export class FileChildTaskStore implements ChildTaskStore {
         const resultDigest = digest(result);
         if (existing) {
           assert.equal(existing.type, 'task-completed');
+          const cancelledAtCompletion =
+            existing.payload.cancellationRequested === true;
+          const effectiveStatus = cancelledAtCompletion
+            ? 'CANCELLED'
+            : request.status;
+          const effectiveResult = cancelledAtCompletion ? null : result;
+          const effectiveError = cancelledAtCompletion ? null : error;
+          if (cancelledAtCompletion) {
+            assert.equal(existing.payload.requestedStatus, request.status);
+            assert.equal(
+              existing.payload.requestResultDigest,
+              resultDigest,
+              'Idempotency key completion request result changed.',
+            );
+            assert.equal(existing.payload.requestErrorDigest, digest(error));
+          }
           assert.equal(
             existing.payload.to,
-            request.status,
+            effectiveStatus,
             'Idempotency key target changed.',
           );
           assert.equal(
@@ -1169,12 +1297,12 @@ export class FileChildTaskStore implements ChildTaskStore {
           );
           assert.equal(
             existing.payload.resultDigest,
-            resultDigest,
+            digest(effectiveResult),
             'Idempotency key result changed.',
           );
           assert.equal(
             existing.payload.error,
-            error,
+            effectiveError,
             'Idempotency key error changed.',
           );
           assert.equal(
@@ -1191,15 +1319,19 @@ export class FileChildTaskStore implements ChildTaskStore {
           }
           assert.equal(
             record.status,
-            request.status,
+            effectiveStatus,
             'Completed task status changed.',
           );
           assert.equal(
             canonical(record.result),
-            canonical(result),
+            canonical(effectiveResult),
             'Completed task result changed.',
           );
-          assert.equal(record.error, error, 'Completed task error changed.');
+          assert.equal(
+            record.error,
+            effectiveError,
+            'Completed task error changed.',
+          );
           return record;
         }
         const now = request.now ?? new Date();
@@ -1229,13 +1361,21 @@ export class FileChildTaskStore implements ChildTaskStore {
           Date.parse(record.lease.expiresAt) > now.getTime(),
           'Child task lease has expired.',
         );
+        const cancelledAtCompletion = events.some(
+          (event) => event.type === 'task-cancellation-requested',
+        );
+        const effectiveStatus = cancelledAtCompletion
+          ? 'CANCELLED'
+          : request.status;
+        const effectiveResult = cancelledAtCompletion ? null : result;
+        const effectiveError = cancelledAtCompletion ? null : error;
         const next: ChildTaskRecord = {
           ...record,
-          status: request.status,
+          status: effectiveStatus,
           updatedAt: now.toISOString(),
           lease: null,
-          result,
-          error,
+          result: effectiveResult,
+          error: effectiveError,
         };
         const event = this.createEvent({
           taskId: request.taskId,
@@ -1247,12 +1387,20 @@ export class FileChildTaskStore implements ChildTaskStore {
           idempotencyKey: request.idempotencyKey,
           payload: {
             from: record.status,
-            to: request.status,
+            to: effectiveStatus,
             attempt: record.attempt,
             fencingEpoch: request.fencingEpoch,
-            resultDigest,
-            error,
+            resultDigest: digest(effectiveResult),
+            error: effectiveError,
             leaseTokenDigest: digest(request.leaseToken),
+            ...(cancelledAtCompletion
+              ? {
+                  cancellationRequested: true,
+                  requestedStatus: request.status,
+                  requestResultDigest: resultDigest,
+                  requestErrorDigest: digest(error),
+                }
+              : {}),
           },
           now,
         });
@@ -1342,55 +1490,72 @@ export class FileChildTaskStore implements ChildTaskStore {
           (event) => event.idempotencyKey === request.idempotencyKey,
         );
         if (existing) {
-          assert.equal(existing.type, 'task-cancelled');
+          assert(
+            existing.type === 'task-cancellation-requested' ||
+              existing.type === 'task-cancelled',
+            'Idempotency key was used for another child task event.',
+          );
           assert.equal(existing.actor, request.actor);
-          return record;
         }
         if (isTerminal(record.status)) return record;
         const now = request.now ?? new Date();
         assertDate(now);
+        const intent = events.some(
+          (event) => event.type === 'task-cancellation-requested',
+        );
         if (
           record.status === 'RUNNING' &&
           record.lease !== null &&
           Date.parse(record.lease.expiresAt) > now.getTime()
         ) {
+          if (intent) return record;
+          const event = this.createEvent({
+            taskId: request.taskId,
+            sequence: events.length + 1,
+            runId: record.runId,
+            revision: record.revision,
+            actor: request.actor,
+            type: 'task-cancellation-requested',
+            idempotencyKey: request.idempotencyKey,
+            payload: {
+              requested: true,
+              attempt: record.attempt,
+              fencingEpoch: record.lease.fencingEpoch,
+            },
+            now,
+          });
+          await this.commitTransitionLocked({
+            taskId: request.taskId,
+            baseState: record,
+            baseEvents: events,
+            nextState: record,
+            nextEvents: [...events, event],
+          });
           return record;
         }
-        const next: ChildTaskRecord = {
-          ...record,
-          status: 'CANCELLED',
-          updatedAt: now.toISOString(),
-          lease: null,
-          result: null,
-          error: null,
-        };
-        const event = this.createEvent({
-          taskId: request.taskId,
-          sequence: events.length + 1,
-          runId: record.runId,
-          revision: record.revision,
-          actor: request.actor,
-          type: 'task-cancelled',
-          idempotencyKey: request.idempotencyKey,
-          payload: {
-            from: record.status,
-            to: 'CANCELLED',
-            attempt: record.attempt,
-            resultDigest: digest(null),
-            error: null,
-          },
+        return this.cancelLocked(
+          record,
+          events,
+          request.actor,
+          intent ? `cancel-finalize:${randomUUID()}` : request.idempotencyKey,
+          intent ? 'lease-expired' : 'explicit',
           now,
-        });
-        await this.commitTransitionLocked({
-          taskId: request.taskId,
-          baseState: record,
-          baseEvents: events,
-          nextState: next,
-          nextEvents: [...events, event],
-        });
-        return next;
+        );
       }),
     );
+  }
+
+  async cancellationRequested(taskId: string): Promise<boolean> {
+    assertSafeId(taskId, 'Task ID');
+    return this.withLock(taskId, async () => {
+      await this.reconcileLocked(taskId);
+      const record = await this.requireRecord(taskId);
+      if (record.status === 'CANCELLED') return true;
+      const events = await this.readEvents(taskId, record.revision);
+      return events.some(
+        (event) => event.type === 'task-cancellation-requested',
+      );
+    });
   }
 
   async listReady(
@@ -1418,6 +1583,12 @@ export class FileChildTaskStore implements ChildTaskStore {
         (record.status === 'RUNNING' &&
           record.lease !== null &&
           Date.parse(record.lease.expiresAt) <= now);
+      if (
+        record.status === 'RUNNING' &&
+        (await this.cancellationRequested(taskId))
+      ) {
+        continue;
+      }
       if (reclaimable && (await this.dependenciesSucceeded(record))) {
         records.push(record);
       }
