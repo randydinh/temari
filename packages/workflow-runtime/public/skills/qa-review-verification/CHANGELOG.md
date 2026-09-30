@@ -6,6 +6,8 @@
   and installed evaluator even when acceptance fixtures or decisions are missing.
 - Keep an unadmitted route and its exact missing input visible; do not relabel a
   full-review request as evidence-only drafting or imply an evaluator ran.
+- Derive ticket selection from each request without a standing reviewer filter;
+  distinguish sprint planning and defect triage from acceptance signoff.
 
 ## 0.7.0 — 2026-09-29
 

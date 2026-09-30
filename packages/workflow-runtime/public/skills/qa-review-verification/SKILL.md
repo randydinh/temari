@@ -121,13 +121,14 @@ does not establish the observed behavior.
 
 ## Establish scope and candidate
 
-Apply the user's ticket-selection constraints before opening ticket details. For a
-reviewer-label restriction, confirm the exact label in the tracker and use a filtered
-list to verify membership. Record the filter, capture time, qualifying IDs and sampling
-limits. Ownership, comment authorship and a linked ticket do not establish label
-membership. Inspect linked tickets only when they also qualify. If recent sprints have
-no matches, report that gap and sample earlier qualifying sprints within the requested
-history. Attribute each note to its actual author even when a ticket has multiple reviewers.
+Apply the current request's ticket-selection constraints before opening ticket
+details. Selection may be by ticket, team, column, sprint, label, release, or the
+whole requested set; do not carry a filter forward from a previous assignment.
+Verify membership against the tracker, record the selection and capture time,
+and disclose any sampling limits. When a label is requested, verify the exact
+label rather than inferring membership from ownership, comment authorship, or
+linked tickets. Inspect linked tickets only when they fall within the requested
+scope. Attribute each note to its actual author.
 
 Read acceptance criteria, relevant comments, linked requirements and available results.
 Identify the original failure, expected behavior, relevant variants, fixture/persona and

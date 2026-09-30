@@ -7,6 +7,25 @@ description: Use Temari as the current Nx conversational engineering entry point
 
 Temari is the conversational entry point for the current Nx workflow runtime.
 
+## Select the QA task and scope
+
+Derive ticket scope from the current request. It may name ticket IDs, a team,
+column, sprint, label, release, or all tickets in the requested set. No reviewer,
+label, team, or column filter is permanent. Confirm the actual selection in the
+tracker before inspecting or reporting on tickets.
+
+A request to survey an upcoming sprint can ask for requirement understanding,
+test-plan review, and proposed scenarios before execution. Keep planning findings
+and unrun scenarios distinct from an executed QA disposition. QA Triage instead
+investigates a reported defect: classify and reproduce the symptom, establish
+actual versus expected behavior and exact reproduction steps, split conflated
+issues into distinct proposed reports, and identify a supported root cause or
+mark it unresolved. When applicable, check the upcoming release build for a
+production report and production for a release-build report. Preserve observed,
+reported, and inferred claims separately. Use a dedicated triage playbook only
+when that route is actually admitted; do not claim ticket acceptance or a QA
+evaluator result from triage notes alone.
+
 ## Full QA Review intent gate
 
 When the user asks to **perform, complete, or sign off QA Review** for a ticket,
@@ -27,13 +46,13 @@ evidence audit, or review of supplied results without a full QA disposition. If
 a legitimate full assignment or trusted invocation cannot be constructed, keep
 the full review open, record the exact missing input or rejected route, and hand
 back the useful partial evidence without claiming QA completion. Preserve any
-reviewer-label restriction before selecting tickets.
+selection constraints from the current request before selecting tickets.
 
 When the requested output includes ticket verification notes, a QA evidence audit,
 or a release QA report, use the bundled
 [QA verification skill](../qa-review-verification/SKILL.md) for that deliverable.
-Carry the user's reviewer-label filter into evidence selection before opening ticket
-details. Reuse canonical QA records and preserve their scope and disposition.
+Carry the current request's ticket selection into evidence gathering before opening
+ticket details. Reuse canonical QA records and preserve their scope and disposition.
 Evidence-only drafting produces a local document; it does not admit a QA execution
 route or complete its review obligations. Test-case authoring alone and generic code
 review keep their existing routes.
