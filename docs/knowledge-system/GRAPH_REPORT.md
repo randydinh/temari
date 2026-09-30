@@ -5,7 +5,7 @@ Date: 2026-09-29. Temari base: `664144d17272697d68e045143f0ede0458ee6eca`.
 
 ## Corpus and provenance
 
-Canonical input is [evidence.json](evidence.json): **28 source records,
+Canonical input is [evidence.json](evidence.json): **30 source records,
 31 points, 10 decisions and 46 relationship assertions**.
 The corpus is bounded to the supplied research brief, selected historical design lineage,
 pinned Temari contracts/adapter, selected Registrar source, unmerged candidate designs,
@@ -55,8 +55,8 @@ remains conditional. Regenerated readback checks that provenance as well as topo
 These are integrity checks; they do not establish that every claim is true or that a
 proposed runtime meets the design. No Temari/Registrar runtime tests were run here.
 
-- Evidence SHA-256: `a2d2607e7a467fc6605b21aff0fde92218507a466e13ba807a18aaa178e3e81d`.
-- Graph SHA-256: `4eb084058360b876add932e736353b486fde034d4a16ae064ca2e6e606d6f368`.
+- Evidence SHA-256: `4b347a59b76a6de00c1c8728d1c0cbdbb1bb514a9c2e47020cfaa1e9145ebe9e`.
+- Graph SHA-256: `4ac5a5bc98947d84edf94eba45c6a8c6afc3636f97ddcb0c3466cae17fd54039`.
 
 ## Query executed
 
@@ -119,3 +119,13 @@ pages are dated observations; pinned commits or local byte hashes are recorded w
 Useful next queries: Which facts constrain snapshot optimization? Which records are
 needed before v1 recovery and v2 invalidation can be proven? Which proposed gates prevent
 a skill-text improvement from concealing a citation/access regression?
+
+## BM25 clarification
+
+The user explicitly selected BM25 ranking. The [preserved request](sources/bm25-selection-2026-09-29.md)
+and official BM25 reference are recorded in the ledger. `P-retrieval-flow` and
+its existing inferred link to `D-serving` now carry that selection and context.
+This bounded documentation follow-up uses focused self-review and exact artifact
+readback. The earlier independent review remains bound to the prior design commit.
+Node/edge identities and topology are unchanged; the ledger and projection
+attributes/hashes are refreshed. No ranking implementation or benchmark is claimed.

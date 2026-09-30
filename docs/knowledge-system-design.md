@@ -11,7 +11,8 @@ boundaries, compatibility requirements, evidence gates and an implementable orde
 Keep standalone Python Content Registrar as the source, index and evidence authority.
 Keep versioned contracts, host adapters, two agents and evaluation in Temari's Nx monorepo.
 Use Nx for project/task structure, Graft for non-Nx code, Graphify for non-code
-relationships, OKF for portable representations, and Jev for bounded judgments.
+relationships, OKF for portable representations, BM25 for lexical ranking, and Jev
+for bounded judgments.
 The two agents are intake and search/retrieval; the existing runtime remains their
 execution and persistence owner. A second scheduler would create duplicate authority.
 
@@ -51,6 +52,7 @@ A saved API key establishes neither integration nor permission for hosted data u
 | Decision | Standing | Consequence |
 | --- | --- | --- |
 | Intake plus retrieval agents | Selected direction | Separate grants and queues; deployment topology remains open. |
+| BM25 lexical ranking | Selected by the user | Rank text candidates alongside exact lookup and graph context; validate quality before runtime rollout. |
 | Registrar authority; Temari orchestration | Recommended | Preserve independent releases and version the interface. |
 | Directed, reified Graphify projection | Selected preservation approach | Verify IDs, attributes and edges after every projection. |
 | Jev judgment plus generative workers | Conditional | Do not start dependent model work until scope is resolved. |
@@ -101,6 +103,7 @@ They are plausible scale costs, not measured latency or grounds to remove checks
 | Graphify | Useful non-code concept navigation and derived views | Semantic extraction needs a host/generative model; default graph/dedup can conflate identity | Feed checked source-scoped records through a directed projection with assertion nodes. |
 | OKF | Human-readable Markdown/YAML and portable concept packages | Path IDs and prose links do not supply archive, ACL or typed query infrastructure | Export a Registrar profile with immutable identity and evidence extensions. |
 | Registrar | One authority for sources, hashes, citations and versioned evidence | More lifecycle work than a simple search cache; current scans can be costly | Keep independent Python service/library, add explicit archive and serving manifests. |
+| BM25 | Lexical candidate ranking without a model request | Term matching can miss relevant paraphrases; rank does not establish evidence support or completeness | Include in candidate retrieval, then combine exact matches and graph context before conditional Jev reranking. |
 | Jev | Typed judgments fit candidate relevance, support and equivalence review | Cannot generate prose or recover candidates never retrieved; confidence needs local evaluation | Bounded shadow reranking/judgment after cheap candidate selection. |
 | Two agents | Separate read authority from publication; durable handoffs | Queues, failure handling and consistency add complexity | Existing runtime owns jobs; one publisher per manifest, no shared mutable graph editing. |
 | Continual graph improvement | Repairs stale links and missed relationships | Popularity feedback can amplify false claims; audits cost effort | Source refresh, reviewed query feedback and blind audits are distinct inputs. |
@@ -129,7 +132,7 @@ flowchart TD
   V --> P[Atomic generation and RevisionSet manifest]
   P --> G[Graphify derived projection]
   P --> O[OKF portable export]
-  P --> L[Exact and sparse indexes]
+  P --> L[Exact lookup and BM25 indexes]
   Q[Knowledge worker question] --> A[Search and retrieval agent]
   L --> A
   G --> A
@@ -270,13 +273,21 @@ Quick lookup can return a useful answer with explicit limits; audit mode tracks 
 unreviewed work until assessed or visibly deferred, across bounded resumable passes.
 
 1. Resolve question, scope, requested time/currentness and task budget; pin a RevisionSet.
-2. Consult a compact corpus map and exact IDs/phrases; use sparse BM25 as an evaluated lane.
+2. Consult a compact corpus map and exact IDs/phrases; rank lexical candidates with BM25.
 3. Traverse typed graph edges only where dependencies, contradictions or identities matter.
 4. Optionally add semantic candidates after an allowed model and measured recall gap exist.
 5. Fuse candidates with route provenance and document diversity; preserve duplicate lineage.
 6. Optionally use Jev on a bounded shortlist; never discard required dependencies or contrary evidence by score.
 7. Outline, read and expand exact anchors; revalidate selected versions and current authorization.
 8. Save a bounded evidence packet, assessment progress, gaps and continuation outside conversation context.
+
+BM25 is a selected component of this design, as recorded in the
+[user clarification](knowledge-system/sources/bm25-selection-2026-09-29.md). It ranks
+keyword matches; [the BM25 reference](https://sqlite.org/fts5.html#the_bm25_function)
+describes lexical match scoring. The search backend remains an implementation choice.
+Combine BM25 candidates with exact matches and relevant graph context before conditional
+Jev reranking. Retain required context and contrary evidence regardless of lexical rank.
+BM25 scores are ranking signals, not confidence in a claim or proof of complete retrieval.
 
 Each evidence packet includes citation IDs, exact excerpts, applicability, origin, support
 and contradiction anchors, freshness mode, omission reasons and the next useful action.
@@ -295,7 +306,7 @@ implicit latest-state substitution. Failed saves cannot report durable completio
 ## Efficient serving without weakened integrity
 
 Start with exact and metadata lookup; many identifier questions need no model call.
-Partition indexes by source/access scope, revision and asset type; precompute term postings
+Partition BM25 indexes by source/access scope, revision and asset type; precompute term postings
 and outlines at publication. Fetch spans lazily instead of sending whole corpora to Jev.
 Block relationship candidates by compatible types, structured IDs and alias neighborhoods;
 avoid quadratic all-pairs comparisons. Batch only independent judgments sharing safe state.
@@ -485,7 +496,7 @@ compare new ranking/model routes on the same journey.
 | 0 — this increment | Design, reconciliation inventory, ledger and separate Graphify projection | Artifact readback/query and diff checks; no runtime readiness claim. |
 | 1 — local preservation journey | Reconcile main plus both candidates behind versioned contracts; add explicit local revision archive and synthetic fixture workflow | Compatibility tests plus the four-part v1/v2/resume/currentness receipt above and explicit capture-gap cases; exercise synthetic backup/restore with hash, derived-view and revocation/erasure checks; scope stays deterministic/local while policy is unresolved. |
 | 2 — relationship lifecycle | Multi-anchor/cross-source RevisionSet, reversible identity, invalidation, checked projection and OKF profile | Same-name/rename/conflict fixtures, exact topology/provenance and OKF roundtrip; failed publish rollback. |
-| 3 — serving and judgment trial | Published-snapshot indexing, exact/BM25/graph ablations and conditional Jev adapter in shadow | Preserve assurance modes, required evidence and citations; measured complete-task benefit before default promotion. |
+| 3 — serving and judgment trial | Published-snapshot BM25 indexes, exact/BM25/graph ablations and conditional Jev adapter in shadow | Preserve assurance modes, required evidence and citations; measured complete-task benefit before default promotion. |
 | 4 — one real connector | Selected admitted corpus with identity, freshness, retention and revocation decisions | Real end-to-end task, grants/withdrawal, capture watermarks/history availability, omissions and deletion/purge recovery; before production claims, satisfy the preservation gate with an exercised recovery receipt and selected/tested RPO/RTO; no broad corpus expansion by inference. |
 | 5 — offline evolution | One retrieval skill through custom SkillOpt adapter; depends on model-role decision and stable evaluation | Sanitized replay with real tools, sealed final test, reviewed patch and rollback; broaden across Temari only on evidence. |
 

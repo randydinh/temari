@@ -910,48 +910,6 @@
       "type": "motivates"
     },
     {
-      "id": "A-022",
-      "label": "A-022 | P-retrieval-flow motivates D-serving",
-      "basis": "Decision rationale: Repeated corpus and provider verification suggests targets, but current-original checks cannot disappear behind a cached receipt",
-      "community": null,
-      "confidence": "INFERRED",
-      "file_type": "concept",
-      "norm_label": "a-022 | p-retrieval-flow motivates d-serving",
-      "record_kind": "assertion",
-      "source": "P-retrieval-flow",
-      "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Search/retrieval and corrections; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md @ sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc :: Retrieval and evaluation proposals; https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py @ dfdb9882f814df05354a74b7ab1f72d78d7acc2c :: discover coverage",
-      "source_refs": [
-        {
-          "source_id": "S-request",
-          "locator": "task:registrar-knowledge-design-20260929/research-brief",
-          "span": "Search/retrieval and corrections",
-          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
-        },
-        {
-          "source_id": "S-recovered",
-          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md",
-          "span": "Retrieval and evaluation proposals",
-          "revision": "sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc"
-        },
-        {
-          "source_id": "S-retrieval",
-          "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py",
-          "span": "discover coverage",
-          "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c"
-        }
-      ],
-      "status": "design-link",
-      "tags": [
-        "assertion",
-        "motivates",
-        "INFERRED"
-      ],
-      "target": "D-serving",
-      "title": "P-retrieval-flow motivates D-serving",
-      "type": "motivates"
-    },
-    {
       "id": "A-023",
       "label": "A-023 | P-metrics motivates D-serving",
       "basis": "Decision rationale: Repeated corpus and provider verification suggests targets, but current-original checks cannot disappear behind a cached receipt",
@@ -985,6 +943,60 @@
       ],
       "target": "D-serving",
       "title": "P-metrics motivates D-serving",
+      "type": "motivates"
+    },
+    {
+      "id": "A-022",
+      "label": "A-022 | P-retrieval-flow motivates D-serving",
+      "basis": "Decision rationale: Repeated corpus and provider verification suggests targets, but current-original checks cannot disappear behind a cached receipt; the explicit BM25 selection is recorded in this existing candidate-retrieval path without changing runtime behavior",
+      "community": null,
+      "confidence": "INFERRED",
+      "file_type": "concept",
+      "norm_label": "a-022 | p-retrieval-flow motivates d-serving",
+      "record_kind": "assertion",
+      "source": "P-retrieval-flow",
+      "source_file": "docs/knowledge-system/evidence.json",
+      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Search/retrieval and corrections; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md @ sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc :: Retrieval and evaluation proposals; https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py @ dfdb9882f814df05354a74b7ab1f72d78d7acc2c :: discover coverage; docs/knowledge-system/sources/bm25-selection-2026-09-29.md @ sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291 :: User request (verbatim); https://sqlite.org/fts5.html#the_bm25_function @ official-docs observed 2026-09-29 :: 5.1.1 The bm25() function",
+      "source_refs": [
+        {
+          "source_id": "S-request",
+          "locator": "task:registrar-knowledge-design-20260929/research-brief",
+          "span": "Search/retrieval and corrections",
+          "revision": "sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a"
+        },
+        {
+          "source_id": "S-recovered",
+          "locator": "https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md",
+          "span": "Retrieval and evaluation proposals",
+          "revision": "sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc"
+        },
+        {
+          "source_id": "S-retrieval",
+          "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py",
+          "span": "discover coverage",
+          "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c"
+        },
+        {
+          "source_id": "S-bm25-selection",
+          "locator": "docs/knowledge-system/sources/bm25-selection-2026-09-29.md",
+          "revision": "sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291",
+          "span": "User request (verbatim)"
+        },
+        {
+          "source_id": "S-bm25-reference",
+          "locator": "https://sqlite.org/fts5.html#the_bm25_function",
+          "revision": "official-docs observed 2026-09-29",
+          "span": "5.1.1 The bm25() function"
+        }
+      ],
+      "status": "design-link",
+      "tags": [
+        "assertion",
+        "motivates",
+        "INFERRED"
+      ],
+      "target": "D-serving",
+      "title": "P-retrieval-flow motivates D-serving",
       "type": "motivates"
     },
     {
@@ -2071,19 +2083,19 @@
     },
     {
       "id": "P-retrieval-flow",
-      "label": "P-retrieval-flow | Retrieve progressively with separate evidence progress sets",
+      "label": "P-retrieval-flow | Retrieve with BM25 ranking, exact lookup and graph context",
       "benefit": "Less context bloat with resumable required-context work",
       "community": null,
-      "conditions": "Quick lookup versus comprehensive investigation is explicit",
-      "confidence_basis": "Bounded continuation reuses current contracts while clarifying consumption",
+      "conditions": "Quick lookup versus comprehensive investigation is explicit; BM25 is explicitly selected by the user and participates before conditional Jev reranking",
+      "confidence_basis": "Bounded continuation reuses current contracts while clarifying consumption; user clarification selects BM25, while lexical scoring does not establish claim support",
       "evidence_type": "engineering inference",
       "file_type": "concept",
       "limits": "No top-k or enumeration-exhausted semantic guarantee",
-      "norm_label": "p-retrieval-flow | retrieve progressively with separate evidence progress sets",
+      "norm_label": "p-retrieval-flow | retrieve with bm25 ranking, exact lookup and graph context",
       "record_kind": "point",
       "risk": "Dropping low-ranked contradictions or dependencies biases results",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Search/retrieval and corrections; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md @ sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc :: Retrieval and evaluation proposals; https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py @ dfdb9882f814df05354a74b7ab1f72d78d7acc2c :: discover coverage",
+      "source_location": "task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Search/retrieval and corrections; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md @ sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc :: Retrieval and evaluation proposals; https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py @ dfdb9882f814df05354a74b7ab1f72d78d7acc2c :: discover coverage; docs/knowledge-system/sources/bm25-selection-2026-09-29.md @ sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291 :: User request (verbatim); https://sqlite.org/fts5.html#the_bm25_function @ official-docs observed 2026-09-29 :: 5.1.1 The bm25() function",
       "source_refs": [
         {
           "source_id": "S-request",
@@ -2102,15 +2114,28 @@
           "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py",
           "span": "discover coverage",
           "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c"
+        },
+        {
+          "source_id": "S-bm25-selection",
+          "locator": "docs/knowledge-system/sources/bm25-selection-2026-09-29.md",
+          "revision": "sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291",
+          "span": "User request (verbatim)"
+        },
+        {
+          "source_id": "S-bm25-reference",
+          "locator": "https://sqlite.org/fts5.html#the_bm25_function",
+          "revision": "official-docs observed 2026-09-29",
+          "span": "5.1.1 The bm25() function"
         }
       ],
       "status": "proposed",
       "tags": [
         "retrieval",
         "engineering inference",
-        "proposed"
+        "proposed",
+        "bm25"
       ],
-      "title": "Retrieve progressively with separate evidence progress sets",
+      "title": "Retrieve with BM25 ranking, exact lookup and graph context",
       "topic": "retrieval"
     },
     {
@@ -3545,7 +3570,7 @@
       "rationale": "Repeated corpus and provider verification suggests targets, but current-original checks cannot disappear behind a cached receipt",
       "record_kind": "decision",
       "source_file": "docs/knowledge-system/evidence.json",
-      "source_location": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py @ dfdb9882f814df05354a74b7ab1f72d78d7acc2c :: _corpus; discover initial/final checks; read_document; https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/src/lib/registrar.ts @ 664144d17272697d68e045143f0ede0458ee6eca :: implementationDigest; pin; invoke; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Additional current-code performance finding; Efficiency; https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/README.md @ 664144d17272697d68e045143f0ede0458ee6eca :: Supported boundary and gaps; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Search/retrieval and corrections; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md @ sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc :: Retrieval and evaluation proposals; https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py @ dfdb9882f814df05354a74b7ab1f72d78d7acc2c :: discover coverage; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Acceptance/evaluation; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md @ sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc :: Evaluation set",
+      "source_location": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py @ dfdb9882f814df05354a74b7ab1f72d78d7acc2c :: _corpus; discover initial/final checks; read_document; https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/src/lib/registrar.ts @ 664144d17272697d68e045143f0ede0458ee6eca :: implementationDigest; pin; invoke; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Additional current-code performance finding; Efficiency; https://github.com/randydinh/temari/blob/664144d17272697d68e045143f0ede0458ee6eca/libs/knowledge/README.md @ 664144d17272697d68e045143f0ede0458ee6eca :: Supported boundary and gaps; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Search/retrieval and corrections; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md @ sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc :: Retrieval and evaluation proposals; https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py @ dfdb9882f814df05354a74b7ab1f72d78d7acc2c :: discover coverage; docs/knowledge-system/sources/bm25-selection-2026-09-29.md @ sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291 :: User request (verbatim); https://sqlite.org/fts5.html#the_bm25_function @ official-docs observed 2026-09-29 :: 5.1.1 The bm25() function; task:registrar-knowledge-design-20260929/research-brief @ sha256:7a57422de156250a7a46c9d58859a80ce0718d15991f0a28fd6369cb88c4045a :: Acceptance/evaluation; https://github.com/randydinh/temari-v4.1/blob/0d0d7d8/docs/recovered-content-registrar-buildout.md @ sha256:96ed502c0e361b2bbcf80dfc9d14797635d71bcdaad3a4f3f08bcff56f9084bc :: Evaluation set",
       "source_refs": [
         {
           "source_id": "S-retrieval",
@@ -3588,6 +3613,18 @@
           "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py",
           "span": "discover coverage",
           "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c"
+        },
+        {
+          "source_id": "S-bm25-selection",
+          "locator": "docs/knowledge-system/sources/bm25-selection-2026-09-29.md",
+          "revision": "sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291",
+          "span": "User request (verbatim)"
+        },
+        {
+          "source_id": "S-bm25-reference",
+          "locator": "https://sqlite.org/fts5.html#the_bm25_function",
+          "revision": "official-docs observed 2026-09-29",
+          "span": "5.1.1 The bm25() function"
         },
         {
           "source_id": "S-request",

@@ -201,6 +201,20 @@
       "revision": "official-docs observed 2026-09-29",
       "reading_status": "Opened official cookbook; method sections inspected, no experiment executed",
       "intended_influence": "Bounded candidate judgments as experimental design input; vendor results are not Temari workload proof"
+    },
+    {
+      "id": "S-bm25-selection",
+      "locator": "docs/knowledge-system/sources/bm25-selection-2026-09-29.md",
+      "revision": "sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291",
+      "reading_status": "Direct user clarification preserved verbatim; runtime not implemented by this documentation edit",
+      "intended_influence": "Explicit user selection of BM25 ranking in the existing retrieval design"
+    },
+    {
+      "id": "S-bm25-reference",
+      "locator": "https://sqlite.org/fts5.html#the_bm25_function",
+      "revision": "official-docs observed 2026-09-29",
+      "reading_status": "Read official BM25 match-scoring description; no backend selection or runtime experiment",
+      "intended_influence": "Meaning of lexical match ranking, separate from evidence support and semantic completeness"
     }
   ],
   "points": [
@@ -702,7 +716,7 @@
     },
     {
       "id": "P-retrieval-flow",
-      "label": "Retrieve progressively with separate evidence progress sets",
+      "label": "Retrieve with BM25 ranking, exact lookup and graph context",
       "topic": "retrieval",
       "source_refs": [
         {
@@ -722,11 +736,23 @@
           "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py",
           "span": "discover coverage",
           "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c"
+        },
+        {
+          "source_id": "S-bm25-selection",
+          "locator": "docs/knowledge-system/sources/bm25-selection-2026-09-29.md",
+          "revision": "sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291",
+          "span": "User request (verbatim)"
+        },
+        {
+          "source_id": "S-bm25-reference",
+          "locator": "https://sqlite.org/fts5.html#the_bm25_function",
+          "revision": "official-docs observed 2026-09-29",
+          "span": "5.1.1 The bm25() function"
         }
       ],
       "evidence_type": "engineering inference",
-      "conditions": "Quick lookup versus comprehensive investigation is explicit",
-      "confidence_basis": "Bounded continuation reuses current contracts while clarifying consumption",
+      "conditions": "Quick lookup versus comprehensive investigation is explicit; BM25 is explicitly selected by the user and participates before conditional Jev reranking",
+      "confidence_basis": "Bounded continuation reuses current contracts while clarifying consumption; user clarification selects BM25, while lexical scoring does not establish claim support",
       "limits": "No top-k or enumeration-exhausted semantic guarantee",
       "benefit": "Less context bloat with resumable required-context work",
       "risk": "Dropping low-ranked contradictions or dependencies biases results",
@@ -734,7 +760,8 @@
       "tags": [
         "retrieval",
         "engineering inference",
-        "proposed"
+        "proposed",
+        "bm25"
       ]
     },
     {
@@ -1941,7 +1968,7 @@
       "target": "D-serving",
       "type": "motivates",
       "confidence": "INFERRED",
-      "basis": "Decision rationale: Repeated corpus and provider verification suggests targets, but current-original checks cannot disappear behind a cached receipt",
+      "basis": "Decision rationale: Repeated corpus and provider verification suggests targets, but current-original checks cannot disappear behind a cached receipt; the explicit BM25 selection is recorded in this existing candidate-retrieval path without changing runtime behavior",
       "tags": [
         "assertion",
         "motivates",
@@ -1966,6 +1993,18 @@
           "locator": "https://github.com/randydinh/content-registrar/blob/dfdb9882f814df05354a74b7ab1f72d78d7acc2c/src/knowledge_agent/retrieval.py",
           "span": "discover coverage",
           "revision": "dfdb9882f814df05354a74b7ab1f72d78d7acc2c"
+        },
+        {
+          "source_id": "S-bm25-selection",
+          "locator": "docs/knowledge-system/sources/bm25-selection-2026-09-29.md",
+          "revision": "sha256:2d79d9b0849e25f43d3b164acede7512538be541b7647b986951889377e81291",
+          "span": "User request (verbatim)"
+        },
+        {
+          "source_id": "S-bm25-reference",
+          "locator": "https://sqlite.org/fts5.html#the_bm25_function",
+          "revision": "official-docs observed 2026-09-29",
+          "span": "5.1.1 The bm25() function"
         }
       ]
     },
