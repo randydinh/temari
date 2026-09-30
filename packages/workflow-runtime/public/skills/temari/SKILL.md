@@ -47,6 +47,15 @@ reported, and inferred claims separately. Use a dedicated triage playbook only
 when that route is actually admitted; do not claim ticket acceptance or a QA
 evaluator result from triage notes alone.
 
+Across these workflows, derive expected behavior from the applicable product or
+business decision. Current code, prior behavior, and a developer's or Temari's
+interpretation are evidence or hypotheses, not product authority. Surface an
+unresolved expectation instead of assuming it is a defect or a pass. For a
+suspected defect, separate user impact, severity, affected scope, and how the
+failure is reached from the fix-priority decision. State uncertainty and the
+decision owner; a low-harm ambiguity may need no change, while a small
+user-experience improvement can merit exploration without becoming a defect.
+
 ## Full QA Review intent gate
 
 When the user asks to **perform, complete, or sign off QA Review** for a ticket,

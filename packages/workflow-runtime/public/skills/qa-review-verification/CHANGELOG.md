@@ -1,5 +1,12 @@
 # QA verification changes
 
+## 0.7.2 — 2026-09-30
+
+- Record impact, severity, affected scope, reachability, and fix priority as
+  separate judgments for supported failures.
+- Preserve ambiguous product intent and potential user-experience improvements
+  without silently turning either into a confirmed defect.
+
 ## 0.7.1 — 2026-09-30
 
 - Route an explicit full QA Review request through the ticket acceptance playbook

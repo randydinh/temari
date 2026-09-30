@@ -2,7 +2,7 @@
 name: qa-review-verification
 description: Draft or review per-ticket QA verification notes and release QA reports from requirements, source reviews, and actual execution evidence. Use for QA Review closeout, verification handoffs, and evidence audits; not for authoring reusable test cases alone or generic code review.
 metadata:
-  version: '0.7.1'
+  version: '0.7.2'
 ---
 
 # QA Review verification
@@ -231,6 +231,14 @@ a product failure. For state changes or cross-service effects, choose the smalle
 integration or deployed test that distinguishes a product defect from a bad oracle;
 retain candidate, fixture ownership, independent readback and cleanup. Repeating an
 unchanged fake does not increase confidence in its realism.
+For each supported failure, record the affected user or business outcome, severity
+under the selected project's scale, affected personas/builds/environments, known
+frequency and workaround, and how it is reached: happy path, ordinary user flow,
+unusual but user-reachable state, constructed input or direct call only, or
+unproven. Keep the fix-priority recommendation separate from severity and note
+the decision owner. Do not invent thresholds, affected-user counts, or product
+rules. An ambiguous low-harm behavior may need a product decision or no action;
+a modest user-experience improvement can be explored without calling it a defect.
 Prefer a functional user-facing flow when it can observe the promised outcome. Use a
 service, persistence, queue, simulator, or controlled failure check when the user flow
 cannot expose the material risk. A suitable nonproduction environment can establish

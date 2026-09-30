@@ -13,7 +13,7 @@ of inventing one.
 1. Read the pinned product decision for every required outcome. Record conflicting or absent intent as unresolved; current implementation and existing tests do not establish the expected behavior.
 2. Derive scenarios from those outcomes, including required behavior absent from the candidate. Choose a check whose assertion would fail for a plausible wrong result. Retain the counterexample and the expectation source.
 3. Select the applicable project verifier and its actual control surface. Record a missing verifier or environment as a capability gap. Execute only authorized checks on the assigned candidate and retain canonical observations.
-4. Separate a product failure from a broken check, missing environment, or unresolved expectation. Keep unexecuted and failed required scenarios visible.
+4. Separate a product failure from a broken check, missing environment, or unresolved expectation. Keep unexecuted and failed required scenarios visible. For a supported failure, record impact, severity under the selected project's scale, affected scope, and whether it occurs on the happy path, through an ordinary user flow, or only through constructed inputs. Keep fix priority and any product decision separate from that evidence.
 5. Give an independent evaluator the pinned intent, scenarios, assertions, observations, contradictions, and coverage gaps. A procedural evidence scan alone cannot approve product intent or assertion adequacy.
 6. Report the QA disposition at its proven scope. A blocked evaluator, uncovered required outcome, or green command without a discriminating observation cannot produce a full pass.
 
