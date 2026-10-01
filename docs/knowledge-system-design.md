@@ -76,6 +76,15 @@ continual correction, but no autonomous relationship authoring, authenticated
 reviewer identity or measured default-ranking improvement is claimed. Held-out
 ranking promotion, PDF boundary support and plugin lifecycle remain open.
 
+The current-source sharing increment adds an operator-controlled Registrar
+setting to each source. Temari checks that setting and the pinned registration
+before credential lookup and every Jev request attempt. An older handoff cannot
+override a newer `local-only` setting; an older local-only handoff also remains
+denied if the current setting is loosened. Policy lookup failure is a reported
+gap and prevents hosted use. Revocation can prevent the next attempt but cannot
+retract text in a request that is already in flight. A Registrar upgrade changes
+the implementation pin, requiring publication rebind and a fresh intake handoff.
+
 ## Delivery decision: complete the knowledge journey before plugin packaging
 
 On 2026-09-30 the owner chose to keep building the knowledge system before
@@ -170,8 +179,10 @@ the current design's explicit capture gaps and distinct evidence-progress sets.
 The user's later decision selects **Jev as the only hosted model** for this knowledge path
 and skips SkillOpt. Deterministic extraction, human-authored assertions and closed Jev
 judgments remain available. Free-form model generation, semantic extraction and SkillOpt
-optimization are outside this implementation. A saved API key does not itself authorize
-sending a corpus; each Jev request requires explicit text approval.
+optimization are outside this implementation. The owner later selected
+registered-source sharing by default unless a source is marked local-only;
+individual queries can also opt out. A saved API key does not change either
+choice. Jev receives bounded, revalidated excerpts, not a corpus upload.
 
 | Decision | Standing | Consequence |
 | --- | --- | --- |

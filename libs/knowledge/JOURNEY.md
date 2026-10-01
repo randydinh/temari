@@ -226,6 +226,18 @@ after the registered-source sharing gate passes. An explicit server-side key or
 in task receipts or reports. A local-only source never reaches the lookup or
 TypeSafe. Vercel is not part of this path.
 
+Registrar also holds each source's current sharing setting. To change it for an
+already registered source, run `python -m knowledge_agent.cli sources
+--workspace /absolute/registrar-state set-sharing REGISTERED_SOURCE_ID
+local-only` (or `registered-sources` to allow future hosted use). The current
+setting is checked before credential lookup and before every TypeSafe attempt,
+including retries. A current `local-only` setting overrides an older handoff
+that allowed sharing. A handoff already pinned `local-only` stays local even
+if the current setting later changes. If the current setting cannot be
+verified, Jev is denied and local search still returns its evidence and gap.
+This is Temari's hosted-use gate; Registrar's generic local CLI/MCP reads do
+not interpret sharing metadata as a ban on local retrieval.
+
 For ordinary search, use an unlabelled query. It selects a pinned intake handoff,
 source scope, exact or BM25 discovery and a bounded top K. There is no gold path,
 recall score or graph expansion in this path:
@@ -342,17 +354,25 @@ plan. That choice is pinned in the immutable handoff and wins even if a later
 search case sets `hostedTextApproved: true`. For an individual search, set
 `hostedTextApproved: false` to keep that case local. Older handoffs without the
 standing policy still require the explicit per-case boolean. A Keychain entry or
-API key supplies credentials but does not change the source policy.
+API key supplies credentials but does not change the source policy. Registrar
+sharing changes do not invalidate a retained archive; upgrading Registrar code
+changes the pinned implementation identity, so use `archive-rebind` to bind an
+existing generation to the new implementation and create a fresh intake
+handoff before searching it.
 
 The Jev request carries the query, candidate IDs and bounded, revalidated shortlist
 excerpts. The archive, full documents and local-only sources remain local. The report records
-`jevSharing` as `allowed`, `local-only`, or `case-opt-out`. Jev still produces
+`jevSharing` as `allowed`, `local-only`, `case-opt-out`,
+`current-local-only`, or `policy-unavailable`. Jev still produces
 shadow advice only. Missing key, network or invalid response leaves judgments
-`unknown`. For macOS local runs, load the saved key into the search process:
+`unknown`. `attemptedRequests` records how many TypeSafe POSTs were started;
+revocation after a retryable response can therefore show both a prior attempt
+and a current denial. A setting change after a policy check cannot retract a
+request already in flight. For macOS local runs, the adapter reads the saved
+Keychain item after the sharing gate passes:
 
 ```sh
-TYPESAFE_API_KEY="$(security find-generic-password -a "$USER" -s "temari-typesafe-jev" -w)" \
-  pnpm nx run knowledge:demo -- journey-search --input /absolute/search-plan.json
+pnpm nx run knowledge:demo -- journey-search --input /absolute/search-plan.json
 ```
 
 For an optional graph ablation, set `graphId` on a search case to a published

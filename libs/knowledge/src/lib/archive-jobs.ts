@@ -321,7 +321,16 @@ async function durableReport(
         )
       ? 'local-only'
       : 'case-opt-out';
-  assert.equal(report.query.jevSharing, expectedSharing);
+  if (expectedSharing === 'allowed') {
+    assert(
+      report.query.jevSharing === 'allowed' ||
+        report.query.jevSharing === 'current-local-only' ||
+        report.query.jevSharing === 'policy-unavailable',
+      'Current sharing result differs from allowed job policy',
+    );
+  } else {
+    assert.equal(report.query.jevSharing, expectedSharing);
+  }
   assert.equal(canonical(report.task), canonical(spec.intake.task));
   return report;
 }

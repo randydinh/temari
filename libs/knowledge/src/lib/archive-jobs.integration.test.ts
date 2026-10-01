@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { promisify } from 'node:util';
 import { FileChildTaskStore } from '@temari/runtime';
 import { actualFixture, documents } from '../support/fixtures.js';
 import {
@@ -99,6 +101,40 @@ test('ACTUAL CLI: local-only intake prevents hosted query despite explicit appro
     ),
   );
   assert(!JSON.stringify(report).includes('required'));
+});
+
+test('current local-only setting denies an already pinned allowed job handoff', async () => {
+  const base = await fixture();
+  const plan = { ...base, query: { ...base.query, hostedTextApproved: true } };
+  const specPath = await createArchiveJobSpec(plan);
+  const first = await tickArchiveJobs(specPath);
+  assert.equal(first.intake, 'SUCCEEDED');
+  await promisify(execFile)(
+    base.intake.intakes[0].transport.python,
+    [
+      '-B', '-m', 'knowledge_agent.cli', 'sources', '--workspace',
+      base.intake.intakes[0].transport.workspace,
+      'set-sharing', base.query.sourceIds[0], 'local-only',
+    ],
+    {
+      cwd: base.intake.intakes[0].transport.registrarSource,
+      env: {
+        PATH: '/usr/bin:/bin',
+        PYTHONPATH: join(base.intake.intakes[0].transport.registrarSource, 'src'),
+        PYTHONNOUSERSITE: '1',
+        PYTHONDONTWRITEBYTECODE: '1',
+      },
+    },
+  );
+  const second = await tickArchiveJobs(specPath);
+  assert.equal(second.search, 'ISSUES');
+  assert(second.reportPath);
+  const report = (await readJson(second.reportPath)) as Record<string, any>;
+  assert.equal(report.query.jevSharing, 'current-local-only');
+  assert(report.query.jev.judgments.every(
+    (item: Record<string, unknown>) => item['gap'] === 'current-local-only',
+  ));
+  assert.equal((await tickArchiveJobs(specPath)).action, 'none');
 });
 
 test('job spec rejects privacy typos before any intake or TypeSafe call', async () => {
