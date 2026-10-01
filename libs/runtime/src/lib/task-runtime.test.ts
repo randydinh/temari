@@ -845,6 +845,42 @@ test('pickup uses exact canonical workspace scope and respects explicit-task fil
   );
 });
 
+test('unresolvable unrelated workspaces do not block a healthy pickup scope', async (t) => {
+  const f = await fixture(t);
+  const file = join(f.root, 'no-longer-a-directory');
+  await writeFile(file, 'This path is now a file.');
+  const loop = join(f.root, 'symlink-loop');
+  await symlink(loop, loop);
+  for (const [index, workspaceRoot] of [
+    join(f.root, 'missing'),
+    join(file, 'child'),
+    loop,
+  ].entries()) {
+    await f.store.createTask({
+      taskId: `unavailable-${index}`,
+      actor: 'temari',
+      idempotencyKey: `unavailable-${index}`,
+      title: 'Previously registered workspace',
+      goal: 'Retain history after the workspace moves.',
+      workspaceRoot,
+    });
+  }
+  const picked = await f.runtime.pickup({ workspaceRoot: f.root });
+  assert.equal(picked.status, 'selected');
+  assert.equal(picked.selected?.taskId, 'goal');
+  assert.equal(
+    (await f.runtime.pickup({ taskId: 'unavailable-1' })).selected?.taskId,
+    'unavailable-1',
+  );
+  await assert.rejects(
+    f.runtime.pickup({ workspaceRoot: join(file, 'child') }),
+    { code: 'ENOTDIR' },
+  );
+  await assert.rejects(f.runtime.pickup({ workspaceRoot: loop }), {
+    code: 'ELOOP',
+  });
+});
+
 test('fresh-session pickup restores the handoff without executing provider actions', async (t) => {
   const f = await fixture(t);
   const session = { host: 'codex', sessionId: 'previous-chat' };

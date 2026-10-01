@@ -226,7 +226,14 @@ export async function selectTaskPickupCandidates(
       try {
         canonicalRoots.set(root, await realpath(root));
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        // A stale or inaccessible unrelated workspace cannot prevent pickup in
+        // a healthy scope. The requested root itself was validated above.
+        if (
+          !['ENOENT', 'ENOTDIR', 'ELOOP', 'EACCES', 'EPERM'].includes(
+            (error as NodeJS.ErrnoException).code ?? '',
+          )
+        )
+          throw error;
         canonicalRoots.set(root, null);
       }
     }
