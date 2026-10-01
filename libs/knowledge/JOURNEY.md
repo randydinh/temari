@@ -161,8 +161,43 @@ after the registered-source sharing gate passes. An explicit server-side key or
 in task receipts or reports. A local-only source never reaches the lookup or
 TypeSafe. Vercel is not part of this path.
 
-Write a separate search plan. Gold paths are explicit annotations, not text
-extracted from the source. Each case narrows the handoff to listed source IDs.
+For ordinary search, use an unlabelled query. It selects a pinned intake handoff,
+source scope, exact or BM25 discovery and a bounded top K. There is no gold path,
+recall score or graph expansion in this path:
+
+```json
+{
+  "handoffPath": "/absolute/private-task/archive-handoff-HASH.json",
+  "id": "user-query-1",
+  "query": "example search terms",
+  "sourceIds": ["REGISTERED_SOURCE_ID"],
+  "topK": 4,
+  "discoveryMode": "bm25"
+}
+```
+
+```sh
+pnpm nx run knowledge:demo -- journey-query --input /absolute/query.json
+```
+
+The content-addressed `archive-query-HASH.json` report contains ranked pinned
+document paths and hashes, first-excerpt verification counts, source and search
+gaps, and Jev shadow advice. It contains no source text, expected paths, recall
+score or required gold flag. The private shortlist checkpoint holds the bounded
+verified excerpts and evidence checks for a reader. `shortlistVerified` covers
+only the selected first excerpts, not complete documents or answer quality. Jev
+cannot override BM25 or exact order; `suggestedOrder` is advice. A local-only
+source or `hostedTextApproved: false` prevents TypeSafe calls. Unknown input
+fields, including a misspelled privacy field, fail before discovery or Jev.
+This CLI action is a single run, not a durable scheduled job: repeat invocations
+can repeat TypeSafe requests and billing, including after a crash. A later
+workflow coordinator must hold a lease before automatic retries. Older handoffs
+without a pinned sharing policy require an explicit `hostedTextApproved` boolean.
+
+Use a separate labelled plan to evaluate retrieval. Gold paths are explicit
+annotations, not text extracted from the source. Each case narrows the handoff
+to listed source IDs. Unknown plan or case fields fail before search, including
+a misspelled `hostedTextApproved` opt-out.
 
 ```json
 {
@@ -251,16 +286,26 @@ omits real source IDs and paths:
   "handoffPath": "/absolute/private-task/archive-handoff-HASH.json",
   "topK": 3,
   "cohorts": {
-    "development": [{
-      "id": "question-1", "query": "bounded search terms",
-      "sourceIds": ["REGISTERED_SOURCE_ID"],
-      "expected": [{"sourceId": "REGISTERED_SOURCE_ID", "path": "relative/file.md"}]
-    }],
-    "holdout": [{
-      "id": "question-2", "query": "separate search terms",
-      "sourceIds": ["REGISTERED_SOURCE_ID"],
-      "expected": [{"sourceId": "REGISTERED_SOURCE_ID", "path": "relative/other.md"}]
-    }]
+    "development": [
+      {
+        "id": "question-1",
+        "query": "bounded search terms",
+        "sourceIds": ["REGISTERED_SOURCE_ID"],
+        "expected": [
+          { "sourceId": "REGISTERED_SOURCE_ID", "path": "relative/file.md" }
+        ]
+      }
+    ],
+    "holdout": [
+      {
+        "id": "question-2",
+        "query": "separate search terms",
+        "sourceIds": ["REGISTERED_SOURCE_ID"],
+        "expected": [
+          { "sourceId": "REGISTERED_SOURCE_ID", "path": "relative/other.md" }
+        ]
+      }
+    ]
   }
 }
 ```
@@ -311,16 +356,26 @@ opts out of Jev. The graph ID is never silently taken from a handoff default.
   "graphId": "64-lowercase-hex-digest",
   "topK": 3,
   "cohorts": {
-    "development": [{
-      "id": "question-1", "query": "bounded search terms",
-      "sourceIds": ["REGISTERED_SOURCE_ID"],
-      "expected": [{"sourceId": "REGISTERED_SOURCE_ID", "path": "relative/file.md"}]
-    }],
-    "holdout": [{
-      "id": "question-2", "query": "separate search terms",
-      "sourceIds": ["REGISTERED_SOURCE_ID"],
-      "expected": [{"sourceId": "REGISTERED_SOURCE_ID", "path": "relative/other.md"}]
-    }]
+    "development": [
+      {
+        "id": "question-1",
+        "query": "bounded search terms",
+        "sourceIds": ["REGISTERED_SOURCE_ID"],
+        "expected": [
+          { "sourceId": "REGISTERED_SOURCE_ID", "path": "relative/file.md" }
+        ]
+      }
+    ],
+    "holdout": [
+      {
+        "id": "question-2",
+        "query": "separate search terms",
+        "sourceIds": ["REGISTERED_SOURCE_ID"],
+        "expected": [
+          { "sourceId": "REGISTERED_SOURCE_ID", "path": "relative/other.md" }
+        ]
+      }
+    ]
   }
 }
 ```
