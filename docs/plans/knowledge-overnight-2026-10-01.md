@@ -151,3 +151,14 @@ gate-mechanics increment pending commit and exact-head review. The fixture
 cohorts were authored together, so they cannot certify independent task
 quality or justify switching the default ranker. No-answer and unsupported
 visual/PDF modalities remain separate coverage gaps.
+
+## 03:05 PDT retrieval delivery and lifecycle selection
+
+PR #131 merged at `e6f0c03a1348fba457223461195b82d7ac72865b` after
+independent exact-head review of clean commit `6749b0f2c7b2c77e2240630f4a70b05f44c20c52`.
+GitHub reported no branch checks. The isolated worktree now starts a new branch
+from that merged main. An architect is comparing operator-triggered recapture,
+archive recovery evidence and relationship feedback as the next bounded unit.
+The synthetic retrieval fixture is evaluation plumbing, not an independent
+real-task holdout or default-ranker promotion. The macOS PDF text boundary and
+production losslessness remain open.
