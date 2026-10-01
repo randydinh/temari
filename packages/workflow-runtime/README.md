@@ -17,6 +17,75 @@ directory below this package's ignored `dist/` directory. A repeated build reuse
 only an exact matching artifact. Changed or foreign destinations are preserved
 and rejected. No installation is changed by either command.
 
+## Installed Temari Knowledge capability
+
+The public Codex artifact also includes `skills/temari-knowledge/SKILL.md`,
+`bin/temari-knowledge.mjs`, the compiled `@temari/knowledge` CLI, and the pinned
+Content Registrar source under `registrar/`. This is a knowledge capability,
+not a fourth engineering route; `temari`, `poteto-mode`, and `closeout` remain
+the three public route entries. The public artifact manifest inventories the
+Registrar bytes and rejects any missing or altered file.
+
+After installing or copying the artifact to a fresh location on macOS or Linux,
+a recipient can activate the local Registrar and Codex MCP connection with one
+explicit command:
+
+```sh
+node /absolute/installed/temari/bin/temari-knowledge.mjs setup --connect-codex
+```
+
+This builds a wheel from the bundled, pinned Registrar source and installs it
+into `~/.local/share/temari-knowledge/venv` using Python 3.12. The workspace
+at `~/.local/share/temari-knowledge/workspace` is outside the plugin. Python
+package download access is needed on a cold machine. The bundled project pins
+its direct Python dependencies; pip resolves transitive dependencies at setup,
+so this command is not a fully locked Python environment. No private GitHub
+checkout or credential is needed. Use `--python PYTHON_3_12`
+or `--home ABS` when needed. `setup` alone installs the environment without
+changing Codex configuration. `connect-codex` is also available later; it
+refuses to overwrite an existing server entry. `status` checks the local
+installation without creating directories. Neither command registers or scans
+sources, and removing the plugin leaves the workspace, registry, archives,
+credentials, and task artifacts in place.
+Setup checks the bundled Registrar against the launcher's pinned inventory and
+records its identity outside the artifact. A later setup repairs a same-version
+payload change or damaged installed Python files without clearing the workspace.
+
+Knowledge operations use explicit plans and output paths outside the artifact:
+
+```sh
+node /absolute/installed/temari/bin/temari-knowledge.mjs journey-intake --input /absolute/intake-plan.json
+node /absolute/installed/temari/bin/temari-knowledge.mjs journey-query --input /absolute/query.json
+node /absolute/installed/temari/bin/temari-knowledge.mjs journey-jobs-tick --spec /absolute/job-spec.json
+```
+
+`journey-search`, `journey-jobs-create`, and `archive-collect` are also exposed;
+the skill describes the bounded source-selection rule. Local Registrar
+read/search needs no TypeSafe key. Hosted Jev use remains conditional on its
+existing credential and source-sharing policy.
+
+### Windows recipient
+
+Native Windows setup is not verified and the launcher rejects it. Run the
+plugin and Python 3.12 setup inside WSL2, keeping its artifact and user-local
+workspace on the Linux side. For Codex running inside WSL2, the same
+`setup --connect-codex` command above configures that WSL2 Codex instance.
+For Codex running on Windows, first run setup in WSL2 without the connection
+flag, then explicitly add the Windows Codex MCP entry from PowerShell:
+
+```powershell
+wsl.exe -d Ubuntu -- node /home/YOUR_LINUX_USER/temari/bin/temari-knowledge.mjs setup
+codex mcp add temari-content-registrar -- wsl.exe -d Ubuntu -- /home/YOUR_LINUX_USER/.local/share/temari-knowledge/venv/bin/python -m knowledge_agent.cli mcp serve --workspace /home/YOUR_LINUX_USER/.local/share/temari-knowledge/workspace
+```
+
+Replace `Ubuntu`, `YOUR_LINUX_USER`, and the plugin path with the installed WSL2
+distribution and paths. The Windows command uses [Microsoft's documented WSL
+command invocation](https://learn.microsoft.com/en-us/windows/dev-environment/wsl-interop)
+and configures the Windows Codex CLI only when run explicitly. This PowerShell
+connection pattern has not been exercised on Windows in this repository.
+Hosted Jev calls need `TYPESAFE_API_KEY` in the environment running the
+Temari Knowledge CLI. A WSL2 process cannot read the owner's macOS Keychain.
+
 For Archon, select its lane explicitly:
 
 ```sh

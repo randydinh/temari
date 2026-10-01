@@ -85,7 +85,28 @@ gap and prevents hosted use. Revocation can prevent the next attempt but cannot
 retract text in a request that is already in flight. A Registrar upgrade changes
 the implementation pin, requiring publication rebind and a fresh intake handoff.
 
-## Delivery decision: complete the knowledge journey before plugin packaging
+## Delivery decisions
+
+### Installed capability decision — 2026-10-01
+
+An installation of Temari exposed only its three engineering entries and omitted
+Content Registrar entirely. The owner asked to include Registrar in Temari so a
+recipient can use the knowledge capability without access to a separate private
+repository. This supersedes the earlier packaging deferral for the installed
+capability. Package the pinned Registrar source and the Temari knowledge adapter
+in the verified plugin artifact. Installation must keep a recipient's source
+registry, archives, credentials and task artifacts outside the plugin bundle.
+Activation may create a local Python environment and a Codex MCP connection,
+but must not register or scan any source without an explicit selection. Local
+read/search should work with no TypeSafe key; hosted Jev remains conditional on
+the existing Keychain or configured key and current source sharing policy.
+Disconnect and uninstall must preserve retained data by default; reinstall is
+explicit, and purge remains a distinct choice. The package should report
+unsupported host prerequisites rather than silently substituting another
+model or provider.
+The bundled Registrar snapshot is pinned by upstream commit and file hashes.
+Its upstream tree has no separate license declaration; release review must
+record the owner's distribution terms before making this bundle public.
 
 On 2026-09-30 the owner chose to keep building the knowledge system before
 refactoring it into an installable Temari plugin. This supersedes the proposed

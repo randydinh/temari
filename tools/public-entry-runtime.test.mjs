@@ -129,6 +129,115 @@ test('packages an isolated relocated outer bundle with three current public entr
   }
 });
 
+test('relocated Knowledge cold install keeps state outside the artifact and connects Codex only on request', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'temari knowledge-relocated-'));
+  t.after(async () => rm(root, { recursive: true, force: true }));
+  const artifact = join(root, 'installed', 'temari');
+  const home = join(root, 'recipient-state');
+  const launcher = join(artifact, 'bin/temari-knowledge.mjs');
+  const codex = join(root, 'fake-codex');
+  const codexLog = join(root, 'codex-args.txt');
+  await cp(output, artifact, { recursive: true });
+  await writeFile(codex, '#!/bin/sh\nif [ "$1" = mcp ] && [ "$2" = get ]; then echo "Error: No MCP server named temari-content-registrar found." >&2; exit 1; fi\nprintf "%s\\n" "$@" > "$FAKE_CODEX_LOG"\n');
+  await chmod(codex, 0o755);
+  const cold = await child([launcher, 'status', '--home', home]);
+  assert.equal(cold.installedVersion, null);
+  await assert.rejects(lstat(home), { code: 'ENOENT' });
+  await assert.rejects(lstat(codexLog), { code: 'ENOENT' });
+
+  const result = await new Promise((resolveResult, reject) => {
+    execFile(
+      process.execPath,
+      [launcher, 'setup', '--home', home, '--python', 'python3.12',
+        '--connect-codex', '--codex', codex],
+      {
+        cwd: root,
+        env: { ...process.env, FAKE_CODEX_LOG: codexLog, NODE_OPTIONS: '', NODE_PATH: '' },
+        encoding: 'utf8',
+        maxBuffer: 1024 * 1024,
+        timeout: 180_000,
+      },
+      (error, stdout, stderr) => {
+        if (error) reject(new Error(`${error.message}\n${stderr}\n${stdout}`));
+        else resolveResult(JSON.parse(stdout));
+      },
+    );
+  });
+  assert.equal(result.installedVersion, '0.1.0');
+  assert.equal(result.connection.status, 'connected');
+  assert.equal(result.connection.workspace, join(home, 'workspace'));
+  assert.equal(result.home, home);
+  assert.deepEqual(await readdir(join(home, 'workspace')), []);
+  assert.deepEqual(
+    await checkPublicEntryArtifact(artifact, manifestSha256(manifest)),
+    manifest,
+  );
+  const args = (await readFile(codexLog, 'utf8')).trim().split('\n');
+  assert.deepEqual(args, [
+    'mcp', 'add', 'temari-content-registrar', '--',
+    join(home, 'venv', 'bin', 'python'), '-m', 'knowledge_agent.cli',
+    'mcp', 'serve', '--workspace', join(home, 'workspace'),
+  ]);
+  const marker = join(home, 'workspace', 'preserved.txt');
+  await writeFile(marker, 'recipient data\n');
+  const repeated = await child([launcher, 'setup', '--home', home]);
+  assert.equal(repeated.setup, 'already-installed');
+  assert.equal(await readFile(marker, 'utf8'), 'recipient data\n');
+  assert.equal((await readFile(codexLog, 'utf8')).trim().split('\n').length, args.length);
+  assert.equal((await child([launcher, 'status', '--home', home])).installedVersion, '0.1.0');
+
+  const receiptPath = join(home, 'installation.json');
+  const receipt = JSON.parse(await readFile(receiptPath, 'utf8'));
+  await writeFile(receiptPath, JSON.stringify({
+    ...receipt,
+    registrarManifestSha256: '0'.repeat(64),
+  }));
+  const installedModule = execFileSync(
+    join(home, 'venv/bin/python'),
+    ['-c', 'import knowledge_agent; print(knowledge_agent.__file__)'],
+    { encoding: 'utf8' },
+  ).trim();
+  const originalModule = await readFile(installedModule);
+  await writeFile(installedModule, 'stale same-version payload\n');
+  const repaired = await child([launcher, 'setup', '--home', home]);
+  assert.equal(repaired.setup, 'repaired');
+  assert.equal(repaired.payloadInstalled, true);
+  assert.deepEqual(await readFile(installedModule), originalModule);
+  assert.equal(await readFile(marker, 'utf8'), 'recipient data\n');
+  assert.equal(JSON.parse(await readFile(receiptPath)).registrarManifestSha256,
+    receipt.registrarManifestSha256);
+  await writeFile(installedModule, 'damaged installed module\n');
+  assert.equal((await child([launcher, 'status', '--home', home])).payloadInstalled, false);
+  assert.equal((await child([launcher, 'setup', '--home', home])).setup, 'repaired');
+  assert.deepEqual(await readFile(installedModule), originalModule);
+  assert.equal(await readFile(marker, 'utf8'), 'recipient data\n');
+
+  const sourcePath = join(artifact, 'registrar/src/knowledge_agent/cli.py');
+  const sourceBytes = await readFile(sourcePath);
+  await writeFile(sourcePath, Buffer.concat([sourceBytes, Buffer.from('\n# changed\n')]));
+  const rejectedSetup = await childResult([launcher, 'setup', '--home', home], 1);
+  assert.match(rejectedSetup.stderr, /Bundled Registrar bytes differ/);
+  const rejectedConnect = await childResult(
+    [launcher, 'connect-codex', '--home', home, '--codex', codex], 1,
+    { FAKE_CODEX_LOG: codexLog },
+  );
+  assert.match(rejectedConnect.stderr, /Bundled Registrar bytes differ/);
+  await writeFile(sourcePath, sourceBytes);
+
+  const linkedHome = join(root, 'linked-home');
+  await symlink(artifact, linkedHome, 'dir');
+  const rejectedLinked = await childResult(
+    [launcher, 'setup', '--home', linkedHome], 1,
+  );
+  assert.match(rejectedLinked.stderr, /outside the immutable artifact/);
+  assert.equal(await readFile(marker, 'utf8'), 'recipient data\n');
+  assert.deepEqual(
+    await checkPublicEntryArtifact(artifact, manifestSha256(manifest)),
+    manifest,
+  );
+  assert.equal((await lstat(join(artifact, 'registrar/UPSTREAM.json'))).isFile(), true);
+});
+
 test('relocated QA entry runs the packaged evaluator without source-checkout access', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari qa-relocated-'));
   try {

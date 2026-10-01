@@ -18,8 +18,15 @@ import ts from 'typescript';
 
 const toolPath = fileURLToPath(import.meta.url);
 const workspace = resolve(dirname(toolPath), '..');
-const packageNames = ['contracts', 'temari-core', 'workflow-engine', 'runtime'];
+const packageNames = [
+  'contracts',
+  'temari-core',
+  'workflow-engine',
+  'runtime',
+  'knowledge',
+];
 const manifestName = 'canonical-manifest.json';
+const knowledgePrepare = 'node_modules/@temari/knowledge/src/support/prepare.py';
 const compilerSettings = {
   target: ts.ScriptTarget.ES2022,
   module: ts.ModuleKind.NodeNext,
@@ -92,14 +99,23 @@ function auditImports(files) {
     assert.equal(metadata.type, 'module');
     assert.equal(metadata.main, './src/index.js');
     assert.equal(metadata.types, './src/index.d.ts');
-    assert.deepEqual(metadata.exports, {
+    const expectedExports = {
       '.': {
         types: './src/index.d.ts',
         import: './src/index.js',
         default: './src/index.js',
       },
       './package.json': './package.json',
-    });
+    };
+    if (name === 'knowledge') {
+      expectedExports['./cli'] = './src/demo.js';
+      assert.deepEqual(metadata.bin, {
+        'temari-knowledge': './src/demo.js',
+      });
+      assert(files.has(`${root}/src/demo.js`), 'Missing knowledge CLI');
+      assert(files.has(knowledgePrepare), 'Missing knowledge preparation helper');
+    } else assert.equal(metadata.bin, undefined);
+    assert.deepEqual(metadata.exports, expectedExports);
     assert(files.has(`${root}/src/index.js`), `Missing entry for ${name}`);
     assert(
       files.has(`${root}/src/index.d.ts`),
@@ -128,14 +144,13 @@ function auditImports(files) {
     );
     assert(owner, `File outside included packages: ${path}`);
     if (path === `${owner.root}/package.json`) continue;
+    if (path === knowledgePrepare) continue;
     assert(
       /^src\/.+\.(?:js|d\.ts)$/.test(path.slice(owner.root.length + 1)),
       `Unexpected emitted file: ${path}`,
     );
     assert(
-      !/(?:^|\/)(?:fixtures?|demos?|__tests__)(?:\/|$)|\.(?:test|spec)\./.test(
-        path,
-      ),
+      !/(?:^|\/)(?:fixtures?|demos?|__tests__)(?:\/|$)|\.(?:test|spec)\./.test(path),
       `Nonproduction file: ${path}`,
     );
     const source = ts.createSourceFile(
@@ -313,7 +328,10 @@ export async function packageCanonicalRuntime(output) {
   const host = ts.createCompilerHost(options);
   host.getCurrentDirectory = () => workspace;
   const program = ts.createProgram(
-    packageNames.map((name) => join(workspace, 'libs', name, 'src/index.ts')),
+    [
+      ...packageNames.map((name) => join(workspace, 'libs', name, 'src/index.ts')),
+      join(workspace, 'libs/knowledge/src/demo.ts'),
+    ],
     options,
     host,
   );
@@ -340,9 +358,7 @@ export async function packageCanonicalRuntime(output) {
       `Source outside production closure: ${path}`,
     );
     assert(
-      !/(?:^|\/)(?:fixtures?|demos?|__tests__)(?:\/|$)|\.(?:test|spec)\./.test(
-        path,
-      ),
+      !/(?:^|\/)(?:fixtures?|demos?|__tests__)(?:\/|$)|\.(?:test|spec)\./.test(path),
       `Nonproduction source: ${path}`,
     );
     inputs.set(`libs/${path}`, Buffer.from(source.text));
@@ -360,6 +376,10 @@ export async function packageCanonicalRuntime(output) {
   });
   failDiagnostics(result.diagnostics);
   assert(!result.emitSkipped, 'TypeScript skipped canonical runtime emit');
+  const preparationSource = 'libs/knowledge/src/support/prepare.py';
+  const preparationBytes = await readFile(join(workspace, preparationSource));
+  inputs.set(preparationSource, preparationBytes);
+  files.set(knowledgePrepare, preparationBytes);
   for (const value of metadata.values()) {
     const dependencies = Object.fromEntries(
       Object.keys(value.dependencies ?? {})
@@ -388,7 +408,13 @@ export async function packageCanonicalRuntime(output) {
             default: './src/index.js',
           },
           './package.json': './package.json',
+          ...(value.name === '@temari/knowledge'
+            ? { './cli': './src/demo.js' }
+            : {}),
         },
+        ...(value.name === '@temari/knowledge'
+          ? { bin: { 'temari-knowledge': './src/demo.js' } }
+          : {}),
         dependencies,
       }),
     );
