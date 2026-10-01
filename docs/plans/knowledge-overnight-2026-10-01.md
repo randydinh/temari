@@ -428,3 +428,37 @@ Keep pending clean canonical package/check, commit and exact-head PR review.
 The lexical shortlist and gold are operator supplied; query text is attribution
 only. This proves a source-pinned evaluation path, not BM25 lift, independent
 task quality or an enabled unlabelled graph search route.
+
+## 05:13 PDT reviewed-root evaluation delivery
+
+PR #137 merged at `5ddd98353244e93f06c43aa1544cc668c412050f`
+after independent exact-head review of clean commit
+`6f69fdb30691875544a33057d3e463e1811a7351`. Final Nx knowledge
+integration passed 72/72, unit tests 43/43, typecheck, clean canonical
+package/check and stock-Node export passed. GitHub reported no branch checks.
+The isolated worktree now starts an audit branch from merged main. The next
+work is to reconcile the overnight decision trail with actual merged code,
+test logs, receipts and remaining finish predicates before pausing the
+heartbeat for the morning handoff.
+
+## 05:17 PDT morning audit
+
+At the reconciliation check, the append-only decision log parsed as 92
+six-field data rows with 11 delivery entries; audit rows were appended
+afterward. GitHub reports PRs #127–137 all merged; their merge commits are in
+the isolated checkout's main ancestry. The final actual-Registrar knowledge
+integration run passed 72/72, unit tests 43/43 and typecheck passed. The
+latest two canonical artifacts matched their exact clean reviewed heads, and
+stock Node imports succeeded. The detailed reconciliation is
+`docs/evidence/knowledge-system/overnight-audit-2026-10-01.md`.
+
+The first-unit macOS searchable-PDF hard-memory-boundary predicate remains
+open. So do independent real-task retrieval quality, no-answer and visual
+coverage, continuous source scheduling, authenticated semantic review,
+production-safe recovery, Windows operation and optional plugin lifecycle.
+The next relationship experiment needs a receipt-pinned reviewed-child
+evaluation after a changed v2 Markdown link; the current diagnostic accepts
+only the fresh v2 root, so no changed-content recovery success is claimed.
+The overnight run produced verified local increments but has not established
+a production lossless knowledge system. The heartbeat should be paused after
+this audit is persisted and merged.
