@@ -55,6 +55,15 @@ keeping the draft against the displayed current version enabled a successful sav
 Both services were observed listening only on loopback: dashboard `127.0.0.1:3092`
 and its matching Archon console `127.0.0.1:3091`.
 
+The matching native run link was opened in Archon. Its Log view showed all stage
+transitions. Graph initially reported a missing workflow because pinned Archon
+looks up the current workflow catalog instead of the retained run definition.
+Copying the exact retained 1,694-byte YAML into the dedicated
+`ARCHON_HOME/workflows/temari-nx-canonical.yaml` restored the graph. The browser
+then showed six completed stages plus finalization. The copied SHA-256 is
+`89f03b21c7acf58add17fe041a842fcbf0fbef397a8926b1baa3e814d7217e02`.
+Captured evidence and the execution workspace were unchanged.
+
 ## Review and fixes
 
 An independent reviewer found and re-reviewed fixes for stale note drafts and

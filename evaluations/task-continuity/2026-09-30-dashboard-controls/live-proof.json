@@ -119,9 +119,13 @@
   "browser": {
     "noteConflict": "draft survived concurrent version change; Save disabled; explicit keep-against-current followed by successful Save",
     "taskPreservation": "existing broad dashboard task remains OPEN; no canonical completion fabricated",
-    "listeners": [
-      "127.0.0.1:3092",
-      "127.0.0.1:3091"
-    ]
+    "listeners": ["127.0.0.1:3092", "127.0.0.1:3091"],
+    "archonTrace": {
+      "log": "all six stages plus finalization visibly completed",
+      "graph": "all six stages plus finalization visibly completed after catalog registration",
+      "definitionBytes": 1694,
+      "definitionSha256": "89f03b21c7acf58add17fe041a842fcbf0fbef397a8926b1baa3e814d7217e02",
+      "installation": "dedicated ARCHON_HOME/workflows/temari-nx-canonical.yaml; exact retained source bytes"
+    }
   }
 }

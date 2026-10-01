@@ -132,6 +132,14 @@ Open <http://127.0.0.1:3092>. The server prints its URL, task root, and mode; th
 browser shows **Local controls** and **New goal**. `--archon-url` is a link to
 your existing console; this command does not start that console.
 
+Archon 0.10.1 resolves its **Graph** view from the current workflow catalog.
+When execution uses an external workflow source, install the same canonical YAML
+in the dedicated `ARCHON_HOME/workflows/temari-nx-canonical.yaml` to make the graph
+discoverable. For an existing run, copy its retained
+`workflow-source/project/.archon/workflows/temari-nx-canonical.yaml` unchanged and
+compare hashes first. Keep historical run captures as the evidence authority;
+the graph uses the currently discoverable definition.
+
 For a read-only inbox over an existing store, omit `--control-config` and the
 native execution options:
 
