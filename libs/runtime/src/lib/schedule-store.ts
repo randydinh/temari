@@ -274,7 +274,13 @@ export class FileScheduleStore {
       const digest = scheduleDigest(request);
       const duplicate = record.events.find((event) => event.requestId === request.requestId);
       if (duplicate) { assert.equal(duplicate.digest, digest, 'Schedule command idempotency conflict.'); return record; }
-      assert.equal(record.version, request.expectedVersion, 'Schedule version conflict; refresh before changing it.');
+      // Operator intent changes future scheduling settings. Execution telemetry
+      // may advance after the browser reads them without changing those settings.
+      // Accept only that drift; never overwrite an intervening operator command
+      // or accept a version the store has not actually published.
+      assert(request.expectedVersion <= record.version &&
+        record.events.slice(request.expectedVersion).every((event) => event.kind === 'occurrence'),
+        'Schedule version conflict; refresh before changing its controls.');
       assert(record.status !== 'CANCELLED', 'Cancelled schedules cannot be resumed; create a new schedule.');
       const status: ScheduleStatus = request.action === 'pause' ? 'PAUSED' : request.action === 'resume' ? 'ACTIVE' : 'CANCELLED';
       assert(record.status !== status, 'Schedule already has the requested status.');

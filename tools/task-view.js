@@ -604,6 +604,7 @@ async function refresh() {
     byId('error').hidden = true;
     renderList();
     renderDetail();
+    window.dispatchEvent(new Event('dashboard-refreshed'));
   } catch (error) {
     byId('connection').textContent = 'Refresh failed';
     byId('error').textContent = error.message;

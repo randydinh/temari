@@ -66,6 +66,67 @@ test('occurrence intent, exact dispatch version and cursor are durable and immut
   await assert.rejects(reopened.claimOccurrence(record.id, '2026-10-01T10:00:30.000Z', 0, 'INTENT', null), /not aligned/);
 });
 
+test('identical occurrence observations preserve bytes, timestamps and optimistic version while actual changes remain durable', async (t) => {
+  const f = await fixture(t);
+  const record = await f.create();
+  const occurrence = await f.store.claimOccurrence(record.id, at, 0, 'INTENT', null, new Date(at));
+  assert(occurrence);
+  await f.store.updateOccurrence(record.id, occurrence.id, { state: 'PREPARED', issue: null }, new Date(at));
+  await f.store.updateOccurrence(record.id, occurrence.id, { state: 'STARTING', expectedVersion: 2, issue: null }, new Date(at));
+  const active = await f.store.updateOccurrence(record.id, occurrence.id, { state: 'ACTIVE', issue: null }, new Date(at));
+  const before = await f.store.get(record.id);
+  const bytes = await readFile(join(f.directory, 'schedules.json'));
+  for (let tick = 1; tick <= 12; tick++) {
+    assert.deepEqual(await f.store.updateOccurrence(record.id, occurrence.id, { state: 'ACTIVE', issue: null }, new Date(Date.parse(at) + tick * 1000)), active);
+  }
+  assert.deepEqual(await f.store.get(record.id), before);
+  assert.deepEqual(await readFile(join(f.directory, 'schedules.json')), bytes);
+  const uncertain = await f.store.updateOccurrence(record.id, occurrence.id, { state: 'UNCERTAIN', issue: 'Cancellation remains pending.' }, new Date(Date.parse(at) + 13_000));
+  const changed = (await f.store.get(record.id))!;
+  assert.equal(changed.version, before!.version + 1);
+  assert.equal(changed.occurrences[0].issue, 'Cancellation remains pending.');
+  for (let tick = 14; tick <= 20; tick++) {
+    assert.deepEqual(await f.store.updateOccurrence(record.id, occurrence.id, { state: 'UNCERTAIN', issue: uncertain.issue, expectedVersion: 2 }, new Date(Date.parse(at) + tick * 1000)), uncertain);
+  }
+  assert.deepEqual(await f.store.get(record.id), changed);
+  const completedAt = new Date(Date.parse(at) + 21_000);
+  await f.store.updateOccurrence(record.id, occurrence.id, { state: 'TERMINAL', issue: null }, completedAt);
+  const reopened = await FileScheduleStore.create(f.directory, f.workspace);
+  const completed = (await reopened.get(record.id))!;
+  assert.equal(completed.version, changed.version + 1);
+  assert.equal(completed.occurrences[0].state, 'TERMINAL');
+  assert.equal(completed.occurrences[0].updatedAt, completedAt.toISOString());
+});
+
+test('future controls accept only occurrence telemetry drift and preserve exact replay while rejecting settings races', async (t) => {
+  const f = await fixture(t);
+  const record = await f.create();
+  const occurrence = await f.store.claimOccurrence(record.id, at, 0, 'INTENT', null, new Date(at));
+  assert(occurrence);
+  await f.store.updateOccurrence(record.id, occurrence.id, { state: 'PREPARED', issue: null });
+  await f.store.updateOccurrence(record.id, occurrence.id, { state: 'STARTING', expectedVersion: 2, issue: null });
+  await f.store.updateOccurrence(record.id, occurrence.id, { state: 'ACTIVE', issue: null });
+  const browser = (await f.store.get(record.id))!;
+  await f.store.updateOccurrence(record.id, occurrence.id, { state: 'TERMINAL', issue: null });
+  const terminal = (await f.store.get(record.id))!;
+  assert.equal(terminal.version, browser.version + 1);
+  const command = { requestId: 'pause-after-completion', expectedVersion: browser.version, action: 'pause' as const };
+  const paused = await f.store.update(record.id, command);
+  assert.equal(paused.status, 'PAUSED');
+  assert.equal(paused.version, terminal.version + 1);
+  assert.equal(paused.occurrences[0].state, 'TERMINAL');
+  assert.deepEqual(await f.store.update(record.id, command), paused);
+  await assert.rejects(f.store.update(record.id, { requestId: 'future-version', expectedVersion: paused.version + 1, action: 'resume' }), /version conflict/);
+  await assert.rejects(f.store.update(record.id, { requestId: 'stale-resume', expectedVersion: browser.version, action: 'resume' }), /version conflict/);
+  const resumed = await f.store.update(record.id, { requestId: 'current-resume', expectedVersion: paused.version, action: 'resume' });
+  assert.equal(resumed.status, 'ACTIVE');
+  // Returning to the same ACTIVE status does not erase the intervening human
+  // pause/resume decisions, so another stale tab cannot overwrite them.
+  await assert.rejects(f.store.update(record.id, { requestId: 'stale-pause', expectedVersion: browser.version, action: 'pause' }), /version conflict/);
+  assert.deepEqual(await f.store.update(record.id, command), resumed);
+  await assert.rejects(f.store.update(record.id, { ...command, expectedVersion: terminal.version }), /idempotency conflict/);
+});
+
 test('one tick owns external effects; concurrent callers do not wait and launch twice', async (t) => {
   const f = await fixture(t);
   let release!: () => void;

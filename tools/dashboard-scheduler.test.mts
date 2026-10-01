@@ -124,6 +124,33 @@ test('concurrent ticks on two scheduler instances launch one occurrence', async 
   assert.deepEqual(f.counts(), { createCalls: 1, startCalls: 1 });
 });
 
+test('one-second ticks with advancing canonical task versions do not grow unchanged schedule history', async (t) => {
+  const f = await fixture(t);
+  const record = await f.create();
+  await f.scheduler.tick(minute(0));
+  const active = await f.get(record.id);
+  const originalInspect = f.dispatcher.inspect;
+  f.dispatcher.inspect = async (taskId, startRequestId) => {
+    const task = f.tasks.get(taskId)!;
+    f.tasks.set(taskId, { ...task, version: task.version + 1 });
+    return originalInspect(taskId, startRequestId);
+  };
+  for (let tick = 1; tick <= 12; tick++) {
+    const outcome = await f.scheduler.tick(new Date(Date.parse(anchor) + tick * 1000));
+    assert.deepEqual(outcome.issues, []);
+    assert.equal(outcome.occurrences[0].state, 'ACTIVE');
+  }
+  assert.deepEqual(await f.get(record.id), active);
+  assert.deepEqual(f.counts(), { createCalls: 1, startCalls: 1 });
+  const occurrence = active.occurrences[0];
+  f.tasks.set(occurrence.taskId, { ...f.tasks.get(occurrence.taskId)!, state: 'terminal' });
+  await f.scheduler.tick(new Date(Date.parse(anchor) + 13_000));
+  const completed = await f.get(record.id);
+  assert.equal(completed.version, active.version + 1);
+  assert.equal(completed.events.length, active.events.length + 1);
+  assert.equal(completed.occurrences[0].state, 'TERMINAL');
+});
+
 test('crash after canonical create resumes the same deterministic task rather than creating another', async (t) => {
   const f = await fixture(t);
   const schedule = await f.create();

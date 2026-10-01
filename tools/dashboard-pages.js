@@ -420,6 +420,7 @@ function renderSchedules() {
           cancel: 'Cancel schedule',
         }[action] ?? action,
       );
+      button.disabled = state.dashboard?.mode !== 'writable';
       button.addEventListener('click', async () => {
         button.disabled = true;
         try {
@@ -431,6 +432,9 @@ function renderSchedules() {
           await loadSchedules();
         } catch (error) {
           pageError(error);
+          await loadSchedules();
+        } finally {
+          button.disabled = false;
         }
       });
       controls.append(button);
@@ -533,6 +537,13 @@ byId('schedule-form').addEventListener('submit', async (event) => {
 byId('refresh').addEventListener('click', () => {
   if (pages.view === 'knowledge') loadKnowledge();
   if (pages.view === 'schedules') loadSchedules();
+});
+let scheduleControlMode = null;
+window.addEventListener('dashboard-refreshed', () => {
+  if (pages.view === 'schedules' && pages.schedules && scheduleControlMode !== state.dashboard?.mode) {
+    scheduleControlMode = state.dashboard?.mode;
+    renderSchedules();
+  }
 });
 setInterval(() => {
   if (

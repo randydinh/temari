@@ -2001,11 +2001,19 @@ export class DashboardController implements TaskViewController {
   }
 
   async describe(): Promise<unknown> {
-    const tasks = await this.options.runtime.listSnapshots();
-    const controls: Record<string, unknown> = {};
-    for (const task of tasks.filter(
+    const tasks = (await this.options.runtime.listSnapshots()).filter(
       (item) => item.workspaceRoot === this.options.config.workspaceRoot,
-    )) {
+    );
+    // Reserve keys in snapshot order while bounded projections complete independently.
+    const controls: Record<string, unknown> = Object.fromEntries(
+      tasks.map((task) => [task.taskId, undefined]),
+    );
+    let workspaceCandidate: Promise<Candidate> | undefined;
+    const currentCandidate = (): Promise<Candidate> =>
+      (workspaceCandidate ??= cleanCandidate(
+        this.options.config.workspaceRoot,
+      ));
+    const project = async (task: TaskSnapshot): Promise<void> => {
       try {
         const planned = await this.planningPreparation(task);
         const planning = planned ? await inspectGoalPlan(planned.handle) : null;
@@ -2029,7 +2037,7 @@ export class DashboardController implements TaskViewController {
           let candidateCurrent = false;
           try {
             candidateCurrent =
-              taskDigest(await cleanCandidate(task.workspaceRoot)) ===
+              taskDigest(await currentCandidate()) ===
               taskDigest(implementation.candidate);
           } catch {}
           if (
@@ -2056,13 +2064,13 @@ export class DashboardController implements TaskViewController {
             verifiedRevision: implementation.candidate.head,
             message: snapshot.statusNote,
           };
-          continue;
+          return;
         }
         if (planning) {
           let candidateCurrent = false;
           try {
             candidateCurrent =
-              taskDigest(await cleanCandidate(task.workspaceRoot)) ===
+              taskDigest(await currentCandidate()) ===
               taskDigest(planning.candidate);
           } catch {}
           const actions = ['update'];
@@ -2084,7 +2092,7 @@ export class DashboardController implements TaskViewController {
                 ? 'Workspace changed since planning; create a new goal for the current candidate.'
                 : planning.statusNote,
           };
-          continue;
+          return;
         }
         const swarm = await this.swarmPreparation(task);
         if (swarm) {
@@ -2093,7 +2101,7 @@ export class DashboardController implements TaskViewController {
           let candidateCurrent = false;
           try {
             candidateCurrent =
-              taskDigest(await cleanCandidate(task.workspaceRoot)) ===
+              taskDigest(await currentCandidate()) ===
               taskDigest(swarm.candidate);
           } catch {}
           if (
@@ -2117,7 +2125,7 @@ export class DashboardController implements TaskViewController {
             verifiedRevision: swarm.candidate.head,
             message: snapshot.statusNote,
           };
-          continue;
+          return;
         }
         const prepared = await this.preparation(task);
         if (!prepared) {
@@ -2126,14 +2134,14 @@ export class DashboardController implements TaskViewController {
             message: 'Goal saved. Temari needs to prepare an execution plan.',
             progress: [],
           };
-          continue;
+          return;
         }
         const run = task.runs.find((item) => item.runId === prepared.runId)!;
         const actions = ['update'];
         let candidateCurrent = false;
         try {
           candidateCurrent =
-            taskDigest(await cleanCandidate(task.workspaceRoot)) ===
+            taskDigest(await currentCandidate()) ===
             taskDigest(prepared.candidate);
         } catch {}
         const pending = run.operations.some(
@@ -2261,7 +2269,16 @@ export class DashboardController implements TaskViewController {
           progress: [],
         };
       }
-    }
+    };
+    let nextTask = 0;
+    await Promise.all(
+      Array.from({ length: Math.min(4, tasks.length) }, async () => {
+        while (nextTask < tasks.length) {
+          const task = tasks[nextTask++]!;
+          await project(task);
+        }
+      }),
+    );
     return {
       workspaceRoot: this.options.config.workspaceRoot,
       recipes: this.options.config.recipes.map(({ id, title, goal }) => ({
