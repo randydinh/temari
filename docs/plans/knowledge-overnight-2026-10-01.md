@@ -110,3 +110,14 @@ an explicit wrapper repaired it, and two later full runs passed. The decision
 is to keep this read-only, metadata-only increment pending clean package and
 exact-head PR review. It does not close the macOS PDF extraction or broader
 production losslessness gates.
+
+## 02:52 PDT paging delivery and next selection
+
+PR #130 merged at `772691f846b15b43ff80054a303645a9bb6a12f0` after
+independent exact-head review of clean commit `ceee15d7f89404ca003121d083a64b487085fe2c`.
+Canonical package/check reported `dirty: false` at that head, and a relocated
+stock-Node import of the new API passed. GitHub reported no branch checks.
+The isolated worktree now starts a new branch from merged main. Relationship
+refresh, held-out retrieval quality and source lifecycle gaps are being
+compared for the next bounded increment. The macOS searchable-PDF hard worker
+boundary and the broader production finish condition remain open.
