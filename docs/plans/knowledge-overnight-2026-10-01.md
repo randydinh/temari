@@ -121,3 +121,33 @@ The isolated worktree now starts a new branch from merged main. Relationship
 refresh, held-out retrieval quality and source lifecycle gaps are being
 compared for the next bounded increment. The macOS searchable-PDF hard worker
 boundary and the broader production finish condition remain open.
+
+## 02:55 PDT sealed retrieval cohort experiment
+
+The existing actual-CLI gate test has one development and one holdout question;
+the gate itself requires at least five of each. The nine-case real-corpus pilot
+found BM25 at top three in five of nine target-file questions, but did not
+establish a held-out task-quality benchmark. The next bounded increment will
+freeze five development and five distinct holdout gold paths outside a
+registered synthetic source root, run exact and BM25 through actual Registrar
+captures at one top-K, and require verified shortlists and a reasoned gate
+status after the sample floor. Rare identifiers, partial paraphrase probes,
+duplicate crowding and contrary text make retrieval limits visible. No hosted
+model will be called. Passing this local gate would validate evaluation mechanics only;
+it cannot promote a default ranker or certify task correctness. No-answer and
+image-only coverage remain separate open cases because this gate requires an
+expected indexed path for each question.
+
+## 03:03 PDT sealed retrieval checkpoint
+
+The actual-CLI fixture yielded five indexed, unique gold paths in each cohort
+and verified every exact and BM25 shortlist at top two. Each cohort scored
+exact 3/5 and BM25 5/5 with no regression; the existing local gate returned
+`promotion-eligible`. The post-edit focused Nx integration test passed 1/1 and
+typecheck passed; an earlier full integration run passed 64/64 before the last
+scenario assertions. Independent review found no blocking issue and confirmed
+the contrary-draft ranking assertions. The decision is to keep this synthetic
+gate-mechanics increment pending commit and exact-head review. The fixture
+cohorts were authored together, so they cannot certify independent task
+quality or justify switching the default ranker. No-answer and unsupported
+visual/PDF modalities remain separate coverage gaps.
