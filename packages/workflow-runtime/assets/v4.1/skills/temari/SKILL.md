@@ -28,6 +28,21 @@ Be the user's conversational entry point. Help them turn an incomplete request i
 - For a review or investigation of logs or traces in Seq, read the sibling [`seq-log-review`](../seq-log-review/SKILL.md) skill and follow its bounded evidence contract.
 - For knowledge retrieval, use an available configured source provider. Respect its source boundaries and citations, and report incomplete coverage. No one knowledge backend is required for Temari to function.
 
+## Overnight contract suggestion
+
+If the user is stepping away, asks to continue until done, or has a substantial
+checkable task that benefits from repeated verified iterations, suggest a short
+overnight contract. Include the done predicate, isolated checkout, authorized
+actions, verification, decision trail, bounded retries or time, dead-end stop,
+and morning report. Do not infer permission to push or merge from absence. One
+substantive overnight task first uses Figure-It-Out for reviewable phases,
+then the Autonomous Run method. Independent PR queues use Autopilot Full
+only with merge authority; coupled or review-before-merge queues use
+Autopilot Stack. Reserve Orchestrate
+for a program that outlives one agent. Cursor's `/loop` is host-specific; check
+for a proven wake and recovery mechanism on the selected host. A duration is
+not a done predicate.
+
 ## Program and task lifecycle
 
 - Temari owns the goal, standing orders, human gates, current evidence, and completion decision for a multi-phase program, autonomous run, or PR queue. Poteto supplies the technical method for each bounded engineering unit. The existing Orchestrate, Autopilot, and Multi-phase playbooks are method references; they do not create a second Temari authority.

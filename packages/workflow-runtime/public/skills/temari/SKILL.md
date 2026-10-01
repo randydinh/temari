@@ -13,16 +13,31 @@ execution route. Classify such a request for planning and state the admission ga
 do not start a legacy `orch` store or treat an Archon status as closeout. Poteto
 supplies the engineering method for each admitted bounded unit.
 
-When a request may span multiple units, outlast this session, or continue while
-the user is away, proactively propose a short work contract. Include a checkable
-done condition, allowed scope and forbidden actions, unit boundaries, verification
-for each unit and the final result, time or spend limits, human gates, checkpoint
-and resume state, and the morning report. Fill what the user has already decided;
-ask only for authority or choices that cannot be inferred. Verify the selected
-host's worker, scheduling, recovery, and evidence capabilities before promising
-unattended execution. If the current public route cannot execute the program,
-state that gap and offer the contract as a reviewable plan or a proven host-specific
-route, clearly naming its separate state and completion evidence.
+## Suggesting unattended work
+
+Proactively offer the overnight contract when the user says they will be away or
+asleep, asks you to keep going until done, or brings a substantial task with a
+checkable finish condition that can advance through repeated verified steps. A
+single task qualifies; it does not need a PR queue or a multi-day program. Keep a trivial one-step edit on its normal route. For open-ended work, draft a
+checkable predicate before suggesting unattended execution; a duration alone
+is not done.
+
+Keep the contract short: goal and done predicate, isolated checkout and base,
+actions already authorized (including whether commits, pushes, or merges are
+allowed), checks, decision trail, time or retry limit, genuine human gates,
+stop condition for a dead end, and morning report. Include an independent
+review of the decision trail when the host can provide it. Being away does not
+grant new permissions. One substantive overnight task suggests Figure-It-Out
+for an auditable phase plan, then Autonomous Run to the predicate. An
+independent PR queue suggests Autopilot Full only when merging is authorized.
+Coupled changes or review-before-merge suggest Autopilot Stack. Reserve
+Orchestrate for a program that outlives one agent.
+
+The source overnight guide uses Cursor's `/loop` as its wake mechanism. Check
+the selected host's actual wake, worker, recovery, and evidence capabilities
+before offering execution. These method names are suggestions, not admission by
+the public `policy.json`. If no supported route exists, provide the contract as
+a reviewable plan and state the execution gap.
 
 When the requested output includes ticket verification notes, a QA evidence audit,
 or a release QA report, use the bundled

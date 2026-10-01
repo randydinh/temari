@@ -670,9 +670,9 @@
       "path": "skills/poteto-mode/SKILL.md",
       "lane": "portable",
       "sourceSha256": "d6507c6b87d3a3c7c263b711e9152bb513ca1c8b0204aa8da4a1fefe4357f9b3",
-      "artifactSha256": "7269e25a832829aa60b8296f3b03ace4468fe9d332c443817c9ddeb279f139f9",
+      "artifactSha256": "dcaad1aac05d925f0818dd20c7220f4129579846e367bc4be554e02b77366907",
       "executable": false,
-      "transformation": "New program and lifecycle requests return to Temari; retained playbooks are method or legacy references."
+      "transformation": "Route one-task overnight requests to Temari for a short contract and distinguish Autonomous Run from PR queues and standing programs; retain program and lifecycle ownership references."
     },
     {
       "path": "skills/poteto-mode/playbook-contracts/v1/feature.json",
@@ -1454,9 +1454,9 @@
       "path": "skills/temari/SKILL.md",
       "lane": "portable",
       "sourceSha256": "4309ed9237767f9a25cea2ff8da1322ccc19abfd990e65074e86ad6e80a30206",
-      "artifactSha256": "97691396ada5c43cf7319658e03707faee9077b9271260af60425906a3cc5c9b",
+      "artifactSha256": "a509c7d48c8908dd4cea17a1f28253eff2261cba7c13c1b7904ab3760b397820",
       "executable": false,
-      "transformation": "Retain the previously accepted semantic skill-selection and invocation policy sentence assigning policy to Temari and translation to the host adapter; source revision removed it. Vendored content is unchanged. Temari takes new program and lifecycle route decisions; Archon remains run control with a receipt parity gate."
+      "transformation": "Retain the accepted semantic skill-selection and host translation policy. Add Temari program and lifecycle ownership, Archon receipt boundary, and proactive overnight-contract suggestion with one-task, queue, and program distinctions."
     },
     {
       "path": "skills/temari/references/credentials.md",

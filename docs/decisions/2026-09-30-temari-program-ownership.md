@@ -59,11 +59,16 @@ explanation in `provenance.json`.
 ## User-facing priority
 
 Verification is the first product priority. A dependable contract for unattended
-agent work is second. Temari should surface that option when a task has several
-independent units or the user will be away, instead of waiting for the user to
-name Orchestrate, an automation, or another host mechanism. The contract makes
-the finish line, delegated scope, verification, time or spend limits, human
-gates, checkpoints, recovery, and final report reviewable before dispatch.
+agent work is second. Temari should suggest it when the user will be away or
+wants one substantial task driven to a checkable finish condition. The contract
+needs a goal, isolated checkout and base, authorized actions, verification, a
+decision trail, bounded time or retries, a dead-end stop, and a morning report.
+A duration alone is not a finish condition. The
+[upstream overnight guide](https://github.com/cursor/plugins/blob/main/pstack/docs/guide/07-overnight.md)
+routes a substantive overnight task through Figure-It-Out for reviewable
+phases, then Autonomous Run to the finish condition.
+Independent PR queues and multi-day programs select their own heavier methods;
+being asleep by itself does not select Orchestrate.
 
 This priority does not itself admit a new program execution route. The current
 public route can draft the contract, then must check the selected host and

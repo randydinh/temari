@@ -7,9 +7,13 @@ description: Use the current Nx P-stack engineering workflow with pinned lightwe
 
 Poteto mode supplies the engineering workflow selected by Temari.
 
-Standing-program and task-lifecycle decisions return to Temari. This public
-entry admits only the routes named by `policy.json`; it does not create an
-Orchestrate store or promote a program from a bounded engineering request.
+A request to keep working while the user is away returns to Temari for an
+overnight contract. For one substantive overnight task, suggest Figure-It-Out
+to plan reviewable phases, then Autonomous Run; do not escalate it to
+Orchestrate merely
+because it runs overnight. Queues and multi-day programs have separate routes.
+This public entry admits only the routes named by `policy.json`; it does not
+create an Orchestrate store or promote a program from a bounded request.
 
 For ticket verification notes, QA evidence audits, and release QA reports requested
 during verification or handoff, load the bundled

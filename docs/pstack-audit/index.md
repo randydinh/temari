@@ -35,10 +35,24 @@ verifies a trusted invocation against the current candidate.
 is a public supporting skill, invoked through Temari for QA deliverables rather
 than a fourth `policy.entries` key.
 
-For multi-unit work or a user stepping away, Temari should proactively offer
-a [reviewable unattended work contract](../decisions/2026-09-30-temari-program-ownership.md#user-facing-priority)
-with a finish line, scope, verification, gates, and recovery plan. Verify the
-selected host before promising that agents will continue while the user is away.
+The [upstream overnight guide](https://github.com/cursor/plugins/blob/main/pstack/docs/guide/07-overnight.md)
+starts with one task and a checkable finish condition. Temari should suggest
+that short contract when the user will be away or wants repeated work until
+done. Suggest Figure-It-Out for auditable phases, then Autonomous Run for
+one substantive overnight task; Autopilot Full for independent PRs authorized to merge; Autopilot Stack
+for coupled changes or human landing; and Orchestrate only for a program that
+outlives one agent. A clock duration alone is not completion. The
+[ownership decision](../decisions/2026-09-30-temari-program-ownership.md#user-facing-priority)
+records the contract and host admission boundary.
+
+| Request signal | Suggested method | Boundary |
+| --- | --- | --- |
+| “I’m going to bed; migrate callers until none remain” | Short contract, Figure-It-Out, then Autonomous Run | One task; verify the predicate and keep a decision trail |
+| “Work on this for four hours” | Draft a pass/fail finish condition first | Time is a limit, not completion |
+| “Merge these independent PRs by morning” | Autopilot Full | Require merge authority and current-head verification |
+| “Stack these changes; I’ll land them” | Autopilot Stack | Preserve human review before merge |
+| “Own this migration across many packages and days” | Orchestrate | Program-scale coordination; current Temari execution admission remains gated |
+| “Fix this small typo” | Ordinary lightweight route | No unattended contract needed |
 
 The public policy currently admits lightweight engineering, host-proven full
 feature work, and versioned QA. It has no standing-program execution entry.

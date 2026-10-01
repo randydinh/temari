@@ -98,6 +98,7 @@ for identifier, label, url in (
     ("third-party", "Third-party MCP marketplace", "https://github.com/cursor/plugins/tree/main/third_party"),
     ("ralph-loop", "Ralph Loop", "https://github.com/cursor/plugins/tree/main/ralph-loop"),
     ("benny", "Benny automation pack", "https://github.com/cursor/plugins/tree/main/pstack/automations/benny"),
+    ("overnight-guide", "P-stack overnight guide", "https://github.com/cursor/plugins/blob/main/pstack/docs/guide/07-overnight.md"),
 ):
     node(f"external:{identifier}", "external", label, upstream=url)
 
@@ -178,6 +179,15 @@ edge("component:archon", "component:execution-harness", "implements", "documente
 edge("playbook:orchestrate", "component:orch-store", "uses", "documented", relative(PLAYBOOKS / "orchestrate.md"))
 edge("component:orch-store", "owner:runtime", "overlaps", "review_recommendation", "docs/pstack-audit/index.md")
 edge("external:ralph-loop", "playbook:autonomous-run", "separate_loop_mechanism", "documented", "docs/pstack-audit/index.md")
+overnight_source = "https://github.com/cursor/plugins/blob/main/pstack/docs/guide/07-overnight.md"
+for target, relation in (
+    ("skill:figure-it-out", "plans_overnight_task"),
+    ("playbook:autonomous-run", "drives_one_task_to_predicate"),
+    ("playbook:autopilot-full", "handles_independent_pr_queue"),
+    ("playbook:autopilot-stack", "handles_reviewed_stack"),
+    ("playbook:orchestrate", "handles_multi_day_program"),
+):
+    edge("external:overnight-guide", target, relation, "documented", overnight_source)
 edge("external:third-party", "skill:why", "optional_evidence_provider", "documented", relative(SKILLS / "why/SKILL.md"))
 edge("external:benny", "skill:poteto-mode", "uses_shared_skills", "documented", "docs/pstack-audit/index.md")
 

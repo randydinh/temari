@@ -29,6 +29,12 @@
       "upstream": "https://github.com/cursor/plugins/tree/main/pstack/automations/benny"
     },
     {
+      "id": "external:overnight-guide",
+      "kind": "external",
+      "label": "P-stack overnight guide",
+      "upstream": "https://github.com/cursor/plugins/blob/main/pstack/docs/guide/07-overnight.md"
+    },
+    {
       "id": "external:ralph-loop",
       "kind": "external",
       "label": "Ralph Loop",
@@ -620,6 +626,41 @@
       "relation": "uses_shared_skills",
       "basis": "documented",
       "evidence": "docs/pstack-audit/index.md"
+    },
+    {
+      "from": "external:overnight-guide",
+      "to": "playbook:autonomous-run",
+      "relation": "drives_one_task_to_predicate",
+      "basis": "documented",
+      "evidence": "https://github.com/cursor/plugins/blob/main/pstack/docs/guide/07-overnight.md"
+    },
+    {
+      "from": "external:overnight-guide",
+      "to": "playbook:autopilot-full",
+      "relation": "handles_independent_pr_queue",
+      "basis": "documented",
+      "evidence": "https://github.com/cursor/plugins/blob/main/pstack/docs/guide/07-overnight.md"
+    },
+    {
+      "from": "external:overnight-guide",
+      "to": "playbook:orchestrate",
+      "relation": "handles_multi_day_program",
+      "basis": "documented",
+      "evidence": "https://github.com/cursor/plugins/blob/main/pstack/docs/guide/07-overnight.md"
+    },
+    {
+      "from": "external:overnight-guide",
+      "to": "playbook:autopilot-stack",
+      "relation": "handles_reviewed_stack",
+      "basis": "documented",
+      "evidence": "https://github.com/cursor/plugins/blob/main/pstack/docs/guide/07-overnight.md"
+    },
+    {
+      "from": "external:overnight-guide",
+      "to": "skill:figure-it-out",
+      "relation": "plans_overnight_task",
+      "basis": "documented",
+      "evidence": "https://github.com/cursor/plugins/blob/main/pstack/docs/guide/07-overnight.md"
     },
     {
       "from": "external:ralph-loop",
