@@ -96,3 +96,27 @@ For one annotated query in each corpus at K=2, BM25 alone had expected-document
 recall 0 and the graph trial had recall 1. These counts do not estimate general
 retrieval quality, prove runtime calls, or establish visual/text coverage.
 Private reports and source manifests remain outside this repository.
+
+## Archived generation diff and PDF boundary, 2026-10-01
+
+From an isolated worktree based on merged Temari `ef5553a942e64bbffbc551e74be31f0368b8f58f`,
+the final changed source passed `knowledge:typecheck`, 43 `knowledge:test` unit
+tests, and 55 `knowledge:integration` actual Registrar CLI tests. The latter
+used the bundled pinned Registrar and an isolated Python with its frozen
+dependencies. `workflow-runtime:canonical-test` passed 15 tests; canonical
+package and check passed, and the relocated stock-Node package exported
+`diffArchiveGenerations`.
+
+The new CLI cases compare explicit v1 and v2 captures after an edit, addition,
+deletion and rename, including a valid leading-dash filename. They check exact
+retained SHA-256 changes, a metadata-only durable receipt, deterministic replay,
+historical v1 read, tampered publication rejection and current-registration
+revocation. This compares archived originals; it does not establish live source
+currentness or refresh graph relationships.
+
+The PDF corpus test now requires a searchable text representation and citation
+on Linux, and exact retained bytes with `pdf-memory-boundary-unavailable` on
+this macOS host. It requires scanned PDF and PNG fixtures to yield no invented
+text. Linux assertions were not executed on this macOS run. The macOS worker
+cannot establish a hard address-space, data or resident-memory limit through
+`setrlimit`; no successful macOS searchable-PDF extraction is claimed.

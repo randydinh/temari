@@ -109,6 +109,34 @@ For a retained publication that already exists, use the separate
 `structure-publish --input /absolute/structure-plan.json` command with the
 same fields plus `publicationPath` instead of `sourceId`.
 
+## Compare two archived generations
+
+After explicitly capturing the same registered source twice with different
+request keys, a caller can compare the retained originals in those two pinned
+generations:
+
+```ts
+import { diffArchiveGenerations } from '@temari/knowledge';
+
+const { receiptPath, receipt } = await diffArchiveGenerations({
+  beforePublicationPath:
+    '/absolute/private-task/archive-publication-BEFORE.json',
+  afterPublicationPath: '/absolute/private-task/archive-publication-AFTER.json',
+});
+```
+
+The durable receipt lists added, removed, changed and unchanged **captured
+originals** by relative path and SHA-256. It contains no document body. Both
+publications must be complete, use the same enabled registration and compatible
+Registrar implementation, and pass pinned manifest inspection. Excluded files
+are outside this comparison. `removed` means an original was retained in the
+first capture but not the second; it does not prove a live file was deleted.
+A changed path can guide an operator to rebuild
+affected graph relationships, but the receipt does not do that rebuild. It
+always says `currentOriginal: not-checked`: it compares two archived snapshots,
+without checking whether the source has changed since either capture. Historic
+readers remain pinned to their selected generation.
+
 ## Pinned Markdown links
 
 An operator can publish explicit links between Markdown documents already in
@@ -171,7 +199,9 @@ does not change default ranking.
   "query": "the exact original query",
   "reviewerRef": "operator:local-review",
   "reason": "Verified the selected documents against the task",
-  "relevant": [{ "sourceId": "SOURCE", "path": "a.md", "sha256": "ORIGINAL_SHA256" }],
+  "relevant": [
+    { "sourceId": "SOURCE", "path": "a.md", "sha256": "ORIGINAL_SHA256" }
+  ],
   "missed": []
 }
 ```
