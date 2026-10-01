@@ -97,6 +97,42 @@ For a retained publication that already exists, use the separate
 `structure-publish --input /absolute/structure-plan.json` command with the
 same fields plus `publicationPath` instead of `sourceId`.
 
+## Pinned Markdown links
+
+An operator can publish explicit links between Markdown documents already in
+one Registrar archive. List both the linking files and every permitted target;
+the adapter does not discover new sources or follow links on the network.
+
+```json
+{
+  "publicationPath": "/absolute/private-task/archive-publication-HASH.json",
+  "paths": ["docs/start.md", "docs/guide.md"],
+  "maxEdges": 100
+}
+```
+
+```sh
+pnpm nx run knowledge:demo -- document-links-publish --input /absolute/links-plan.json
+```
+
+The adapter reads the complete, bounded `utf-8-text` representations from the
+pinned archive and publishes only simple inline links to admitted relative
+`.md` or `.markdown` paths. It cites the exact link token and a verified target
+excerpt. Fences, inline and indented code, comments, frontmatter, images,
+external URLs, fragments, query strings and encoded destinations do not create
+relationships. The result is a `links-to` fact about the reference, not a claim
+that the target agrees with, depends on, or answers the source. Known visual and
+asset omissions remain in the receipt. The adapter makes no model call and does
+not need the current original file; changed or deleted originals do not alter
+the historical graph. Current source admission is still checked.
+
+The returned `graphId` can be supplied explicitly in a `journey-search` case
+for an experimental one-hop trial. A `no-anchored-links` receipt has `graphId:
+null` and should not be used as a graph. This route does not claim native
+Graphify extraction or enable graph ranking by default. HTML link destinations
+are not retained in the current visible-text representation and need a separate
+versioned extraction path.
+
 An operator can retire an incorrect active graph assertion through
 `retractArchiveGraph` with the exact parent graph ID, its admitted publications,
 assertion IDs, reviewer reference and review reason. Registrar publishes a child
