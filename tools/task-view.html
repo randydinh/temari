@@ -91,8 +91,8 @@
           <span class="eyebrow">CONTENT REGISTRAR</span>
           <h1>Knowledge map</h1>
           <p>
-            Follow sources, publications, paths and their recorded
-            relationships.
+            Browse each connected source like a drive, then follow the
+            recorded connections between its files and knowledge records.
           </p>
         </div>
         <button id="refresh-map" class="quiet">Refresh map</button>
@@ -110,17 +110,49 @@
           </select></label
         >
       </div>
+      <div class="knowledge-view-switch" role="group" aria-label="Knowledge view">
+        <button id="knowledge-sources-view" class="quiet" aria-pressed="true">
+          Sources
+        </button>
+        <button id="knowledge-graph-view" class="quiet" aria-pressed="false">
+          Connection map
+        </button>
+      </div>
       <div class="knowledge-layout">
+        <aside class="knowledge-drives" aria-label="Connected sources">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">CONNECTED SOURCES</span>
+              <h2>Drives</h2>
+            </div>
+          </div>
+          <div id="knowledge-drives" aria-live="polite"></div>
+        </aside>
         <div class="map-content">
+          <div id="knowledge-empty" class="knowledge-empty" hidden></div>
+          <div id="knowledge-source-browser">
+            <div class="source-browser-heading">
+              <div>
+                <span class="eyebrow">SOURCE BROWSER</span>
+                <h2>Folders and files</h2>
+              </div>
+              <p class="event-detail">
+                Expand folders to inspect the records the Registrar has retained.
+              </p>
+            </div>
+            <div id="knowledge-tree" class="knowledge-tree" aria-label="Source files"></div>
+          </div>
           <div
             id="knowledge-map"
             class="knowledge-map"
             aria-label="Source relationships"
+            hidden
           ></div>
           <div
             id="knowledge-nodes"
             class="knowledge-nodes"
             aria-label="Map nodes"
+            hidden
           ></div>
         </div>
         <aside

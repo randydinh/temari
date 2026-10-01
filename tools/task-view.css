@@ -968,11 +968,170 @@ dialog textarea[readonly] {
   border-radius: 7px;
   background: white;
 }
+.knowledge-view-switch {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 18px;
+}
+.knowledge-view-switch button[aria-pressed='true'] {
+  background: #edf2e9;
+  border-color: #bfd0bd;
+  color: #28503a;
+  font-weight: 600;
+}
 .knowledge-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 310px;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr) 310px;
   gap: 24px;
   align-items: start;
+}
+.knowledge-drives,
+.source-browser-heading,
+.source-drive {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: white;
+}
+.knowledge-drives {
+  padding: 14px 10px;
+}
+.knowledge-drives .section-heading h2,
+.source-browser-heading h2,
+.source-drive h3 {
+  margin: 5px 0 0;
+  font-size: 15px;
+}
+.knowledge-drives .section-heading {
+  padding: 0 7px 12px;
+}
+.drive-button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: center;
+  border: 0;
+  border-radius: 6px;
+  padding: 9px 7px;
+  background: transparent;
+  color: #425146;
+  text-align: left;
+  font-size: 12px;
+}
+.drive-button:hover,
+.drive-button[aria-pressed='true'] {
+  background: #edf2e9;
+  color: #28503a;
+}
+.drive-mark {
+  color: var(--accent);
+  font-weight: 600;
+}
+.drive-count {
+  color: var(--muted);
+  font-size: 11px;
+}
+.source-browser-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+  margin-bottom: 12px;
+  padding: 16px 18px;
+}
+.source-browser-heading p {
+  max-width: 280px;
+  margin: 0;
+}
+.knowledge-tree {
+  display: grid;
+  gap: 12px;
+}
+.source-drive {
+  padding: 14px 16px;
+}
+.source-drive-contents,
+.source-folder-contents {
+  display: grid;
+  gap: 2px;
+}
+.source-drive-contents {
+  margin-top: 10px;
+}
+.source-folder {
+  padding-left: 2px;
+}
+.source-folder-summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 4px;
+  color: #3d5141;
+  font-size: 12px;
+  cursor: pointer;
+}
+.source-folder-summary::-webkit-details-marker {
+  display: none;
+}
+.source-folder[open] > .source-folder-summary .folder-mark {
+  transform: rotate(90deg);
+}
+.folder-mark {
+  display: inline-block;
+  color: var(--accent);
+  font-size: 10px;
+  transition: transform 120ms ease;
+}
+.source-folder-contents {
+  margin-left: 10px;
+  padding-left: 12px;
+  border-left: 1px solid #e4e8e1;
+}
+.source-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border: 0;
+  border-radius: 6px;
+  padding: 7px 5px;
+  background: transparent;
+  color: #425146;
+  text-align: left;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.source-file:hover,
+.source-file[aria-pressed='true'] {
+  background: #edf2e9;
+  color: #28503a;
+}
+.file-mark {
+  color: #839381;
+}
+.knowledge-empty {
+  margin-bottom: 16px;
+  padding: 42px 24px;
+  border: 1px dashed #cdd8c8;
+  border-radius: 10px;
+  background: #f6f8f2;
+  text-align: center;
+}
+.knowledge-empty .empty-symbol {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--accent);
+  font-size: 26px;
+}
+.knowledge-empty h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+.knowledge-empty p {
+  max-width: 520px;
+  margin: auto;
+  color: var(--muted);
+  font-size: 13px;
 }
 .knowledge-map {
   overflow: auto;
@@ -1046,6 +1205,21 @@ dialog textarea[readonly] {
   font-size: 20px;
   margin-top: 9px;
 }
+.metadata-list {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.8fr) minmax(0, 1.2fr);
+  gap: 7px 14px;
+  margin: 12px 0;
+  font-size: 12px;
+}
+.metadata-list dt {
+  color: var(--muted);
+}
+.metadata-list dd {
+  margin: 0;
+  color: #425146;
+  overflow-wrap: anywhere;
+}
 .provenance-card {
   margin: 12px 0;
   padding: 10px;
@@ -1090,6 +1264,15 @@ dialog textarea[readonly] {
   }
   .knowledge-layout {
     grid-template-columns: 1fr;
+  }
+  .knowledge-drives {
+    max-width: none;
+  }
+  .source-browser-heading {
+    display: block;
+  }
+  .source-browser-heading p {
+    margin-top: 10px;
   }
   .map-tools {
     flex-wrap: wrap;

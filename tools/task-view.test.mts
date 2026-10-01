@@ -161,9 +161,18 @@ test('read-only task view serves retained task data and rejects mutation and for
     page.headers.get('content-security-policy')!,
     /script-src 'self'/,
   );
-  assert.match(await page.text(), /Task inbox/);
+  const html = await page.text();
+  assert.match(html, /Task inbox/);
+  assert.match(html, /id="knowledge-drives"/);
+  assert.match(html, /id="knowledge-source-browser"/);
+  assert.match(html, /id="knowledge-graph-view"/);
+  assert.match(html, /Expand folders to inspect/);
   assert.equal((await fetch(`${base}/task-view.js`)).status, 200);
   assert.equal((await fetch(`${base}/task-view.css`)).status, 200);
+  const dashboardPages = await (await fetch(`${base}/dashboard-pages.js`)).text();
+  assert.match(dashboardPages, /No content source is connected yet/);
+  assert.match(dashboardPages, /node\.kind === 'path' \? parts : parts\.slice\(0, -1\)/);
+  assert.match(dashboardPages, /pages\.knowledgeView === 'sources' && sourceEmpty/);
   assert.equal((await fetch(base, { method: 'HEAD' })).status, 200);
 });
 
