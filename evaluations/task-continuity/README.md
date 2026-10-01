@@ -7,6 +7,8 @@ The next [source host entry record](host-entry-2026-09-30.md) covers automatic
 recovery and outcome handoffs around actual stage dialogue.
 The [public entry record](installed-entry-2026-09-30.md) extends this journey to
 rebuilt public bundles, including full-feature worker preparation.
+The [local activation record](activation-2026-09-30.md) verifies the installed and
+enabled `0.15.3+codex.2` plugin and retention of the previous pinned bundle.
 
 Verified on 2026-09-30, macOS arm64, against implementation candidate
 `2656e8420e33e25894bec32d5764b5b270a68440`. Base:
