@@ -396,6 +396,7 @@ import './archive-generation-diff.integration.test.js';
 import './archive-graph-impact.integration.test.js';
 import './archive-graph-repin.integration.test.js';
 import './archive-graph-republish.integration.test.js';
+import './archive-graph-handoff.integration.test.js';
 import './archive-currentness.integration.test.js';
 import './archive-graph.integration.test.js';
 import './archive-journey.integration.test.js';

@@ -292,3 +292,27 @@ mode-0600 artifact for deterministic replay. Generated receipt evidence is
 metadata only; the reviewer reference and reason are operator-supplied free
 text. This does not authenticate the reviewer, promote graph facts
 automatically, or establish continuous source freshness.
+
+## Explicit reviewed-v2-root graph evaluation, 2026-10-01
+
+`evaluateReviewedArchiveGraphRoot` reads a content-addressed fresh-root review
+receipt, checks its v2 publication, source admission, draft and graph pins,
+then builds an archive provider for exactly that v2 publication. It verifies
+each operator-supplied lexical candidate against retained v2 bytes and runs a
+bounded one-hop graph trial. The persisted summary pins the trial checkpoint,
+counts gaps and target reads, and carries no excerpts. The private trial
+checkpoint may contain excerpts. The case query is attribution metadata, not
+an executed search; lexical and gold inputs are operator supplied. The summary
+therefore marks BM25 lift, gold coverage, semantic correctness, reviewer
+authentication and original currentness as unverified, with no operational
+query or graph mutation. Wall-clock timing can give repeated diagnostics
+different per-run summary hashes.
+
+An actual Registrar CLI fixture first confirms a v1 graph refuses under the
+v2 publication. Its explicitly reviewed v2 root then adds one unchanged,
+archived and revalidated related target from an extracted link. The changed
+target remains excluded. Tampered review bytes, a bad lexical original hash
+and revoked registration refuse the evaluation. Full Nx knowledge integration
+passed 72/72 after the final checkpoint-integrity repair; a focused actual-CLI
+run passed 1/1, unit tests 43/43 and typecheck passed. This does not enable
+graph expansion in unlabelled production search.
