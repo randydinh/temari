@@ -3,6 +3,8 @@
 For the subsequent main integration, host entry, scoped pickup, and handoff
 increment, see the [compatibility and verification record](main-compatibility-2026-09-30.md).
 The results below remain the historical evidence for the first increment.
+The next [source host entry record](host-entry-2026-09-30.md) covers automatic
+recovery and outcome handoffs around actual stage dialogue.
 
 Verified on 2026-09-30, macOS arm64, against implementation candidate
 `2656e8420e33e25894bec32d5764b5b270a68440`. Base:
