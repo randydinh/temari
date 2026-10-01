@@ -100,6 +100,12 @@ no issue with this delta.
 
 ## Local activation and limits
 
+The main dashboard was refreshed from `8e73731` at
+<http://127.0.0.1:3092>. All three existing task identities remained present;
+the matching Archon service was retained. The browser confirmed the coding option
+and its ownership, check and reviewer preview. See the
+[activation record](2026-10-01-dashboard-implementation/activation.json).
+
 The local dashboard configuration selects a bounded **Improve dashboard UI and
 operator guide** plan: one implementer owns the three browser assets and another
 owns `docs/task-dashboard.md`. Dependency preparation and syntax, type, controller
