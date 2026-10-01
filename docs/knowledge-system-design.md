@@ -58,7 +58,55 @@ graph retraction. These later measurements supersede the
 synthetic test counts above; the incomplete modalities and retrieval limits
 remain explicit in the pilot record.
 
-## Delivery decision: complete the knowledge journey before plugin packaging
+The [two-job pilot](evidence/knowledge-system/two-job-pilot-2026-10-01.md)
+then ran intake and unlabelled BM25/Jev retrieval as dependent children in the
+existing runtime store. Exact capture and report bindings, leases, bounded
+retries and an uncertain-hosted-call block make explicit ticks resumable. The
+live three-source intake succeeded; its narrowed search returned a verified
+excerpt and Jev judgment with explicit gaps, correctly ending `ISSUES`.
+This is an operator-run workflow, not unattended agent scheduling or a
+complete-task quality claim.
+
+The next [feedback and graph review pilot](evidence/knowledge-system/feedback-graph-review-2026-10-01.md)
+adds operator-attributed, revision-pinned query feedback as a private regression
+candidate and an explicit child graph publication for one verified archived
+Markdown link and/or selected retractions. The graph trial now excludes
+inferred and call-name-candidate edges from expansion. These controls support
+continual correction, but no autonomous relationship authoring, authenticated
+reviewer identity or measured default-ranking improvement is claimed. Held-out
+ranking promotion, PDF boundary support and plugin lifecycle remain open.
+
+The current-source sharing increment adds an operator-controlled Registrar
+setting to each source. Temari checks that setting and the pinned registration
+before credential lookup and every Jev request attempt. An older handoff cannot
+override a newer `local-only` setting; an older local-only handoff also remains
+denied if the current setting is loosened. Policy lookup failure is a reported
+gap and prevents hosted use. Revocation can prevent the next attempt but cannot
+retract text in a request that is already in flight. A Registrar upgrade changes
+the implementation pin, requiring publication rebind and a fresh intake handoff.
+
+## Delivery decisions
+
+### Installed capability decision — 2026-10-01
+
+An installation of Temari exposed only its three engineering entries and omitted
+Content Registrar entirely. The owner asked to include Registrar in Temari so a
+recipient can use the knowledge capability without access to a separate private
+repository. This supersedes the earlier packaging deferral for the installed
+capability. Package the pinned Registrar source and the Temari knowledge adapter
+in the verified plugin artifact. Installation must keep a recipient's source
+registry, archives, credentials and task artifacts outside the plugin bundle.
+Activation may create a local Python environment and a Codex MCP connection,
+but must not register or scan any source without an explicit selection. Local
+read/search should work with no TypeSafe key; hosted Jev remains conditional on
+the existing Keychain or configured key and current source sharing policy.
+Disconnect and uninstall must preserve retained data by default; reinstall is
+explicit, and purge remains a distinct choice. The package should report
+unsupported host prerequisites rather than silently substituting another
+model or provider.
+The bundled Registrar snapshot is pinned by upstream commit and file hashes.
+Its upstream tree has no separate license declaration; release review must
+record the owner's distribution terms before making this bundle public.
 
 On 2026-09-30 the owner chose to keep building the knowledge system before
 refactoring it into an installable Temari plugin. This supersedes the proposed
@@ -152,8 +200,10 @@ the current design's explicit capture gaps and distinct evidence-progress sets.
 The user's later decision selects **Jev as the only hosted model** for this knowledge path
 and skips SkillOpt. Deterministic extraction, human-authored assertions and closed Jev
 judgments remain available. Free-form model generation, semantic extraction and SkillOpt
-optimization are outside this implementation. A saved API key does not itself authorize
-sending a corpus; each Jev request requires explicit text approval.
+optimization are outside this implementation. The owner later selected
+registered-source sharing by default unless a source is marked local-only;
+individual queries can also opt out. A saved API key does not change either
+choice. Jev receives bounded, revalidated excerpts, not a corpus upload.
 
 | Decision | Standing | Consequence |
 | --- | --- | --- |

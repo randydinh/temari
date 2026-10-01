@@ -20,6 +20,10 @@ import {
   checkCanonicalArtifact,
   packageCanonicalRuntime,
 } from './canonical-runtime.mjs';
+import {
+  REGISTRAR_PAYLOAD_FILES,
+  verifyRegistrarPayload,
+} from './registrar-payload.mjs';
 
 const toolPath = fileURLToPath(import.meta.url);
 const workspace = resolve(dirname(toolPath), '..');
@@ -77,6 +81,10 @@ const publicFiles = [
   ],
   ['packages/workflow-runtime/public/bin/temari.mjs', 'bin/temari.mjs'],
   [
+    'packages/workflow-runtime/public/bin/temari-knowledge.mjs',
+    'bin/temari-knowledge.mjs',
+  ],
+  [
     'packages/workflow-runtime/public/bin/poteto-mode.mjs',
     'bin/poteto-mode.mjs',
   ],
@@ -88,6 +96,10 @@ const publicFiles = [
   [
     'packages/workflow-runtime/public/skills/temari/references/task-tracking.md',
     'skills/temari/references/task-tracking.md',
+  ],
+  [
+    'packages/workflow-runtime/public/skills/temari-knowledge/SKILL.md',
+    'skills/temari-knowledge/SKILL.md',
   ],
   [
     'packages/workflow-runtime/public/skills/poteto-mode/SKILL.md',
@@ -111,6 +123,10 @@ const publicFiles = [
   ].map((path) => [
     `packages/workflow-runtime/public/skills/qa-review-verification/${path}`,
     `skills/qa-review-verification/${path}`,
+  ]),
+  ...REGISTRAR_PAYLOAD_FILES.map((path) => [
+    `packages/workflow-runtime/registrar/${path}`,
+    `registrar/${path}`,
   ]),
 ];
 
@@ -341,7 +357,16 @@ export async function checkPublicEntryArtifact(root, expectedManifestSha256) {
   assertPolicy(policy);
   const plugin = JSON.parse(files.get('.codex-plugin/plugin.json').toString());
   assert.equal(plugin.name, 'temari');
+  assert.equal(plugin.version, '0.15.4+codex.1');
   assert.equal(plugin.skills, './skills/');
+  assert(files.has('skills/temari-knowledge/SKILL.md'));
+  assert(files.has('bin/temari-knowledge.mjs'));
+  assert(files.has('runtime/node_modules/@temari/knowledge/src/demo.js'));
+  for (const path of REGISTRAR_PAYLOAD_FILES)
+    assert(
+      files.has(`registrar/${path}`),
+      `Missing Registrar payload: ${path}`,
+    );
   assert.equal(manifest.build.parallelBundler.name, 'bun');
   assert.match(manifest.build.parallelBundler.version, /^\d+\.\d+\.\d+/);
   for (const path of generatedFiles) assert(files.has(path));
@@ -353,6 +378,11 @@ export async function checkPublicEntryArtifact(root, expectedManifestSha256) {
     if (process.platform !== 'win32')
       assert(stat.mode & 0o111, `Entry is not executable: ${path}`);
   }
+  if (process.platform !== 'win32')
+    assert(
+      (await lstat(join(root, 'bin/temari-knowledge.mjs'))).mode & 0o111,
+      'Knowledge CLI is not executable.',
+    );
   for (const [path, content] of files) {
     assert(
       !content.toString().includes(workspace),
@@ -374,6 +404,7 @@ export async function packagePublicEntries(
   { packageCanonical = packageCanonicalRuntime } = {},
 ) {
   assert(isAbsolute(output), 'Output path must be absolute');
+  await verifyRegistrarPayload();
   try {
     await lstat(output);
     throw new Error(`Output already exists: ${output}`);
@@ -386,6 +417,10 @@ export async function packagePublicEntries(
   sourceFiles.set(
     'tools/canonical-runtime.mjs',
     await readFile(join(workspace, 'tools/canonical-runtime.mjs')),
+  );
+  sourceFiles.set(
+    'tools/registrar-payload.mjs',
+    await readFile(join(workspace, 'tools/registrar-payload.mjs')),
   );
   for (const [source, destination] of publicFiles) {
     sourceFiles.set(source, await readFile(join(workspace, source)));

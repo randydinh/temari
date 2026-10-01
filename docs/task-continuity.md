@@ -17,10 +17,10 @@ schedules, and the Registrar graph view remain follow-up work.
 
 ## Supported dashboard journeys
 
-| Choice | What runs | Completion boundary |
-| --- | --- | --- |
-| New goal for Temari | Saves a goal, next action, and continuation context. | Remains open until Temari admits an execution plan. |
-| Configured verification recipe | Runs the host-configured checks through Archon against a pinned clean workspace. | Verified canonical serial evidence and explicit coordinator acceptance can produce `DONE`. |
+| Choice                           | What runs                                                                                       | Completion boundary                                                                                 |
+| -------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| New goal for Temari              | Saves a goal, next action, and continuation context.                                            | Remains open until Temari admits an execution plan.                                                 |
+| Configured verification recipe   | Runs the host-configured checks through Archon against a pinned clean workspace.                | Verified canonical serial evidence and explicit coordinator acceptance can produce `DONE`.          |
 | Investigate with parallel agents | Runs 2–4 read-only Codex investigator/reviewer assignments, with configured concurrency of 1–4. | Retained findings require coordinator review; the parallel receipt cannot produce canonical `DONE`. |
 
 The browser offers only the actions available for that task. Native workflows
@@ -32,7 +32,7 @@ before enabling execution.
 
 ## Current continuation: host pickup and handoff
 
-Main through `8e3ddc4` was integrated on 2026-09-30. Its knowledge and privacy
+Main through `ef5553a` is integrated, including the 2026-10-01 Registrar packaging and current source-sharing gate. Its knowledge and privacy
 decisions are assessed in the [compatibility review](../evaluations/task-continuity/main-compatibility-2026-09-30.md).
 The host entry increment connects conversations to durable tasks without
 changing the native executor or knowledge authority.
@@ -48,8 +48,7 @@ The API preserves old ledgers and uses the same version/idempotency checks for
 entry and handoff. Pickup scopes task discovery before reading selected evidence.
 It returns choices when several tasks match, even with a choice limit of one.
 It does not execute a workflow, query Registrar, read credentials, or call a model.
-This is source-workspace integration. The
-knowledge journey remains ahead of plugin packaging, as decided on main.
+The task dashboard runs from the source workspace. Main now bundles the Registrar and knowledge capability in the public plugin; task tracking and the knowledge entry both remain in its package inventory. Registrar source sharing is checked at each hosted knowledge attempt, independently of dashboard run status.
 
 ## Start or pick up a task
 
@@ -343,15 +342,15 @@ or a role permission system.
 
 ## Recovery
 
-| Symptom                        | Inspect and recover                                                                                                                                                                                           |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Store does not exist           | Confirm the configured root. Use `create` only for a new task/store.                                                                                                                                          |
-| Missing or corrupt ledger      | Stop writers, preserve the directory, and restore a known-good backup. The inbox must show an error instead of reporting zero tasks.                                                                          |
-| Version conflict               | `show` the task, reconcile current changes, then issue a new command with its current version.                                                                                                                |
-| Dispatch/control uncertain     | Inspect the exact Archon run and reconcile or observe. A timeout is not proof that execution stopped.                                                                                                         |
-| Ledger locked                  | Inspect `.tasks.lock/owner.json` for hostname, PID, start time and nonce. Confirm all writers on that host have stopped before manually removing the stale lock directory. No automatic lock takeover occurs. |
-| Run opens in the wrong console | Correct `--archon-url` to match the owning `--archon-home`; the inbox does not move native logs between instances.                                                                                            |
-| Native resume refused          | Check that the run has a completed node. Preserve the failed run; a new attempt needs a new run binding after confirmed termination.                                                                          |
+| Symptom                        | Inspect and recover                                                                                                                                                                                                                        |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Store does not exist           | Confirm the configured root. Use `create` only for a new task/store.                                                                                                                                                                       |
+| Missing or corrupt ledger      | Stop writers, preserve the directory, and restore a known-good backup. The inbox must show an error instead of reporting zero tasks.                                                                                                       |
+| Version conflict               | `show` the task, reconcile current changes, then issue a new command with its current version.                                                                                                                                             |
+| Dispatch/control uncertain     | Inspect the exact Archon run and reconcile or observe. A timeout is not proof that execution stopped.                                                                                                                                      |
+| Ledger locked                  | Inspect `.tasks.lock/owner.json` for hostname, PID, start time and nonce. Confirm all writers on that host have stopped before manually removing the stale lock directory. No automatic lock takeover occurs.                              |
+| Run opens in the wrong console | Correct `--archon-url` to match the owning `--archon-home`; the inbox does not move native logs between instances.                                                                                                                         |
+| Native resume refused          | Check that the run has a completed node. Preserve the failed run; a new attempt needs a new run binding after confirmed termination.                                                                                                       |
 | Swarm supervisor uncertain     | Preserve preparation, child records, supervisor identity, and attempt artifacts. Do not delete the launch marker or start a replacement to hide uncertainty. See [dashboard recovery](task-dashboard.md#recover-without-duplicating-work). |
 
 Keep the whole task-store directory when backing up, together with referenced

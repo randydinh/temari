@@ -1,0 +1,678 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Registrar archive CLI response contract 1",
+  "description": "SA-001 operator JSON response envelope. Semantics and invocation: source-archive.md. Additional fields are forward-compatible; clients must reject unsupported schema versions.",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/receipt"
+    },
+    {
+      "$ref": "#/$defs/read"
+    },
+    {
+      "$ref": "#/$defs/discovery"
+    },
+    {
+      "$ref": "#/$defs/inspection"
+    },
+    {
+      "$ref": "#/$defs/generations"
+    },
+    {
+      "$ref": "#/$defs/recovery"
+    },
+    {
+      "$ref": "#/$defs/export"
+    },
+    {
+      "$ref": "#/$defs/import"
+    },
+    {
+      "$ref": "#/$defs/error"
+    }
+  ],
+  "$defs": {
+    "receipt": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": 1
+        },
+        "status": {
+          "enum": [
+            "complete",
+            "partial",
+            "invalid"
+          ]
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "generation": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$"
+        },
+        "manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "request_key": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "request_fingerprint": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "replayed": {
+          "type": "boolean"
+        },
+        "preservation": {
+          "enum": [
+            "complete-admitted",
+            "incomplete"
+          ]
+        },
+        "counts": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "schema",
+        "status",
+        "source_id",
+        "generation",
+        "manifest_sha256",
+        "request_key",
+        "request_fingerprint",
+        "replayed",
+        "preservation",
+        "counts"
+      ],
+      "additionalProperties": true
+    },
+    "representation": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "original_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8388608
+        },
+        "encoding": {
+          "const": "utf-8"
+        },
+        "coordinate_space": {
+          "const": "unicode-codepoints"
+        },
+        "extractor_signature": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "extraction": {
+          "type": "string"
+        },
+        "settings": {
+          "type": "object"
+        },
+        "omissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "version",
+        "original_sha256",
+        "sha256",
+        "bytes",
+        "encoding",
+        "coordinate_space",
+        "extractor_signature",
+        "extraction",
+        "settings",
+        "omissions"
+      ],
+      "additionalProperties": true
+    },
+    "citation": {
+      "type": "object",
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "snapshot_generation": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$"
+        },
+        "manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "path": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "original_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "representation_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "extractor_signature": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "text_start": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "text_end": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "quote": {
+          "type": "string"
+        },
+        "evidence": {
+          "const": "archived-snapshot"
+        },
+        "current_original": {
+          "const": "not-checked"
+        }
+      },
+      "required": [
+        "source_id",
+        "snapshot_generation",
+        "manifest_sha256",
+        "path",
+        "sha256",
+        "representation_sha256",
+        "extractor_signature",
+        "text_start",
+        "text_end",
+        "quote",
+        "evidence",
+        "current_original"
+      ],
+      "additionalProperties": true
+    },
+    "read": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": 1
+        },
+        "status": {
+          "enum": [
+            "complete",
+            "partial",
+            "invalid"
+          ]
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "generation": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$"
+        },
+        "manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "integrity": {
+          "const": "verified"
+        },
+        "evidence": {
+          "const": "archived-snapshot"
+        },
+        "current_original": {
+          "const": "not-checked"
+        },
+        "representation": {
+          "$ref": "#/$defs/representation"
+        },
+        "record": {
+          "type": "object",
+          "properties": {
+            "body": {
+              "type": "string"
+            },
+            "citations": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1,
+              "items": {
+                "$ref": "#/$defs/citation"
+              }
+            }
+          },
+          "required": [
+            "body",
+            "citations"
+          ],
+          "additionalProperties": true
+        },
+        "next_cursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 2048
+        },
+        "gaps": {
+          "type": "array"
+        },
+        "path": {
+          "type": "string"
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_chars": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "next_offset": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      },
+      "required": [
+        "schema",
+        "status",
+        "source_id",
+        "generation",
+        "manifest_sha256",
+        "integrity",
+        "evidence",
+        "current_original",
+        "representation",
+        "record",
+        "next_cursor",
+        "gaps",
+        "path",
+        "offset",
+        "total_chars",
+        "next_offset"
+      ],
+      "additionalProperties": true
+    },
+    "discovery": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": 1
+        },
+        "status": {
+          "enum": [
+            "complete",
+            "partial",
+            "invalid"
+          ]
+        },
+        "documents": {
+          "type": "array",
+          "maxItems": 200
+        },
+        "route": {
+          "const": "archive-bm25"
+        },
+        "ranker": {
+          "const": "sqlite-fts5-bm25-v1"
+        },
+        "tokenizer": {
+          "type": "string"
+        },
+        "sqlite_version": {
+          "type": "string"
+        },
+        "index_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "shortlist_truncated": {
+          "const": false
+        },
+        "matched_documents": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "next_cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "gaps": {
+          "type": "array"
+        },
+        "evidence": {
+          "const": "archived-snapshot"
+        },
+        "current_original": {
+          "const": "not-checked"
+        },
+        "integrity": {
+          "const": "verified"
+        },
+        "indexed_documents": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "returned_documents": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "consumed_documents": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "remaining_documents": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exhausted": {
+          "type": "boolean"
+        },
+        "snapshots": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "properties": {
+              "source_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "generation": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{32}$"
+              },
+              "manifest_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            },
+            "required": [
+              "source_id",
+              "generation",
+              "manifest_sha256"
+            ],
+            "additionalProperties": true
+          }
+        }
+      },
+      "required": [
+        "schema",
+        "status",
+        "documents",
+        "matched_documents",
+        "next_cursor",
+        "gaps",
+        "evidence",
+        "current_original",
+        "integrity",
+        "indexed_documents",
+        "offset",
+        "returned_documents",
+        "consumed_documents",
+        "remaining_documents",
+        "exhausted",
+        "snapshots"
+      ],
+      "additionalProperties": true,
+      "if": {
+        "required": ["route"]
+      },
+      "then": {
+        "required": ["ranker", "tokenizer", "sqlite_version", "index_digest", "shortlist_truncated"],
+        "properties": {
+          "documents": {
+            "items": {
+              "type": "object",
+              "required": ["score"],
+              "properties": {
+                "score": {"type": "number"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "inspection": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/receipt"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "integrity": {
+              "const": "verified"
+            },
+            "documents": {
+              "type": "array",
+              "maxItems": 200
+            },
+            "next_offset": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "integrity",
+            "documents",
+            "next_offset"
+          ],
+          "additionalProperties": true
+        }
+      ]
+    },
+    "generations": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": 1
+        },
+        "status": {
+          "enum": [
+            "complete",
+            "partial",
+            "invalid"
+          ]
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "generations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/receipt"
+          },
+          "maxItems": 200
+        },
+        "next_offset": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "schema",
+        "source_id",
+        "generations",
+        "next_offset"
+      ],
+      "additionalProperties": true
+    },
+    "recovery": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": 1
+        },
+        "status": {
+          "enum": [
+            "complete",
+            "partial",
+            "invalid"
+          ]
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "generation": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$"
+        },
+        "path": {
+          "type": "string"
+        },
+        "destination": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bytes": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schema",
+        "status",
+        "source_id",
+        "generation",
+        "path",
+        "destination",
+        "sha256",
+        "bytes"
+      ],
+      "additionalProperties": true
+    },
+    "export": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": 1
+        },
+        "status": {
+          "enum": [
+            "complete",
+            "partial",
+            "invalid"
+          ]
+        },
+        "generations": {
+          "type": "integer"
+        },
+        "bytes": {
+          "type": "integer"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "schema",
+        "status",
+        "generations",
+        "bytes",
+        "sha256"
+      ],
+      "additionalProperties": true
+    },
+    "import": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": 1
+        },
+        "status": {
+          "enum": [
+            "complete",
+            "partial",
+            "invalid"
+          ]
+        },
+        "imported_generations": {
+          "type": "integer"
+        },
+        "access_settings": {
+          "const": "preserved"
+        }
+      },
+      "required": [
+        "schema",
+        "status",
+        "imported_generations",
+        "access_settings"
+      ],
+      "additionalProperties": true
+    },
+    "error": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": 1
+        },
+        "status": {
+          "const": "invalid"
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "status",
+        "error"
+      ],
+      "additionalProperties": true
+    }
+  }
+}

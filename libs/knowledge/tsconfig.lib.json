@@ -9,7 +9,14 @@
   },
   "include": ["src/**/*.ts"],
   "references": [
-    { "path": "../contracts/tsconfig.lib.json" },
-    { "path": "../workflow-engine/tsconfig.lib.json" }
+    {
+      "path": "../runtime/tsconfig.lib.json"
+    },
+    {
+      "path": "../contracts/tsconfig.lib.json"
+    },
+    {
+      "path": "../workflow-engine/tsconfig.lib.json"
+    }
   ]
 }

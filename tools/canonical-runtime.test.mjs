@@ -18,7 +18,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   packageCanonicalRuntime,
   checkCanonicalArtifact,
@@ -78,7 +78,7 @@ test('canonical artifact contains only compiled production packages and verifies
       !/\.test\.|\/demo\/|\/fixtures\/|\.map$|tsbuildinfo/.test(file.path),
       file.path,
     );
-    assert(/\.(?:js|d\.ts|json)$/.test(file.path), file.path);
+    assert(/\.(?:js|d\.ts|json|py)$/.test(file.path), file.path);
     const text = await readFile(join(artifact, file.path), 'utf8');
     assert(!text.includes(repository), file.path);
     assert(!text.includes('@swc-node/register'), file.path);
@@ -88,6 +88,7 @@ test('canonical artifact contains only compiled production packages and verifies
     'temari-core',
     'workflow-engine',
     'runtime',
+    'knowledge',
   ]) {
     const pkg = JSON.parse(
       await readFile(
@@ -100,6 +101,209 @@ test('canonical artifact contains only compiled production packages and verifies
     assert(!JSON.stringify(pkg).includes('workspace:'));
     assert(!JSON.stringify(pkg).includes('@org/source'));
   }
+  const knowledge = JSON.parse(
+    await readFile(
+      join(artifact, 'node_modules/@temari/knowledge/package.json'),
+      'utf8',
+    ),
+  );
+  assert.deepEqual(knowledge.bin, {
+    'temari-knowledge': './src/demo.js',
+  });
+  assert.equal(knowledge.exports['./cli'], './src/demo.js');
+  assert.match(
+    await readFile(
+      join(artifact, 'node_modules/@temari/knowledge/src/demo.js'),
+      'utf8',
+    ),
+    /^#!\/usr\/bin\/env node\n/,
+  );
+  assert(
+    manifest.files.some(
+      (file) => file.path === 'node_modules/@temari/knowledge/src/support/prepare.py',
+    ),
+  );
+});
+
+test('relocated knowledge API and CLI run with stock Node and no workspace loader', async (t) => {
+  const { artifact } = await relocated(t);
+  const env = { ...process.env };
+  delete env.NODE_OPTIONS;
+  delete env.NODE_PATH;
+  const imported = await child(
+    [
+      '--permission',
+      `--allow-fs-read=${artifact}`,
+      '--input-type=module',
+      '-e',
+      'import * as knowledge from "@temari/knowledge"; console.log(JSON.stringify([typeof knowledge.createLocalRegistrar, typeof knowledge.captureArchive]));',
+    ],
+    { cwd: artifact, env },
+  );
+  assert.deepEqual(JSON.parse(imported.stdout), ['function', 'function']);
+  const cli = await child(
+    [
+      '--permission',
+      `--allow-fs-read=${artifact}`,
+      join(artifact, 'node_modules/@temari/knowledge/src/demo.js'),
+      '--help',
+    ],
+    { cwd: artifact, env },
+  );
+  assert.match(cli.stdout, /journey-intake --input/);
+  assert.match(cli.stdout, /journey-query --input/);
+  assert.match(cli.stdout, /journey-jobs-tick --spec/);
+});
+
+test('relocated knowledge prepare command finds its packaged helper', async (t) => {
+  const { root, artifact } = await relocated(t);
+  const snapshots = join(root, 'snapshots');
+  await mkdir(snapshots);
+  const documents = [];
+  for (const [snapshot, role] of [
+    ['plan.txt', 'plan'],
+    ['update.txt', 'update'],
+  ]) {
+    const bytes = Buffer.from(`${role} fixture\n`);
+    await writeFile(join(snapshots, snapshot), bytes);
+    documents.push({
+      snapshot,
+      role,
+      origin: 'packaged CLI test',
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+    });
+  }
+  const selected = join(root, 'selected.json');
+  await writeFile(selected, JSON.stringify({ snapshotRoot: snapshots, documents }));
+  const python = join(root, 'python-shim');
+  await writeFile(
+    python,
+    '#!/bin/sh\ntest -f "$2" || exit 17\nprintf \'{"sourceId":"fixture","receipt":{"status":"complete"}}\\n\'\n',
+    { mode: 0o700 },
+  );
+  const env = { ...process.env };
+  delete env.NODE_OPTIONS;
+  delete env.NODE_PATH;
+  const result = await child(
+    [
+      join(artifact, 'node_modules/@temari/knowledge/src/demo.js'),
+      'prepare',
+      '--manifest',
+      selected,
+      '--python',
+      python,
+      '--registrar-source',
+      root,
+    ],
+    { cwd: root, env },
+  );
+  const prepared = JSON.parse(result.stdout);
+  t.after(() => rm(prepared.base, { recursive: true, force: true }));
+  assert.equal(prepared.source.id, 'fixture');
+  assert.equal(prepared.config.registrarSource, root);
+  assert.equal(prepared.input, join(prepared.base, 'input.json'));
+});
+
+test('compiled archive adapter hashes emitted JavaScript and refuses changed bytes', async (t) => {
+  const { root, artifact } = await relocated(t);
+  const registrar = join(root, 'registrar');
+  await mkdir(join(registrar, 'src'), { recursive: true });
+  await mkdir(join(registrar, 'docs/design'), { recursive: true });
+  await writeFile(join(registrar, 'src/cli.py'), 'pass\n');
+  await writeFile(join(registrar, 'pyproject.toml'), '[project]\nname="fixture"\n');
+  await writeFile(join(registrar, 'uv.lock'), 'fixture\n');
+  await writeFile(
+    join(registrar, 'docs/design/source-archive-contract-v1.json'),
+    '{}\n',
+  );
+  const adapter = await import(
+    pathToFileURL(
+      join(artifact, 'node_modules/@temari/knowledge/src/lib/archive-transport.js'),
+    ).href
+  );
+  const transport = await adapter.archiveTransport({
+    python: process.execPath,
+    registrarSource: registrar,
+    workspace: root,
+  });
+  assert.match(transport.implementation, /^[a-f0-9]{64}$/);
+  const codec = join(
+    artifact,
+    'node_modules/@temari/knowledge/src/lib/codec.js',
+  );
+  const bytes = await readFile(codec);
+  const altered = Buffer.from(bytes);
+  altered[0] ^= 1;
+  await writeFile(codec, altered);
+  await assert.rejects(transport.invoke('list', []), /Archive implementation changed/);
+  await assert.rejects(checkCanonicalArtifact(artifact, manifest), /integrity/i);
+});
+
+test('compiled local registrar hashes emitted JavaScript and detects adapter tampering', async (t) => {
+  const { root, artifact } = await relocated(t);
+  const registrar = join(root, 'registrar');
+  const state = join(root, 'state');
+  const sources = join(root, 'sources');
+  await mkdir(join(registrar, 'src'), { recursive: true });
+  await mkdir(state);
+  await mkdir(sources);
+  await writeFile(join(registrar, 'src/cli.py'), 'pass\n');
+  await writeFile(join(registrar, 'pyproject.toml'), '[project]\nname="fixture"\n');
+  await writeFile(join(registrar, 'uv.lock'), 'fixture\n');
+  await writeFile(join(state, 'registry.sqlite3'), 'fixture\n');
+  const python = join(root, 'python-shim');
+  await writeFile(
+    python,
+    `#!/bin/sh\ncat <<'EOF'\n${JSON.stringify({
+      sources: [{
+        id: 'fixture-source',
+        root: sources,
+        kind: 'local',
+        recursive: false,
+        exclude: [],
+        enabled: true,
+        generation: 'fixture-generation',
+      }],
+    })}\nEOF\n`,
+    { mode: 0o700 },
+  );
+  const preparation = join(root, 'preparation.json');
+  await writeFile(preparation, JSON.stringify({
+    kind: 'temari-knowledge-isolated',
+    schema: 1,
+    state,
+    root: sources,
+    instance: 'fixture-instance',
+    sourceId: 'fixture-source',
+  }));
+  const knowledge = await import(
+    pathToFileURL(join(artifact, 'node_modules/@temari/knowledge/src/index.js')).href
+  );
+  const provider = await knowledge.createLocalRegistrar({
+    python,
+    registrarSource: registrar,
+    preparation,
+    readScope: 'source-root',
+  });
+  assert.match(provider.identity.implementation, /^registrar-source\+adapter\+python-binary:[a-f0-9]{64}$/);
+  const codec = join(artifact, 'node_modules/@temari/knowledge/src/lib/codec.js');
+  const bytes = await readFile(codec);
+  const altered = Buffer.from(bytes);
+  altered[0] ^= 1;
+  await writeFile(codec, altered);
+  const result = await provider.discover({
+    scope: [{
+      provider: 'fixture-instance',
+      id: 'fixture-source',
+      locator: pathToFileURL(sources).href,
+    }],
+    query: 'fixture',
+    limit: 1,
+    maxBytes: 1024,
+    continuation: null,
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.gap.detail, /Provider implementation changed/);
 });
 
 test('relocated stock Node resumes an acknowledged prefix and verifies bytes with isolated readback', async (t) => {

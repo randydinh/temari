@@ -23,7 +23,7 @@ export interface RankedArchiveDocument {
 export interface ArchiveGraphTrial {
   readonly graphId: string;
   readonly status: 'complete' | 'gap';
-  readonly policy: 'one-lexical-seed-one-hop-related-first-v1';
+  readonly policy: 'one-lexical-seed-one-hop-related-first-v2';
   readonly ranked: readonly RankedArchiveDocument[];
   readonly expectedRecallAtK: number;
   readonly added: readonly (RankedArchiveDocument & {
@@ -32,12 +32,22 @@ export interface ArchiveGraphTrial {
     readonly provenance: ArchiveGraphRecord['provenance'];
   })[];
   readonly verifiedEvidenceCount: number;
+  /** Extra archived target reads attempted after the lexical shortlist. */
+  readonly targetReadAttempts: number;
+  /** Records materialized by the pinned graph projection. */
+  readonly projectionNodeCount: number;
   readonly checkpointPath: string | null;
   readonly gaps: readonly KnowledgeGap[];
   readonly timingMs: number;
 }
 
-const policy = 'one-lexical-seed-one-hop-related-first-v1' as const;
+const policy = 'one-lexical-seed-one-hop-related-first-v2' as const;
+const traversablePredicates = new Set(['contains', 'depends-on', 'links-to']);
+const traversable = (record: ArchiveGraphRecord): boolean =>
+  record.kind === 'relationship' &&
+  record.lifecycle === 'active' &&
+  record.provenance === 'extracted' &&
+  traversablePredicates.has(record.predicate ?? '');
 const key = (sourceId: string, path: string): string =>
   canonical([sourceId, path]);
 const identity = (item: RankedArchiveDocument): string =>
@@ -62,6 +72,8 @@ export async function evaluateArchiveGraphTrial(input: {
     provenance: ArchiveGraphRecord['provenance'];
   })[] = [];
   const evidence: KnowledgeEvidence[] = [];
+  let targetReadAttempts = 0;
+  let projectionNodeCount = 0;
   const result = (
     status: ArchiveGraphTrial['status'],
     checkpointPath: string | null,
@@ -88,6 +100,8 @@ export async function evaluateArchiveGraphTrial(input: {
         expected.size,
       added,
       verifiedEvidenceCount: evidence.length,
+      targetReadAttempts,
+      projectionNodeCount,
       checkpointPath,
       gaps,
       timingMs: Math.max(0, Math.round(performance.now() - started)),
@@ -115,13 +129,10 @@ export async function evaluateArchiveGraphTrial(input: {
   const records = new Map(
     projection.value.nodes.map((node) => [node.id, node.attributes]),
   );
+  projectionNodeCount = records.size;
   const connected = new Set(
     [...records.values()]
-      .filter(
-        (record) =>
-          (record.kind === 'relationship' || record.kind === 'identity-link') &&
-          record.lifecycle === 'active',
-      )
+      .filter(traversable)
       .flatMap((record) => [record.subject, record.object]),
   );
   const nodesFor = (candidate: RankedArchiveDocument): Set<string> =>
@@ -146,17 +157,17 @@ export async function evaluateArchiveGraphTrial(input: {
   const seedNodes = nodesFor(seed);
   const scopedIds = new Set(input.scope.map((source) => source.id));
   const seen = new Set(input.lexical.map(identity));
+  let readBudgetExhausted = false;
   for (const relation of [...records.values()].sort((a, b) =>
     a.id.localeCompare(b.id),
   )) {
     if (
-      (relation.kind !== 'relationship' && relation.kind !== 'identity-link') ||
-      relation.lifecycle !== 'active'
+      !traversable(relation)
     )
       continue;
     const opposite = seedNodes.has(relation.subject!)
       ? relation.object
-      : seedNodes.has(relation.object!)
+      : relation.predicate !== 'links-to' && seedNodes.has(relation.object!)
         ? relation.subject
         : null;
     if (!opposite) continue;
@@ -172,9 +183,14 @@ export async function evaluateArchiveGraphTrial(input: {
         sha256: anchor.original_sha256,
       };
       if (seen.has(identity(candidate))) continue;
+      if (targetReadAttempts >= input.topK - 1) {
+        readBudgetExhausted = true;
+        break;
+      }
       seen.add(identity(candidate));
       const source = input.scope.find((item) => item.id === anchor.source_id)!;
       try {
+        targetReadAttempts++;
         const read = await input.provider.read({
           document: { source, path: anchor.path },
           expectedSha256: anchor.original_sha256,
@@ -214,8 +230,12 @@ export async function evaluateArchiveGraphTrial(input: {
         });
       }
     }
-    if (added.length >= input.topK - 1) break;
+    if (added.length >= input.topK - 1 || readBudgetExhausted) break;
   }
+  if (readBudgetExhausted) gaps.push({
+    kind: 'pending', subject: 'graph-trial',
+    detail: 'Graph target read-attempt budget exhausted.',
+  });
   const checkpoint = {
     schema: 1,
     kind: 'temari-archive-graph-trial',
@@ -225,6 +245,8 @@ export async function evaluateArchiveGraphTrial(input: {
     added,
     evidence,
     gaps,
+    targetReadAttempts,
+    projectionNodeCount,
     policy,
     fullDocumentRead: false,
   };

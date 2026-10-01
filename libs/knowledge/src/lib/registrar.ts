@@ -102,6 +102,9 @@ export async function createLocalRegistrar(
   );
   async function implementationDigest(): Promise<string> {
     const files: string[] = [];
+    const adapterExtension = fileURLToPath(import.meta.url).endsWith('.ts')
+      ? '.ts'
+      : '.js';
     async function walk(path: string): Promise<void> {
       for (const entry of (await readdir(path, { withFileTypes: true })).sort(
         (a, b) => a.name.localeCompare(b.name),
@@ -118,10 +121,7 @@ export async function createLocalRegistrar(
       join(options.registrarSource, 'uv.lock'),
       options.python,
       fileURLToPath(import.meta.url),
-      fileURLToPath(new URL('./codec.js', import.meta.url)).replace(
-        /\.js$/,
-        '.ts',
-      ),
+      fileURLToPath(new URL(`./codec${adapterExtension}`, import.meta.url)),
     );
     const entries = await Promise.all(
       files.map(async (path) => [path, hash(await readFile(path))]),

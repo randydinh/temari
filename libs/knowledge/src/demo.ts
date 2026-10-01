@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { lstat, readFile, realpath, writeFile } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
@@ -29,25 +30,53 @@ import {
 import { collectKnowledge, type RetrievalOptions } from './lib/retrieval.js';
 import {
   evaluateArchiveSearch,
+  runArchiveQuery,
   runArchiveIntake,
   type ArchiveIntakePlan,
   type ArchiveSearchPlan,
+  type ArchiveQueryInput,
 } from './lib/archive-journey.js';
+import {
+  createArchiveJobSpec,
+  tickArchiveJobs,
+  type ArchiveJobPlan,
+} from './lib/archive-jobs.js';
 import { runRetrievalGate } from './lib/archive-evaluation-gate.js';
+import { runGraphRetrievalGate } from './lib/archive-graph-evaluation-gate.js';
 import {
   publishArchiveStructure,
   type ArchiveStructurePlan,
 } from './lib/archive-structure.js';
+import {
+  publishArchiveDocumentLinks,
+  type ArchiveDocumentLinksPlan,
+} from './lib/archive-document-links.js';
+import {
+  recordArchiveQueryFeedback,
+  type ArchiveQueryFeedbackInput,
+} from './lib/archive-query-feedback.js';
+import {
+  publishReviewedArchiveGraphChange,
+  type ArchiveReviewedGraphChange,
+} from './lib/archive-graph-reviewed-change.js';
 
 const help = `Knowledge demo (explicit local files; no model or semantic approval):
+  node /absolute/artifact/node_modules/@temari/knowledge/src/demo.js <command> [--flag value]
   pnpm nx run knowledge:demo -- capture --input /absolute/intake.json
   pnpm nx run knowledge:demo -- rebind --input /absolute/rebind.json
   pnpm nx run knowledge:demo -- archive-collect --input /absolute/retrieval.json [--resume /absolute/retrieval-HASH.json]
   pnpm nx run knowledge:demo -- archive-assess --input /absolute/investigation.json --assessment /absolute/assessment.json
   pnpm nx run knowledge:demo -- journey-intake --input /absolute/intake-plan.json
   pnpm nx run knowledge:demo -- journey-search --input /absolute/search-plan.json
+  pnpm nx run knowledge:demo -- journey-query --input /absolute/query.json
+  pnpm nx run knowledge:demo -- journey-jobs-create --input /absolute/jobs-plan.json
+  pnpm nx run knowledge:demo -- journey-jobs-tick --spec /absolute/archive-job-spec-HASH.json
   pnpm nx run knowledge:demo -- journey-gate --input /absolute/sealed-questions.json --sha256 QUESTION_SET_SHA256
+  pnpm nx run knowledge:demo -- graph-gate --input /absolute/sealed-graph-questions.json --sha256 QUESTION_SET_SHA256 --handoff-sha256 HANDOFF_SHA256
   pnpm nx run knowledge:demo -- structure-publish --input /absolute/structure-plan.json
+  pnpm nx run knowledge:demo -- document-links-publish --input /absolute/links-plan.json
+  pnpm nx run knowledge:demo -- query-feedback --input /absolute/feedback.json
+  pnpm nx run knowledge:demo -- graph-reviewed-change --input /absolute/review.json
   pnpm nx run knowledge:demo -- --help
   pnpm nx run knowledge:demo -- prepare --manifest /absolute/selected-documents.json --python /absolute/python --registrar-source /absolute/registrar-repo
   pnpm nx run knowledge:demo -- collect --input /absolute/input.json [--resume /absolute/knowledge-HASH.json] [--assessment /absolute/assessment.json]
@@ -82,6 +111,31 @@ async function main(): Promise<void> {
     );
     return;
   }
+  if (command === 'journey-jobs-create') {
+    const input = JSON.parse(
+      await readFile(arg('--input'), 'utf8'),
+    ) as ArchiveJobPlan;
+    process.stdout.write(
+      JSON.stringify({ specPath: await createArchiveJobSpec(input) }, null, 2) +
+        '\n',
+    );
+    return;
+  }
+  if (command === 'journey-jobs-tick') {
+    process.stdout.write(
+      JSON.stringify(await tickArchiveJobs(arg('--spec')), null, 2) + '\n',
+    );
+    return;
+  }
+  if (command === 'journey-query') {
+    const input = JSON.parse(
+      await readFile(arg('--input'), 'utf8'),
+    ) as ArchiveQueryInput;
+    process.stdout.write(
+      JSON.stringify(await runArchiveQuery(input), null, 2) + '\n',
+    );
+    return;
+  }
   if (command === 'journey-search') {
     const input = JSON.parse(
       await readFile(arg('--input'), 'utf8'),
@@ -92,8 +146,27 @@ async function main(): Promise<void> {
     return;
   }
   if (command === 'journey-gate') {
-    process.stdout.write(JSON.stringify(
-      await runRetrievalGate(arg('--input'), arg('--sha256')), null, 2) + '\n');
+    process.stdout.write(
+      JSON.stringify(
+        await runRetrievalGate(arg('--input'), arg('--sha256')),
+        null,
+        2,
+      ) + '\n',
+    );
+    return;
+  }
+  if (command === 'graph-gate') {
+    process.stdout.write(
+      JSON.stringify(
+        await runGraphRetrievalGate(
+          arg('--input'),
+          arg('--sha256'),
+          arg('--handoff-sha256'),
+        ),
+        null,
+        2,
+      ) + '\n',
+    );
     return;
   }
   if (command === 'structure-publish') {
@@ -102,6 +175,33 @@ async function main(): Promise<void> {
     ) as ArchiveStructurePlan;
     process.stdout.write(
       JSON.stringify(await publishArchiveStructure(input), null, 2) + '\n',
+    );
+    return;
+  }
+  if (command === 'document-links-publish') {
+    const input = JSON.parse(
+      await readFile(arg('--input'), 'utf8'),
+    ) as ArchiveDocumentLinksPlan;
+    process.stdout.write(
+      JSON.stringify(await publishArchiveDocumentLinks(input), null, 2) + '\n',
+    );
+    return;
+  }
+  if (command === 'query-feedback') {
+    const input = JSON.parse(
+      await readFile(arg('--input'), 'utf8'),
+    ) as ArchiveQueryFeedbackInput;
+    process.stdout.write(
+      JSON.stringify(await recordArchiveQueryFeedback(input), null, 2) + '\n',
+    );
+    return;
+  }
+  if (command === 'graph-reviewed-change') {
+    const input = JSON.parse(
+      await readFile(arg('--input'), 'utf8'),
+    ) as ArchiveReviewedGraphChange;
+    process.stdout.write(
+      JSON.stringify(await publishReviewedArchiveGraphChange(input), null, 2) + '\n',
     );
     return;
   }
