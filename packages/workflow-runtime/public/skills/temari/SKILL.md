@@ -13,6 +13,17 @@ execution route. Classify such a request for planning and state the admission ga
 do not start a legacy `orch` store or treat an Archon status as closeout. Poteto
 supplies the engineering method for each admitted bounded unit.
 
+When a request may span multiple units, outlast this session, or continue while
+the user is away, proactively propose a short work contract. Include a checkable
+done condition, allowed scope and forbidden actions, unit boundaries, verification
+for each unit and the final result, time or spend limits, human gates, checkpoint
+and resume state, and the morning report. Fill what the user has already decided;
+ask only for authority or choices that cannot be inferred. Verify the selected
+host's worker, scheduling, recovery, and evidence capabilities before promising
+unattended execution. If the current public route cannot execute the program,
+state that gap and offer the contract as a reviewable plan or a proven host-specific
+route, clearly naming its separate state and completion evidence.
+
 When the requested output includes ticket verification notes, a QA evidence audit,
 or a release QA report, use the bundled
 [QA verification skill](../qa-review-verification/SKILL.md) for that deliverable.

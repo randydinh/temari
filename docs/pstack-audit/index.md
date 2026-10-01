@@ -35,6 +35,11 @@ verifies a trusted invocation against the current candidate.
 is a public supporting skill, invoked through Temari for QA deliverables rather
 than a fourth `policy.entries` key.
 
+For multi-unit work or a user stepping away, Temari should proactively offer
+a [reviewable unattended work contract](../decisions/2026-09-30-temari-program-ownership.md#user-facing-priority)
+with a finish line, scope, verification, gates, and recovery plan. Verify the
+selected host before promising that agents will continue while the user is away.
+
 The public policy currently admits lightweight engineering, host-proven full
 feature work, and versioned QA. It has no standing-program execution entry.
 The new typed `programKind` route records Temari ownership and is planning-only;

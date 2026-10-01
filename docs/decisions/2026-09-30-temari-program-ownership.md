@@ -56,6 +56,22 @@ the legacy files and the verifier that exercises their bookkeeping. Each changed
 vendored file has an updated artifact hash and an explicit transformation
 explanation in `provenance.json`.
 
+## User-facing priority
+
+Verification is the first product priority. A dependable contract for unattended
+agent work is second. Temari should surface that option when a task has several
+independent units or the user will be away, instead of waiting for the user to
+name Orchestrate, an automation, or another host mechanism. The contract makes
+the finish line, delegated scope, verification, time or spend limits, human
+gates, checkpoints, recovery, and final report reviewable before dispatch.
+
+This priority does not itself admit a new program execution route. The current
+public route can draft the contract, then must check the selected host and
+policy before promising unattended work. A proven host-specific route can be
+offered with its own state and completion evidence labeled explicitly. If none
+is available, Temari reports the execution gap and keeps the contract ready for
+admission rather than claiming the agents will continue overnight.
+
 ## Promotion gates
 
 Remove the planning-only guard only after an end-to-end program journey proves:
