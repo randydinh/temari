@@ -12,6 +12,7 @@ import {
   loadArchivePublication,
   type ArchiveIntakeOptions,
   type ArchiveIntakeOutcome,
+  type ArchivePublication,
 } from './archive-intake.js';
 import { createArchiveRegistrar } from './archive-registrar.js';
 import {
@@ -86,6 +87,15 @@ export interface ArchiveSearchPlan {
   readonly handoffPath: string;
   readonly cases: readonly ArchiveEvaluationCase[];
 }
+export interface ArchiveQueryInput {
+  readonly handoffPath: string;
+  readonly id: string;
+  readonly query: string;
+  readonly sourceIds: readonly string[];
+  readonly topK: number;
+  readonly discoveryMode: 'exact' | 'bm25';
+  readonly hostedTextApproved?: boolean;
+}
 export interface ArchiveCaseResult {
   readonly id: string;
   readonly querySha256: string;
@@ -124,6 +134,26 @@ export interface ArchiveSearchReport {
   readonly task: InvestigationTask;
   readonly cases: readonly ArchiveCaseResult[];
 }
+/** Operational advice has no evaluation labels; Jev remains shadow-only. */
+export type ArchiveQueryJevAdvice = Omit<JevShadowResult, 'judgments'> & {
+  readonly judgments: readonly Omit<
+    JevShadowResult['judgments'][number],
+    'required'
+  >[];
+};
+export type ArchiveQueryResult = Omit<
+  ArchiveCaseResult,
+  'expected' | 'expectedRecallAtK' | 'graph' | 'jev'
+> & {
+  readonly jev: ArchiveQueryJevAdvice | null;
+};
+export interface ArchiveQueryReport {
+  readonly schema: 1;
+  readonly kind: 'temari-archive-query';
+  readonly handoffPath: string;
+  readonly task: InvestigationTask;
+  readonly query: ArchiveQueryResult;
+}
 
 const same = (a: unknown, b: unknown): boolean => canonical(a) === canonical(b);
 const key = (sourceId: string, path: string): string =>
@@ -134,6 +164,12 @@ export async function runArchiveIntake(
   plan: ArchiveIntakePlan,
 ): Promise<ArchiveIntakeBatchResult> {
   const selected = JSON.parse(canonical(plan)) as ArchiveIntakePlan;
+  assert(
+    Object.keys(selected).every((field) =>
+      ['task', 'intakes', 'localOnlySourceIds', 'structures'].includes(field),
+    ),
+    'Unknown intake plan field',
+  );
   assert(selected.intakes.length >= 1 && selected.intakes.length <= 8);
   assert(
     new Set(selected.intakes.map((item) => item.source.id)).size ===
@@ -228,7 +264,9 @@ export async function runArchiveIntake(
   };
 }
 
-export async function loadArchiveHandoff(path: string): Promise<ArchiveIntakeHandoff> {
+export async function loadArchiveHandoff(
+  path: string,
+): Promise<ArchiveIntakeHandoff> {
   assert(isAbsolute(path));
   const value = object(await readJson(path)) as unknown as ArchiveIntakeHandoff;
   assert.equal(value.schema, 1);
@@ -299,6 +337,278 @@ export async function loadArchiveHandoff(path: string): Promise<ArchiveIntakeHan
   return value;
 }
 
+type QueryCase = Omit<ArchiveEvaluationCase, 'expected' | 'graphId'>;
+type CoreCaseResult = Omit<
+  ArchiveCaseResult,
+  'expected' | 'expectedRecallAtK' | 'graph'
+>;
+interface CoreContext {
+  readonly result: CoreCaseResult;
+  readonly selectedPublications: readonly string[];
+  readonly scope: readonly ArchivePublication['source'][];
+  readonly provider: Awaited<ReturnType<typeof createArchiveRegistrar>>;
+}
+
+function validateQuery(c: QueryCase, handoff: ArchiveIntakeHandoff): void {
+  assert(text(c.id).length <= 128 && text(c.query).length <= 512);
+  integer(c.topK, 1, 8);
+  assert(['exact', 'bm25'].includes(c.discoveryMode));
+  assert(
+    c.hostedTextApproved === undefined ||
+      typeof c.hostedTextApproved === 'boolean',
+  );
+  if (!handoff.jevPolicy)
+    assert(
+      typeof c.hostedTextApproved === 'boolean',
+      'Legacy handoff requires per-case Jev approval',
+    );
+  assert(
+    Array.isArray(c.sourceIds) &&
+      c.sourceIds.length >= 1 &&
+      c.sourceIds.length <= 8,
+  );
+  assert.equal(new Set(c.sourceIds).size, c.sourceIds.length);
+  for (const sourceId of c.sourceIds)
+    assert(
+      handoff.sources.some((source) => source.id === sourceId),
+      'Case source outside handoff',
+    );
+}
+
+function validateExpected(c: ArchiveEvaluationCase): Set<string> {
+  assert(
+    Array.isArray(c.expected) &&
+      c.expected.length >= 1 &&
+      c.expected.length <= 16,
+  );
+  const expected = new Set<string>();
+  for (const item of c.expected) {
+    assert(
+      c.sourceIds.includes(item.sourceId),
+      'Expected source outside case scope',
+    );
+    assert(
+      text(item.path).length <= 4096 &&
+        !isAbsolute(item.path) &&
+        !item.path.includes('\\') &&
+        !item.path.includes('\0') &&
+        !item.path.startsWith('-') &&
+        !item.path
+          .split('/')
+          .some((part: string) => ['', '.', '..'].includes(part)),
+    );
+    expected.add(key(item.sourceId, item.path));
+  }
+  assert.equal(expected.size, c.expected.length);
+  return expected;
+}
+
+/** Both operational queries and labeled evaluations use the same pinned lexical path. */
+async function searchArchiveCore(
+  c: QueryCase,
+  handoff: ArchiveIntakeHandoff,
+  publications: readonly ArchivePublication[],
+  jevOptions: JevShadowOptions,
+  expected?: ReadonlySet<string>,
+): Promise<CoreContext> {
+  const caseStarted = performance.now();
+  validateQuery(c, handoff);
+  const jevSharing: ArchiveCaseResult['jevSharing'] = c.sourceIds.some(
+    (id: string) => handoff.jevPolicy?.localOnlySourceIds.includes(id),
+  )
+    ? 'local-only'
+    : c.hostedTextApproved === false
+      ? 'case-opt-out'
+      : 'allowed';
+  const selectedPublications = handoff.publications.filter((_path, index) =>
+    c.sourceIds.includes(publications[index].source.id),
+  );
+  const provider = await createArchiveRegistrar({
+    publications: selectedPublications,
+    readScope: 'source-root',
+    discoveryMode: c.discoveryMode,
+  });
+  const scope = publications
+    .filter((item) => c.sourceIds.includes(item.source.id))
+    .map((item) => item.source);
+  const limits = {
+    evidenceCodePoints: 64000,
+    contextCodePoints: 65536,
+    stateBytes: 4 * 1024 * 1024,
+  };
+  const discovery = await collectKnowledge({
+    task: handoff.task,
+    provider,
+    request: { scope, query: c.query, selections: [], limits },
+    budget: {
+      calls: 1,
+      responseBytes: 131072,
+      codePoints: 1,
+      codePointsPerRead: 1,
+      documentsPerPage: c.topK,
+    },
+  });
+  const discovered = await loadRetrieval(discovery.checkpointPath);
+  const discoveryMs = Math.max(0, Math.round(performance.now() - caseStarted));
+  const candidates = discovered.discovery
+    .flatMap((page) => page.documents)
+    .slice(0, c.topK);
+  const ranked = candidates.map((item) => ({
+    sourceId: item.document.source.id,
+    path: item.document.path,
+    sha256: item.sha256,
+  }));
+  let retrievalCheckpointPath: string | null = null;
+  let shortlistVerified = false;
+  let verifiedEvidenceCount = 0;
+  let evidenceCount = 0;
+  let excerptReadsMs = 0;
+  let jevMs = 0;
+  let gaps: KnowledgeGap[] = [
+    ...discovered.gaps,
+    ...discovered.discovery.flatMap((page) => page.gaps),
+  ];
+  let jev: JevShadowResult | null = null;
+  if (candidates.length) {
+    const readStarted = performance.now();
+    const evidence: KnowledgeEvidence[] = [];
+    const checks: KnowledgeCheck[] = [];
+    for (const candidate of candidates) {
+      try {
+        const result = await provider.read({
+          document: candidate.document,
+          expectedSha256: candidate.sha256,
+          continuation: null,
+          maxCodePoints: 1000,
+          maxBytes: 65536,
+        });
+        if (!result.ok) {
+          gaps.push(result.gap);
+          continue;
+        }
+        const item = result.value.evidence;
+        assert(
+          same(item.document, candidate.document) &&
+            item.sha256 === candidate.sha256,
+          'Shortlist evidence changed',
+        );
+        evidence.push(item);
+        const check = await provider.revalidate(item);
+        assert.equal(check.evidenceId, item.id);
+        checkBasis(check, item);
+        checks.push(check);
+        if (check.state !== 'unchanged')
+          gaps.push({
+            kind: check.state,
+            subject: item.id,
+            detail: check.detail,
+          });
+      } catch {
+        gaps.push({
+          kind: 'unknown',
+          subject: candidate.document.path,
+          detail: 'Archive excerpt read or revalidation failed',
+        });
+      }
+    }
+    evidenceCount = evidence.length;
+    verifiedEvidenceCount = checks.filter(
+      (item) => item.state === 'unchanged',
+    ).length;
+    shortlistVerified = verifiedEvidenceCount === candidates.length;
+    const checkpoint = {
+      schema: 1,
+      kind: 'temari-archive-shortlist',
+      task: handoff.task,
+      provider: provider.identity,
+      querySha256: hash(c.query),
+      ranked,
+      evidence,
+      checks,
+      gaps,
+      readMode: 'first-1000-codepoints',
+      fullDocumentRead: false,
+    };
+    retrievalCheckpointPath = join(
+      handoff.task.directory,
+      `archive-shortlist-${hash(canonical(checkpoint))}.json`,
+    );
+    await publishJson(retrievalCheckpointPath, checkpoint);
+    excerptReadsMs = Math.max(0, Math.round(performance.now() - readStarted));
+    const shortlist = candidates.flatMap((item) => {
+      const piece = evidence.find(
+        (e) =>
+          same(e.document, item.document) &&
+          checks.some(
+            (check) => check.evidenceId === e.id && check.state === 'unchanged',
+          ),
+      );
+      if (!piece || !piece.excerpt) return [];
+      return [
+        {
+          id: hash(canonical(item.document)),
+          evidenceIds: [piece.id],
+          excerpt: piece.excerpt,
+          required:
+            expected?.has(key(item.document.source.id, item.document.path)) ??
+            false,
+          contrary: false,
+        },
+      ];
+    });
+    if (
+      shortlist.length &&
+      shortlist.reduce((total, item) => total + item.excerpt.length, 0) > 16000
+    ) {
+      gaps.push({
+        kind: 'pending',
+        subject: 'jev-shadow',
+        detail:
+          'Verified excerpts exceed the Jev shortlist text limit; local retrieval remains available.',
+      });
+    } else if (shortlist.length) {
+      const jevStarted = performance.now();
+      jev = await judgeJevShadow(
+        {
+          query: c.query,
+          hostedTextApproved: jevSharing === 'allowed',
+          ...(jevSharing === 'allowed' ? {} : { denialReason: jevSharing }),
+          candidates: shortlist,
+        },
+        jevOptions,
+      );
+      jevMs = Math.max(0, Math.round(performance.now() - jevStarted));
+    }
+  }
+  const result: CoreCaseResult = {
+    id: c.id,
+    querySha256: hash(c.query),
+    discoveryMode: c.discoveryMode,
+    sourceIds: [...c.sourceIds],
+    jevSharing,
+    sourceCapabilityGaps: publications
+      .filter((item) => c.sourceIds.includes(item.source.id))
+      .flatMap((item) => item.gaps),
+    discoveryCheckpointPath: discovery.checkpointPath,
+    retrievalCheckpointPath,
+    discoveryExhausted:
+      discovered.discoveryNext === null && discovered.discoveryStarted,
+    ranked,
+    verifiedEvidenceCount,
+    evidenceCount,
+    shortlistVerified,
+    gaps,
+    jev,
+    timingMs: {
+      discovery: discoveryMs,
+      excerptReads: excerptReadsMs,
+      jev: jevMs,
+      total: Math.max(0, Math.round(performance.now() - caseStarted)),
+    },
+  };
+  return { result, selectedPublications, scope, provider };
+}
+
 /** Search authority accepts only a verified handoff and writes evidence-free metrics. */
 export async function evaluateArchiveSearch(
   plan: ArchiveSearchPlan,
@@ -306,240 +616,50 @@ export async function evaluateArchiveSearch(
 ): Promise<{ report: ArchiveSearchReport; reportPath: string }> {
   const selected = JSON.parse(canonical(plan)) as ArchiveSearchPlan;
   assert(
+    Object.keys(selected).every((field) =>
+      ['handoffPath', 'cases'].includes(field),
+    ),
+    'Unknown search plan field',
+  );
+  assert(
     Array.isArray(selected.cases) &&
       selected.cases.length >= 1 &&
       selected.cases.length <= 32,
   );
   const handoff = await loadArchiveHandoff(selected.handoffPath);
-  assert(
-    new Set(selected.cases.map((item) => item.id)).size ===
-      selected.cases.length,
+  assert.equal(
+    new Set(selected.cases.map((item) => item.id)).size,
+    selected.cases.length,
   );
   const publications = await Promise.all(
     handoff.publications.map(loadArchivePublication),
   );
-  const sourceById = new Map(
-    publications.map((item) => [item.source.id, item.source]),
-  );
   const results: ArchiveCaseResult[] = [];
   for (const c of selected.cases) {
-    const caseStarted = performance.now();
-    assert(text(c.id).length <= 128 && text(c.query).length <= 512);
-    integer(c.topK, 1, 8);
-    assert(['exact', 'bm25'].includes(c.discoveryMode));
     assert(
-      c.hostedTextApproved === undefined ||
-        typeof c.hostedTextApproved === 'boolean',
+      Object.keys(c).every((field) =>
+        [
+          'id',
+          'query',
+          'sourceIds',
+          'expected',
+          'topK',
+          'discoveryMode',
+          'hostedTextApproved',
+          'graphId',
+        ].includes(field),
+      ),
+      'Unknown evaluation case field',
     );
-    if (!handoff.jevPolicy)
-      assert(
-        typeof c.hostedTextApproved === 'boolean',
-        'Legacy handoff requires per-case Jev approval',
-      );
-    assert(
-      Array.isArray(c.sourceIds) &&
-        c.sourceIds.length >= 1 &&
-        c.sourceIds.length <= 8,
+    validateQuery(c, handoff);
+    const expected = validateExpected(c);
+    const core = await searchArchiveCore(
+      c,
+      handoff,
+      publications,
+      jevOptions,
+      expected,
     );
-    assert.equal(new Set(c.sourceIds).size, c.sourceIds.length);
-    for (const sourceId of c.sourceIds)
-      assert(sourceById.has(sourceId), 'Case source outside handoff');
-    const jevSharing: ArchiveCaseResult['jevSharing'] = c.sourceIds.some(
-      (id: string) => handoff.jevPolicy?.localOnlySourceIds.includes(id),
-    )
-      ? 'local-only'
-      : c.hostedTextApproved === false
-        ? 'case-opt-out'
-        : 'allowed';
-    assert(
-      Array.isArray(c.expected) &&
-        c.expected.length >= 1 &&
-        c.expected.length <= 16,
-    );
-    const expected = new Set<string>();
-    for (const item of c.expected) {
-      assert(
-        c.sourceIds.includes(item.sourceId),
-        'Expected source outside case scope',
-      );
-      assert(
-        text(item.path).length <= 4096 &&
-          !isAbsolute(item.path) &&
-          !item.path.includes('\\') &&
-          !item.path.includes('\0') &&
-          !item.path.startsWith('-') &&
-          !item.path
-            .split('/')
-            .some((part: string) => ['', '.', '..'].includes(part)),
-      );
-      expected.add(key(item.sourceId, item.path));
-    }
-    assert.equal(expected.size, c.expected.length);
-    const selectedPublications = handoff.publications.filter((_path, index) =>
-      c.sourceIds.includes(publications[index].source.id),
-    );
-    const provider = await createArchiveRegistrar({
-      publications: selectedPublications,
-      readScope: 'source-root',
-      discoveryMode: c.discoveryMode,
-    });
-    const scope = publications
-      .filter((item) => c.sourceIds.includes(item.source.id))
-      .map((item) => item.source);
-    const limits = {
-      evidenceCodePoints: 64000,
-      contextCodePoints: 65536,
-      stateBytes: 4 * 1024 * 1024,
-    };
-    const discovery = await collectKnowledge({
-      task: handoff.task,
-      provider,
-      request: { scope, query: c.query, selections: [], limits },
-      budget: {
-        calls: 1,
-        responseBytes: 131072,
-        codePoints: 1,
-        codePointsPerRead: 1,
-        documentsPerPage: c.topK,
-      },
-    });
-    const discovered = await loadRetrieval(discovery.checkpointPath);
-    const discoveryMs = Math.max(
-      0,
-      Math.round(performance.now() - caseStarted),
-    );
-    const candidates = discovered.discovery
-      .flatMap((page) => page.documents)
-      .slice(0, c.topK);
-    const ranked = candidates.map((item) => ({
-      sourceId: item.document.source.id,
-      path: item.document.path,
-      sha256: item.sha256,
-    }));
-    let retrievalCheckpointPath: string | null = null;
-    let shortlistVerified = false;
-    let verifiedEvidenceCount = 0;
-    let evidenceCount = 0;
-    let excerptReadsMs = 0;
-    let jevMs = 0;
-    let gaps: KnowledgeGap[] = [
-      ...discovered.gaps,
-      ...discovered.discovery.flatMap((page) => page.gaps),
-    ];
-    let jev: JevShadowResult | null = null;
-    if (candidates.length) {
-      const readStarted = performance.now();
-      const evidence: KnowledgeEvidence[] = [];
-      const checks: KnowledgeCheck[] = [];
-      for (const candidate of candidates) {
-        try {
-          const result = await provider.read({
-            document: candidate.document,
-            expectedSha256: candidate.sha256,
-            continuation: null,
-            maxCodePoints: 1000,
-            maxBytes: 65536,
-          });
-          if (!result.ok) {
-            gaps.push(result.gap);
-            continue;
-          }
-          const item = result.value.evidence;
-          assert(
-            same(item.document, candidate.document) &&
-              item.sha256 === candidate.sha256,
-            'Shortlist evidence changed',
-          );
-          evidence.push(item);
-          const check = await provider.revalidate(item);
-          assert.equal(check.evidenceId, item.id);
-          checkBasis(check, item);
-          checks.push(check);
-          if (check.state !== 'unchanged')
-            gaps.push({
-              kind: check.state,
-              subject: item.id,
-              detail: check.detail,
-            });
-        } catch {
-          gaps.push({
-            kind: 'unknown',
-            subject: candidate.document.path,
-            detail: 'Archive excerpt read or revalidation failed',
-          });
-        }
-      }
-      evidenceCount = evidence.length;
-      verifiedEvidenceCount = checks.filter(
-        (item) => item.state === 'unchanged',
-      ).length;
-      shortlistVerified = verifiedEvidenceCount === candidates.length;
-      const checkpoint = {
-        schema: 1,
-        kind: 'temari-archive-shortlist',
-        task: handoff.task,
-        provider: provider.identity,
-        querySha256: hash(c.query),
-        ranked,
-        evidence,
-        checks,
-        gaps,
-        readMode: 'first-1000-codepoints',
-        fullDocumentRead: false,
-      };
-      retrievalCheckpointPath = join(
-        handoff.task.directory,
-        `archive-shortlist-${hash(canonical(checkpoint))}.json`,
-      );
-      await publishJson(retrievalCheckpointPath, checkpoint);
-      excerptReadsMs = Math.max(0, Math.round(performance.now() - readStarted));
-      const shortlist = candidates.flatMap((item) => {
-        const piece = evidence.find(
-          (e) =>
-            same(e.document, item.document) &&
-            checks.some(
-              (check) =>
-                check.evidenceId === e.id && check.state === 'unchanged',
-            ),
-        );
-        if (!piece || !piece.excerpt) return [];
-        return [
-          {
-            id: hash(canonical(item.document)),
-            evidenceIds: [piece.id],
-            excerpt: piece.excerpt,
-            required: expected.has(
-              key(item.document.source.id, item.document.path),
-            ),
-            contrary: false,
-          },
-        ];
-      });
-      if (
-        shortlist.length &&
-        shortlist.reduce((total, item) => total + item.excerpt.length, 0) >
-          16000
-      ) {
-        gaps.push({
-          kind: 'pending',
-          subject: 'jev-shadow',
-          detail:
-            'Verified excerpts exceed the Jev shortlist text limit; local retrieval remains available.',
-        });
-      } else if (shortlist.length) {
-        const jevStarted = performance.now();
-        jev = await judgeJevShadow(
-          {
-            query: c.query,
-            hostedTextApproved: jevSharing === 'allowed',
-            ...(jevSharing === 'allowed' ? {} : { denialReason: jevSharing }),
-            candidates: shortlist,
-          },
-          jevOptions,
-        );
-        jevMs = Math.max(0, Math.round(performance.now() - jevStarted));
-      }
-    }
     const selectedGraphId =
       c.graphId ??
       (c.sourceIds.length === 1
@@ -551,45 +671,22 @@ export async function evaluateArchiveSearch(
         ? undefined
         : await evaluateArchiveGraphTrial({
             graphId: selectedGraphId,
-            publications: selectedPublications,
-            scope,
-            provider,
-            lexical: ranked,
+            publications: core.selectedPublications,
+            scope: core.scope,
+            provider: core.provider,
+            lexical: core.result.ranked,
             expected: c.expected,
             topK: c.topK,
             taskDirectory: handoff.task.directory,
           });
-    const hitCount = ranked.filter((item) =>
+    const hitCount = core.result.ranked.filter((item) =>
       expected.has(key(item.sourceId, item.path)),
     ).length;
     results.push({
-      id: c.id,
-      querySha256: hash(c.query),
-      discoveryMode: c.discoveryMode,
-      sourceIds: [...c.sourceIds],
-      jevSharing,
+      ...core.result,
       expected: [...c.expected],
-      sourceCapabilityGaps: publications
-        .filter((item) => c.sourceIds.includes(item.source.id))
-        .flatMap((item) => item.gaps),
-      discoveryCheckpointPath: discovery.checkpointPath,
-      retrievalCheckpointPath,
-      discoveryExhausted:
-        discovered.discoveryNext === null && discovered.discoveryStarted,
-      ranked,
       expectedRecallAtK: hitCount / expected.size,
-      verifiedEvidenceCount,
-      evidenceCount,
-      shortlistVerified,
-      gaps,
-      jev,
       ...(graph === undefined ? {} : { graph }),
-      timingMs: {
-        discovery: discoveryMs,
-        excerptReads: excerptReadsMs,
-        jev: jevMs,
-        total: Math.max(0, Math.round(performance.now() - caseStarted)),
-      },
     });
   }
   const report: ArchiveSearchReport = {
@@ -602,6 +699,63 @@ export async function evaluateArchiveSearch(
   const reportPath = join(
     handoff.task.directory,
     `archive-evaluation-${hash(canonical(report))}.json`,
+  );
+  await publishJson(reportPath, report);
+  return { report, reportPath };
+}
+
+/** Unlabelled search returns ranked pins and bounded evidence checks, never a gold claim.
+ * This is a single run, not an idempotent job: a retry can repeat TypeSafe calls.
+ * A workflow coordinator must lease it before scheduling or automatic retries.
+ */
+export async function runArchiveQuery(
+  input: ArchiveQueryInput,
+  jevOptions: JevShadowOptions = {},
+): Promise<{ report: ArchiveQueryReport; reportPath: string }> {
+  const selected = JSON.parse(canonical(input)) as ArchiveQueryInput;
+  assert(
+    Object.keys(selected).every((field) =>
+      [
+        'handoffPath',
+        'id',
+        'query',
+        'sourceIds',
+        'topK',
+        'discoveryMode',
+        'hostedTextApproved',
+      ].includes(field),
+    ),
+    'Unknown operational query field',
+  );
+  const handoff = await loadArchiveHandoff(selected.handoffPath);
+  const publications = await Promise.all(
+    handoff.publications.map(loadArchivePublication),
+  );
+  const core = await searchArchiveCore(
+    selected,
+    handoff,
+    publications,
+    jevOptions,
+  );
+  const jev =
+    core.result.jev === null
+      ? null
+      : {
+          ...core.result.jev,
+          judgments: core.result.jev.judgments.map(
+            ({ required: _required, ...judgment }) => judgment,
+          ),
+        };
+  const report: ArchiveQueryReport = {
+    schema: 1,
+    kind: 'temari-archive-query',
+    handoffPath: selected.handoffPath,
+    task: handoff.task,
+    query: { ...core.result, jev },
+  };
+  const reportPath = join(
+    handoff.task.directory,
+    `archive-query-${hash(canonical(report))}.json`,
   );
   await publishJson(reportPath, report);
   return { report, reportPath };

@@ -2,13 +2,17 @@ import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { test } from 'node:test';
 import { actualFixture, documents } from '../support/fixtures.js';
 import { prepareRegistrar } from '../support/prepare.js';
-import { evaluateArchiveSearch, runArchiveIntake } from './archive-journey.js';
+import {
+  evaluateArchiveSearch,
+  runArchiveIntake,
+  runArchiveQuery,
+} from './archive-journey.js';
 import { loadArchivePublication } from './archive-intake.js';
-import { hash } from './codec.js';
+import { canonical, hash } from './codec.js';
 
 test('ACTUAL CLI: explicit OCR mode is retained in the archive publication', async () => {
   const f = await actualFixture();
@@ -17,6 +21,15 @@ test('ACTUAL CLI: explicit OCR mode is retained in the archive publication', asy
     directory: join(f.base, 'task'),
     authorityRef: 'synthetic-local-admission',
   };
+  await assert.rejects(
+    () =>
+      runArchiveIntake({
+        task,
+        intakes: [],
+        localOnlySourceId: [f.source.id],
+      } as unknown as Parameters<typeof runArchiveIntake>[0]),
+    /Unknown intake plan field/,
+  );
   const intake = await runArchiveIntake({
     task,
     intakes: [
@@ -149,6 +162,116 @@ test('ACTUAL CLI: intake handoff through exact/BM25 search, pinned reads and Jev
       'synthetic-test-key',
     ),
   );
+  let queryModelCalls = 0;
+  const query = await runArchiveQuery(
+    {
+      handoffPath: intake.handoffPath,
+      id: 'unlabelled',
+      query: 'Proposal',
+      sourceIds: [f.source.id],
+      topK: 2,
+      discoveryMode: 'bm25',
+    },
+    {
+      apiKey: 'synthetic-test-key',
+      fetcher: async (_url, init) => {
+        queryModelCalls++;
+        const payload = JSON.parse(String(init?.body));
+        assert(!JSON.stringify(payload).includes('required'));
+        return new Response(
+          JSON.stringify({
+            model: 'jev-1.13.0',
+            answers: {
+              relevance: { type: 'noul', noul: 0.8 },
+              support: {
+                type: 'choice',
+                choice: 'unknown',
+                probabilities: {
+                  supported: 0.1,
+                  contradicted: 0.1,
+                  unknown: 0.8,
+                },
+                confidence: 0.8,
+              },
+            },
+            usage: { input_tokens: 12, output_tokens: 4 },
+          }),
+          { status: 200 },
+        );
+      },
+    },
+  );
+  assert.equal(query.report.kind, 'temari-archive-query');
+  assert.equal(query.report.query.ranked.length, 2);
+  assert.equal(query.report.query.shortlistVerified, true);
+  assert.equal(query.report.query.verifiedEvidenceCount, 2);
+  assert.equal(query.report.query.jevSharing, 'allowed');
+  assert.equal(queryModelCalls, 2);
+  assert(
+    query.report.query.jev?.judgments.every((item) => item.state === 'judged'),
+  );
+  const queryBytes = await readFile(query.reportPath, 'utf8');
+  assert.equal(
+    basename(query.reportPath),
+    `archive-query-${hash(canonical(query.report))}.json`,
+  );
+  assert(!queryBytes.includes(documents['update.txt']));
+  assert(!queryBytes.includes('synthetic-test-key'));
+  assert(!queryBytes.includes('expected'));
+  assert(!queryBytes.includes('required'));
+  assert(!queryBytes.includes('graph'));
+  await assert.rejects(
+    () =>
+      runArchiveQuery(
+        {
+          handoffPath: intake.handoffPath!,
+          id: 'typo-opt-out',
+          query: 'Proposal',
+          sourceIds: [f.source.id],
+          topK: 2,
+          discoveryMode: 'bm25',
+          hostedTextApproval: false,
+        } as unknown as Parameters<typeof runArchiveQuery>[0],
+        {
+          apiKey: 'synthetic-test-key',
+          fetcher: async () => {
+            throw new Error('Typo reached TypeSafe');
+          },
+        },
+      ),
+    /Unknown operational query field/,
+  );
+  await assert.rejects(() =>
+    runArchiveQuery({
+      handoffPath: intake.handoffPath!,
+      id: 'bad-label',
+      query: 'Proposal',
+      sourceIds: [f.source.id],
+      topK: 2,
+      discoveryMode: 'bm25',
+      expected: [{ sourceId: f.source.id, path: 'plan.txt' }],
+    } as Parameters<typeof runArchiveQuery>[0]),
+  );
+  const { hostedTextApproved: _removedApproval, ...unsafeCase } = cases[0];
+  void _removedApproval;
+  await assert.rejects(
+    () =>
+      evaluateArchiveSearch(
+        {
+          handoffPath: intake.handoffPath!,
+          cases: [
+            { ...unsafeCase, id: 'eval-typo', hostedTextApproval: false },
+          ],
+        } as unknown as Parameters<typeof evaluateArchiveSearch>[0],
+        {
+          apiKey: 'synthetic-test-key',
+          fetcher: async () => {
+            throw new Error('Evaluation typo reached TypeSafe');
+          },
+        },
+      ),
+    /Unknown evaluation case field/,
+  );
   await assert.rejects(() =>
     evaluateArchiveSearch({
       handoffPath: intake.handoffPath!,
@@ -217,6 +340,30 @@ test('ACTUAL CLI: local-only source blocks Jev even with a case approval', async
   assert.equal(result.shortlistVerified, true);
   assert.equal(result.jevSharing, 'local-only');
   assert(result.jev?.judgments.every((item) => item.gap === 'local-only'));
+  const operational = await runArchiveQuery(
+    {
+      handoffPath: intake.handoffPath,
+      id: 'local-only-operational',
+      query: 'Proposal',
+      sourceIds: [f.source.id],
+      topK: 1,
+      discoveryMode: 'bm25',
+      hostedTextApproved: true,
+    },
+    {
+      apiKey: 'synthetic-test-key',
+      fetcher: async () => {
+        throw new Error('Local-only operational query reached Jev');
+      },
+    },
+  );
+  assert.equal(operational.report.query.jevSharing, 'local-only');
+  assert(
+    operational.report.query.jev?.judgments.every(
+      (item) => item.gap === 'local-only',
+    ),
+  );
+  assert(!JSON.stringify(operational.report).includes('required'));
 });
 
 test('ACTUAL CLI: eight astral excerpts stay within Jev shadow bounds without approval', async () => {

@@ -29,9 +29,11 @@ import {
 import { collectKnowledge, type RetrievalOptions } from './lib/retrieval.js';
 import {
   evaluateArchiveSearch,
+  runArchiveQuery,
   runArchiveIntake,
   type ArchiveIntakePlan,
   type ArchiveSearchPlan,
+  type ArchiveQueryInput,
 } from './lib/archive-journey.js';
 import { runRetrievalGate } from './lib/archive-evaluation-gate.js';
 import { runGraphRetrievalGate } from './lib/archive-graph-evaluation-gate.js';
@@ -51,6 +53,7 @@ const help = `Knowledge demo (explicit local files; no model or semantic approva
   pnpm nx run knowledge:demo -- archive-assess --input /absolute/investigation.json --assessment /absolute/assessment.json
   pnpm nx run knowledge:demo -- journey-intake --input /absolute/intake-plan.json
   pnpm nx run knowledge:demo -- journey-search --input /absolute/search-plan.json
+  pnpm nx run knowledge:demo -- journey-query --input /absolute/query.json
   pnpm nx run knowledge:demo -- journey-gate --input /absolute/sealed-questions.json --sha256 QUESTION_SET_SHA256
   pnpm nx run knowledge:demo -- graph-gate --input /absolute/sealed-graph-questions.json --sha256 QUESTION_SET_SHA256 --handoff-sha256 HANDOFF_SHA256
   pnpm nx run knowledge:demo -- structure-publish --input /absolute/structure-plan.json
@@ -89,6 +92,15 @@ async function main(): Promise<void> {
     );
     return;
   }
+  if (command === 'journey-query') {
+    const input = JSON.parse(
+      await readFile(arg('--input'), 'utf8'),
+    ) as ArchiveQueryInput;
+    process.stdout.write(
+      JSON.stringify(await runArchiveQuery(input), null, 2) + '\n',
+    );
+    return;
+  }
   if (command === 'journey-search') {
     const input = JSON.parse(
       await readFile(arg('--input'), 'utf8'),
@@ -99,14 +111,27 @@ async function main(): Promise<void> {
     return;
   }
   if (command === 'journey-gate') {
-    process.stdout.write(JSON.stringify(
-      await runRetrievalGate(arg('--input'), arg('--sha256')), null, 2) + '\n');
+    process.stdout.write(
+      JSON.stringify(
+        await runRetrievalGate(arg('--input'), arg('--sha256')),
+        null,
+        2,
+      ) + '\n',
+    );
     return;
   }
   if (command === 'graph-gate') {
-    process.stdout.write(JSON.stringify(
-      await runGraphRetrievalGate(arg('--input'), arg('--sha256'), arg('--handoff-sha256')),
-      null, 2) + '\n');
+    process.stdout.write(
+      JSON.stringify(
+        await runGraphRetrievalGate(
+          arg('--input'),
+          arg('--sha256'),
+          arg('--handoff-sha256'),
+        ),
+        null,
+        2,
+      ) + '\n',
+    );
     return;
   }
   if (command === 'structure-publish') {
