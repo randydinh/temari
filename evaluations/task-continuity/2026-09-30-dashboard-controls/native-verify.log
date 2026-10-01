@@ -1,0 +1,143 @@
+
+> nx run runtime:dashboard-worker-test
+
+> node --import @swc-node/register/esm-register --test --test-concurrency=1 libs/runtime/src/lib/parallel-runtime.test.ts libs/runtime/src/lib/stage-evidence.test.ts
+
+(node:40391) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:40392) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:40392) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:40392) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ prepares stable child identities without claiming work before the parent binds them (144.508583ms)
+▶ renews a child lease while a long-running worker is executing
+  ✔ durable renewals carry the child beyond its initial lease (231.234334ms)
+  ✔ a missed logical deadline leaves the child incomplete (99.019542ms)
+✔ renews a child lease while a long-running worker is executing (330.718417ms)
+✔ keeps a larger restartable batch within its declared concurrency bound (663.640375ms)
+✔ resumes a bounded child batch and joins terminal results in declaration order (176.736125ms)
+✔ retains a thrown handler as FAILED mechanics and a blocked semantic receipt (59.699292ms)
+▶ persists bounded diagnostics for blank and oversized worker failures
+  ✔ empty Error (61.299584ms)
+  ✔ whitespace Error (59.341417ms)
+  ✔ oversized Error (63.040375ms)
+  ✔ combined oversized Error (61.03725ms)
+  ✔ unprintable thrown value (62.49925ms)
+✔ persists bounded diagnostics for blank and oversized worker failures (308.12175ms)
+✔ an oversized first failure remains retryable under the attempt bound (113.987792ms)
+✔ retries mechanical child failures within an explicit attempt bound (116.835917ms)
+✔ stops mechanical retries at the declared attempt bound (110.858209ms)
+✔ durably cancels queued assignments and keeps the join incomplete (90.9705ms)
+✔ an active child cancellation blocks the join even when its handler returns PASS (75.556083ms)
+✔ publishes and verifies a workspace manifest for every completed child (125.197166ms)
+✔ publishes portable worker evidence and refuses replay when the artifact is missing (68.474083ms)
+✔ refuses a partial join while another owner holds a child lease (117.820042ms)
+✔ recovers one expired child through a second independent coordinator (420.682ms)
+✔ takeover barrier propagates evidence and drains the held child (365.789833ms)
+✔ takeover barrier propagates completion and drains the held child (358.014458ms)
+✔ takeover barrier propagates readback and drains the held child (378.496917ms)
+✔ takeover barrier propagates missing-signal and drains the held child (1038.765292ms)
+✔ takeover barrier propagates failed-drain and drains the held child (373.041417ms)
+✔ takeover barrier propagates slow-held-start and drains the held child (852.669958ms)
+✔ repairs an interrupted completion without rerunning the handler (69.684834ms)
+✔ refuses receipt replay when an expected child state is missing (60.228208ms)
+✔ concurrent receipt publication converges on one persisted winner (8.138541ms)
+(node:40714) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:40714) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:40714) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ concurrent identical evidence writes converge without temporary-file collisions (39.343125ms)
+✔ publishes all six distinct stage payloads and verifies via new store instances (108.348459ms)
+✔ identical payload bytes across stages remain legitimate with distinct attestations (97.205041ms)
+▶ rejects malformed persisted coverage, identities, profile and contextual bindings
+  ✔ missingStage (1.404709ms)
+  ✔ duplicateStage (1.916792ms)
+  ✔ unsupportedProfile (0.782542ms)
+  ✔ absentProfile (0.669584ms)
+  ✔ unsupportedSchema (0.414792ms)
+  ✔ wrongRun (0.467167ms)
+  ✔ wrongRevision (0.384459ms)
+  ✔ missingBinding (0.452292ms)
+  ✔ unsupportedBinding (1.176459ms)
+  ✔ swappedBinding (0.797917ms)
+  ✔ badDigest (0.471125ms)
+  ✔ badSize (0.351708ms)
+  ✔ nonPass (0.41625ms)
+  ✔ changedSummary (0.747542ms)
+  ✔ changedManifest (0.840208ms)
+  ✔ badTimestamp (0.388417ms)
+  ✔ badPaths (0.39175ms)
+  ✔ badPlan (0.541959ms)
+  ✔ failure (0.464334ms)
+  ✔ nullStage (0.511125ms)
+✔ rejects malformed persisted coverage, identities, profile and contextual bindings (115.92125ms)
+▶ strictly decodes contextual attestations and each payload reference
+  ✔ version (6.070458ms)
+  ✔ wrongRun (6.43075ms)
+  ✔ wrongRevision (5.904667ms)
+  ✔ wrongStage (5.527875ms)
+  ✔ wrongStatus (5.772542ms)
+  ✔ missingPayload (5.625125ms)
+  ✔ duplicateName (6.179417ms)
+  ✔ extraField (5.843875ms)
+  ✔ payloadExtra (5.519417ms)
+  ✔ payloadVersion (5.181542ms)
+  ✔ payloadRun (6.308708ms)
+  ✔ payloadRevision (5.565417ms)
+  ✔ payloadKind (5.678708ms)
+  ✔ payloadName (6.494958ms)
+  ✔ payloadSize (6.041084ms)
+✔ strictly decodes contextual attestations and each payload reference (201.295583ms)
+✔ missing and same-length modified attestation or payload fails, restoration succeeds (121.031125ms)
+▶ runtime rejects duplicate payload names and handler-supplied bindings before acknowledgment
+  ✔ duplicate (11.4755ms)
+  ✔ raw (10.012375ms)
+  ✔ missing (9.876458ms)
+✔ runtime rejects duplicate payload names and handler-supplied bindings before acknowledgment (31.968125ms)
+▶ partial and complete resume reverify evidence before handlers or final publication
+  ✔ 3 acknowledged stages (150.901041ms)
+  ✔ 6 acknowledged stages (123.678167ms)
+✔ partial and complete resume reverify evidence before handlers or final publication (275.402708ms)
+✔ engine rejects profile upgrades, downgrades, unknown versions and mixed completed prefixes (104.667583ms)
+✔ payload count and aggregate size are bounded before publication or payload loading (125.807667ms)
+✔ final publication rechecks earlier acknowledged evidence after later handlers (100.735083ms)
+▶ publication refuses store-substituted payloads, kinds, and attestations before acknowledgment
+  ✔ payload (15.191833ms)
+  ✔ kind (13.480334ms)
+  ✔ attestation (24.282333ms)
+  ✔ mutated-input (15.068042ms)
+✔ publication refuses store-substituted payloads, kinds, and attestations before acknowledgment (69.059459ms)
+✔ invalid verifier identity is rejected before contacting the receipt store (1.877625ms)
+ℹ tests 88
+ℹ suites 0
+ℹ pass 88
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8524.444625
+
+
+
+ NX   Successfully ran target dashboard-worker-test for project runtime
+
+
+  Run duration:      8.6s
+  Cache:             0/1 hit (0%)
+  Critical path:     8.6s (1 task)
+  Recoverable time:  <1ms
+
+(node:40309) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:40314) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:40320) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:40321) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:40323) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:40322) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)

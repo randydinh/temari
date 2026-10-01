@@ -20,6 +20,8 @@ const state = {
   expanded: new Set(),
 };
 const stages = ['investigate', 'plan', 'build', 'review', 'verify', 'deliver'];
+// Keep terminal escape sequences out of the browser preview; retain raw artifacts.
+const plainLog = (value) => value.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '');
 const statusNames = {
   OPEN: 'Open',
   RUNNING: 'Running',
@@ -388,8 +390,8 @@ function renderDetail() {
     for (const capture of control.progress) {
       const row = el('details', 'log-capture');
       row.append(el('summary', '', `${capture.stage} · ${capture.summary}`));
-      row.append(el('pre', '', capture.stdout || '(No stdout)'));
-      if (capture.stderr) row.append(el('pre', '', capture.stderr));
+      row.append(el('pre', '', plainLog(capture.stdout) || '(No stdout)'));
+      if (capture.stderr) row.append(el('pre', '', plainLog(capture.stderr)));
       if (capture.outputTruncated)
         row.append(
           el(

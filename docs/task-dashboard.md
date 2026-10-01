@@ -240,6 +240,6 @@ state and acceptance. It adds no scheduler, unattended service manager, Registra
 map, budget telemetry, or autonomous implementation swarm. The investigation
 transport is local Codex; Archon owns configured native verification workflows.
 
-Consult the [retained evaluation](../evaluations/task-continuity/README.md) for
-executed checks and their revision. This guide describes supported behavior; it
-does not certify a live model run or cross-platform process-control proof.
+The [dashboard verification record](../evaluations/task-continuity/dashboard-controls-2026-09-30.md)
+retains actual macOS browser, native workflow and two-agent model evidence, with
+their exact revisions. This does not establish cross-platform process-control proof.

@@ -1,5 +1,8 @@
 # Task continuity: first local increment
 
+The latest [dashboard controls and parallel-agent record](dashboard-controls-2026-09-30.md)
+verifies the writable UI, real Codex overlap, native verification and restart recovery.
+
 For the subsequent main integration, host entry, scoped pickup, and handoff
 increment, see the [compatibility and verification record](main-compatibility-2026-09-30.md).
 The results below remain the historical evidence for the first increment.
