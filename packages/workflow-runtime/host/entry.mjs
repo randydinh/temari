@@ -20,6 +20,7 @@ import {
   assertSourceEvidence,
 } from './source.mjs';
 import { invocationScope } from './invocation.mjs';
+import { prepareTaskTracking } from './task-tracking.mjs';
 import { verifyLocalFeatureHostProof } from './feature-proof.mjs';
 import { verifyLocalPullRequest } from './forge.mjs';
 import {
@@ -397,8 +398,11 @@ async function main(session) {
       runtimeFlag === '--runtime' &&
       inputFlag === (mode === 'start' ? '--request' : '--run-directory') &&
       inputArgument !== undefined &&
-      extra.length === 0,
-    'Usage: node entry.mjs start --runtime ABS --request ABS_JSON | resume --runtime ABS --run-directory ABS',
+      (extra.length === 0 ||
+        (extra.length === 4 &&
+          extra[0] === '--task-tracking' &&
+          extra[2] === '--expected-task-tracking-sha256')),
+    'Usage: node entry.mjs start --runtime ABS --request ABS_JSON | resume --runtime ABS --run-directory ABS [--task-tracking ABS_JSON --expected-task-tracking-sha256 HEX]',
   );
   const runtimeRoot = await directory(runtimeArgument);
   absolute(inputArgument);
@@ -639,10 +643,25 @@ async function main(session) {
         runtime,
       );
     }
+    assert.equal(
+      await receipts.load(input.runId),
+      null,
+      'Terminal workflow receipt already exists; use the persisted reader or a new run ID.',
+    );
   }
+  const tracking = await prepareTaskTracking({
+    runtime,
+    runtimeRoot,
+    input,
+    paths,
+    sidecarPath: extra[1],
+    expectedSha256: extra[3],
+  });
+  let trackingFailure;
   const store = {
     load: (id) => receipts.load(id),
     save: async (receipt) => {
+      if (trackingFailure) throw trackingFailure;
       await nextTurn();
       if (receipt.status !== 'BLOCKED') session.assertHealthy();
       if (sourceContract && receipt.status === 'PASS')
@@ -658,58 +677,74 @@ async function main(session) {
       return saved;
     },
   };
-  const checkpointStore = sourceContract
-    ? {
-        load: (id) => checkpoints.load(id),
-        save: async (checkpoint) => {
-          await assertSourceEvidence(
-            checkpoint,
-            evidenceStore,
-            sourceContract,
-            runtime,
-          );
-          return checkpoints.save(checkpoint);
-        },
-      }
-    : checkpoints;
-  const receipt = await runtime.executeAndPersist({
-    runId: input.runId,
-    revision: input.revision,
-    plan: input.plan,
-    capabilities: input.capabilities,
-    store,
-    checkpointStore,
-    stageEvidence: { store: evidenceStore },
-    workspaceManifestStore,
-    workspaceForStage: paths.workspaceForStage,
-    candidate: {
-      scope: invocationScope(input),
-      expectedInitial: input.expectedInitial,
-      knownWriteRoots: paths.knownWriteRoots,
+  const checkpointStore = {
+    load: (id) => checkpoints.load(id),
+    save: async (checkpoint) => {
+      if (trackingFailure) throw trackingFailure;
+      if (sourceContract)
+        await assertSourceEvidence(
+          checkpoint,
+          evidenceStore,
+          sourceContract,
+          runtime,
+        );
+      return checkpoints.save(checkpoint);
     },
-    handler: async (stage) => {
-      const result = await session.stage(
-        stage,
-        paths.workspaceForStage(stage).root,
-        input.candidate,
-      );
-      if (!sourceContract || result.status !== 'PASS') return result;
-      return attachSourceClaims(
-        stage,
-        featureProof
-          ? await featureStageResult(stage, result, featureProof)
-          : result,
-        input,
-        sourceContract,
-      );
-    },
-    onStageCheckpoint: async (checkpoint) => {
-      await session.emit({
-        type: 'checkpoint',
-        stage: checkpoint.stages.at(-1).stage,
-      });
-    },
-  });
+  };
+  let receipt;
+  try {
+    receipt = await runtime.executeAndPersist({
+      runId: input.runId,
+      revision: input.revision,
+      plan: input.plan,
+      capabilities: input.capabilities,
+      store,
+      checkpointStore,
+      stageEvidence: { store: evidenceStore },
+      workspaceManifestStore,
+      workspaceForStage: paths.workspaceForStage,
+      candidate: {
+        scope: invocationScope(input),
+        expectedInitial: input.expectedInitial,
+        knownWriteRoots: paths.knownWriteRoots,
+      },
+      handler: async (stage) => {
+        try {
+          await tracking?.start();
+        } catch (error) {
+          // The engine captures worker failures. A bookkeeping refusal must not
+          // become an ISSUES stage, checkpoint or terminal engineering receipt.
+          trackingFailure = error;
+          throw error;
+        }
+        const result = await session.stage(
+          stage,
+          paths.workspaceForStage(stage).root,
+          input.candidate,
+        );
+        if (!sourceContract || result.status !== 'PASS') return result;
+        return attachSourceClaims(
+          stage,
+          featureProof
+            ? await featureStageResult(stage, result, featureProof)
+            : result,
+          input,
+          sourceContract,
+        );
+      },
+      onStageCheckpoint: async (checkpoint) => {
+        await session.emit({
+          type: 'checkpoint',
+          stage: checkpoint.stages.at(-1).stage,
+        });
+      },
+    });
+  } catch (error) {
+    if (tracking?.started && !trackingFailure)
+      await tracking.finish(await receipts.load(input.runId), error);
+    throw error;
+  }
+  await tracking?.finish(receipt);
   if (receipt.status !== 'BLOCKED') session.assertHealthy();
   await session.emit({
     type: 'complete',

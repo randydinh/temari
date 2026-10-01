@@ -37,6 +37,10 @@ const publicFiles = [
     '.codex-plugin/plugin.json',
   ],
   ['packages/workflow-runtime/host/entry.mjs', 'host/entry.mjs'],
+  [
+    'packages/workflow-runtime/host/task-tracking.mjs',
+    'host/task-tracking.mjs',
+  ],
   ['packages/workflow-runtime/host/stdio.mjs', 'host/stdio.mjs'],
   ['packages/workflow-runtime/host/source.mjs', 'host/source.mjs'],
   ['packages/workflow-runtime/host/invocation.mjs', 'host/invocation.mjs'],

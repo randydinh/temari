@@ -9,7 +9,7 @@ authenticate host capabilities, launch workers or prove distributed operation.
 ## Usage and ownership
 
 Build and verify a new [canonical artifact](./canonical-packages.md). Keep that
-trusted artifact and the two files under `packages/workflow-runtime/host/`
+trusted artifact and the modules under `packages/workflow-runtime/host/`
 together in your isolated experiment. They can be relocated; use absolute paths.
 The script is not an installer and does not modify discovery or marketplace
 configuration. No source loader or external runtime dependency is needed.
@@ -54,6 +54,74 @@ Plans requiring delegation, independent review, forge or parallelism cannot
 be made executable by passing a caller-authored capability declaration. In
 particular, a full-playbook classification with default serial obligations is
 not an acceptable public migration shortcut.
+
+## Track the host journey as a durable task
+
+The source host entry can now do the task bookkeeping around actual execution.
+Select the task explicitly with [task pickup](../task-continuity.md), then supply
+a separate tracking file. It carries local context and the intended task;
+it grants no capabilities or route admission. The original execution request
+and its invocation digest stay unchanged.
+
+```json
+{
+  "schemaVersion": 1,
+  "taskRoot": "/isolated/tasks",
+  "taskId": "product-improvement",
+  "actor": "temari-coordinator",
+  "session": { "host": "codex", "sessionId": "ACTUAL_CHAT_ID" },
+  "expectedVersion": 0,
+  "idempotencyKey": "start-product-improvement",
+  "create": {
+    "title": "Improve the product",
+    "goal": "Keep the goal and recovery point through a lost session.",
+    "workspaceRoot": "/isolated/example/product"
+  },
+  "expected": {
+    "runId": "local-example",
+    "revision": "example-revision-v1",
+    "runDirectory": "/isolated/example/new-run",
+    "candidateRoot": "/isolated/example/product"
+  }
+}
+```
+
+The task's workspace must resolve to the selected candidate. The task store must
+be disjoint from the candidate, run directory and compiled runtime. Use an
+existing task's current `version` and omit `create` when continuing a goal.
+The parent of a new task root must exist. Supply the SHA-256 of the reviewed file
+independently of its contents, then launch from the checkout:
+
+```sh
+pnpm exec nx run workflow-runtime:host-entry -- start --runtime /isolated/canonical --request /isolated/example/request.json --task-tracking /isolated/tracking.json --expected-task-tracking-sha256 TRUSTED_TRACKING_SHA256
+```
+
+The same flags work with `resume --run-directory /isolated/example/new-run`.
+The hash pins the selected bytes; it is not authentication or permission.
+An invalid digest, identity, task scope, or stale task version refuses work.
+Omit both tracking flags for an ordinary untracked start.
+
+The entry links the actual chat to the task and saves a starting handoff before
+requesting a stage. It includes locations for the retained invocation,
+checkpoint, receipt and evidence. These locations may not yet have final output.
+A bounded binding beside the host run pins the chosen task across resume. A
+tracked run cannot silently resume untracked or move to another task. A fresh
+chat uses that same task with its current version and a new idempotency key.
+
+Normal completion or interruption records a handoff automatically. A hard process
+kill leaves the starting handoff and runtime checkpoints available for recovery.
+If another chat changes the task during execution, the final handoff refuses to
+overwrite that change. The process reports the tracking failure; any already
+persisted canonical receipt remains available. Inspect that receipt and reconcile
+the handoff instead of rerunning completed work. Terminal host receipts remain
+nonresumable.
+
+These host receipts use `candidate-stage-evidence-v1`. Their locations are
+**context references pending trusted closeout**, not ordinary `TaskRun` evidence
+bindings. A host `PASS` does not mark the task `DONE` or satisfy feature delivery.
+Use the existing trusted candidate closeout route. This source integration does
+not intercept every chat, update the installed plugin, or change the public
+entry's existing request and manifest checks.
 
 ## Private dialogue
 

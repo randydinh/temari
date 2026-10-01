@@ -34,6 +34,11 @@ leaving. These are local context, not execution permission or evidence. Use a ne
 a new candidate; preserve prior run history. A missing/corrupt store is a visible
 recovery issue. Native success alone does not satisfy Temari closeout, and the
 local inbox's acceptance command does not verify full feature/forge obligations.
+When running the source host dialogue, use its optional tracking file described
+in [host session tracking](docs/migrations/host-session.md#track-the-host-journey-as-a-durable-task)
+to retain progress automatically. Keep tracking metadata outside the invocation
+descriptor. A candidate-profile host receipt is a pending-closeout context link;
+never pass it through the simpler task-run verifier or infer `DONE` from host PASS.
 
 ## Local Codex parallel batches
 

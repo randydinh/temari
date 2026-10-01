@@ -28,6 +28,8 @@ tree — [docs/overlays.md](docs/overlays.md).
   Use workspace-scoped `pickup` before creating work, explicitly `enter` the matching
   task with the current host conversation, and save a `handoff` before ending a session.
   When pickup returns choices, select the intended goal explicitly.
+  For source host execution, the [tracked host entry](docs/migrations/host-session.md#track-the-host-journey-as-a-durable-task)
+  saves recovery and outcome handoffs automatically around the existing stage dialogue.
 - **Route a request:** [Temari coordinator and worker contracts](docs/system-roles-and-responsibilities.md#decision-and-control-owners),
   [one workflow](docs/workflow.md), and the packaged
   [Temari](packages/workflow-runtime/assets/v4.1/skills/temari/SKILL.md) and

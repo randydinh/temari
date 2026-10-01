@@ -148,6 +148,18 @@ rechecks it before copying; if clipboard access is unavailable, the text is
 selected for manual copying. This is an explicit handoff, not automatic chat
 interception or packaged host integration.
 
+### Let the source host entry retain progress
+
+When executing the existing local host dialogue, use its
+[optional task tracking file](migrations/host-session.md#track-the-host-journey-as-a-durable-task).
+Temari selects the task and real conversation identity once; the entry writes the
+starting recovery handoff and outcome automatically. Resume stays with that same
+task, and concurrent edits cannot be overwritten by a late result.
+
+The host's candidate-profile receipt remains a context reference pending trusted
+closeout. It does not become `DONE` through this tracking integration. Ordinary
+Archon task execution still uses the run binding and evidence rules below.
+
 ### Layout and everyday flow
 
 - **Left inbox:** search, open/all/done filters, task title, next action, run count,
