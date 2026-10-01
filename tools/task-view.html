@@ -27,6 +27,7 @@
           <span class="eyebrow">YOUR WORK</span>
           <h1>Tasks <span id="task-count" class="count">0</span></h1>
           <p>Pick up where you left off.</p>
+          <button id="new-goal" class="primary" hidden>New goal</button>
         </div>
         <label class="search"
           ><span class="sr-only">Find a task</span
@@ -56,5 +57,49 @@
       </section>
     </main>
     <div id="error" class="error-banner" role="alert" hidden></div>
+    <dialog id="goal-dialog" aria-labelledby="goal-dialog-title">
+      <form id="goal-form">
+        <div class="section-heading">
+          <h2 id="goal-dialog-title">Give Temari a goal</h2>
+          <button id="close-goal" type="button" class="quiet">Close</button>
+        </div>
+        <p id="goal-workspace" class="event-detail"></p>
+        <label
+          >Type of work<select id="goal-recipe">
+            <option value="">New goal for Temari</option>
+          </select></label
+        >
+        <label
+          >Title<input
+            id="goal-title"
+            required
+            maxlength="256"
+            autocomplete="off"
+        /></label>
+        <label
+          >Goal<textarea
+            id="goal-text"
+            required
+            maxlength="8192"
+            rows="5"
+            placeholder="What should be accomplished?"
+          ></textarea>
+        </label>
+        <div id="swarm-options" class="swarm-options" hidden>
+          <label>Agents<select id="swarm-workers"></select></label>
+          <label>Run at once<select id="swarm-concurrency"></select></label>
+          <p>
+            Agents investigate complementary perspectives in read-only mode.
+            Their findings stay together on this task for Temari to review.
+          </p>
+        </div>
+        <p id="goal-help">
+          Your goal will be saved with a continuation brief. Temari prepares the
+          execution plan before work starts.
+        </p>
+        <p id="goal-error" class="blocker" role="alert" hidden></p>
+        <button id="save-goal" class="primary" type="submit">Save goal</button>
+      </form>
+    </dialog>
   </body>
 </html>

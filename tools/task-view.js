@@ -13,6 +13,11 @@ const state = {
   loading: false,
   continuationOpen: new Set(),
   renderedDetail: null,
+  dashboard: null,
+  mutating: false,
+  drafts: new Map(),
+  goalRequestId: null,
+  expanded: new Set(),
 };
 const stages = ['investigate', 'plan', 'build', 'review', 'verify', 'deliver'];
 const statusNames = {
@@ -31,7 +36,29 @@ const statusNames = {
   PENDING: 'Pending',
   UNCERTAIN: 'Uncertain',
   CONFIRMED: 'Confirmed',
+  CANCELLING: 'Stopping agents',
+  PREPARED: 'Ready to start',
+  STARTING: 'Starting',
+  COMPLETE: 'Findings ready',
+  RECOVERY_REQUIRED: 'Recovery required',
 };
+function displayedStatus(task) {
+  const swarm = state.dashboard?.config?.controls?.[task.taskId]?.swarm;
+  if (!swarm) return task.status;
+  if (
+    swarm.integrityIssue ||
+    ['RECOVERY_REQUIRED', 'FAILED'].includes(swarm.state)
+  )
+    return 'BLOCKED';
+  if (swarm.state === 'PREPARED') return 'OPEN';
+  if (['STARTING', 'RUNNING'].includes(swarm.state))
+    return swarm.workers.some(({ events }) =>
+      events.some((event) => event.type === 'task-cancellation-requested'),
+    )
+      ? 'CANCELLING'
+      : 'RUNNING';
+  return task.status;
+}
 const badge = (status) =>
   el(
     'span',
@@ -84,7 +111,9 @@ function renderList() {
         'no-results',
         state.tasks.length
           ? 'No tasks match this view.'
-          : 'No tasks yet. Register a task with the Temari task command to see it here.',
+          : state.dashboard?.mode === 'writable'
+            ? 'No tasks yet. Choose New goal to get started.'
+            : 'No tasks yet. Register a task with Temari to see it here.',
       ),
     );
     return;
@@ -93,7 +122,10 @@ function renderList() {
     const card = el('button', 'task-card');
     card.setAttribute('aria-current', String(task.taskId === state.selected));
     const top = el('div', 'task-card-top');
-    top.append(el('span', 'task-title', task.title), badge(task.status));
+    top.append(
+      el('span', 'task-title', task.title),
+      badge(displayedStatus(task)),
+    );
     const meta = el('div', 'task-meta');
     meta.append(
       el(
@@ -258,7 +290,13 @@ function renderContinuation(task) {
 }
 function renderDetail() {
   const task = state.tasks.find((t) => t.taskId === state.selected);
-  const detailKey = JSON.stringify([task ?? null, state.archonBaseUrl]);
+  const control = state.dashboard?.config?.controls?.[task?.taskId];
+  const detailKey = JSON.stringify([
+    task ?? null,
+    state.archonBaseUrl,
+    control,
+    state.mutating,
+  ]);
   if (detailKey === state.renderedDetail) return;
   state.renderedDetail = detailKey;
   const detail = byId('detail');
@@ -276,7 +314,7 @@ function renderDetail() {
   const previousScroll = window.scrollY;
   detail.replaceChildren(el('div', 'crumb', `TASK / ${task.taskId}`));
   const title = el('div', 'detail-heading');
-  title.append(el('h2', '', task.title), badge(task.status));
+  title.append(el('h2', '', task.title), badge(displayedStatus(task)));
   detail.append(title, el('p', 'goal', task.goal));
   const next = el('div', 'next-action');
   next.append(
@@ -296,7 +334,9 @@ function renderDetail() {
   );
   if (task.blocker)
     next.append(el('div', 'blocker', `Blocked · ${task.blocker}`));
-  detail.append(next, renderContinuation(task));
+  detail.append(next);
+  if (control) detail.append(renderControls(task, control));
+  detail.append(renderContinuation(task));
   if (task.handoff) {
     const handoff = el('div', 'handoff');
     handoff.append(
@@ -318,12 +358,13 @@ function renderDetail() {
     );
     detail.append(handoff);
   }
-  detail.append(
-    section(
-      'Workflow',
-      task.currentStage ? `Current · ${task.currentStage}` : 'Six stages',
-    ),
-  );
+  if (!control?.swarm)
+    detail.append(
+      section(
+        'Workflow',
+        task.currentStage ? `Current · ${task.currentStage}` : 'Six stages',
+      ),
+    );
   const current = task.runSnapshots.find((r) => r.runId === task.currentRunId);
   const stageGrid = el('div', 'stages');
   for (const stage of stages) {
@@ -337,7 +378,30 @@ function renderDetail() {
     );
     stageGrid.append(card);
   }
-  detail.append(stageGrid, section('Runs', 'One goal, retained history'));
+  if (!control?.swarm) detail.append(stageGrid);
+  detail.append(section('Runs', 'One goal, retained history'));
+  if (control?.progress?.length) {
+    const progress = el('div', 'native-progress');
+    progress.append(
+      section('Execution logs', 'Native captures · verified at closeout'),
+    );
+    for (const capture of control.progress) {
+      const row = el('details', 'log-capture');
+      row.append(el('summary', '', `${capture.stage} · ${capture.summary}`));
+      row.append(el('pre', '', capture.stdout || '(No stdout)'));
+      if (capture.stderr) row.append(el('pre', '', capture.stderr));
+      if (capture.outputTruncated)
+        row.append(
+          el(
+            'p',
+            'event-detail',
+            'Preview shortened. Full output is retained in the run artifacts.',
+          ),
+        );
+      progress.append(row);
+    }
+    detail.append(progress);
+  }
   if (!task.runs.length)
     detail.append(
       el('p', 'no-results', 'Attach a run when the task is ready to execute.'),
@@ -348,7 +412,11 @@ function renderDetail() {
     const top = el('div', 'run-top');
     top.append(
       el('span', 'run-id', run.runId),
-      badge(run.nativeSnapshot?.status ?? snap?.receiptStatus ?? 'PENDING'),
+      badge(
+        run.runId === task.currentRunId && control?.swarm
+          ? control.swarm.state
+          : (run.nativeSnapshot?.status ?? snap?.receiptStatus ?? 'PENDING'),
+      ),
     );
     const info = el('div', 'run-info');
     info.append(
@@ -477,10 +545,19 @@ async function refresh() {
   state.loading = true;
   byId('refresh').disabled = true;
   try {
-    const response = await fetch('/api/tasks', { cache: 'no-store' });
+    const [response, dashboardResponse] = await Promise.all([
+      fetch('/api/tasks', { cache: 'no-store' }),
+      fetch('/api/dashboard', { cache: 'no-store' }),
+    ]);
     const data = await response.json();
+    const dashboard = await dashboardResponse.json();
     if (!response.ok)
       throw new Error(data.error ?? 'Task state could not be read.');
+    if (!dashboardResponse.ok)
+      throw new Error(
+        dashboard.error ?? 'Dashboard controls could not be read.',
+      );
+    state.dashboard = dashboard;
     state.tasks = data.tasks;
     state.archonBaseUrl = data.archonBaseUrl;
     if (!state.selected && state.tasks.length)
@@ -488,7 +565,9 @@ async function refresh() {
         state.tasks.find((t) => t.status !== 'DONE')?.taskId ??
         state.tasks[0].taskId;
     byId('archon-home').href = `${data.archonBaseUrl}/console`;
-    byId('connection').textContent = 'Read-only · refreshed';
+    byId('connection').textContent =
+      `${dashboard.mode === 'writable' ? 'Local controls' : 'Read-only'} · refreshed`;
+    byId('new-goal').hidden = dashboard.mode !== 'writable';
     byId('error').hidden = true;
     renderList();
     renderDetail();
@@ -501,6 +580,405 @@ async function refresh() {
     byId('refresh').disabled = false;
   }
 }
+async function post(path, body) {
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-temari-token': state.dashboard.csrfToken,
+    },
+    body: JSON.stringify(body),
+  });
+  const result = await response.json();
+  if (!response.ok)
+    throw new Error(
+      result.error ?? 'The operation failed. Refresh the task before retrying.',
+    );
+  return result;
+}
+async function perform(task, action, extra = {}) {
+  if (state.mutating) return;
+  state.mutating = true;
+  renderDetail();
+  let failure;
+  try {
+    await post(`/api/tasks/${encodeURIComponent(task.taskId)}/actions`, {
+      action,
+      requestId: crypto.randomUUID(),
+      expectedVersion: task.version,
+      ...extra,
+    });
+    if (action === 'update') state.drafts.delete(task.taskId);
+  } catch (error) {
+    failure = error.message;
+  } finally {
+    state.mutating = false;
+    await refresh();
+  }
+  if (failure) {
+    byId('error').textContent = failure;
+    byId('error').hidden = false;
+  }
+}
+function renderControls(task, control) {
+  const panel = el('section', 'task-controls');
+  panel.append(
+    section(
+      'Work on this task',
+      control.swarm
+        ? 'Read-only agent swarm'
+        : (control.recipe ?? 'Needs planning'),
+    ),
+  );
+  if (control.message) panel.append(el('p', 'event-detail', control.message));
+  if (control.issue) panel.append(el('p', 'blocker', control.issue));
+  if (control.verifiedRevision)
+    panel.append(
+      el(
+        'p',
+        'event-detail',
+        `Prepared revision ${control.verifiedRevision.slice(0, 12)}`,
+      ),
+    );
+  if (control.swarm) {
+    const limits = control.limits;
+    panel.append(
+      el(
+        'p',
+        'event-detail',
+        `${limits.totalWorkers} agents · at most ${limits.maxConcurrency} running at once · ${Math.round(limits.timeoutMs / 1000)}s per attempt · at most 2 attempts each. Dollar usage is unavailable.`,
+      ),
+    );
+    const swarm = control.swarm;
+    panel.append(
+      el(
+        'p',
+        'event-detail',
+        `Execution: ${statusNames[swarm.state] ?? swarm.state.toLowerCase()}. Findings require coordinator review.`,
+      ),
+    );
+    if (swarm.state === 'RECOVERY_REQUIRED')
+      panel.append(
+        el(
+          'p',
+          'blocker',
+          'Supervisor ownership needs recovery. Ask Temari to reconcile retained process identity and artifacts before restarting work.',
+        ),
+      );
+    const outcomes = el('div', 'swarm-outcomes');
+    for (const { assignment, task: child, events } of swarm.workers) {
+      const row = el('details', 'log-capture');
+      const key = `${task.taskId}/${assignment.id}`;
+      row.open = state.expanded.has(key);
+      row.addEventListener('toggle', () => {
+        if (row.isConnected)
+          row.open ? state.expanded.add(key) : state.expanded.delete(key);
+      });
+      const summary = el('summary');
+      summary.append(
+        el(
+          'span',
+          '',
+          `${assignment.id} · ${assignment.role} · attempt ${child.attempt} `,
+        ),
+        badge(child.status),
+      );
+      row.append(summary);
+      row.append(el('p', 'event-detail', assignment.brief.context));
+      if (child.result?.summary)
+        row.append(el('pre', '', child.result.summary));
+      if (child.error) row.append(el('p', 'blocker', child.error));
+      if (
+        events.some((event) => event.type === 'task-cancellation-requested') &&
+        ![
+          'CANCELLED',
+          'SUCCEEDED',
+          'FAILED',
+          'ISSUES',
+          'BLOCKED',
+          'DROPPED',
+        ].includes(child.status)
+      )
+        row.append(
+          el(
+            'p',
+            'event-detail',
+            'Stop requested. Waiting for the worker process to exit.',
+          ),
+        );
+      const history = el('ul', 'worker-history');
+      for (const event of events.filter(
+        (item) => item.type !== 'task-lease-renewed',
+      ))
+        history.append(
+          el(
+            'li',
+            '',
+            `${new Date(event.at).toLocaleTimeString()} · ${event.type.replace(/^task-/, '').replaceAll('-', ' ')}`,
+          ),
+        );
+      row.append(history);
+      for (const path of child.result?.evidencePaths ?? [])
+        row.append(el('p', 'artifact-path', path));
+      outcomes.append(row);
+    }
+    panel.append(outcomes);
+  }
+  const actions = el('div', 'control-actions');
+  const labels = {
+    start: 'Start verification',
+    observe: 'Check execution',
+    resume: 'Resume run',
+    cancel: 'Cancel run',
+    verify: 'Verify evidence',
+    'swarm-start': 'Start agents',
+    'swarm-cancel': 'Cancel agents',
+  };
+  for (const [action, label] of Object.entries(labels)) {
+    if (!control.actions.includes(action)) continue;
+    const button = el(
+      'button',
+      ['start', 'swarm-start'].includes(action) ? 'primary' : 'quiet',
+      label,
+    );
+    button.disabled = state.mutating;
+    button.addEventListener('click', () => perform(task, action));
+    actions.append(button);
+  }
+  panel.append(actions);
+  const drafts = state.drafts.get(task.taskId) ?? {
+    nextAction: task.nextAction ?? '',
+    blocker: task.blocker ?? '',
+    reason: '',
+    baseVersion: task.version,
+    dirty: new Set(),
+  };
+  if (!drafts.dirty.size) {
+    drafts.nextAction = task.nextAction ?? '';
+    drafts.blocker = task.blocker ?? '';
+    drafts.baseVersion = task.version;
+  }
+  state.drafts.set(task.taskId, drafts);
+  if (control.actions.includes('accept')) {
+    const review = el('div', 'acceptance');
+    review.append(el('h4', '', 'Review the result'));
+    review.append(
+      el(
+        'p',
+        '',
+        'Evidence passes. Confirm that the result satisfies this task’s goal.',
+      ),
+    );
+    const reason = el('textarea');
+    reason.rows = 3;
+    reason.value = drafts.reason;
+    reason.setAttribute('aria-label', 'Acceptance reason');
+    reason.placeholder = 'Why does this result satisfy the goal?';
+    reason.addEventListener('input', () => {
+      drafts.reason = reason.value;
+    });
+    const accept = el('button', 'primary', 'Accept result');
+    accept.disabled = state.mutating;
+    accept.addEventListener('click', () => {
+      if (!reason.value.trim()) {
+        reason.focus();
+        return;
+      }
+      perform(task, 'accept', { reason: reason.value.trim() });
+    });
+    review.append(reason, accept);
+    panel.append(review);
+  }
+  if (control.actions.includes('update')) {
+    const metadata = el('details', 'task-notes');
+    metadata.append(el('summary', '', 'Update next action or blocker'));
+    const conflict =
+      drafts.dirty.size > 0 && drafts.baseVersion !== task.version;
+    metadata.open = conflict || drafts.dirty.size > 0;
+    const nextLabel = el('label', '', 'Next action');
+    const next = el('textarea');
+    next.rows = 2;
+    next.value = drafts.nextAction;
+    next.setAttribute('aria-label', 'Next action');
+    next.addEventListener('input', () => {
+      drafts.nextAction = next.value;
+      drafts.dirty.add('nextAction');
+    });
+    nextLabel.append(next);
+    const blockerLabel = el('label', '', 'Blocker');
+    const blocker = el('textarea');
+    blocker.rows = 2;
+    blocker.value = drafts.blocker;
+    blocker.setAttribute('aria-label', 'Blocker');
+    blocker.addEventListener('input', () => {
+      drafts.blocker = blocker.value;
+      drafts.dirty.add('blocker');
+    });
+    blockerLabel.append(blocker);
+    const save = el('button', 'quiet', 'Save update');
+    save.disabled = state.mutating || conflict;
+    save.addEventListener('click', () => {
+      if (!drafts.dirty.size) return;
+      perform(task, 'update', {
+        expectedVersion: drafts.baseVersion,
+        ...Object.fromEntries(
+          [...drafts.dirty].map((field) => [
+            field,
+            drafts[field].trim() || null,
+          ]),
+        ),
+      });
+    });
+    if (conflict) {
+      metadata.append(
+        el(
+          'p',
+          'blocker',
+          'This task changed while you were editing. Review the latest values before saving your draft.',
+        ),
+      );
+      metadata.append(
+        el(
+          'p',
+          'event-detail',
+          `Current next action: ${task.nextAction || '(empty)'}\nCurrent blocker: ${task.blocker || '(empty)'}`,
+        ),
+      );
+      const keep = el('button', 'quiet', 'Keep my draft against this version');
+      keep.addEventListener('click', () => {
+        drafts.baseVersion = task.version;
+        state.renderedDetail = null;
+        renderDetail();
+      });
+      const discard = el('button', 'quiet', 'Discard my draft');
+      discard.addEventListener('click', () => {
+        state.drafts.delete(task.taskId);
+        state.renderedDetail = null;
+        renderDetail();
+      });
+      metadata.append(keep, discard);
+    }
+    metadata.append(nextLabel, blockerLabel, save);
+    panel.append(metadata);
+  }
+  return panel;
+}
+function selectGoalRecipe() {
+  const swarm = byId('goal-recipe').value === '__swarm__';
+  const recipe = state.dashboard.config.recipes.find(
+    (item) => item.id === byId('goal-recipe').value,
+  );
+  byId('goal-title').value = recipe?.title ?? '';
+  byId('goal-text').value = recipe?.goal ?? '';
+  byId('goal-title').readOnly = Boolean(recipe);
+  byId('goal-text').readOnly = Boolean(recipe);
+  byId('swarm-options').hidden = !swarm;
+  byId('save-goal').textContent = swarm
+    ? 'Prepare agents'
+    : recipe
+      ? 'Prepare verification'
+      : 'Save goal';
+  byId('goal-help').textContent = swarm
+    ? 'Prepare 2–4 agents against a pinned, clean workspace. Review the task, then start the investigation.'
+    : recipe
+      ? 'This runs the configured checks against a pinned, clean workspace. Review the prepared task, then start it.'
+      : 'Your goal will be saved with a continuation brief. Temari prepares the execution plan before work starts.';
+}
+function selectConcurrency() {
+  const bound = Math.min(
+    Number(byId('swarm-workers').value),
+    state.dashboard.config.swarm.maxConcurrency,
+  );
+  const select = byId('swarm-concurrency');
+  select.replaceChildren();
+  for (let count = 1; count <= bound; count++) {
+    const option = el('option', '', count);
+    option.value = count;
+    select.append(option);
+  }
+  select.value = String(bound);
+}
+byId('new-goal').addEventListener('click', () => {
+  state.goalRequestId = crypto.randomUUID();
+  const select = byId('goal-recipe');
+  select.replaceChildren();
+  const general = el('option', '', 'New goal for Temari');
+  general.value = '';
+  select.append(general);
+  if (state.dashboard.config.swarm) {
+    const option = el('option', '', 'Investigate with parallel agents');
+    option.value = '__swarm__';
+    select.append(option);
+    const workers = byId('swarm-workers');
+    workers.replaceChildren();
+    for (
+      let count = 2;
+      count <= state.dashboard.config.swarm.maxWorkers;
+      count++
+    ) {
+      const item = el('option', '', count);
+      item.value = count;
+      workers.append(item);
+    }
+    selectConcurrency();
+  }
+  for (const recipe of state.dashboard.config.recipes) {
+    const option = el('option', '', recipe.title);
+    option.value = recipe.id;
+    select.append(option);
+  }
+  byId('goal-workspace').textContent = state.dashboard.config.workspaceRoot;
+  byId('goal-error').hidden = true;
+  selectGoalRecipe();
+  byId('goal-dialog').showModal();
+});
+byId('close-goal').addEventListener('click', () => byId('goal-dialog').close());
+byId('goal-recipe').addEventListener('change', () => {
+  state.goalRequestId = crypto.randomUUID();
+  selectGoalRecipe();
+});
+byId('swarm-workers').addEventListener('change', selectConcurrency);
+byId('goal-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  byId('save-goal').disabled = true;
+  try {
+    const recipeId = byId('goal-recipe').value;
+    const task = await post('/api/tasks', {
+      requestId: state.goalRequestId,
+      ...(recipeId === '__swarm__'
+        ? {
+            mode: 'swarm',
+            title: byId('goal-title').value.trim(),
+            goal: byId('goal-text').value.trim(),
+            workerCount: Number(byId('swarm-workers').value),
+            maxConcurrency: Number(byId('swarm-concurrency').value),
+          }
+        : recipeId
+          ? { recipeId }
+          : {
+              title: byId('goal-title').value.trim(),
+              goal: byId('goal-text').value.trim(),
+            }),
+    });
+    state.selected = task.taskId;
+    const url = new URL(location.href);
+    url.searchParams.set('task', task.taskId);
+    history.replaceState(null, '', url);
+    state.filter = 'all';
+    for (const button of document.querySelectorAll('[data-filter]'))
+      button.setAttribute(
+        'aria-pressed',
+        String(button.dataset.filter === 'all'),
+      );
+    byId('goal-dialog').close();
+    await refresh();
+  } catch (error) {
+    byId('goal-error').textContent = error.message;
+    byId('goal-error').hidden = false;
+  } finally {
+    byId('save-goal').disabled = false;
+  }
+});
 byId('refresh').addEventListener('click', refresh);
 byId('search').addEventListener('input', renderList);
 for (const button of document.querySelectorAll('[data-filter]'))
@@ -516,6 +994,18 @@ window.addEventListener('popstate', () => {
   renderDetail();
 });
 setInterval(() => {
-  if (!document.hidden) refresh();
+  if (!document.hidden && !state.mutating) {
+    const task = state.tasks.find((item) => item.taskId === state.selected);
+    const run = task?.runs.find((item) => item.runId === task.currentRunId);
+    const control = state.dashboard?.config?.controls?.[task?.taskId];
+    if (
+      run?.nativeRef &&
+      control?.actions.includes('observe') &&
+      (!run.nativeSnapshot ||
+        ['RUNNING', 'QUEUED'].includes(run.nativeSnapshot.status))
+    )
+      perform(task, 'observe');
+    else refresh();
+  }
 }, 10000);
 refresh();

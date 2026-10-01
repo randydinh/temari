@@ -1,4 +1,5 @@
-import { createServer, type Server } from 'node:http';
+import { createServer, type IncomingMessage, type Server } from 'node:http';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
 export interface TaskViewReader {
@@ -12,6 +13,130 @@ export interface TaskViewReader {
 export interface TaskViewOptions {
   readonly runtime: TaskViewReader;
   readonly archonBaseUrl: string;
+  readonly controller?: TaskViewController;
+}
+
+/** The service owns admission, idempotency, runtime control, and acceptance. */
+export interface TaskViewController {
+  describe(): unknown | Promise<unknown>;
+  create(input: unknown): Promise<unknown>;
+  action(taskId: string, input: unknown): Promise<unknown>;
+}
+
+export class TaskViewControllerError extends Error {
+  constructor(
+    readonly status: 400 | 409,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'TaskViewControllerError';
+  }
+}
+
+class RequestError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+const BODY_LIMIT = 64 * 1024;
+const BODY_TIMEOUT_MS = 5_000;
+
+function headerCount(request: IncomingMessage, name: string): number {
+  let count = 0;
+  for (let index = 0; index < request.rawHeaders.length; index += 2)
+    if (request.rawHeaders[index]!.toLowerCase() === name) count++;
+  return count;
+}
+
+function validateMutation(request: IncomingMessage, csrfToken: string): void {
+  if (
+    headerCount(request, 'origin') !== 1 ||
+    request.headers.origin !== `http://${request.headers.host}`
+  )
+    throw new RequestError(
+      403,
+      'Task changes require the exact local dashboard origin.',
+    );
+  const token = request.headers['x-temari-token'];
+  if (
+    headerCount(request, 'x-temari-token') !== 1 ||
+    typeof token !== 'string' ||
+    Buffer.byteLength(token) !== Buffer.byteLength(csrfToken) ||
+    !timingSafeEqual(Buffer.from(token), Buffer.from(csrfToken))
+  )
+    throw new RequestError(
+      403,
+      'Task changes require this dashboard session token. Reload the dashboard.',
+    );
+  const contentType = request.headers['content-type'];
+  if (
+    headerCount(request, 'content-type') !== 1 ||
+    typeof contentType !== 'string' ||
+    !/^application\/json(?:\s*;\s*charset\s*=\s*utf-8)?$/i.test(contentType)
+  )
+    throw new RequestError(
+      415,
+      'Task changes require application/json encoded as UTF-8.',
+    );
+}
+
+async function readJsonBody(request: IncomingMessage): Promise<unknown> {
+  const length = request.headers['content-length'];
+  if (
+    length !== undefined &&
+    (!/^\d+$/.test(length) || Number(length) > BODY_LIMIT)
+  )
+    throw new RequestError(413, 'Task request body exceeds 64 KiB.');
+  const bytes = await new Promise<Buffer>((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    let settled = false;
+    const finish = (error?: Error): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      request.off('data', onData);
+      request.off('end', onEnd);
+      request.off('aborted', onAborted);
+      if (error) {
+        request.resume();
+        reject(error);
+      } else resolve(Buffer.concat(chunks, size));
+    };
+    const onData = (chunk: Buffer): void => {
+      size += chunk.length;
+      if (size > BODY_LIMIT) {
+        finish(new RequestError(413, 'Task request body exceeds 64 KiB.'));
+        return;
+      }
+      chunks.push(chunk);
+    };
+    const onEnd = (): void => finish();
+    const onAborted = (): void =>
+      finish(new RequestError(400, 'Task request body was interrupted.'));
+    const timer = setTimeout(
+      () => finish(new RequestError(408, 'Task request body timed out.')),
+      BODY_TIMEOUT_MS,
+    );
+    timer.unref();
+    request.on('data', onData);
+    request.once('end', onEnd);
+    request.once('aborted', onAborted);
+    // Retain this listener until the request is collected, including after a
+    // size refusal or timeout while the peer is still sending bytes.
+    request.once('error', (error) => finish(error));
+  });
+  try {
+    return JSON.parse(
+      new TextDecoder('utf-8', { fatal: true }).decode(bytes),
+    ) as unknown;
+  } catch {
+    throw new RequestError(400, 'Task request body must be valid UTF-8 JSON.');
+  }
 }
 
 /** The console location is configured by the operator, never by task content. */
@@ -40,10 +165,13 @@ const assets = new Map([
   ['/task-view.css', ['task-view.css', 'text/css; charset=utf-8']],
 ] as const);
 
-/** Read-only projection; every task mutation stays behind the runtime CLI/API. */
+/** Local task projection with optional mutations delegated to the controller. */
 export function createTaskViewServer(options: TaskViewOptions): Server {
   const archonBaseUrl = validateArchonBaseUrl(options.archonBaseUrl);
+  const csrfToken = randomBytes(32).toString('hex');
   const server = createServer(async (request, response) => {
+    if (request.method !== 'GET' && request.method !== 'HEAD')
+      response.setHeader('Connection', 'close');
     response.setHeader('Cache-Control', 'no-store');
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Referrer-Policy', 'no-referrer');
@@ -63,6 +191,7 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
       const address = server.address();
       const port = typeof address === 'object' && address ? address.port : 0;
       if (
+        headerCount(request, 'host') !== 1 ||
         ![`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`].includes(
           request.headers.host ?? '',
         )
@@ -70,12 +199,66 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
         send(403, { error: 'This task view accepts local requests only.' });
         return;
       }
-      if (request.method !== 'GET' && request.method !== 'HEAD') {
+      const url = new URL(request.url ?? '/', `http://${request.headers.host}`);
+      const actionMatch =
+        /^\/api\/tasks\/([A-Za-z0-9][A-Za-z0-9._-]{0,127})\/actions$/.exec(
+          url.pathname,
+        );
+      if (
+        request.method !== 'GET' &&
+        request.method !== 'HEAD' &&
+        !options.controller
+      ) {
         response.setHeader('Allow', 'GET, HEAD');
         send(405, { error: 'The task view is read-only.' });
         return;
       }
-      const url = new URL(request.url ?? '/', 'http://127.0.0.1');
+      if (request.method !== 'GET' && request.method !== 'HEAD') {
+        if (request.method !== 'POST') {
+          response.setHeader('Allow', actionMatch ? 'POST' : 'GET, HEAD, POST');
+          send(405, {
+            error:
+              'This dashboard accepts POST only for task creation and task actions.',
+          });
+          return;
+        }
+        if (url.search || (url.pathname !== '/api/tasks' && !actionMatch)) {
+          send(404, { error: 'Not found.' });
+          return;
+        }
+        if (
+          !['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(
+            request.socket.remoteAddress ?? '',
+          )
+        )
+          throw new RequestError(
+            403,
+            'Task changes require a local connection.',
+          );
+        validateMutation(request, csrfToken);
+        const input = await readJsonBody(request);
+        const result = actionMatch
+          ? await options.controller!.action(actionMatch[1]!, input)
+          : await options.controller!.create(input);
+        send(200, result);
+        return;
+      }
+      if (url.pathname === '/api/dashboard') {
+        send(200, {
+          mode: options.controller ? 'writable' : 'read-only',
+          csrfToken: options.controller ? csrfToken : null,
+          config: options.controller
+            ? await options.controller.describe()
+            : null,
+          archonBaseUrl,
+        });
+        return;
+      }
+      if (actionMatch && options.controller) {
+        response.setHeader('Allow', 'POST');
+        send(405, { error: 'Task actions require POST.' });
+        return;
+      }
       if (url.pathname === '/api/tasks') {
         send(200, {
           tasks: await options.runtime.listSnapshots(),
@@ -115,7 +298,22 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
       send(404, { error: 'Not found.' });
     } catch (error) {
       // Do not turn an unreadable/corrupt ledger into an empty, successful inbox.
-      send(500, {
+      const controllerStatus =
+        error && typeof error === 'object' && 'status' in error
+          ? error.status
+          : undefined;
+      const status =
+        error instanceof RequestError
+          ? error.status
+          : options.controller &&
+              (controllerStatus === 400 || controllerStatus === 409)
+            ? controllerStatus
+            : 500;
+      if (request.method !== 'GET' && request.method !== 'HEAD') {
+        response.setHeader('Connection', 'close');
+        request.resume();
+      }
+      send(status, {
         error:
           error instanceof Error
             ? error.message

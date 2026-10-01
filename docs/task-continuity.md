@@ -1,14 +1,34 @@
-# Task continuity and the local inbox
+# Task continuity and the local dashboard
 
 Temari keeps a durable task above individual execution runs. Return to the same
 goal after a new chat, restart, failed attempt, or replan, with its next action and
-history intact. Archon remains the native execution and log owner.
+history intact. Archon owns native workflow execution and logs; the runtime owns
+task state and durable child work. The read-only investigation swarm uses local
+Codex processes and the existing runtime child store.
 
 This guide is for the agent operating a local Temari checkout. It implements the
-[approved first increment](system-roles-and-responsibilities.md#final-recommendation-and-first-proof).
-The browser is a read-only inbox; the agent uses the task CLI or runtime API to
-record work. Automatic capture of every chat, a conversational web frontend,
+[approved first increment](system-roles-and-responsibilities.md#final-recommendation-and-first-proof)
+and its continuation work. For browser setup and daily operation, start with the
+[dashboard guide](task-dashboard.md). `serve` is read-only by default;
+`--control-config` enables goal intake, configured verification, and optional
+bounded investigation agents. This guide covers the underlying CLI and agent
+handoffs. Automatic capture of every chat, autonomous implementation swarms,
 schedules, and the Registrar graph view remain follow-up work.
+
+## Supported dashboard journeys
+
+| Choice | What runs | Completion boundary |
+| --- | --- | --- |
+| New goal for Temari | Saves a goal, next action, and continuation context. | Remains open until Temari admits an execution plan. |
+| Configured verification recipe | Runs the host-configured checks through Archon against a pinned clean workspace. | Verified canonical serial evidence and explicit coordinator acceptance can produce `DONE`. |
+| Investigate with parallel agents | Runs 2–4 read-only Codex investigator/reviewer assignments, with configured concurrency of 1–4. | Retained findings require coordinator review; the parallel receipt cannot produce canonical `DONE`. |
+
+The browser offers only the actions available for that task. Native workflows
+support start, observation, exact-run resume, and cancel. Investigation agents
+support preparation, start, and cancellation; an ambiguous supervisor is not
+automatically restarted. There is no Pause control. See the
+[configuration and limits](task-dashboard.md#control-configuration-reference)
+before enabling execution.
 
 ## Current continuation: host pickup and handoff
 
@@ -70,10 +90,12 @@ pnpm exec nx run runtime:tasks -- serve --port 3092 --archon-url http://127.0.0.
 
 Open <http://127.0.0.1:3092>. Stop the server with Ctrl-C; the task remains on disk.
 Configure `--archon-url` for the console instance that owns the linked runs.
-The view listens on loopback, has no mutation endpoints, and refreshes every ten
-seconds while visible. A refresh failure leaves the prior view visible with an
-error. The browser refresh reads persisted observations; it does not poll Archon
-or start work.
+Without `--control-config`, the view listens on loopback, exposes no mutations,
+and refreshes every ten seconds while visible. A refresh failure leaves the prior
+view visible with an error. This read-only refresh reads persisted observations;
+it does not poll Archon or start work. The
+[controlled dashboard](task-dashboard.md) adds explicit task actions through the
+same runtime.
 
 ### Connect the current chat and leave a handoff
 
@@ -330,6 +352,7 @@ or a role permission system.
 | Ledger locked                  | Inspect `.tasks.lock/owner.json` for hostname, PID, start time and nonce. Confirm all writers on that host have stopped before manually removing the stale lock directory. No automatic lock takeover occurs. |
 | Run opens in the wrong console | Correct `--archon-url` to match the owning `--archon-home`; the inbox does not move native logs between instances.                                                                                            |
 | Native resume refused          | Check that the run has a completed node. Preserve the failed run; a new attempt needs a new run binding after confirmed termination.                                                                          |
+| Swarm supervisor uncertain     | Preserve preparation, child records, supervisor identity, and attempt artifacts. Do not delete the launch marker or start a replacement to hide uncertainty. See [dashboard recovery](task-dashboard.md#recover-without-duplicating-work). |
 
 Keep the whole task-store directory when backing up, together with referenced
 receipt, evidence and child stores. The ledger is atomically replaced and bounded
@@ -353,16 +376,17 @@ pnpm exec nx run runtime:task-native-test
 | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Task store/runtime tests    | Fresh-session continuity, idempotency, stale writes, immutable identities, dispatch uncertainty, evidence invalidation, and retained sibling outcomes.                     |
 | CLI process test            | Separate processes find the same task, next action, events and version.                                                                                                    |
-| HTTP tests                  | Read-only methods, loopback host validation, safe static assets, missing task handling, and visible storage errors.                                                        |
+| HTTP tests                  | Read-only mode, controlled mutation boundaries, loopback/origin validation, safe static assets, missing task handling, and visible storage errors.                         |
 | Native smoke on macOS arm64 | Pinned model-free Archon execution joins canonical evidence; exact-run resume preserves a completed node; cancellation is observed; a fresh task store reopens the result. |
 
-The native checks consume no model calls. They do not prove Windows process
-control, paid-provider budgets, a live two-agent Archon swarm, installed-plugin
-chat capture, or full feature closeout. Those remain explicit follow-up gates.
-The worker failure test projects existing durable child records; it does not
-claim a new scheduler or native swarm implementation.
+The native checks consume no model calls. They do not establish live Codex swarm
+quality, Windows process control, provider spending limits, installed-plugin chat
+capture, or full feature closeout. Dashboard and swarm implementation checks are
+available through `pnpm exec nx run runtime:dashboard-test`; fixture results are
+not evidence of live model execution. Consult the retained evaluation for the
+checks actually performed against the reviewed revision.
 
-Next increments are host entry integration and route-specific closeout, then
-bounded live parallel execution and limits, the pinned scheduler upgrade, and
-the Registrar knowledge map. See the [roles matrix](system-roles-and-responsibilities.md)
-for ownership and the full sequence.
+The dashboard adds bounded local investigation, not a new scheduler. Scheduled
+work, autonomous implementation swarms, route-specific parallel acceptance,
+provider budget telemetry, and the Registrar knowledge map remain outside this
+increment. See the [roles matrix](system-roles-and-responsibilities.md) for ownership.

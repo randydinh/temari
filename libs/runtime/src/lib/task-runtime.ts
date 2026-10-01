@@ -199,7 +199,11 @@ export class TaskRuntime {
       )
     )
       status = 'RUNNING';
-    else if (evidence.verified) {
+    else if (observed?.children.some((child) => child.status === 'CANCELLED')) {
+      status = 'CANCELLED';
+      nextAction ??=
+        'Review the retained worker results. Cancelled assignments do not establish completion.';
+    } else if (evidence.verified) {
       status = 'NEEDS_REVIEW';
       nextAction ??= eligible
         ? 'Review the verified stage evidence and record coordinator acceptance.'
@@ -207,6 +211,13 @@ export class TaskRuntime {
     } else if (task.acceptance) {
       status = 'BLOCKED';
       blocker ??= 'Previously accepted evidence no longer verifies.';
+    } else if (
+      observed?.children.length &&
+      observed.children.every((child) => child.status === 'SUCCEEDED')
+    ) {
+      status = 'NEEDS_REVIEW';
+      nextAction ??=
+        'Parallel findings are ready. Temari must review the retained worker evidence and decide the next step; this is not canonical task completion.';
     } else if (run?.nativeSnapshot?.status === 'SUCCEEDED')
       nextAction ??=
         'Retain and verify the canonical stage evidence; native success does not close this task.';

@@ -656,3 +656,151 @@ h1 {
     grid-template-columns: 12px minmax(0, 1fr) 60px;
   }
 }
+
+.primary {
+  border: 1px solid var(--accent);
+  border-radius: 7px;
+  background: var(--accent);
+  color: white;
+  padding: 9px 14px;
+  font: inherit;
+  font-size: 13px;
+}
+#new-goal {
+  margin-bottom: 20px;
+  width: 100%;
+}
+.task-controls {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin: 20px 0;
+  background: #fff;
+}
+.task-controls .section-heading {
+  margin-top: 0;
+}
+.control-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
+.task-notes {
+  margin-top: 14px;
+  font-size: 13px;
+}
+.task-notes label,
+dialog label {
+  display: block;
+  margin: 14px 0;
+  font-size: 13px;
+}
+.task-notes textarea,
+.acceptance textarea,
+dialog input,
+dialog textarea,
+dialog select {
+  display: block;
+  width: 100%;
+  margin: 7px 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid #528568;
+  outline-offset: 2px;
+}
+.acceptance {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  font-size: 13px;
+}
+.log-capture {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+.log-capture summary,
+.task-notes summary {
+  cursor: pointer;
+}
+.log-capture pre {
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 340px;
+  padding: 12px;
+  background: #f4f6f1;
+}
+dialog {
+  width: min(600px, calc(100% - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 25px;
+  color: inherit;
+  box-shadow: 0 20px 80px #20302433;
+}
+dialog::backdrop {
+  background: #20302466;
+}
+dialog h2 {
+  margin: 0;
+  font-size: 23px;
+}
+dialog p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+dialog input[readonly],
+dialog textarea[readonly] {
+  background: #f4f6f1;
+}
+.swarm-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+}
+.swarm-options p {
+  grid-column: 1 / -1;
+}
+.artifact-path {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font: 11px monospace;
+}
+.swarm-outcomes {
+  margin-top: 14px;
+}
+.badge.cancelling {
+  background: #fff0cf;
+  color: #795e26;
+}
+
+.worker-history {
+  color: #6c7964;
+  font-size: 11px;
+  line-height: 1.8;
+  padding-left: 18px;
+}
+.task-notes button {
+  margin-right: 8px;
+  margin-bottom: 8px;
+}
+.badge.prepared {
+  background: #edf1e9;
+  color: #59674d;
+}
+.badge.recovery_required {
+  background: #ffe8df;
+  color: #8a4337;
+}

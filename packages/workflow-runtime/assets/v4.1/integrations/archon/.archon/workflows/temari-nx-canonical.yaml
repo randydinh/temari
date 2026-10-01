@@ -39,4 +39,4 @@ nodes:
     depends_on: [deliver]
     always_run: true
     mutates_checkout: false
-    bash: node --import @swc-node/register/esm-register "$INPUTS_FINALIZER" --bridge "$INPUTS_BRIDGE" --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --spec "$INPUTS_SPEC"
+    bash: bun "$INPUTS_FINALIZER" --bridge "$INPUTS_BRIDGE" --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --spec "$INPUTS_SPEC"

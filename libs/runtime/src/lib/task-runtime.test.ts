@@ -785,6 +785,84 @@ test('pickup keeps two goals in the same session ambiguous even with limit one',
   );
 });
 
+for (const cancelled of [false, true])
+  test(`parallel child results project ${cancelled ? 'cancellation' : 'review'} without canonical completion`, async (t) => {
+    const f = await fixture(t);
+    const root = join(f.root, 'parallel-children');
+    const children = await FileChildTaskStore.create(root);
+    for (const taskId of ['worker-1', 'worker-2']) {
+      await children.create({
+        taskId,
+        runId: 'parallel',
+        revision: 'rev',
+        dependsOn: [],
+        actor: 'temari',
+      });
+      if (cancelled && taskId === 'worker-2')
+        await children.cancel({
+          taskId,
+          actor: 'temari',
+          idempotencyKey: 'cancel',
+        });
+      else {
+        const claimed = await children.claim({
+          taskId,
+          owner: 'worker',
+          leaseMs: 60_000,
+        });
+        await children.complete({
+          taskId,
+          owner: 'worker',
+          leaseToken: claimed.record.lease!.token,
+          fencingEpoch: claimed.record.lease!.fencingEpoch,
+          idempotencyKey: 'result',
+          status: 'SUCCEEDED',
+          result: {
+            status: 'PASS',
+            summary: 'Source-backed findings',
+            evidencePaths: ['result.json'],
+            rawLogPath: null,
+          },
+        });
+      }
+    }
+    await children.ensureGroup({
+      groupId: 'group',
+      runId: 'parallel',
+      revision: 'rev',
+      taskIds: ['worker-1', 'worker-2'],
+      assignmentIds: ['first', 'second'],
+    });
+    await f.store.bindRun({
+      ...(await f.command('bind-parallel')),
+      run: {
+        runId: 'parallel',
+        revision: 'rev',
+        plan: {
+          ...minimalPlan('investigation'),
+          parallelism: { maxConcurrency: 2 },
+          requiredCapabilities: ['parallelism'],
+        },
+        childRefs: [{ storeRoot: root, groupId: 'group' }],
+      },
+    });
+    const snapshot = await f.runtime.snapshot('goal');
+    assert.equal(snapshot.status, cancelled ? 'CANCELLED' : 'NEEDS_REVIEW');
+    assert.equal(snapshot.evidence.verified, false);
+    assert.equal(snapshot.semanticAcceptance, false);
+    await assert.rejects(
+      f.runtime.accept({
+        taskId: 'goal',
+        actor: 'temari',
+        idempotencyKey: 'invalid-accept',
+        expectedVersion: snapshot.version,
+        runId: 'parallel',
+        reason: 'Workers reported success',
+      }),
+      /route-specific verifier/,
+    );
+  });
+
 test('pickup uses exact canonical workspace scope and respects explicit-task filters', async (t) => {
   const f = await fixture(t);
   const nested = join(f.root, 'nested-workspace');

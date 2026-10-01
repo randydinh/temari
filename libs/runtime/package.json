@@ -33,7 +33,7 @@
         "executor": "nx:run-commands",
         "cache": false,
         "options": {
-          "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 libs/runtime/src/lib/task-store.test.ts libs/runtime/src/lib/task-runtime.test.ts tools/task-view.test.mts tools/task-continuity.test.mts",
+          "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 libs/runtime/src/lib/task-store.test.ts libs/runtime/src/lib/task-runtime.test.ts tools/task-view.test.mts tools/task-continuity.test.mts tools/dashboard-controller.test.mts",
           "cwd": "{workspaceRoot}"
         }
       },
@@ -44,7 +44,7 @@
           "typecheck"
         ],
         "options": {
-          "command": "tsc --ignoreConfig --noEmit --module nodenext --moduleResolution nodenext --target es2022 --types node --strict --skipLibCheck tools/task-view.mts tools/task-continuity.mts tools/task-view.test.mts tools/task-continuity.test.mts tools/task-native.test.mts",
+          "command": "tsc --ignoreConfig --noEmit --module nodenext --moduleResolution nodenext --target es2022 --types node --strict --skipLibCheck tools/task-view.mts tools/task-continuity.mts tools/task-view.test.mts tools/task-continuity.test.mts tools/task-native.test.mts tools/dashboard-controller.mts tools/dashboard-controller.test.mts tools/dashboard-swarm.mts tools/dashboard-swarm.test.mts tools/dashboard-native.test.mts",
           "cwd": "{workspaceRoot}"
         }
       },
@@ -52,7 +52,7 @@
         "executor": "nx:run-commands",
         "cache": false,
         "options": {
-          "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 tools/task-native.test.mts",
+          "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 tools/task-native.test.mts tools/dashboard-native.test.mts",
           "cwd": "{workspaceRoot}"
         }
       },
@@ -84,6 +84,30 @@
         "cache": false,
         "options": {
           "command": "node --import @swc-node/register/esm-register --test libs/runtime/src/lib/nx05-dispatch-contract.test.ts",
+          "cwd": "{workspaceRoot}"
+        }
+      },
+      "dashboard-test": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 tools/dashboard-controller.test.mts tools/dashboard-swarm.test.mts",
+          "cwd": "{workspaceRoot}"
+        }
+      },
+      "dashboard-native-test": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 tools/dashboard-native.test.mts",
+          "cwd": "{workspaceRoot}"
+        }
+      },
+      "dashboard-worker-test": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 libs/runtime/src/lib/parallel-runtime.test.ts libs/runtime/src/lib/stage-evidence.test.ts",
           "cwd": "{workspaceRoot}"
         }
       }

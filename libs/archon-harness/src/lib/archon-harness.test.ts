@@ -138,6 +138,53 @@ test('reads provider status and resumes the same native run', async () => {
   );
 });
 
+test('resume detaches the exact native run and returns its current nonterminal status', async () => {
+  const calls: Array<{
+    args: readonly string[];
+    cwd: string;
+    timeoutMs: number;
+  }> = [];
+  const harness = new ArchonHarness({
+    runtime,
+    commandRunner: {
+      async run(_executable, args, cwd, _environment, timeoutMs) {
+        calls.push({ args, cwd, timeoutMs });
+        return {
+          exitCode: 0,
+          stdout: JSON.stringify(
+            args[1] === 'resume'
+              ? { runId: 'native-run-cancel', detached: true }
+              : { id: 'native-run-cancel', status: 'running' },
+          ),
+          stderr: '',
+        };
+      },
+    },
+  });
+  const snapshot = await harness.resume(runReference());
+  assert.equal(snapshot.status, 'RUNNING');
+  assert.deepEqual(calls, [
+    {
+      args: [
+        'workflow',
+        'resume',
+        'native-run-cancel',
+        '--cwd',
+        '/workspace',
+        '--detach',
+        '--json',
+      ],
+      cwd: '/workspace',
+      timeoutMs: 60_000,
+    },
+    {
+      args: ['workflow', 'get', 'native-run-cancel', '--json'],
+      cwd: '/workspace',
+      timeoutMs: 15_000,
+    },
+  ]);
+});
+
 test('rejects malformed provider identities before invoking the CLI', async () => {
   const calls: Array<{ args: readonly string[]; cwd: string }> = [];
   const harness = new ArchonHarness({

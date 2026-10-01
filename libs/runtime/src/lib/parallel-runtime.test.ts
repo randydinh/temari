@@ -9,11 +9,58 @@ import { parallelPlan, type WorkerAssignment } from '@temari/contracts';
 
 import {
   executeRestartableParallelWorkers,
+  prepareRestartableParallelWorkers,
   FileParallelWorkerReceiptStore,
 } from './parallel-runtime.js';
 import { FileChildTaskStore } from './child-task-store.js';
 import { FileEvidenceStore } from './evidence-store.js';
 import { FileWorkspaceManifestStore } from './workspace-manifest.js';
+
+test('prepares stable child identities without claiming work before the parent binds them', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-parallel-prepare-'));
+  try {
+    const childStore = await FileChildTaskStore.create(join(root, 'children'));
+    const request = {
+      runId: 'prepare-1',
+      revision: 'revision-1',
+      plan: parallelPlan('feature', 2),
+      capabilities: parallelCapabilities(),
+      assignments: workerAssignments(2),
+      childStore,
+      owner: 'preparer',
+    };
+    const first = await prepareRestartableParallelWorkers(request);
+    assert(
+      first.tasks.every(
+        (task) =>
+          task.status === 'QUEUED' && task.attempt === 0 && task.lease === null,
+      ),
+    );
+    assert.deepEqual(await prepareRestartableParallelWorkers(request), first);
+    for (const task of first.tasks)
+      assert.deepEqual(
+        (await childStore.events(task.taskId)).map((event) => event.type),
+        ['task-created'],
+      );
+    const executed = await executeRestartableParallelWorkers({
+      ...request,
+      receiptStore: await FileParallelWorkerReceiptStore.create(
+        join(root, 'receipts'),
+      ),
+      leaseMs: 30_000,
+      handler: (assignment) => result(assignment.id),
+    });
+    assert.deepEqual(executed.group, first.group);
+    assert.equal(executed.receipt?.status, 'PASS');
+    await assert.rejects(
+      () =>
+        prepareRestartableParallelWorkers({ ...request, maxConcurrency: 3 }),
+      /plan limit/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test('renews a child lease while a long-running worker is executing', async (t) => {
   for (const missedDeadline of [false, true]) {
@@ -233,16 +280,21 @@ test('resumes a bounded child batch and joins terminal results in declaration or
     );
     assert.equal(calls.length, 2);
 
-    const second = await executeRestartableParallelWorkers(request);
+    const second = await executeRestartableParallelWorkers({
+      ...request,
+      receiptStore: await FileParallelWorkerReceiptStore.create(
+        join(root, 'receipts'),
+      ),
+    });
     assert.equal(second.state, 'COMPLETE');
     assert.equal(second.receipt?.status, 'PASS');
-    assert.equal(second.receipt?.peakConcurrency, 1);
+    assert.equal(second.receipt?.peakConcurrency, 2);
     assert.deepEqual(second.receipt?.executionEvidence, {
       schema: 1,
       groupId: second.group?.groupId,
       assignmentIds: assignments.map((assignment) => assignment.id),
       maxConcurrency: 2,
-      peakConcurrency: 1,
+      peakConcurrency: 2,
     });
     assert.deepEqual(
       second.receipt?.outcomes.map((outcome) => outcome.assignment.id),
@@ -1040,7 +1092,7 @@ for (const fault of [
 
           assert.equal(resumed.state, 'COMPLETE');
           assert.equal(resumed.receipt?.status, 'PASS');
-          assert.equal(resumed.receipt?.peakConcurrency, 1);
+          assert.equal(resumed.receipt?.peakConcurrency, 2);
           assert.equal(resumedWorkerCalls, 1);
           for (const outcome of resumed.receipt?.outcomes ?? []) {
             assert(outcome.result?.evidenceReferences?.length);

@@ -459,9 +459,11 @@ export class ArchonHarness implements ExecutionHarness {
         reference.externalRunId,
         '--cwd',
         reference.workspaceRoot,
+        '--detach',
+        '--json',
       ],
       reference.workspaceRoot,
-      60 * 60 * 1000,
+      60_000,
     );
     return this.status(reference);
   }

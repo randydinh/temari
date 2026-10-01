@@ -1,7 +1,8 @@
 import { readFile, stat } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
 import { isAbsolute, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { parseArgs } from 'node:util';
+import { parseArgs, promisify } from 'node:util';
 import {
   ArchonHarness,
   installArchonRuntime,
@@ -13,6 +14,10 @@ import {
 } from '../libs/runtime/src/index.js';
 import { platformInfo } from '../packages/initializer/src/lib/platform.js';
 import { startTaskViewServer } from './task-view.mjs';
+import {
+  DashboardController,
+  loadDashboardConfig,
+} from './dashboard-controller.mjs';
 
 export const taskHelp = `Temari tasks — keep a goal and its evidence across runs
 
@@ -38,7 +43,7 @@ Commands:
   cancel      Request cancellation of the exact bound native run
   verify      Verify the bound canonical receipt and stage evidence
   accept      Record explicit coordinator acceptance of eligible local work
-  serve       Open a read-only local task view
+  serve       Open the local task dashboard (read-only without --control-config)
 
 Mutation commands require --input ABSOLUTE_JSON with taskId, actor and
 idempotencyKey. All except create also require expectedVersion from show.
@@ -59,7 +64,10 @@ Native controls and native-backed accept require --archon-home ABSOLUTE_DIRECTOR
 same Archon installation that owns the run. --workflow-source selects workflow
 definitions for start; --archon-cache optionally selects the pinned binary cache.
 serve accepts --port 3092 and --archon-url http://127.0.0.1:3091; configure the
-console URL for that same installation. No mutation endpoint is exposed.
+console URL for that same installation. --control-config ABSOLUTE_JSON enables
+goal intake and configured local verification controls; it requires --archon-home.
+The trusted config fixes the workspace, preparation directory, and verification
+recipes. Browser requests cannot supply executable commands or evidence paths.
 See docs/task-continuity.md for full examples and recovery rules.
 `;
 
@@ -83,7 +91,7 @@ async function inputFile(
   return data as Record<string, unknown>;
 }
 
-/** One-shot commands are the writable boundary; the browser is a projection. */
+/** CLI and optional local dashboard share the same runtime mutation boundary. */
 export async function runTaskCommand(
   args: readonly string[],
 ): Promise<unknown> {
@@ -103,6 +111,7 @@ export async function runTaskCommand(
       'workflow-source': { type: 'string' },
       'archon-url': { type: 'string' },
       port: { type: 'string' },
+      'control-config': { type: 'string' },
       help: { type: 'boolean', short: 'h' },
     },
   });
@@ -129,6 +138,13 @@ export async function runTaskCommand(
   ];
   if (positionals.length !== 1 || !supported.includes(command!))
     throw new Error('Unknown task command. Use --help.');
+  if (values['control-config'] && command !== 'serve')
+    throw new Error('--control-config is only supported by serve.');
+  const dashboardConfig = values['control-config']
+    ? await loadDashboardConfig(
+        absolute(values['control-config'], '--control-config'),
+      )
+    : null;
   const root = absolute(
     values.root ??
       process.env.TEMARI_TASK_ROOT ??
@@ -136,13 +152,17 @@ export async function runTaskCommand(
     '--root',
   );
   const store =
-    command === 'create' || command === 'enter'
+    command === 'create' ||
+    command === 'enter' ||
+    (command === 'serve' && dashboardConfig !== null)
       ? await FileTaskStore.create(root)
       : await FileTaskStore.openExisting(root);
   let selection: HarnessSelection | undefined;
+  let nativeExecutable: string | undefined;
   if (
     ['start', 'observe', 'reconcile', 'resume', 'cancel'].includes(command!) ||
-    (command === 'accept' && values['archon-home'] !== undefined)
+    (command === 'accept' && values['archon-home'] !== undefined) ||
+    dashboardConfig !== null
   ) {
     const archonHome = absolute(values['archon-home'], '--archon-home');
     const cacheDirectory = values['archon-cache']
@@ -153,15 +173,17 @@ export async function runTaskCommand(
       platform: process.platform,
       arch: process.arch,
     });
+    nativeExecutable = runtime.executablePath;
     const harness = new ArchonHarness({
       runtime,
       environment: { ARCHON_HOME: archonHome },
-      ...(values['workflow-source']
+      ...(values['workflow-source'] || dashboardConfig
         ? {
-            workflowSource: absolute(
-              values['workflow-source'],
-              '--workflow-source',
-            ),
+            workflowSource: values['workflow-source']
+              ? absolute(values['workflow-source'], '--workflow-source')
+              : resolve(
+                  'packages/workflow-runtime/assets/v4.1/integrations/archon',
+                ),
           }
         : {}),
     });
@@ -196,8 +218,36 @@ export async function runTaskCommand(
     return runtime.snapshot(values.task);
   }
   if (command === 'serve') {
+    const controller = dashboardConfig
+      ? new DashboardController({
+          config: dashboardConfig,
+          store,
+          runtime,
+          archonHome: absolute(values['archon-home'], '--archon-home'),
+          bridgePath: resolve(
+            'packages/workflow-runtime/assets/v4.1/integrations/archon/canonical-bridge.ts',
+          ),
+          finalizerPath: resolve(
+            'libs/archon-harness/src/lib/canonical-finalize.ts',
+          ),
+          readNative: async (reference) => {
+            const result = await promisify(execFile)(
+              nativeExecutable!,
+              ['workflow', 'get', reference.externalRunId, '--json'],
+              {
+                cwd: reference.workspaceRoot,
+                env: { ...process.env, ARCHON_HOME: values['archon-home'] },
+                timeout: 15_000,
+                maxBuffer: 2 * 1024 * 1024,
+              },
+            );
+            return JSON.parse(result.stdout);
+          },
+        })
+      : undefined;
     const server = await startTaskViewServer({
       runtime,
+      ...(controller ? { controller } : {}),
       archonBaseUrl: values['archon-url'] ?? 'http://127.0.0.1:3091',
       port: values.port ? Number(values.port) : 3092,
     });
@@ -207,7 +257,11 @@ export async function runTaskCommand(
         server.close();
       });
     const port = (server.address() as { port: number }).port;
-    return { url: `http://127.0.0.1:${port}`, root, mode: 'read-only' };
+    return {
+      url: `http://127.0.0.1:${port}`,
+      root,
+      mode: controller ? 'writable' : 'read-only',
+    };
   }
   const input = await inputFile(values.input);
   // Runtime validators own payload shape and durable invariants; the CLI adds

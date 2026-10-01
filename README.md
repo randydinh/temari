@@ -12,9 +12,13 @@ and [component guide](docs/platform-components.md) for the full design. Use the
 [verification matrix](docs/verification-matrix.md) to trace claims to
 implementation and retained evidence.
 
-The [task continuity guide](docs/task-continuity.md) covers the local inbox:
-durable goals, chat links, continuation briefs, handoffs, evidence, and exact-run Archon controls.
-Start there to pick up unfinished work. The [boundary assessment](docs/system-roles-and-responsibilities.md#how-granular-are-the-boundaries-today)
+**Start with the [local dashboard guide](docs/task-dashboard.md)** to save goals,
+launch bounded read-only investigation agents, or run configured verification
+checks. It covers setup, the UI flow, cancellation, retained results, and recovery.
+The [task continuity guide](docs/task-continuity.md) covers agent pickup, chat links,
+handoffs, evidence, and exact-run Archon controls. Successful agent findings need
+coordinator review; only eligible canonical evidence plus explicit acceptance can
+mark a task done. The [boundary assessment](docs/system-roles-and-responsibilities.md#how-granular-are-the-boundaries-today)
 distinguishes documented roles from implemented enforcement.
 
 Temari owns routing, plans, evidence, and closeout. The host (Cursor,
@@ -24,6 +28,9 @@ tree — [docs/overlays.md](docs/overlays.md).
 
 ## Agent starting points
 
+- **Operate the dashboard:** [setup and supported journeys](docs/task-dashboard.md).
+  Choose a saved goal, a configured verification recipe, or a bounded investigation
+  swarm. Preserve the task's explicit execution and acceptance boundaries.
 - **Pick up unfinished work:** [task continuity and recovery](docs/task-continuity.md).
   Use workspace-scoped `pickup` before creating work, explicitly `enter` the matching
   task with the current host conversation, and save a `handoff` before ending a session.
@@ -79,9 +86,12 @@ pnpm exec nx graph
 # Shareable walkthrough.
 pnpm nx run workflow-engine:demo
 
-# Retained task inbox (create the first task using the guide above).
+# Read-only task inbox over an existing store.
 pnpm exec nx run runtime:tasks -- list
 pnpm exec nx run runtime:tasks -- serve
+
+# Enable local controls; creates the store if needed. Configure using the guide.
+pnpm exec nx run runtime:tasks -- serve --control-config /absolute/dashboard-state/control.json --archon-home /absolute/dashboard-state/archon
 ```
 
 The repository requires pnpm 11.25.0 (declared in `package.json`), which must
