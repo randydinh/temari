@@ -9,3 +9,4 @@ export * from './lib/archive-graph.js';
 export * from './lib/archive-graph-trial.js';
 export * from './lib/archive-structure.js';
 export * from './lib/archive-journey.js';
+export * from './lib/archive-evaluation-gate.js';
