@@ -395,3 +395,4 @@ import './archive.integration.test.js';
 import './archive-graph.integration.test.js';
 import './archive-journey.integration.test.js';
 import './archive-evaluation-gate.integration.test.js';
+import './archive-document-links.integration.test.js';

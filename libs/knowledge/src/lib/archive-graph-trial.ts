@@ -156,7 +156,7 @@ export async function evaluateArchiveGraphTrial(input: {
       continue;
     const opposite = seedNodes.has(relation.subject!)
       ? relation.object
-      : seedNodes.has(relation.object!)
+      : relation.predicate !== 'links-to' && seedNodes.has(relation.object!)
         ? relation.subject
         : null;
     if (!opposite) continue;
