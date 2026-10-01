@@ -8,9 +8,34 @@ import { actualFixture, documents } from '../support/fixtures.js';
 import { captureArchive, loadArchivePublication } from './archive-intake.js';
 import { createArchiveRegistrar } from './archive-registrar.js';
 import { canonical, hash } from './codec.js';
-import { recaptureArchiveSource } from './archive-source-lifecycle.js';
+import {
+  recaptureArchiveSource,
+  resumeArchiveSourceHandoff,
+} from './archive-source-lifecycle.js';
 
 const exec = promisify(execFile);
+
+async function generationCount(
+  f: Awaited<ReturnType<typeof actualFixture>>,
+): Promise<number> {
+  const { stdout } = await exec(
+    f.config.python,
+    [
+      '-B',
+      '-c',
+      "import sqlite3,sys; db=sqlite3.connect(sys.argv[1]); print(db.execute('SELECT COUNT(*) FROM archive_generations').fetchone()[0])",
+      join(f.base, 'state/registry.sqlite3'),
+    ],
+    { timeout: 60000 },
+  );
+  return Number(stdout.trim());
+}
+
+async function attemptCount(directory: string): Promise<number> {
+  return (await readdir(directory)).filter((name) =>
+    name.startsWith('archive-attempt-'),
+  ).length;
+}
 
 function optionsFor(
   f: Awaited<ReturnType<typeof actualFixture>>,
@@ -168,6 +193,15 @@ test('ACTUAL ARCHIVE CLI: recapture hands off pinned diff and optional graph rev
   });
   assert.equal(result.status, 'handoff', JSON.stringify(result));
   const receipt = result.receipt;
+  assert.equal(receipt.schema, 1);
+  assert.equal(receipt.kind, 'temari-archive-source-recapture');
+  for (const key of [
+    'beforeSelection',
+    'captureAttemptSha256',
+    'captureResultSha256',
+    'captureBindingSha256',
+  ])
+    assert(!(key in receipt), `${key} must remain resume-only`);
   assert.equal(receipt.currentOriginal, 'not-checked');
   assert.equal(receipt.graphMutation, 'none');
   assert.notEqual(receipt.before.generation, receipt.after.generation);
@@ -385,4 +419,223 @@ test('ACTUAL ARCHIVE CLI: incomplete v2 remains explicit and invalid graph refus
     ).length,
     attemptsBefore,
   );
+});
+
+test('ACTUAL ARCHIVE CLI: operator resumes a complete persisted v2 twice without a capture', async () => {
+  const f = await actualFixture();
+  const options = optionsFor(f, 'source-resume');
+  const before = await captureArchive(options);
+  assert(before.publicationPath);
+  const beforeGraphId = await graphFor(f, before.publicationPath);
+  await writeFile(
+    join(f.base, 'sources/plan.txt'),
+    'Changed plan for persisted resume.',
+  );
+  await rm(join(f.base, 'sources/owner.txt'));
+  await writeFile(join(f.base, 'sources/new.txt'), 'New private resume text.');
+  const after = await captureArchive({
+    ...options,
+    requestKey: 'after',
+    limits: { entries: 500 },
+  });
+  assert.equal(after.status, 'published');
+  assert(after.publicationPath);
+  const baselineGenerations = await generationCount(f);
+  const baselineAttempts = await attemptCount(options.task.directory);
+  const input = {
+    beforePublicationPath: before.publicationPath,
+    resultPath: after.resultPath,
+    beforeGraphId,
+  };
+  const first = await resumeArchiveSourceHandoff(input);
+  assert.equal(first.receipt.schema, 1);
+  assert.equal(first.receipt.kind, 'temari-archive-source-resume');
+  assert.equal(first.receipt.beforeSelection, 'operator-selected-on-resume');
+  assert.equal(
+    first.receipt.captureAttemptSha256,
+    hash(await readFile(after.attemptPath)),
+  );
+  assert.equal(
+    first.receipt.captureResultSha256,
+    hash(await readFile(after.resultPath)),
+  );
+  assert.equal(
+    first.receipt.captureBindingSha256,
+    hash(
+      await readFile(
+        join(
+          options.task.directory,
+          `archive-binding-${hash((await loadArchivePublication(after.publicationPath)).captureRequestKey)}.json`,
+        ),
+      ),
+    ),
+  );
+  assert.equal(first.receipt.currentOriginal, 'not-checked');
+  assert.equal(first.receipt.graphMutation, 'none');
+  assert.deepEqual(first.receipt.diff.counts, {
+    added: 1,
+    removed: 1,
+    changed: 1,
+    unchanged: 2,
+  });
+  assert.deepEqual(first.receipt.graphImpact?.counts, {
+    needsReview: 2,
+    needRepin: 1,
+    historicalOnly: 0,
+    needDiscovery: 2,
+  });
+  assert.equal(first.capture.attemptPath, after.attemptPath);
+  assert.equal(first.capture.resultPath, after.resultPath);
+  const firstBytes = await readFile(first.receiptPath);
+  assert(
+    !firstBytes.toString('utf8').includes('Changed plan for persisted resume.'),
+  );
+  const second = await resumeArchiveSourceHandoff(input);
+  assert.equal(second.receiptPath, first.receiptPath);
+  assert.deepEqual(await readFile(second.receiptPath), firstBytes);
+  assert.equal(await generationCount(f), baselineGenerations);
+  assert.equal(await attemptCount(options.task.directory), baselineAttempts);
+  const historical = await createArchiveRegistrar({
+    publications: [before.publicationPath],
+    readScope: 'source-root',
+  });
+  const old = await historical.read({
+    document: { source: f.source, path: 'plan.txt' },
+    expectedSha256: hash(documents['plan.txt']),
+    maxCodePoints: 8000,
+    maxBytes: 65536,
+    continuation: null,
+  });
+  assert(old.ok);
+  assert.match(old.value.evidence.excerpt, /Proposal plan/);
+
+  const attemptBytes = await readFile(after.attemptPath, 'utf8');
+  const attempt = JSON.parse(attemptBytes);
+  attempt.options.limits.entries = 499;
+  await writeFile(after.attemptPath, canonical(attempt));
+  await assert.rejects(
+    resumeArchiveSourceHandoff(input),
+    /binding settings changed/,
+  );
+  await writeFile(after.attemptPath, attemptBytes);
+  attempt.options.requestKey = 'different-key';
+  await writeFile(after.attemptPath, canonical(attempt));
+  await assert.rejects(resumeArchiveSourceHandoff(input));
+  await writeFile(after.attemptPath, attemptBytes);
+
+  const resultBytes = await readFile(after.resultPath, 'utf8');
+  const result = JSON.parse(resultBytes);
+  result.attemptPath = before.attemptPath;
+  await writeFile(after.resultPath, canonical(result));
+  await assert.rejects(
+    resumeArchiveSourceHandoff(input),
+    /attempt path mismatch/,
+  );
+  await writeFile(after.resultPath, resultBytes);
+  const fakeResultPath = join(
+    options.task.directory,
+    'archive-result-00000000-0000-4000-8000-000000000000.json',
+  );
+  await writeFile(fakeResultPath, resultBytes);
+  await assert.rejects(
+    resumeArchiveSourceHandoff({ ...input, resultPath: fakeResultPath }),
+    /result path mismatch/,
+  );
+
+  await assert.rejects(
+    resumeArchiveSourceHandoff({ ...input, beforeGraphId: 'a'.repeat(64) }),
+    /Prior graph unavailable/,
+  );
+  await assert.rejects(
+    resumeArchiveSourceHandoff({
+      ...input,
+      beforePublicationPath: after.publicationPath,
+    }),
+  );
+  await rm(after.resultPath);
+  await assert.rejects(resumeArchiveSourceHandoff(input));
+  assert.equal(await generationCount(f), baselineGenerations);
+  assert.equal(await attemptCount(options.task.directory), baselineAttempts);
+});
+
+test('ACTUAL ARCHIVE CLI: resume refuses incomplete capture and changed admission without capture', async () => {
+  const f = await actualFixture();
+  const options = optionsFor(f, 'source-resume-refusal');
+  const before = await captureArchive(options);
+  assert(before.publicationPath);
+  await writeFile(
+    join(f.base, 'sources/oversize.bin'),
+    Buffer.alloc(8 * 1024 * 1024 + 1),
+  );
+  const incomplete = await captureArchive({
+    ...options,
+    requestKey: 'incomplete',
+  });
+  assert.equal(incomplete.preservation, 'incomplete');
+  const input = {
+    beforePublicationPath: before.publicationPath,
+    resultPath: incomplete.resultPath,
+  };
+  const count = await generationCount(f);
+  const attempts = await attemptCount(options.task.directory);
+  await assert.rejects(
+    resumeArchiveSourceHandoff(input),
+    /Complete v2 preservation required/,
+  );
+  await rm(join(f.base, 'sources/oversize.bin'));
+  const complete = await captureArchive({ ...options, requestKey: 'complete' });
+  assert(complete.publicationPath);
+  await exec(
+    f.config.python,
+    [
+      '-B',
+      '-c',
+      "import sqlite3,sys,json; db=sqlite3.connect(sys.argv[1]); row=json.loads(db.execute('SELECT data FROM sources WHERE id=?',(sys.argv[2],)).fetchone()[0]); row['enabled']=False; db.execute('UPDATE sources SET data=? WHERE id=?',(json.dumps(row),sys.argv[2])); db.commit()",
+      join(f.base, 'state/registry.sqlite3'),
+      f.source.id,
+    ],
+    { timeout: 60000 },
+  );
+  await assert.rejects(
+    resumeArchiveSourceHandoff({
+      beforePublicationPath: before.publicationPath,
+      resultPath: complete.resultPath,
+    }),
+    /disabled/,
+  );
+  assert.equal(await generationCount(f), count + 1);
+  assert.equal(await attemptCount(options.task.directory), attempts + 1);
+});
+
+test('ACTUAL ARCHIVE CLI: resume rejects a later operator-selected v1 without recapturing', async () => {
+  const f = await actualFixture();
+  const options = optionsFor(f, 'source-resume-chronology');
+  const original = await captureArchive(options);
+  assert(original.publicationPath);
+  await writeFile(
+    join(f.base, 'sources/plan.txt'),
+    'Earlier complete v2 capture.',
+  );
+  const persisted = await captureArchive({
+    ...options,
+    requestKey: 'persisted',
+  });
+  assert(persisted.publicationPath);
+  await writeFile(
+    join(f.base, 'sources/plan.txt'),
+    'Later generation selected as v1.',
+  );
+  const later = await captureArchive({ ...options, requestKey: 'later' });
+  assert(later.publicationPath);
+  const generations = await generationCount(f);
+  const attempts = await attemptCount(options.task.directory);
+  await assert.rejects(
+    resumeArchiveSourceHandoff({
+      beforePublicationPath: later.publicationPath,
+      resultPath: persisted.resultPath,
+    }),
+    /does not predate persisted v2/,
+  );
+  assert.equal(await generationCount(f), generations);
+  assert.equal(await attemptCount(options.task.directory), attempts);
 });

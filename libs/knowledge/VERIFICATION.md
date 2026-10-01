@@ -249,3 +249,21 @@ publication without the binding now refuses; migration needs an explicit
 decision. This checks local artifact consistency, not authenticity against a
 writer who can rewrite both files. Limits and OCR mode are outside the shared
 publication fields and are not certified by this check.
+
+## Resume a complete persisted source capture, 2026-10-01
+
+`resumeArchiveSourceHandoff` passed the final `knowledge:integration` suite
+70/70, `knowledge:test` 43/43, `knowledge:typecheck`, and post-final focused
+actual-CLI checks 7/7. An actual complete v2 capture can be selected with v1,
+resumed twice with identical receipt bytes, and leaves Registrar generation
+and capture-attempt counts unchanged. The test retains historical v1 reads and
+checks diff and graph-impact queues. It refuses a changed attempt key or
+limits, swapped result path, incomplete v2, invalid v1 graph, reversed capture
+order, missing result and revoked registration. The existing recapture
+schema-1 receipt shape remains unchanged and has a regression assertion.
+
+The new resume receipt has a distinct kind and pins attempt/result/binding
+hashes. It labels v1 as operator-selected during resume; those artifacts do
+not prove a previous call selected that v1 or even failed. This is a local,
+no-capture completion path, not automatic scheduling, crash recovery without
+a result, production restore or continuous source freshness.

@@ -225,6 +225,30 @@ publication during local recovery; a missing or inconsistent binding refuses
 readers. This is a consistency check between retained local artifacts, not
 protection against rewriting both artifacts or proof of current source bytes.
 
+If a complete v2 capture has a persisted result but its later handoff did not
+complete, an operator can finish a new handoff without capturing again:
+
+```ts
+import { resumeArchiveSourceHandoff } from '@temari/knowledge';
+
+const resumed = await resumeArchiveSourceHandoff({
+  beforePublicationPath: '/absolute/private-task/archive-publication-BEFORE.json',
+  resultPath: '/absolute/private-task/archive-result-UUID.json',
+  // Supply beforeGraphId only for a graph pinned to the selected v1.
+});
+```
+
+The resume route requires the canonical attempt and complete result for the
+same capture, its original binding and current source admission, and exact
+v1/v2 archive pins. It checks the Registrar observation order, then redoes
+the diff and optional graph-impact checks. The separate
+`temari-archive-source-resume` receipt pins the attempt, result and binding
+hashes and says `beforeSelection: operator-selected-on-resume`; the capture
+artifacts do not prove which v1 a failed earlier call intended. Repeating the
+same input produces the same handoff without a new generation or attempt.
+A missing result is refused and must be investigated separately. This is not
+an automatic retry, backup restore, live freshness check or graph mutation.
+
 ## Audit one local source at a point in time
 
 To compare a complete archived generation with the currently admitted local
