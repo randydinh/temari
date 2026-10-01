@@ -190,9 +190,48 @@ cannot override BM25 or exact order; `suggestedOrder` is advice. A local-only
 source or `hostedTextApproved: false` prevents TypeSafe calls. Unknown input
 fields, including a misspelled privacy field, fail before discovery or Jev.
 This CLI action is a single run, not a durable scheduled job: repeat invocations
-can repeat TypeSafe requests and billing, including after a crash. A later
-workflow coordinator must hold a lease before automatic retries. Older handoffs
+can repeat TypeSafe requests and billing, including after a crash. Use the
+two-job coordinator below for a resumable intake and query. Older handoffs
 without a pinned sharing policy require an explicit `hostedTextApproved` boolean.
+
+### Resumable intake and query jobs
+
+Put the same intake plan and an unlabelled query **without** `handoffPath` in
+one private job plan:
+
+```json
+{
+  "intake": { "task": {}, "intakes": [] },
+  "query": {
+    "id": "user-query-1",
+    "query": "example search terms",
+    "sourceIds": ["REGISTERED_SOURCE_ID"],
+    "topK": 4,
+    "discoveryMode": "bm25"
+  }
+}
+```
+
+The displayed `intake` object is a placeholder for a complete plan from the
+intake section above. The query may narrow that plan's source IDs. `localOnlySourceIds`
+remains part of intake; `hostedTextApproved: false` on the query is an additional
+opt-out. Unknown plan fields fail before either job starts.
+
+```sh
+pnpm nx run knowledge:demo -- journey-jobs-create --input /absolute/jobs-plan.json
+pnpm nx run knowledge:demo -- journey-jobs-tick --spec /absolute/private-task/archive-job-spec-HASH.json
+pnpm nx run knowledge:demo -- journey-jobs-tick --spec /absolute/private-task/archive-job-spec-HASH.json
+```
+
+Creation saves an immutable, content-addressed spec. Each tick claims at most
+one child in the existing runtime store: intake first, then search only after
+its validated handoff succeeds. A repeated tick returns the durable result
+without rerunning a completed child. Mechanically failed intake may retry up
+to the bounded attempt limit. A hosted search with an uncertain previous
+attempt blocks for manual review, because its TypeSafe call may have occurred.
+The report pins the requested `topK`, query hash and sharing decision; a
+missing excerpt or explicit gap returns `ISSUES`, not a success claim. This is
+an operator-run command, with no unattended scheduler or notification service.
 
 Use a separate labelled plan to evaluate retrieval. Gold paths are explicit
 annotations, not text extracted from the source. Each case narrows the handoff

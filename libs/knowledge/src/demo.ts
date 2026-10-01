@@ -35,6 +35,11 @@ import {
   type ArchiveSearchPlan,
   type ArchiveQueryInput,
 } from './lib/archive-journey.js';
+import {
+  createArchiveJobSpec,
+  tickArchiveJobs,
+  type ArchiveJobPlan,
+} from './lib/archive-jobs.js';
 import { runRetrievalGate } from './lib/archive-evaluation-gate.js';
 import { runGraphRetrievalGate } from './lib/archive-graph-evaluation-gate.js';
 import {
@@ -54,6 +59,8 @@ const help = `Knowledge demo (explicit local files; no model or semantic approva
   pnpm nx run knowledge:demo -- journey-intake --input /absolute/intake-plan.json
   pnpm nx run knowledge:demo -- journey-search --input /absolute/search-plan.json
   pnpm nx run knowledge:demo -- journey-query --input /absolute/query.json
+  pnpm nx run knowledge:demo -- journey-jobs-create --input /absolute/jobs-plan.json
+  pnpm nx run knowledge:demo -- journey-jobs-tick --spec /absolute/archive-job-spec-HASH.json
   pnpm nx run knowledge:demo -- journey-gate --input /absolute/sealed-questions.json --sha256 QUESTION_SET_SHA256
   pnpm nx run knowledge:demo -- graph-gate --input /absolute/sealed-graph-questions.json --sha256 QUESTION_SET_SHA256 --handoff-sha256 HANDOFF_SHA256
   pnpm nx run knowledge:demo -- structure-publish --input /absolute/structure-plan.json
@@ -89,6 +96,22 @@ async function main(): Promise<void> {
     ) as ArchiveIntakePlan;
     process.stdout.write(
       JSON.stringify(await runArchiveIntake(input), null, 2) + '\n',
+    );
+    return;
+  }
+  if (command === 'journey-jobs-create') {
+    const input = JSON.parse(
+      await readFile(arg('--input'), 'utf8'),
+    ) as ArchiveJobPlan;
+    process.stdout.write(
+      JSON.stringify({ specPath: await createArchiveJobSpec(input) }, null, 2) +
+        '\n',
+    );
+    return;
+  }
+  if (command === 'journey-jobs-tick') {
+    process.stdout.write(
+      JSON.stringify(await tickArchiveJobs(arg('--spec')), null, 2) + '\n',
     );
     return;
   }
