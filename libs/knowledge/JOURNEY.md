@@ -165,6 +165,38 @@ graphs are refused until every selected source has an explicit revision
 comparison. The receipt retains `currentOriginal: not-checked` and does not
 prove the live source is still current.
 
+## Hand off an operator-triggered recapture
+
+Use a new request key to capture the same registered local source into a new
+generation and create one pinned lifecycle handoff. Here
+`priorCaptureOptions` is the `ArchiveIntakeOptions` used for v1:
+
+```ts
+import { recaptureArchiveSource } from '@temari/knowledge';
+
+const result = await recaptureArchiveSource({
+  beforePublicationPath: '/absolute/private-task/archive-publication-BEFORE.json',
+  after: { ...priorCaptureOptions, requestKey: 'explicit-recapture-v2' },
+  // Supply beforeGraphId only when reviewing a graph pinned to v1.
+});
+```
+
+The operation checks the complete v1 publication against its original capture
+binding, current source registration, task and transport. If supplied, the
+v1 graph must be readable under that source's exact RevisionSet before v2 is
+captured. A complete v2 produces a durable handoff with v1/v2 publication
+hashes, generation-diff counts and an optional read-only graph-impact receipt.
+The handoff contains metadata, not source bodies, and states
+`currentOriginal: not-checked` and `graphMutation: none`.
+
+An incomplete or blocked v2 returns `status: 'blocked'` with persisted attempt
+and publication paths where available. If comparison or graph planning fails
+after a complete capture, `ArchiveRecaptureHandoffError` carries those capture
+paths; the capture is not rolled back. A request key names one logical
+idempotent capture: concurrent retries can share it, so this operation does
+not promise a separate generation per invocation. It does not schedule source
+changes, assert continuous freshness, or publish a refreshed graph.
+
 ## Audit one local source at a point in time
 
 To compare a complete archived generation with the currently admitted local
