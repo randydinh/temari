@@ -80,6 +80,8 @@ skills/interrogate/references/reviewer-prompt.md
 skills/interrogate/references/rubric.md
 skills/maintain-verification-skill/SKILL.md
 skills/make-bot-ui/SKILL.md
+skills/merge-reconciliation/SKILL.md
+skills/merge-reconciliation/references/reconciliation-contract.md
 skills/no-comments/SKILL.md
 skills/poteto-mode/SKILL.md
 skills/poteto-mode/playbook-contracts/v1/feature.json
@@ -208,6 +210,7 @@ verification/verify-temari/features/closeout.md
 verification/verify-temari/features/credential-profiles.md
 verification/verify-temari/features/decision-log.md
 verification/verify-temari/features/integration-discovery.md
+verification/verify-temari/features/merge-reconciliation.md
 verification/verify-temari/features/orch-bookkeeping.md
 verification/verify-temari/features/plugin-catalog.md
 verification/verify-temari/features/poteto-mode-playbooks.md

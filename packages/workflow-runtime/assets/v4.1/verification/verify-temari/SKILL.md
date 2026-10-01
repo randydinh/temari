@@ -235,6 +235,7 @@ Start here:
 - [`features/poteto-mode-playbooks.md`](features/poteto-mode-playbooks.md)
 - [`features/seq-log-review.md`](features/seq-log-review.md)
 - [`features/integration-discovery.md`](features/integration-discovery.md)
+- [`features/merge-reconciliation.md`](features/merge-reconciliation.md)
 - [`features/routing-chain.md`](features/routing-chain.md)
 - [`features/workflow-conformance.md`](features/workflow-conformance.md)
 - [`features/closeout.md`](features/closeout.md)

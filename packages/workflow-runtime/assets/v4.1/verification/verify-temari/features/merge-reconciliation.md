@@ -1,0 +1,44 @@
+# Merge reconciliation
+
+Merge reconciliation preserves an interrupted task while it observes a Git merge or overlapping worker output, classifies the conflict, and prepares an isolated integration candidate. It never resolves a semantic conflict, mutates the source checkout, or treats an integration commit as a merge or a completed task without the explicit confirmation and trusted closeout that follow.
+
+## Sub-features
+
+- `merge-reconciliation-catalog` requires `skills/merge-reconciliation/SKILL.md` to be present in the portable payload and listed by `plugin-catalog` as `merge-reconciliation`.
+- `merge-reconciliation-links` requires the skill's internal links to resolve and its ownership language to keep Temari responsible for task intent and confirmation, Poteto for method, the runtime for durable records, and the host/harness for observation and isolated execution only.
+- `merge-reconciliation-observation` creates one immutable observation bound to the continuing task, run ID, revision, source candidate identity, Git-operation state, unresolved paths, and evidence digests. Repeating the same request is idempotent.
+- `merge-reconciliation-preservation` records a conflict class and preservation rule for every target: source-of-truth code before generated output; one semantic owner before a combined edit; and retained diagnostics rather than silently discarded worker output.
+- `merge-reconciliation-confirmation` stops at `awaiting-confirmation` before any target mutation. Its confirmation names the isolated checkout, pinned base, exact paths, proposed resolution, and verification plan; a generic approval, worker receipt, or Archon status is insufficient.
+- `merge-reconciliation-integration` applies only confirmed patches to a clean, disjoint integration checkout. It records the ordered application log, candidate identity before and after verification, and a reviewable integration commit only when the verified tree stays unchanged.
+- `merge-reconciliation-task-continuity` projects `observed`, `blocked`, `awaiting-confirmation`, `integrating`, `verifying`, and `ready-for-review` from the durable task record. `invalidated` is a retained reason for `blocked`, not a terminal state. The view preserves the original task/project identity and never reports `complete` merely because an integration candidate exists.
+- `merge-reconciliation-generated-output` rebuilds generated artifacts, provenance, import inventories, and lockfiles only from accepted source-level resolution; hand-edited derivative hashes or inventories are rejected.
+
+## How to get to it (user POV)
+
+- Ask Temari to reconcile an active merge, overlapping worker patches, or a stale candidate while continuing the existing task. Temari routes the engineering method to Poteto and opens or resumes the same durable task; it does not create a replacement task just because an isolated integration checkout is needed.
+- Read the blocked task view to inspect the immutable source observation, each target's conflict class and preservation rule, retained evidence, and the exact confirmation request. The source project remains the task's project even while integration happens elsewhere.
+- Explicitly confirm the displayed isolated-checkout proposal only after reviewing its paths, pinned base, intended resolution, and verification plan. A separate trusted closeout is still required after independent verification of the current candidate.
+
+## Driving it with control-temari
+
+Preconditions:
+
+- The candidate has been packaged from this checkout, and the source task checkout named by the attempt is treated as observation-only. Do not run destructive negative cases, reset, clean, abort, stash, or resolve conflicts in it.
+- Start a fresh `control-temari` run, require `doctor` to report `healthy=yes`, and retain captures under `verification/verify-temari/evidence/<run-id>/`. Use disposable repositories and integration checkouts for every mutation scenario.
+- The portable package proves the catalog and contract. Runtime, host, and task-continuity scenarios require their own control surface or a manual fixture; do not report them as exercised solely because the skill is installed.
+
+- **Check catalog and package identity.** Run `control-temari plugin-catalog`, then `pnpm nx run workflow-runtime:check` and `pnpm nx run workflow-runtime:package -- --lane portable --output <fresh-absolute-temporary-directory>`. `skills=` includes `merge-reconciliation`; both the source payload and relocated artifact contain `skills/merge-reconciliation/SKILL.md`; and the artifact inventory/provenance validates every copied file. Catalog presence proves discoverability, not a reconciliation.
+- **Check internal references and ownership.** Run `scripts/check-skill-references.sh` from the source payload and again from the relocated artifact. Both must resolve all links. Read the skill's owner statements: Temari owns task intent and confirmation, Poteto owns method, the runtime owns durable records, and the host/harness observes and executes only. A missing link, a second ledger presented as canonical state, or language granting merge authority to a harness is source/package drift that must be corrected before release.
+- **Manual fixture: observe without mutation.** After runtime/host support exists, create a disposable repository with an active merge and at least one unresolved path. An observation with fixed task ID, revision, run ID, and idempotency key must record the Git operation and every unresolved target with a preservation rule, while source `git status --porcelain=v1 --untracked-files=all`, index stages, and file digests remain byte-for-byte unchanged. Repeating the key must recover one attempt rather than create another.
+- **Manual fixture: refuse unconfirmed resolution.** A semantic conflict without a confirmation record must remain `awaiting-confirmation` and leave its isolated integration checkout, patches, and commits unchanged. A malformed confirmation that omits the base, target paths, resolution, or verification plan must also fail closed.
+- **Manual fixture: confirm and verify in isolation.** A fully specified confirmation may apply patches only to a clean, pinned, disjoint disposable checkout. The resulting evidence must bind ordered patch digests to the accepted snapshot, resolve source before derivatives, and record candidate identity before and after verification. A changed source candidate or post-verification tree must invalidate the attempt rather than create a commit. A passing candidate reaches `ready-for-review` with an independently rechecked identity.
+- **Manual fixture: task continuity and closeout boundary.** Restart the task view while `blocked`, `awaiting-confirmation`, and `ready-for-review`. It must recover the same task/project identity, snapshot, evidence references, and idempotency behavior. Repeated reconcile, confirm, or resume actions with the same request digest must not create another attempt or integration commit. Reusing a key with a changed candidate, paths, plan, or confirmation must reject. `ready-for-review` remains nonterminal; trusted closeout against a different current candidate must refuse completion.
+- **Manual fixture: generated-output discipline.** Use an accepted source edit that changes a generated output, provenance/import inventory, or lockfile. A hand-edited derivative, unknown payload file, mismatched hash, or stale inventory must fail package verification. Rebuild from the accepted source resolution and require source/artifact byte and inventory/provenance checks before the candidate can become `ready-for-review`.
+
+## Gotchas
+
+- The current `control-temari` harness can prove catalog and package structure, but a host dashboard, Git confirmation UI, or live agent session is not proven by its presence. Mark such a path `verified-unreachable` with the attempted route and unmet host prerequisite rather than treating a synthetic receipt as live proof.
+- An integration commit is a candidate for review, never a source merge, publication, or Temari closeout receipt. Current-candidate revalidation and the existing closeout path decide completion.
+- Do not use the legacy Orchestrate TSV ledger as reconciliation authority. A dashboard or report may derive status from runtime-bound task/evidence records, but it must not become a second writable lifecycle store.
+- Generated files are evidence of the accepted source resolution, not a conflict-resolution surface. Regenerate them only in the isolated integration checkout; never select a generated side of a conflict by hand.
+- A clean source checkout is not proof that a prior observation remains current. Any changed head, merge state, status, path digest, candidate identity, or verification-side mutation invalidates the attempt and requires a fresh observation.

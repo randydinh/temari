@@ -1,0 +1,69 @@
+
+ NX   Running target task-typecheck for project runtime and 4 tasks it depends on:
+
+
+
+> nx run contracts:typecheck  [local cache]
+
+> tsc --build tsconfig.json --emitDeclarationOnly
+
+
+> nx run temari-core:typecheck  [local cache]
+
+> tsc --build tsconfig.json --emitDeclarationOnly
+
+
+> nx run workflow-engine:typecheck  [local cache]
+
+> tsc --build tsconfig.json --emitDeclarationOnly
+
+
+> nx run runtime:typecheck  [local cache]
+
+> tsc --build tsconfig.json --emitDeclarationOnly
+
+
+> nx run runtime:task-typecheck
+
+> tsc --ignoreConfig --noEmit --module nodenext --moduleResolution nodenext --target es2022 --types node --strict --skipLibCheck tools/task-view.mts tools/task-continuity.mts tools/task-view.test.mts tools/task-continuity.test.mts tools/task-native.test.mts tools/dashboard-controller.mts tools/dashboard-controller.test.mts tools/dashboard-swarm.mts tools/dashboard-swarm.test.mts tools/dashboard-native.test.mts
+
+
+
+
+ NX   Successfully ran target task-typecheck for project runtime and 4 tasks it depends on
+
+Nx read the output from the cache instead of running the command for 4 out of 5 tasks.
+
+  Run duration:      1.5s
+  Cache:             4/5 hit (80%)
+  Critical path:     1.5s (4 tasks)
+  Recoverable time:  <1ms
+
+(node:31360) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31367) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31376) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31378) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31375) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31377) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31386) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31383) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31385) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31384) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31391) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31388) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31390) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31389) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)

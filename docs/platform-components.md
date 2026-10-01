@@ -8,8 +8,10 @@ The diagrams distinguish the current Nx slice from planned runtime behavior.
 The distinction matters. The repository currently proves a typed plan boundary,
 capability gating, a serial stage runner, bounded independent worker fan-out,
 bounded knowledge investigation, and a managed Archon-harness port. It does
-not yet claim a complete unattended scheduler, durable child-task recovery,
-universally proven host capabilities, or canonical Archon receipt parity.
+not yet claim a complete unattended scheduler, universally proven host
+capabilities, or installed live Archon receipt parity. Local child recovery and
+the [task continuity inbox](task-continuity.md) have executable checks; native
+canonical evidence is proven for deterministic source-workspace fixtures.
 
 ## The ownership model
 
@@ -300,10 +302,10 @@ or closeout policy.
 ### Responsibilities
 
 - Install the pinned native executable into Temari's user-local cache.
-- Expose runtime dispatch, status, and resume through the selected host,
+- Expose runtime dispatch, status, resume and optional cancellation through the selected host,
   configured, or managed implementation.
 - Translate the shared run-level port to Archon's workflow start, status, and
-  exact-run resume commands using argument arrays, not shell strings.
+  exact-run resume/cancel commands using argument arrays, not shell strings.
 - Bind the native run ID to Temari run ID, revision, harness version, and plan
   digest.
 - Translate known native states to provider-neutral status; preserve unknown
@@ -350,6 +352,13 @@ authentication, sandboxing, or a general production scheduler. Callers choose
 the native-harness dispatch API explicitly; ordinary `executeAndPersist`
 remains the authoritative serial path. The bridge is not a sandbox, and
 current actor identities are host-reported.
+
+The [task continuity layer](task-continuity.md) binds logical goals to these runs,
+projects retained stage/child/source evidence, and keeps native success separate
+from coordinator acceptance. Its local smoke covers exact-run resume and confirmed
+cancellation on macOS. Recovery checks native launch provenance before adopting
+an interrupted dispatch. The inbox links to the owning project in Archon's console;
+it does not create a second native log store or recurring scheduler.
 
 Selection order is host-injected harness, explicitly configured alternate,
 then managed Archon. No missing explicit implementation is silently replaced.

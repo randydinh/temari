@@ -1,0 +1,131 @@
+{
+  "schema": 1,
+  "recordedAtUtc": "2026-10-01T06:02:16.705745+00:00",
+  "mainIntegrated": "ef5553a",
+  "implementation": "04e6da5",
+  "mergedCandidate": "91bd6d35f9d3367d48919210bb3750290a809b13",
+  "browserVerificationCandidate": "08a4a0e77e6471f7c80b80996e10e6d7e45eaece",
+  "platform": "macOS arm64",
+  "liveSwarm": {
+    "taskId": "task-13476a2c-81b7-4192-b8d8-4ce6c835e771",
+    "runId": "run-13476a2c-81b7-4192-b8d8-4ce6c835e771",
+    "state": "COMPLETE",
+    "taskStatus": "NEEDS_REVIEW",
+    "semanticAcceptance": false,
+    "integrityIssue": null,
+    "workers": [
+      {
+        "schema": 1,
+        "pid": 26561,
+        "startedAt": "2026-10-01T05:56:00.979Z",
+        "endedAt": "2026-10-01T05:56:20.993Z",
+        "exitCode": 0,
+        "signal": null,
+        "timedOut": false,
+        "cancelled": false,
+        "outputLimitExceeded": false,
+        "error": null,
+        "stdoutBytes": 19595,
+        "stderrBytes": 4175
+      },
+      {
+        "schema": 1,
+        "pid": 26562,
+        "startedAt": "2026-10-01T05:56:00.980Z",
+        "endedAt": "2026-10-01T05:56:23.530Z",
+        "exitCode": 0,
+        "signal": null,
+        "timedOut": false,
+        "cancelled": false,
+        "outputLimitExceeded": false,
+        "error": null,
+        "stdoutBytes": 87344,
+        "stderrBytes": 4477
+      }
+    ],
+    "overlapSeconds": 20.013,
+    "receiptPeakConcurrency": 2,
+    "serverRestart": "completed live model results retained; active supervisor restart uses real subprocess regression coverage"
+  },
+  "nativeVerification": {
+    "taskId": "task-7e346e45-ac5f-4c1f-b8c1-72e129272423",
+    "runId": "run-7e346e45-ac5f-4c1f-b8c1-72e129272423",
+    "nativeRef": {
+      "schema": 1,
+      "harnessId": "archon",
+      "harnessVersion": "0.10.1",
+      "runId": "run-7e346e45-ac5f-4c1f-b8c1-72e129272423",
+      "revision": "08a4a0e77e6471f7c80b80996e10e6d7e45eaece",
+      "planSha256": "3ad49638fd1d5883e6eec51f9fa5dea07d11ca55017be46c9820bea13d2d855e",
+      "workspaceRoot": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next",
+      "entrypoint": "temari-nx-canonical",
+      "externalRunId": "81c58ecc71f8a1d13c69fd1129199b27",
+      "startedAt": "2026-10-01T05:59:02.417Z"
+    },
+    "taskStatus": "DONE",
+    "evidence": {
+      "verified": true,
+      "scope": "persisted-stage-evidence-only",
+      "receiptSha256": "beb380dfa2c9e1d08c82fa17980ff8f6ff548d64a9f15340418e139271bb1269",
+      "issues": []
+    },
+    "receiptRoot": "/Users/randydinh/Library/Application Support/Temari/dashboard/archon/workspaces/randydinh/temari/artifacts/runs/81c58ecc71f8a1d13c69fd1129199b27/temari-nx-canonical/receipts",
+    "evidenceRoot": "/Users/randydinh/Library/Application Support/Temari/dashboard/archon/workspaces/randydinh/temari/artifacts/runs/81c58ecc71f8a1d13c69fd1129199b27/temari-nx-canonical/evidence",
+    "stages": [
+      {
+        "stage": "investigate",
+        "summary": "Recorded the pinned dashboard revision.",
+        "completedAt": "2026-10-01T05:59:02.725Z",
+        "stdoutSha256": "0c3641ec8429b6487a362ef4e37414e0e8ed75444211cc4388c68f0d354de40d",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "stage": "plan",
+        "summary": "Dashboard browser code parses.",
+        "completedAt": "2026-10-01T05:59:02.992Z",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "stage": "build",
+        "summary": "Dashboard and runtime TypeScript checks pass.",
+        "completedAt": "2026-10-01T05:59:06.629Z",
+        "stdoutSha256": "25745587bcfec2a59ca36c60a5ae6ac4d7235e236580c1aa12ec5565b1bd7c32",
+        "stderrSha256": "9f1be41aba5b2cca06d8fdb81114a82608da98f01c9b0da3bc2fae42bb890e79"
+      },
+      {
+        "stage": "review",
+        "summary": "Dashboard control and worker process tests pass.",
+        "completedAt": "2026-10-01T05:59:23.739Z",
+        "stdoutSha256": "3f2b3d9b4e921b97522ba2f6cd344dfce49ca120091cfa38ea2f870858b5c501",
+        "stderrSha256": "430138a080041ced591d1a20f44214e07deb8c1d2a043ffd4d5ffd7cae19b8fa"
+      },
+      {
+        "stage": "verify",
+        "summary": "Parallel runtime and evidence checks pass.",
+        "completedAt": "2026-10-01T05:59:33.652Z",
+        "stdoutSha256": "66e4f30a2fabe35920a4eedb64b5408a56c851f28bcc18112e445c4cbb1e842e",
+        "stderrSha256": "eeb416232dfd9ed59d41054af8b98db4bfd32cebf31e31d6a05aca81c4a5fd8c"
+      },
+      {
+        "stage": "deliver",
+        "summary": "Pinned checkout remains free of whitespace errors.",
+        "completedAt": "2026-10-01T05:59:33.927Z",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  "browser": {
+    "noteConflict": "draft survived concurrent version change; Save disabled; explicit keep-against-current followed by successful Save",
+    "taskPreservation": "existing broad dashboard task remains OPEN; no canonical completion fabricated",
+    "listeners": ["127.0.0.1:3092", "127.0.0.1:3091"],
+    "archonTrace": {
+      "log": "all six stages plus finalization visibly completed",
+      "graph": "all six stages plus finalization visibly completed after catalog registration",
+      "definitionBytes": 1694,
+      "definitionSha256": "89f03b21c7acf58add17fe041a842fcbf0fbef397a8926b1baa3e814d7217e02",
+      "installation": "dedicated ARCHON_HOME/workflows/temari-nx-canonical.yaml; exact retained source bytes"
+    }
+  }
+}

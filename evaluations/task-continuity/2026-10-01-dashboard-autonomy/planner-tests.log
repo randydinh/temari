@@ -1,0 +1,54 @@
+
+> nx run runtime:dashboard-planner-test
+
+> node --import @swc-node/register/esm-register --test --test-concurrency=1 tools/dashboard-planner.test.mts
+
+(node:48956) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:48958) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:48958) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:48958) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ host policy rejects overlap, unknown fields, dangerous paths and missing fixed verification (107.01625ms)
+✔ preparation is inert, replay is stable, and goal/policy request changes conflict (155.977875ms)
+✔ structured planner retains exact process evidence and materializes only host-owned authority (998.667583ms)
+✔ planner malformed result blocks preparation without automatic repair or retry (917.951666ms)
+✔ planner unknown-fields result blocks preparation without automatic repair or retry (913.068042ms)
+✔ planner injection result blocks preparation without automatic repair or retry (918.904834ms)
+✔ planner unknown-slot result blocks preparation without automatic repair or retry (883.741333ms)
+✔ planner dependencies result blocks preparation without automatic repair or retry (907.343167ms)
+✔ planner blockers result blocks preparation without automatic repair or retry (868.931417ms)
+✔ planner duplicate result blocks preparation without automatic repair or retry (911.905167ms)
+✔ planner missing result blocks preparation without automatic repair or retry (912.155833ms)
+✔ planner oversize result blocks preparation without automatic repair or retry (922.622083ms)
+✔ planner exit result blocks preparation without automatic repair or retry (820.938ms)
+✔ planner output-limit result blocks preparation without automatic repair or retry (829.279708ms)
+✔ planner hang result blocks preparation without automatic repair or retry (1663.607375ms)
+✔ concurrent start and fresh handle observation retain one paid model call (1518.047709ms)
+✔ stale launch intent refuses takeover and never starts a model (140.025542ms)
+✔ source drift before launch does not reserve a model call and drift after planning refuses materialization (983.240833ms)
+✔ model source mutation cannot produce an admitted proposal (864.039333ms)
+✔ tampered raw model output or snapshot cannot authorize execution (920.02775ms)
+✔ symlinked draft storage and evidence inside source are refused (90.239916ms)
+✔ normal model exit drains a leftover owned process group before draft readiness (952.753542ms)
+✔ policy size is bounded before any model call or preparation write (90.863583ms)
+✔ a killed supervisor leaves uncertain ownership and cannot launch a second paid call (5976.163917ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 24536.9305
+
+
+
+ NX   Successfully ran target dashboard-planner-test for project runtime
+
+
+  Run duration:      24.6s
+  Cache:             0/1 hit (0%)
+  Critical path:     24.6s (1 task)
+  Recoverable time:  <1ms

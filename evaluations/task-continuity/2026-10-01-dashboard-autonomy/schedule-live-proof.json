@@ -1,0 +1,1314 @@
+{
+  "schedules": {
+    "available": true,
+    "targets": [
+      {
+        "id": "check-clean-fixture",
+        "title": "Verify fixture source integrity",
+        "goal": "Verify that the original live feature fixture remains at its pinned clean Git revision. This recipe checks checkout integrity only.",
+        "pin": "3480460174b74b7cc5d9d1f8979a04e27261d45871f54f660967f0c5ffb88b53"
+      }
+    ],
+    "missedPolicy": "coalesce-latest",
+    "overlapPolicy": "skip",
+    "minimumIntervalMs": 60000,
+    "automationScope": "fixed-verification-recipes",
+    "schedules": [
+      {
+        "schema": 1,
+        "id": "schedule-7d3b088f-a7e4-4866-b56e-5e31349d9f21",
+        "workspaceRoot": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/source",
+        "version": 60,
+        "status": "CANCELLED",
+        "target": {
+          "id": "check-clean-fixture",
+          "title": "Verify fixture source integrity",
+          "goal": "Verify that the original live feature fixture remains at its pinned clean Git revision. This recipe checks checkout integrity only.",
+          "pin": "3480460174b74b7cc5d9d1f8979a04e27261d45871f54f660967f0c5ffb88b53"
+        },
+        "cadence": {
+          "kind": "interval",
+          "anchor": "2026-10-01T08:22:00.000Z",
+          "everyMs": 60000
+        },
+        "missedPolicy": "coalesce-latest",
+        "overlapPolicy": "skip",
+        "createdAt": "2026-10-01T08:24:40.164Z",
+        "updatedAt": "2026-10-01T08:37:57.774Z",
+        "lastDueAt": "2026-10-01T08:37:00.000Z",
+        "occurrences": [
+          {
+            "id": "occ-cfe601f70514685c1a5f3a0326dea5548e2cb76c",
+            "requestId": "scheduled-cfe601f70514685c1a5f3a0326dea5548e2cb76c",
+            "taskId": "task-scheduled-cfe601f70514685c1a5f3a0326dea5548e2cb76c",
+            "startRequestId": "start-cfe601f70514685c1a5f3a0326dea5548e2cb76c",
+            "dueAt": "2026-10-01T08:24:00.000Z",
+            "coalescedCount": 2,
+            "state": "TERMINAL",
+            "expectedVersion": 2,
+            "createdAt": "2026-10-01T08:24:40.570Z",
+            "updatedAt": "2026-10-01T08:24:43.572Z",
+            "issue": null
+          },
+          {
+            "id": "occ-e4b506cfc50254d8be4be77c88dd302a3ca7a485",
+            "requestId": "scheduled-e4b506cfc50254d8be4be77c88dd302a3ca7a485",
+            "taskId": "task-scheduled-e4b506cfc50254d8be4be77c88dd302a3ca7a485",
+            "startRequestId": "start-e4b506cfc50254d8be4be77c88dd302a3ca7a485",
+            "dueAt": "2026-10-01T08:25:00.000Z",
+            "coalescedCount": 0,
+            "state": "TERMINAL",
+            "expectedVersion": 2,
+            "createdAt": "2026-10-01T08:25:00.591Z",
+            "updatedAt": "2026-10-01T08:25:03.592Z",
+            "issue": null
+          },
+          {
+            "id": "occ-718e105f8219ebdf8203b411434dd7667afa22f3",
+            "requestId": "scheduled-718e105f8219ebdf8203b411434dd7667afa22f3",
+            "taskId": "task-scheduled-718e105f8219ebdf8203b411434dd7667afa22f3",
+            "startRequestId": "start-718e105f8219ebdf8203b411434dd7667afa22f3",
+            "dueAt": "2026-10-01T08:26:00.000Z",
+            "coalescedCount": 0,
+            "state": "TERMINAL",
+            "expectedVersion": 2,
+            "createdAt": "2026-10-01T08:26:00.657Z",
+            "updatedAt": "2026-10-01T08:26:03.661Z",
+            "issue": null
+          },
+          {
+            "id": "occ-6177ab1ef8a4041b02123772679ea070131c2268",
+            "requestId": "scheduled-6177ab1ef8a4041b02123772679ea070131c2268",
+            "taskId": "task-scheduled-6177ab1ef8a4041b02123772679ea070131c2268",
+            "startRequestId": "start-6177ab1ef8a4041b02123772679ea070131c2268",
+            "dueAt": "2026-10-01T08:27:00.000Z",
+            "coalescedCount": 0,
+            "state": "TERMINAL",
+            "expectedVersion": 2,
+            "createdAt": "2026-10-01T08:27:00.712Z",
+            "updatedAt": "2026-10-01T08:27:03.714Z",
+            "issue": null
+          },
+          {
+            "id": "occ-acb99a24f6dba4be887e51ae1b0c1eabfce3bbc8",
+            "requestId": "scheduled-acb99a24f6dba4be887e51ae1b0c1eabfce3bbc8",
+            "taskId": "task-scheduled-acb99a24f6dba4be887e51ae1b0c1eabfce3bbc8",
+            "startRequestId": "start-acb99a24f6dba4be887e51ae1b0c1eabfce3bbc8",
+            "dueAt": "2026-10-01T08:28:00.000Z",
+            "coalescedCount": 0,
+            "state": "TERMINAL",
+            "expectedVersion": 2,
+            "createdAt": "2026-10-01T08:28:00.767Z",
+            "updatedAt": "2026-10-01T08:28:00.767Z",
+            "issue": null
+          },
+          {
+            "id": "occ-24411da06beceb449577993d35f069bf323f1d42",
+            "requestId": "scheduled-24411da06beceb449577993d35f069bf323f1d42",
+            "taskId": "task-scheduled-24411da06beceb449577993d35f069bf323f1d42",
+            "startRequestId": "start-24411da06beceb449577993d35f069bf323f1d42",
+            "dueAt": "2026-10-01T08:29:00.000Z",
+            "coalescedCount": 0,
+            "state": "TERMINAL",
+            "expectedVersion": 2,
+            "createdAt": "2026-10-01T08:29:00.820Z",
+            "updatedAt": "2026-10-01T08:29:00.820Z",
+            "issue": null
+          },
+          {
+            "id": "occ-73876cd2cda84bf9e2010fa42e27d9eb39e73468",
+            "requestId": "scheduled-73876cd2cda84bf9e2010fa42e27d9eb39e73468",
+            "taskId": "task-scheduled-73876cd2cda84bf9e2010fa42e27d9eb39e73468",
+            "startRequestId": "start-73876cd2cda84bf9e2010fa42e27d9eb39e73468",
+            "dueAt": "2026-10-01T08:30:00.000Z",
+            "coalescedCount": 0,
+            "state": "TERMINAL",
+            "expectedVersion": 2,
+            "createdAt": "2026-10-01T08:30:00.326Z",
+            "updatedAt": "2026-10-01T08:30:04.330Z",
+            "issue": null
+          },
+          {
+            "id": "occ-5783c76353cc5ab1043ff0f62f414b62d0653f40",
+            "requestId": "scheduled-5783c76353cc5ab1043ff0f62f414b62d0653f40",
+            "taskId": "task-scheduled-5783c76353cc5ab1043ff0f62f414b62d0653f40",
+            "startRequestId": "start-5783c76353cc5ab1043ff0f62f414b62d0653f40",
+            "dueAt": "2026-10-01T08:31:00.000Z",
+            "coalescedCount": 0,
+            "state": "TERMINAL",
+            "expectedVersion": 2,
+            "createdAt": "2026-10-01T08:31:00.384Z",
+            "updatedAt": "2026-10-01T08:31:04.386Z",
+            "issue": null
+          },
+          {
+            "id": "occ-9246ecdfad701ab85b9908380907d5e2fb2f9d6f",
+            "requestId": "scheduled-9246ecdfad701ab85b9908380907d5e2fb2f9d6f",
+            "taskId": "task-scheduled-9246ecdfad701ab85b9908380907d5e2fb2f9d6f",
+            "startRequestId": "start-9246ecdfad701ab85b9908380907d5e2fb2f9d6f",
+            "dueAt": "2026-10-01T08:32:00.000Z",
+            "coalescedCount": 0,
+            "state": "TERMINAL",
+            "expectedVersion": 2,
+            "createdAt": "2026-10-01T08:32:00.472Z",
+            "updatedAt": "2026-10-01T08:32:05.361Z",
+            "issue": null
+          },
+          {
+            "id": "occ-b36d9702ef6e05368d48df957f678dc9f0f23a7c",
+            "requestId": "scheduled-b36d9702ef6e05368d48df957f678dc9f0f23a7c",
+            "taskId": "task-scheduled-b36d9702ef6e05368d48df957f678dc9f0f23a7c",
+            "startRequestId": "start-b36d9702ef6e05368d48df957f678dc9f0f23a7c",
+            "dueAt": "2026-10-01T08:33:00.000Z",
+            "coalescedCount": 0,
+            "state": "TERMINAL",
+            "expectedVersion": 2,
+            "createdAt": "2026-10-01T08:33:00.212Z",
+            "updatedAt": "2026-10-01T08:33:00.212Z",
+            "issue": null
+          },
+          {
+            "id": "occ-26141474d4d6eab63571d0dfce70ed007de5e32f",
+            "requestId": "scheduled-26141474d4d6eab63571d0dfce70ed007de5e32f",
+            "taskId": "task-scheduled-26141474d4d6eab63571d0dfce70ed007de5e32f",
+            "startRequestId": "start-26141474d4d6eab63571d0dfce70ed007de5e32f",
+            "dueAt": "2026-10-01T08:34:00.000Z",
+            "coalescedCount": 0,
+            "state": "TERMINAL",
+            "expectedVersion": 2,
+            "createdAt": "2026-10-01T08:34:00.306Z",
+            "updatedAt": "2026-10-01T08:34:00.306Z",
+            "issue": null
+          },
+          {
+            "id": "occ-20bf0aedb57f6a797d600f16735c40a85f1e56b4",
+            "requestId": "scheduled-20bf0aedb57f6a797d600f16735c40a85f1e56b4",
+            "taskId": "task-scheduled-20bf0aedb57f6a797d600f16735c40a85f1e56b4",
+            "startRequestId": "start-20bf0aedb57f6a797d600f16735c40a85f1e56b4",
+            "dueAt": "2026-10-01T08:37:00.000Z",
+            "coalescedCount": 2,
+            "state": "TERMINAL",
+            "expectedVersion": 2,
+            "createdAt": "2026-10-01T08:37:50.345Z",
+            "updatedAt": "2026-10-01T08:37:53.351Z",
+            "issue": null
+          }
+        ],
+        "events": [
+          {
+            "version": 1,
+            "at": "2026-10-01T08:24:40.164Z",
+            "kind": "created",
+            "requestId": "7d3b088f-a7e4-4866-b56e-5e31349d9f21",
+            "digest": "9b4b96326a2b5987de3e6304e44d4b300935ec4eac02f6641039499b4a945a77"
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:24:40.570Z",
+            "requestId": "06608b2b-13fa-4b0d-a7dc-ea4e52845b7e",
+            "digest": "d2f079e6d95583864dd74f4e42a2a9ce64c20ed31706242287cd06e4db79b585",
+            "version": 2
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:24:40.570Z",
+            "requestId": "4de0c73b-d39a-492b-8725-8de479fd4b62",
+            "digest": "3c4ecc4f424203c89edd7a4161d2f9b50869994425c8348f43a96873e31c761f",
+            "version": 3
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:24:40.570Z",
+            "requestId": "eb5606bf-f346-41ae-b2dc-883d8dc86eef",
+            "digest": "f4c7a2db389ed4700081c6fad4b1ef40dd9fc2725eff94c8a98586ce8705be96",
+            "version": 4
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:24:40.570Z",
+            "requestId": "a2850ad1-6bc5-4442-bd6c-0cb466707061",
+            "digest": "63b759f287c3026ae9ce378124d94c73d2d98a5b6e4c8609c54d602c47963d11",
+            "version": 5
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:24:43.572Z",
+            "requestId": "028b39d9-6297-4a62-9e12-4125f9811b57",
+            "digest": "902c5bb6976c57c95a8786f6af6e6650e45258be72fef8b7b82eeeb00c515320",
+            "version": 6
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:25:00.591Z",
+            "requestId": "e6f784de-3178-409c-9b61-d11768830239",
+            "digest": "9ee1ea07065c73841dd57efaac013cba8f402d461bd9e0c8a4206d71d0178bdb",
+            "version": 7
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:25:00.591Z",
+            "requestId": "dfc9d653-ff93-40be-bc64-7b80fff5fba8",
+            "digest": "604bcdd2c378423c439529f8dce43555c2b36d90c7c085056cc1cccec2b84dab",
+            "version": 8
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:25:00.591Z",
+            "requestId": "2975ae2a-4a7a-43be-ad88-f0bb3dc41488",
+            "digest": "ae580e46978723cf708a6c750771a7ed264a8c3e116d72307192789017ce2c6d",
+            "version": 9
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:25:00.591Z",
+            "requestId": "81f095c9-395e-4458-b5f5-066eed3104b2",
+            "digest": "e673e354eaa090b01ac5a105f227f963e052503699caad5fb68964b3c5226b91",
+            "version": 10
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:25:03.592Z",
+            "requestId": "07d52e8c-4fd6-402c-b8aa-2d26ab8492d6",
+            "digest": "431239496b192f5325fdcf673df8d7ae1572ec32af5906d9ad07a4d883a83f4f",
+            "version": 11
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:26:00.657Z",
+            "requestId": "52a297dd-8f72-44cf-8871-9010ac89fd51",
+            "digest": "a9089ec6cd22e9d3e3df99dbc072c791cbae4ceb7a19eee39783ff7882a1cd75",
+            "version": 12
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:26:00.657Z",
+            "requestId": "10e15cb0-4578-49c6-8acd-76a22a015a33",
+            "digest": "374074ac89c2411f4ddb543cace1658efc72e5b73144300934f2c30d65afbcfd",
+            "version": 13
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:26:00.657Z",
+            "requestId": "a5524cb2-2930-4677-a1bd-bc0010b72337",
+            "digest": "20fe56faada00b1ded7d1806ccd32b62cac12f5adfa741b5c1fc4a52efa7ecbe",
+            "version": 14
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:26:00.657Z",
+            "requestId": "6623d0f3-9477-44b3-a02e-dbff030f84cc",
+            "digest": "bc4a6528e12f833cd91b7151614aa268aeece2a17e0a87f3103877da0b20231c",
+            "version": 15
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:26:03.661Z",
+            "requestId": "2ae41320-dadd-4ab2-a857-5967c35327b5",
+            "digest": "e62e1387924b864f9b909b79b20f49dbcbc2b26d83deb351789142fcf631b6e9",
+            "version": 16
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:27:00.712Z",
+            "requestId": "555c3552-205d-45b4-a24c-fbe069809a52",
+            "digest": "d8dc71a34c37779f6bed8886998af05ed8671ce0ec894fd6398f1db1b5780d16",
+            "version": 17
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:27:00.712Z",
+            "requestId": "ef139c6d-ebaa-42d2-bb5f-b7bec25be9f5",
+            "digest": "4b6cd5e446662554cad65d80491f7b1b9cb9b30af032a3f969c577a9349b0616",
+            "version": 18
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:27:00.712Z",
+            "requestId": "50ec95c7-f5a9-4e0c-947b-708f7c469c6b",
+            "digest": "8d049fbac189969e33ee7d9c887a60549b13ac7c090c5bdf530347d27fc8eb1c",
+            "version": 19
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:27:00.712Z",
+            "requestId": "0d325fa5-85f6-405b-b4c8-fd9db51cb4ee",
+            "digest": "3b8137b5d83eab786069214812a8dd921b6335fc900f5d7df4772b9e19adbb23",
+            "version": 20
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:27:03.714Z",
+            "requestId": "5c1e3e1e-886d-4c48-a7ae-82c4eb423516",
+            "digest": "366e27cb60b0d04fc711856b635ac5d377c1b8330be47edccd054c9c3288e42c",
+            "version": 21
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:28:00.767Z",
+            "requestId": "60528961-7d5c-416d-aeb4-ec2d097716ec",
+            "digest": "636850080eb8cae92be17784cec4f4feed5f3d0345c51b8526ed58d43376c26f",
+            "version": 22
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:28:00.767Z",
+            "requestId": "8a061cf3-ce52-4687-8947-a5b202993def",
+            "digest": "eeb1eb03551c190490d7afd219ee902fbdc633b565928ed27c203d6ce1d8ba26",
+            "version": 23
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:28:00.767Z",
+            "requestId": "86b50946-49ea-459e-9da0-4a0a102fad85",
+            "digest": "8157908582d0bf0504413a9eb7dbbb1535bee619348ac4abac56429e38bb3456",
+            "version": 24
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:28:00.767Z",
+            "requestId": "0353a4ac-c0b2-42eb-904a-ef00aee04886",
+            "digest": "bcfb9c1e4d77f2c9eaaf5f22b927220ce92df939456362a51c01ebc7110ca991",
+            "version": 25
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:29:00.820Z",
+            "requestId": "cfcbba4d-c0d3-430a-b5a8-a708c8a277f9",
+            "digest": "61e4bdc6c0c85f9498d1fdb26ec9a161f0e560ab6bde1fadfc9daa48a4e15fc7",
+            "version": 26
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:29:00.820Z",
+            "requestId": "2d2c7c46-eaf8-488e-b314-7d05b3755fd4",
+            "digest": "594aac31f1738e5082470f671c1e442a8202ac8ef4b638a2c33a321db9b9161f",
+            "version": 27
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:29:00.820Z",
+            "requestId": "b1b21af6-6f74-43f4-b4df-d89db3b7d17f",
+            "digest": "1ef0db731f3a85c621797f8c6276bdfb24702ce2c71d3692ae6198a1d1e1919e",
+            "version": 28
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:29:00.820Z",
+            "requestId": "c49d8225-4c56-472d-bcfc-c3691d9bf803",
+            "digest": "af524d20927244f2987ff0ae5056833881e1874ecf64b28ebe27219397d55daf",
+            "version": 29
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:30:00.326Z",
+            "requestId": "4fd16863-79fe-4824-ae4a-bb382267a11e",
+            "digest": "1416d7a3212e0fac9e4744f2bda69871bba8e16e5378940295fda1002a6c0d20",
+            "version": 30
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:30:00.326Z",
+            "requestId": "51bb03be-8d3b-4bf1-b89a-0664e882938e",
+            "digest": "93b34316d166148c1d4ae785ab09225615004318280a3edf31de0ba4f8eddd05",
+            "version": 31
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:30:00.326Z",
+            "requestId": "7c6ff5e2-2b4d-4717-8cc7-7317229e9142",
+            "digest": "47663d659b94c56c39699a4316b14b02df40333a04f0de7f4b453165f65279be",
+            "version": 32
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:30:00.326Z",
+            "requestId": "65f89ac2-774e-44d3-b5a0-ce0bffd68bf6",
+            "digest": "0417755a302eb7abab350f2b28542408b192617582043d41b137b82a3d60e6ae",
+            "version": 33
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:30:04.330Z",
+            "requestId": "51171be5-b885-4693-9ca3-01e0392205a5",
+            "digest": "9510bfd5e65154a005c11da897cae017c581d73f25278a94c4336f59814f6863",
+            "version": 34
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:31:00.384Z",
+            "requestId": "6a87d79a-5328-4f1d-abf8-7c9b157579a1",
+            "digest": "576a93c8e3878e704a5d42d6fd0f1b334206fcea67d4210217eb32781f772884",
+            "version": 35
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:31:00.384Z",
+            "requestId": "13ab34d8-4be8-4f6a-99b5-196f1601142d",
+            "digest": "ce329fdc1cdd98767ec7236ae297ebbe2e0dfc3eb2823a1d05d84dd139c73a22",
+            "version": 36
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:31:00.384Z",
+            "requestId": "ee3690e9-423a-451b-9936-e85787f3217e",
+            "digest": "ddd32380429075357742a2ad581f47455483c80968e2d149059bafcbbd34fcbe",
+            "version": 37
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:31:00.384Z",
+            "requestId": "c997bf34-081c-465e-bd43-fe81db8d7f97",
+            "digest": "76b6d4139e99cc52a59e4f960e8cd61a8b829427a92ddebbca19d92741c2943e",
+            "version": 38
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:31:04.386Z",
+            "requestId": "7b4bc03f-b53c-48ad-9e99-f600b2057a7c",
+            "digest": "74a98367f83228151620bc2e6fd8c38bad772f9922319408e4c21d2efe881465",
+            "version": 39
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:32:00.472Z",
+            "requestId": "f982c4ec-4d84-48d0-b493-434e945e842a",
+            "digest": "eff805b314e6e4c79802d4db32f285bf3668d30e86e133820be856ca968e620e",
+            "version": 40
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:32:00.472Z",
+            "requestId": "6c738641-4ea5-44b6-927c-220af2f25543",
+            "digest": "d29f050ad24be88d835d5e4bf017356d7484e09ef7eb2a6d0f7e571a0e2d39b3",
+            "version": 41
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:32:00.472Z",
+            "requestId": "3248b333-d043-4639-bd7f-a6956ae6bd1f",
+            "digest": "28821c207b3b26b04383d406eafd99a610cbe09f526c24b936ef79e0a8cbf97f",
+            "version": 42
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:32:00.472Z",
+            "requestId": "663c8825-e143-4b5c-a4a4-a57627e9e9be",
+            "digest": "ec5508044b93962c7699e1bb887b182119eed6770a89e87a102d74fa853753b1",
+            "version": 43
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:32:05.361Z",
+            "requestId": "85cf7659-fa01-4eae-953a-799c7127dbe7",
+            "digest": "a9f79d4c3a7b95c53f21716528460e4765e7eac5e1c2621e2ee93943405bb318",
+            "version": 44
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:33:00.212Z",
+            "requestId": "4ffb0c7b-9406-422c-a233-1e6fb7da3f43",
+            "digest": "797c79d0f7e4f23217d883a4ab8a2ae1d322cb7d2e49bb1e29229f64f58eda71",
+            "version": 45
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:33:00.212Z",
+            "requestId": "533f177d-1c29-46f1-871b-ce0a7e91231d",
+            "digest": "d3159f366c504e372f049ab405c41b28e79c88f1a512dd57b0e3728f0c1efae3",
+            "version": 46
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:33:00.212Z",
+            "requestId": "269bc256-25f0-4bc9-9d6c-20b9647043a5",
+            "digest": "efd9215e80fb94233e1777f5e725e4a0d51b4c9890a056cdb1d7549408167660",
+            "version": 47
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:33:00.212Z",
+            "requestId": "db10bccf-8608-46cd-8f77-fb6fb33f68d0",
+            "digest": "5dfcdad360e642ee93037008a49890519af78b3b8f6eef596861023d98329bfe",
+            "version": 48
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:34:00.306Z",
+            "requestId": "fc4fb174-04d5-40dc-8dab-1fa7d97e0ec1",
+            "digest": "5b2a8b6db5cda6c8ee3e236f7cd3759c7bed8cbfc32da343b28e5e3a3f2ab797",
+            "version": 49
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:34:00.306Z",
+            "requestId": "8f53f741-8591-4625-9293-9223c42d34fe",
+            "digest": "c43c5d74077405040761fda53ab30655f7ff212acf7a9702b1c53230a80171d9",
+            "version": 50
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:34:00.306Z",
+            "requestId": "b616af86-c2f5-4fd9-b8a8-32a3ede1293f",
+            "digest": "6cd2cbff997ce22a3aa8aefd026370cf4ded3b45029a48631750322b89897ee9",
+            "version": 51
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:34:00.306Z",
+            "requestId": "3204ea71-34ff-4006-9529-61461f905d7e",
+            "digest": "484aa8da7bbd4e762ef48eeac5beab721d99a673e24cbc1e1afe023414670c46",
+            "version": 52
+          },
+          {
+            "kind": "paused",
+            "at": "2026-10-01T08:34:55.937Z",
+            "requestId": "42b0b814-4400-4dfc-a53d-4d767a9b7fd0",
+            "digest": "a7cd21849a5cfbd5f7bb78df0a78344934c2996d51d209eb8b2c80947392ed33",
+            "version": 53
+          },
+          {
+            "kind": "resumed",
+            "at": "2026-10-01T08:37:49.860Z",
+            "requestId": "7a978bd1-ec57-40fd-bf71-76841749fa1c",
+            "digest": "7be3f46232e8235950c2b1104a7fa21041f73866530ffcbe9e3deba355e76511",
+            "version": 54
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:37:50.345Z",
+            "requestId": "b4220b01-ace9-468c-8e35-d113eae9b5f7",
+            "digest": "cc5030761401ba4abc3fb1f9f44268dcbfb50d0cef594ee6902c72bd10c45afd",
+            "version": 55
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:37:50.345Z",
+            "requestId": "73626ffb-b03f-4437-858c-b14c097a708b",
+            "digest": "f65e8225d5a282f6d244b66af5b40b37a861b0a1b9f983e8b88295d6e863659d",
+            "version": 56
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:37:50.345Z",
+            "requestId": "34029a46-ebc3-4278-a78f-96195f954d1f",
+            "digest": "71beb29fb866f595168c952250964272240aa2d455844cfec72edf17327d33da",
+            "version": 57
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:37:50.345Z",
+            "requestId": "3985351e-bc62-4d44-a5dc-c9679a5242ba",
+            "digest": "a10fbabf28b50b9e5c0b596eb884ab6cb6977dbc365d35c0c02a9bc55624d794",
+            "version": 58
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:37:53.351Z",
+            "requestId": "c7699659-9d69-4ebb-8d5e-9b75afb8cd52",
+            "digest": "61b824b1c36d17b6820dbb363a7706cb8590f7a5c8ae592938c976e1e6b3ea63",
+            "version": 59
+          },
+          {
+            "kind": "cancelled",
+            "at": "2026-10-01T08:37:57.774Z",
+            "requestId": "18cdffa7-3160-4bfc-af91-881c9068be91",
+            "digest": "086fc7ce1e049e20bb1af66a56c4becaf257515cbad56f943f2870ffbd64692c",
+            "version": 60
+          }
+        ],
+        "nextDueAt": null,
+        "actions": []
+      },
+      {
+        "schema": 1,
+        "id": "schedule-3d777899-3644-4bf2-af58-e9f48608b8ca",
+        "workspaceRoot": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/source",
+        "version": 6,
+        "status": "CANCELLED",
+        "target": {
+          "id": "check-clean-fixture",
+          "title": "Verify fixture source integrity",
+          "goal": "Verify that the original live feature fixture remains at its pinned clean Git revision. This recipe checks checkout integrity only.",
+          "pin": "3480460174b74b7cc5d9d1f8979a04e27261d45871f54f660967f0c5ffb88b53"
+        },
+        "cadence": {
+          "kind": "once",
+          "at": "2026-10-01T08:35:00.000Z"
+        },
+        "missedPolicy": "coalesce-latest",
+        "overlapPolicy": "skip",
+        "createdAt": "2026-10-01T08:35:20.095Z",
+        "updatedAt": "2026-10-01T08:38:00.692Z",
+        "lastDueAt": "2026-10-01T08:35:00.000Z",
+        "occurrences": [
+          {
+            "id": "occ-3e51f51a60cde873863f1f8f30b072fb6ede47e9",
+            "requestId": "scheduled-3e51f51a60cde873863f1f8f30b072fb6ede47e9",
+            "taskId": "task-scheduled-3e51f51a60cde873863f1f8f30b072fb6ede47e9",
+            "startRequestId": "start-3e51f51a60cde873863f1f8f30b072fb6ede47e9",
+            "dueAt": "2026-10-01T08:35:00.000Z",
+            "coalescedCount": 0,
+            "state": "TERMINAL",
+            "expectedVersion": 2,
+            "createdAt": "2026-10-01T08:35:20.435Z",
+            "updatedAt": "2026-10-01T08:35:20.435Z",
+            "issue": null
+          }
+        ],
+        "events": [
+          {
+            "version": 1,
+            "at": "2026-10-01T08:35:20.095Z",
+            "kind": "created",
+            "requestId": "3d777899-3644-4bf2-af58-e9f48608b8ca",
+            "digest": "225d7982341fd9a6fd0f0019ce32b97cc1af63ba919e3095c1251cac578284bb"
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:35:20.435Z",
+            "requestId": "9b6bc905-8268-45c8-b63c-e1734951ae5c",
+            "digest": "d141dfef20eb4ab4addb64a28c9fe6725306eafa56ce12fa3bc2ceae4910cbf8",
+            "version": 2
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:35:20.435Z",
+            "requestId": "30cc6eba-cc15-4012-b4b0-5e862948b616",
+            "digest": "1d4c65c43d736d09ae600bce1172c96e9db84411fd1501af585fa6a94f9e691f",
+            "version": 3
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:35:20.435Z",
+            "requestId": "5c55689e-6438-4685-a512-42e95d5af3e4",
+            "digest": "46cbf694561cead790eefcefe562eca64d8fd7236b1881238c4045e333936dde",
+            "version": 4
+          },
+          {
+            "kind": "occurrence",
+            "at": "2026-10-01T08:35:20.435Z",
+            "requestId": "b9f2d12e-cb08-4273-8b80-eadb989e86cb",
+            "digest": "7716f66db9ec499f2a7cf2fe2391ecff54edc566850b548d1f3e0dd5551472cb",
+            "version": 5
+          },
+          {
+            "kind": "cancelled",
+            "at": "2026-10-01T08:38:00.692Z",
+            "requestId": "80e02c8f-c7cb-45fd-a809-a2f88310f6e2",
+            "digest": "863badf62b0bade48ec9aa096d9b14503ce52f186a3d2ff0aac8a6bcdaa76fa9",
+            "version": 6
+          }
+        ],
+        "nextDueAt": null,
+        "actions": []
+      }
+    ],
+    "configured": true,
+    "lastTickAt": "2026-10-01T08:38:15.394Z",
+    "issues": [],
+    "issue": null,
+    "tickMs": 1000
+  },
+  "nativeExecution": [
+    {
+      "taskId": "task-scheduled-20bf0aedb57f6a797d600f16735c40a85f1e56b4",
+      "status": "NEEDS_REVIEW",
+      "currentRunId": "run-scheduled-20bf0aedb57f6a797d600f16735c40a85f1e56b4",
+      "nativeRef": {
+        "schema": 1,
+        "harnessId": "archon",
+        "harnessVersion": "0.10.1",
+        "runId": "run-scheduled-20bf0aedb57f6a797d600f16735c40a85f1e56b4",
+        "revision": "8361c0aca326ffbbb9bc8eb55661590f31dcfb7a",
+        "planSha256": "3ad49638fd1d5883e6eec51f9fa5dea07d11ca55017be46c9820bea13d2d855e",
+        "workspaceRoot": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/source",
+        "entrypoint": "temari-nx-canonical",
+        "externalRunId": "244d2d7e5f6a03ac0da0ff25ce261e29",
+        "startedAt": "2026-10-01T08:37:51.783Z"
+      },
+      "nativeSnapshot": {
+        "status": "SUCCEEDED",
+        "observedAt": "2026-10-01T08:37:54.514Z",
+        "summary": "Archon workflow status: completed",
+        "rawLogPath": null,
+        "nativeProjectId": "ca14d215704f4964044d6cd3a850fee2"
+      },
+      "operations": [
+        {
+          "commandId": "ui-start-20bf0aedb57f6a797d600f16735c40a85f1e56b4",
+          "kind": "dispatch",
+          "state": "CONFIRMED",
+          "reason": null,
+          "entrypoint": "temari-nx-canonical",
+          "inputs": {
+            "bridge": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/packages/workflow-runtime/assets/v4.1/integrations/archon/canonical-bridge.ts",
+            "finalizer": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/libs/archon-harness/src/lib/canonical-finalize.ts",
+            "spec": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-scheduled-20bf0aedb57f6a797d600f16735c40a85f1e56b4/spec.json"
+          },
+          "harnessId": "archon",
+          "harnessVersion": "0.10.1"
+        }
+      ],
+      "evidence": {
+        "verified": true,
+        "scope": "persisted-stage-evidence-only",
+        "receiptSha256": "a4ec99ff0e27a84a5bb0bf045dca9eea69d018fc2083fffc38beadc00f77990b",
+        "issues": []
+      }
+    },
+    {
+      "taskId": "task-scheduled-3e51f51a60cde873863f1f8f30b072fb6ede47e9",
+      "status": "NEEDS_REVIEW",
+      "currentRunId": "run-scheduled-3e51f51a60cde873863f1f8f30b072fb6ede47e9",
+      "nativeRef": {
+        "schema": 1,
+        "harnessId": "archon",
+        "harnessVersion": "0.10.1",
+        "runId": "run-scheduled-3e51f51a60cde873863f1f8f30b072fb6ede47e9",
+        "revision": "8361c0aca326ffbbb9bc8eb55661590f31dcfb7a",
+        "planSha256": "3ad49638fd1d5883e6eec51f9fa5dea07d11ca55017be46c9820bea13d2d855e",
+        "workspaceRoot": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/source",
+        "entrypoint": "temari-nx-canonical",
+        "externalRunId": "34e13a3a7fb4d5a22355fbea106b877d",
+        "startedAt": "2026-10-01T08:35:21.840Z"
+      },
+      "nativeSnapshot": {
+        "status": "SUCCEEDED",
+        "observedAt": "2026-10-01T08:35:23.001Z",
+        "summary": "Archon workflow status: completed",
+        "rawLogPath": null,
+        "nativeProjectId": "ca14d215704f4964044d6cd3a850fee2"
+      },
+      "operations": [
+        {
+          "commandId": "ui-start-3e51f51a60cde873863f1f8f30b072fb6ede47e9",
+          "kind": "dispatch",
+          "state": "CONFIRMED",
+          "reason": null,
+          "entrypoint": "temari-nx-canonical",
+          "inputs": {
+            "bridge": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/packages/workflow-runtime/assets/v4.1/integrations/archon/canonical-bridge.ts",
+            "finalizer": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/libs/archon-harness/src/lib/canonical-finalize.ts",
+            "spec": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-scheduled-3e51f51a60cde873863f1f8f30b072fb6ede47e9/spec.json"
+          },
+          "harnessId": "archon",
+          "harnessVersion": "0.10.1"
+        }
+      ],
+      "evidence": {
+        "verified": true,
+        "scope": "persisted-stage-evidence-only",
+        "receiptSha256": "11a5cf20dbde5c893714479d3163b65fa40bc7e15902231971bed48ad88c8802",
+        "issues": []
+      }
+    },
+    {
+      "taskId": "task-scheduled-26141474d4d6eab63571d0dfce70ed007de5e32f",
+      "status": "NEEDS_REVIEW",
+      "currentRunId": "run-scheduled-26141474d4d6eab63571d0dfce70ed007de5e32f",
+      "nativeRef": {
+        "schema": 1,
+        "harnessId": "archon",
+        "harnessVersion": "0.10.1",
+        "runId": "run-scheduled-26141474d4d6eab63571d0dfce70ed007de5e32f",
+        "revision": "8361c0aca326ffbbb9bc8eb55661590f31dcfb7a",
+        "planSha256": "3ad49638fd1d5883e6eec51f9fa5dea07d11ca55017be46c9820bea13d2d855e",
+        "workspaceRoot": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/source",
+        "entrypoint": "temari-nx-canonical",
+        "externalRunId": "739e123cca96c6f5c9dd675ef6e217c0",
+        "startedAt": "2026-10-01T08:34:01.723Z"
+      },
+      "nativeSnapshot": {
+        "status": "SUCCEEDED",
+        "observedAt": "2026-10-01T08:34:02.882Z",
+        "summary": "Archon workflow status: completed",
+        "rawLogPath": null,
+        "nativeProjectId": "ca14d215704f4964044d6cd3a850fee2"
+      },
+      "operations": [
+        {
+          "commandId": "ui-start-26141474d4d6eab63571d0dfce70ed007de5e32f",
+          "kind": "dispatch",
+          "state": "CONFIRMED",
+          "reason": null,
+          "entrypoint": "temari-nx-canonical",
+          "inputs": {
+            "bridge": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/packages/workflow-runtime/assets/v4.1/integrations/archon/canonical-bridge.ts",
+            "finalizer": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/libs/archon-harness/src/lib/canonical-finalize.ts",
+            "spec": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-scheduled-26141474d4d6eab63571d0dfce70ed007de5e32f/spec.json"
+          },
+          "harnessId": "archon",
+          "harnessVersion": "0.10.1"
+        }
+      ],
+      "evidence": {
+        "verified": true,
+        "scope": "persisted-stage-evidence-only",
+        "receiptSha256": "7ff628e073c5e8d6c98817f6e40e6bf4928f9a839b779abe4c5927fac4d6d661",
+        "issues": []
+      }
+    },
+    {
+      "taskId": "task-scheduled-b36d9702ef6e05368d48df957f678dc9f0f23a7c",
+      "status": "NEEDS_REVIEW",
+      "currentRunId": "run-scheduled-b36d9702ef6e05368d48df957f678dc9f0f23a7c",
+      "nativeRef": {
+        "schema": 1,
+        "harnessId": "archon",
+        "harnessVersion": "0.10.1",
+        "runId": "run-scheduled-b36d9702ef6e05368d48df957f678dc9f0f23a7c",
+        "revision": "8361c0aca326ffbbb9bc8eb55661590f31dcfb7a",
+        "planSha256": "3ad49638fd1d5883e6eec51f9fa5dea07d11ca55017be46c9820bea13d2d855e",
+        "workspaceRoot": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/source",
+        "entrypoint": "temari-nx-canonical",
+        "externalRunId": "b229016640e9d9f475b48fa7239c4c73",
+        "startedAt": "2026-10-01T08:33:01.632Z"
+      },
+      "nativeSnapshot": {
+        "status": "SUCCEEDED",
+        "observedAt": "2026-10-01T08:33:02.775Z",
+        "summary": "Archon workflow status: completed",
+        "rawLogPath": null,
+        "nativeProjectId": "ca14d215704f4964044d6cd3a850fee2"
+      },
+      "operations": [
+        {
+          "commandId": "ui-start-b36d9702ef6e05368d48df957f678dc9f0f23a7c",
+          "kind": "dispatch",
+          "state": "CONFIRMED",
+          "reason": null,
+          "entrypoint": "temari-nx-canonical",
+          "inputs": {
+            "bridge": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/packages/workflow-runtime/assets/v4.1/integrations/archon/canonical-bridge.ts",
+            "finalizer": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/libs/archon-harness/src/lib/canonical-finalize.ts",
+            "spec": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-scheduled-b36d9702ef6e05368d48df957f678dc9f0f23a7c/spec.json"
+          },
+          "harnessId": "archon",
+          "harnessVersion": "0.10.1"
+        }
+      ],
+      "evidence": {
+        "verified": true,
+        "scope": "persisted-stage-evidence-only",
+        "receiptSha256": "b5a5efecd16bb0cfcb78ba2d9d79b79ac0743ab4aea4d195ce127b253d0e30b3",
+        "issues": []
+      }
+    },
+    {
+      "taskId": "task-scheduled-9246ecdfad701ab85b9908380907d5e2fb2f9d6f",
+      "status": "NEEDS_REVIEW",
+      "currentRunId": "run-scheduled-9246ecdfad701ab85b9908380907d5e2fb2f9d6f",
+      "nativeRef": {
+        "schema": 1,
+        "harnessId": "archon",
+        "harnessVersion": "0.10.1",
+        "runId": "run-scheduled-9246ecdfad701ab85b9908380907d5e2fb2f9d6f",
+        "revision": "8361c0aca326ffbbb9bc8eb55661590f31dcfb7a",
+        "planSha256": "3ad49638fd1d5883e6eec51f9fa5dea07d11ca55017be46c9820bea13d2d855e",
+        "workspaceRoot": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/source",
+        "entrypoint": "temari-nx-canonical",
+        "externalRunId": "7120834ffbd1ab7ef7a3ced5c382d046",
+        "startedAt": "2026-10-01T08:32:01.887Z"
+      },
+      "nativeSnapshot": {
+        "status": "SUCCEEDED",
+        "observedAt": "2026-10-01T08:32:06.498Z",
+        "summary": "Archon workflow status: completed",
+        "rawLogPath": null,
+        "nativeProjectId": "ca14d215704f4964044d6cd3a850fee2"
+      },
+      "operations": [
+        {
+          "commandId": "ui-start-9246ecdfad701ab85b9908380907d5e2fb2f9d6f",
+          "kind": "dispatch",
+          "state": "CONFIRMED",
+          "reason": null,
+          "entrypoint": "temari-nx-canonical",
+          "inputs": {
+            "bridge": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/packages/workflow-runtime/assets/v4.1/integrations/archon/canonical-bridge.ts",
+            "finalizer": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/libs/archon-harness/src/lib/canonical-finalize.ts",
+            "spec": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-scheduled-9246ecdfad701ab85b9908380907d5e2fb2f9d6f/spec.json"
+          },
+          "harnessId": "archon",
+          "harnessVersion": "0.10.1"
+        }
+      ],
+      "evidence": {
+        "verified": true,
+        "scope": "persisted-stage-evidence-only",
+        "receiptSha256": "92b8262b018f294b6242fc12fb3569e75b0979f67ac73da1b929eff85b56d32e",
+        "issues": []
+      }
+    },
+    {
+      "taskId": "task-scheduled-5783c76353cc5ab1043ff0f62f414b62d0653f40",
+      "status": "NEEDS_REVIEW",
+      "currentRunId": "run-scheduled-5783c76353cc5ab1043ff0f62f414b62d0653f40",
+      "nativeRef": {
+        "schema": 1,
+        "harnessId": "archon",
+        "harnessVersion": "0.10.1",
+        "runId": "run-scheduled-5783c76353cc5ab1043ff0f62f414b62d0653f40",
+        "revision": "8361c0aca326ffbbb9bc8eb55661590f31dcfb7a",
+        "planSha256": "3ad49638fd1d5883e6eec51f9fa5dea07d11ca55017be46c9820bea13d2d855e",
+        "workspaceRoot": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/source",
+        "entrypoint": "temari-nx-canonical",
+        "externalRunId": "ed34e706fa0159618e0e59a5e12093fa",
+        "startedAt": "2026-10-01T08:31:02.198Z"
+      },
+      "nativeSnapshot": {
+        "status": "SUCCEEDED",
+        "observedAt": "2026-10-01T08:31:05.811Z",
+        "summary": "Archon workflow status: completed",
+        "rawLogPath": null,
+        "nativeProjectId": "ca14d215704f4964044d6cd3a850fee2"
+      },
+      "operations": [
+        {
+          "commandId": "ui-start-5783c76353cc5ab1043ff0f62f414b62d0653f40",
+          "kind": "dispatch",
+          "state": "CONFIRMED",
+          "reason": null,
+          "entrypoint": "temari-nx-canonical",
+          "inputs": {
+            "bridge": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/packages/workflow-runtime/assets/v4.1/integrations/archon/canonical-bridge.ts",
+            "finalizer": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/libs/archon-harness/src/lib/canonical-finalize.ts",
+            "spec": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-scheduled-5783c76353cc5ab1043ff0f62f414b62d0653f40/spec.json"
+          },
+          "harnessId": "archon",
+          "harnessVersion": "0.10.1"
+        }
+      ],
+      "evidence": {
+        "verified": true,
+        "scope": "persisted-stage-evidence-only",
+        "receiptSha256": "bff6af288f04ff0922390f638c124c6703ecd020f107754a1910f268cb12e1fc",
+        "issues": []
+      }
+    },
+    {
+      "taskId": "task-scheduled-73876cd2cda84bf9e2010fa42e27d9eb39e73468",
+      "status": "NEEDS_REVIEW",
+      "currentRunId": "run-scheduled-73876cd2cda84bf9e2010fa42e27d9eb39e73468",
+      "nativeRef": {
+        "schema": 1,
+        "harnessId": "archon",
+        "harnessVersion": "0.10.1",
+        "runId": "run-scheduled-73876cd2cda84bf9e2010fa42e27d9eb39e73468",
+        "revision": "8361c0aca326ffbbb9bc8eb55661590f31dcfb7a",
+        "planSha256": "3ad49638fd1d5883e6eec51f9fa5dea07d11ca55017be46c9820bea13d2d855e",
+        "workspaceRoot": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/source",
+        "entrypoint": "temari-nx-canonical",
+        "externalRunId": "d30939d2e9b500f156c630c9b0be8740",
+        "startedAt": "2026-10-01T08:30:02.145Z"
+      },
+      "nativeSnapshot": {
+        "status": "SUCCEEDED",
+        "observedAt": "2026-10-01T08:30:05.754Z",
+        "summary": "Archon workflow status: completed",
+        "rawLogPath": null,
+        "nativeProjectId": "ca14d215704f4964044d6cd3a850fee2"
+      },
+      "operations": [
+        {
+          "commandId": "ui-start-73876cd2cda84bf9e2010fa42e27d9eb39e73468",
+          "kind": "dispatch",
+          "state": "CONFIRMED",
+          "reason": null,
+          "entrypoint": "temari-nx-canonical",
+          "inputs": {
+            "bridge": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/packages/workflow-runtime/assets/v4.1/integrations/archon/canonical-bridge.ts",
+            "finalizer": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/libs/archon-harness/src/lib/canonical-finalize.ts",
+            "spec": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-scheduled-73876cd2cda84bf9e2010fa42e27d9eb39e73468/spec.json"
+          },
+          "harnessId": "archon",
+          "harnessVersion": "0.10.1"
+        }
+      ],
+      "evidence": {
+        "verified": true,
+        "scope": "persisted-stage-evidence-only",
+        "receiptSha256": "ce16ac337e722930a0a6a37f4104b190171ab97be21465ca410479c3c6cabc5d",
+        "issues": []
+      }
+    },
+    {
+      "taskId": "task-scheduled-24411da06beceb449577993d35f069bf323f1d42",
+      "status": "NEEDS_REVIEW",
+      "currentRunId": "run-scheduled-24411da06beceb449577993d35f069bf323f1d42",
+      "nativeRef": {
+        "schema": 1,
+        "harnessId": "archon",
+        "harnessVersion": "0.10.1",
+        "runId": "run-scheduled-24411da06beceb449577993d35f069bf323f1d42",
+        "revision": "8361c0aca326ffbbb9bc8eb55661590f31dcfb7a",
+        "planSha256": "3ad49638fd1d5883e6eec51f9fa5dea07d11ca55017be46c9820bea13d2d855e",
+        "workspaceRoot": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/source",
+        "entrypoint": "temari-nx-canonical",
+        "externalRunId": "668010a4188c22fede8170e58a470e10",
+        "startedAt": "2026-10-01T08:29:02.226Z"
+      },
+      "nativeSnapshot": {
+        "status": "SUCCEEDED",
+        "observedAt": "2026-10-01T08:29:03.368Z",
+        "summary": "Archon workflow status: completed",
+        "rawLogPath": null,
+        "nativeProjectId": "ca14d215704f4964044d6cd3a850fee2"
+      },
+      "operations": [
+        {
+          "commandId": "ui-start-24411da06beceb449577993d35f069bf323f1d42",
+          "kind": "dispatch",
+          "state": "CONFIRMED",
+          "reason": null,
+          "entrypoint": "temari-nx-canonical",
+          "inputs": {
+            "bridge": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/packages/workflow-runtime/assets/v4.1/integrations/archon/canonical-bridge.ts",
+            "finalizer": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/libs/archon-harness/src/lib/canonical-finalize.ts",
+            "spec": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-scheduled-24411da06beceb449577993d35f069bf323f1d42/spec.json"
+          },
+          "harnessId": "archon",
+          "harnessVersion": "0.10.1"
+        }
+      ],
+      "evidence": {
+        "verified": true,
+        "scope": "persisted-stage-evidence-only",
+        "receiptSha256": "9a8b8ea10c2dec688f742358919c74d735778bd3329bc2d2f40fde5d984b2593",
+        "issues": []
+      }
+    },
+    {
+      "taskId": "task-scheduled-acb99a24f6dba4be887e51ae1b0c1eabfce3bbc8",
+      "status": "NEEDS_REVIEW",
+      "currentRunId": "run-scheduled-acb99a24f6dba4be887e51ae1b0c1eabfce3bbc8",
+      "nativeRef": {
+        "schema": 1,
+        "harnessId": "archon",
+        "harnessVersion": "0.10.1",
+        "runId": "run-scheduled-acb99a24f6dba4be887e51ae1b0c1eabfce3bbc8",
+        "revision": "8361c0aca326ffbbb9bc8eb55661590f31dcfb7a",
+        "planSha256": "3ad49638fd1d5883e6eec51f9fa5dea07d11ca55017be46c9820bea13d2d855e",
+        "workspaceRoot": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/source",
+        "entrypoint": "temari-nx-canonical",
+        "externalRunId": "75172ebb49eb31890a9ee3437110d686",
+        "startedAt": "2026-10-01T08:28:02.180Z"
+      },
+      "nativeSnapshot": {
+        "status": "SUCCEEDED",
+        "observedAt": "2026-10-01T08:28:03.330Z",
+        "summary": "Archon workflow status: completed",
+        "rawLogPath": null,
+        "nativeProjectId": "ca14d215704f4964044d6cd3a850fee2"
+      },
+      "operations": [
+        {
+          "commandId": "ui-start-acb99a24f6dba4be887e51ae1b0c1eabfce3bbc8",
+          "kind": "dispatch",
+          "state": "CONFIRMED",
+          "reason": null,
+          "entrypoint": "temari-nx-canonical",
+          "inputs": {
+            "bridge": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/packages/workflow-runtime/assets/v4.1/integrations/archon/canonical-bridge.ts",
+            "finalizer": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/libs/archon-harness/src/lib/canonical-finalize.ts",
+            "spec": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-scheduled-acb99a24f6dba4be887e51ae1b0c1eabfce3bbc8/spec.json"
+          },
+          "harnessId": "archon",
+          "harnessVersion": "0.10.1"
+        }
+      ],
+      "evidence": {
+        "verified": true,
+        "scope": "persisted-stage-evidence-only",
+        "receiptSha256": "077f88e6ab30981a2384462e94a64c1dc9b00c2583fb2eee2c3aaf4e2a2c41d0",
+        "issues": []
+      }
+    },
+    {
+      "taskId": "task-scheduled-6177ab1ef8a4041b02123772679ea070131c2268",
+      "status": "NEEDS_REVIEW",
+      "currentRunId": "run-scheduled-6177ab1ef8a4041b02123772679ea070131c2268",
+      "nativeRef": {
+        "schema": 1,
+        "harnessId": "archon",
+        "harnessVersion": "0.10.1",
+        "runId": "run-scheduled-6177ab1ef8a4041b02123772679ea070131c2268",
+        "revision": "8361c0aca326ffbbb9bc8eb55661590f31dcfb7a",
+        "planSha256": "3ad49638fd1d5883e6eec51f9fa5dea07d11ca55017be46c9820bea13d2d855e",
+        "workspaceRoot": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/source",
+        "entrypoint": "temari-nx-canonical",
+        "externalRunId": "8fec77802b8b1d8f4a2a5f3495797eec",
+        "startedAt": "2026-10-01T08:27:02.137Z"
+      },
+      "nativeSnapshot": {
+        "status": "SUCCEEDED",
+        "observedAt": "2026-10-01T08:27:04.868Z",
+        "summary": "Archon workflow status: completed",
+        "rawLogPath": null,
+        "nativeProjectId": "ca14d215704f4964044d6cd3a850fee2"
+      },
+      "operations": [
+        {
+          "commandId": "ui-start-6177ab1ef8a4041b02123772679ea070131c2268",
+          "kind": "dispatch",
+          "state": "CONFIRMED",
+          "reason": null,
+          "entrypoint": "temari-nx-canonical",
+          "inputs": {
+            "bridge": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/packages/workflow-runtime/assets/v4.1/integrations/archon/canonical-bridge.ts",
+            "finalizer": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/libs/archon-harness/src/lib/canonical-finalize.ts",
+            "spec": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-scheduled-6177ab1ef8a4041b02123772679ea070131c2268/spec.json"
+          },
+          "harnessId": "archon",
+          "harnessVersion": "0.10.1"
+        }
+      ],
+      "evidence": {
+        "verified": true,
+        "scope": "persisted-stage-evidence-only",
+        "receiptSha256": "cc3b424d0005c2ab0705103d89c611a016db28870b40e78b0ca8b76923ae4525",
+        "issues": []
+      }
+    },
+    {
+      "taskId": "task-scheduled-718e105f8219ebdf8203b411434dd7667afa22f3",
+      "status": "NEEDS_REVIEW",
+      "currentRunId": "run-scheduled-718e105f8219ebdf8203b411434dd7667afa22f3",
+      "nativeRef": {
+        "schema": 1,
+        "harnessId": "archon",
+        "harnessVersion": "0.10.1",
+        "runId": "run-scheduled-718e105f8219ebdf8203b411434dd7667afa22f3",
+        "revision": "8361c0aca326ffbbb9bc8eb55661590f31dcfb7a",
+        "planSha256": "3ad49638fd1d5883e6eec51f9fa5dea07d11ca55017be46c9820bea13d2d855e",
+        "workspaceRoot": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/source",
+        "entrypoint": "temari-nx-canonical",
+        "externalRunId": "76eb480e22ab44d32f14d0b752265610",
+        "startedAt": "2026-10-01T08:26:02.059Z"
+      },
+      "nativeSnapshot": {
+        "status": "SUCCEEDED",
+        "observedAt": "2026-10-01T08:26:04.793Z",
+        "summary": "Archon workflow status: completed",
+        "rawLogPath": null,
+        "nativeProjectId": "ca14d215704f4964044d6cd3a850fee2"
+      },
+      "operations": [
+        {
+          "commandId": "ui-start-718e105f8219ebdf8203b411434dd7667afa22f3",
+          "kind": "dispatch",
+          "state": "CONFIRMED",
+          "reason": null,
+          "entrypoint": "temari-nx-canonical",
+          "inputs": {
+            "bridge": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/packages/workflow-runtime/assets/v4.1/integrations/archon/canonical-bridge.ts",
+            "finalizer": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/libs/archon-harness/src/lib/canonical-finalize.ts",
+            "spec": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-scheduled-718e105f8219ebdf8203b411434dd7667afa22f3/spec.json"
+          },
+          "harnessId": "archon",
+          "harnessVersion": "0.10.1"
+        }
+      ],
+      "evidence": {
+        "verified": true,
+        "scope": "persisted-stage-evidence-only",
+        "receiptSha256": "b215aaac9770be0e79bb1ce28adb1ea542949504d371b553310b0e7d21499450",
+        "issues": []
+      }
+    },
+    {
+      "taskId": "task-scheduled-e4b506cfc50254d8be4be77c88dd302a3ca7a485",
+      "status": "NEEDS_REVIEW",
+      "currentRunId": "run-scheduled-e4b506cfc50254d8be4be77c88dd302a3ca7a485",
+      "nativeRef": {
+        "schema": 1,
+        "harnessId": "archon",
+        "harnessVersion": "0.10.1",
+        "runId": "run-scheduled-e4b506cfc50254d8be4be77c88dd302a3ca7a485",
+        "revision": "8361c0aca326ffbbb9bc8eb55661590f31dcfb7a",
+        "planSha256": "3ad49638fd1d5883e6eec51f9fa5dea07d11ca55017be46c9820bea13d2d855e",
+        "workspaceRoot": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/source",
+        "entrypoint": "temari-nx-canonical",
+        "externalRunId": "2142add5ebd787793861471ad046105e",
+        "startedAt": "2026-10-01T08:25:02.027Z"
+      },
+      "nativeSnapshot": {
+        "status": "SUCCEEDED",
+        "observedAt": "2026-10-01T08:25:04.717Z",
+        "summary": "Archon workflow status: completed",
+        "rawLogPath": null,
+        "nativeProjectId": "ca14d215704f4964044d6cd3a850fee2"
+      },
+      "operations": [
+        {
+          "commandId": "ui-start-e4b506cfc50254d8be4be77c88dd302a3ca7a485",
+          "kind": "dispatch",
+          "state": "CONFIRMED",
+          "reason": null,
+          "entrypoint": "temari-nx-canonical",
+          "inputs": {
+            "bridge": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/packages/workflow-runtime/assets/v4.1/integrations/archon/canonical-bridge.ts",
+            "finalizer": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/libs/archon-harness/src/lib/canonical-finalize.ts",
+            "spec": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-scheduled-e4b506cfc50254d8be4be77c88dd302a3ca7a485/spec.json"
+          },
+          "harnessId": "archon",
+          "harnessVersion": "0.10.1"
+        }
+      ],
+      "evidence": {
+        "verified": true,
+        "scope": "persisted-stage-evidence-only",
+        "receiptSha256": "000f4bec36846fea7f79b88bd44208c49402661ec613f97f04ea8a88b17d94b9",
+        "issues": []
+      }
+    },
+    {
+      "taskId": "task-scheduled-cfe601f70514685c1a5f3a0326dea5548e2cb76c",
+      "status": "NEEDS_REVIEW",
+      "currentRunId": "run-scheduled-cfe601f70514685c1a5f3a0326dea5548e2cb76c",
+      "nativeRef": {
+        "schema": 1,
+        "harnessId": "archon",
+        "harnessVersion": "0.10.1",
+        "runId": "run-scheduled-cfe601f70514685c1a5f3a0326dea5548e2cb76c",
+        "revision": "8361c0aca326ffbbb9bc8eb55661590f31dcfb7a",
+        "planSha256": "3ad49638fd1d5883e6eec51f9fa5dea07d11ca55017be46c9820bea13d2d855e",
+        "workspaceRoot": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/source",
+        "entrypoint": "temari-nx-canonical",
+        "externalRunId": "f0a75772712d54933cb9756e323c56b4",
+        "startedAt": "2026-10-01T08:24:42.063Z"
+      },
+      "nativeSnapshot": {
+        "status": "SUCCEEDED",
+        "observedAt": "2026-10-01T08:24:44.714Z",
+        "summary": "Archon workflow status: completed",
+        "rawLogPath": null,
+        "nativeProjectId": "ca14d215704f4964044d6cd3a850fee2"
+      },
+      "operations": [
+        {
+          "commandId": "ui-start-cfe601f70514685c1a5f3a0326dea5548e2cb76c",
+          "kind": "dispatch",
+          "state": "CONFIRMED",
+          "reason": null,
+          "entrypoint": "temari-nx-canonical",
+          "inputs": {
+            "bridge": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/packages/workflow-runtime/assets/v4.1/integrations/archon/canonical-bridge.ts",
+            "finalizer": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/libs/archon-harness/src/lib/canonical-finalize.ts",
+            "spec": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-scheduled-cfe601f70514685c1a5f3a0326dea5548e2cb76c/spec.json"
+          },
+          "harnessId": "archon",
+          "harnessVersion": "0.10.1"
+        }
+      ],
+      "evidence": {
+        "verified": true,
+        "scope": "persisted-stage-evidence-only",
+        "receiptSha256": "c3db66f1127f17a19514457bbf243bee03b03f4ad84e6a2a1bc4861c5fac3314",
+        "issues": []
+      }
+    }
+  ],
+  "actualNativeSucceededCount": 13,
+  "allFixtureSchedulesCancelled": true
+}

@@ -1,0 +1,10 @@
+{
+  "serverPidBefore": 28612,
+  "serverCommandBefore": "node --import @swc-node/register/esm-register tools/task-continuity.mts serve --root /private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/tasks --control-config /private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/control.json --archon-home /Users/randydinh/Library/Application Support/Temari/dashboard/archon --archon-url http://127.0.0.1:3091 --port 3094",
+  "serverPidAfter": 50504,
+  "launcherPid": 50357,
+  "logPath": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/dashboard-final-refresh.log",
+  "ready": true,
+  "sourceHead": "7ae31d50b8f0af063e37a74b79c1f4717701364c",
+  "purpose": "Load final schedule controls and bounded dashboard projection fixes"
+}

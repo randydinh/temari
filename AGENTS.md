@@ -22,6 +22,28 @@
 
 <!-- nx configuration end-->
 
+## Task continuity
+
+Read [docs/task-continuity.md](docs/task-continuity.md) when starting or resuming
+tracked work. Use workspace-scoped `pickup` against the configured local task
+store. Resolve ambiguous choices explicitly; never select the newest task merely
+because it is first. `enter` links the selected logical task to the actual host
+conversation; one chat can coordinate multiple tasks. Save a structured `handoff`
+with progress, decisions, next action, blocker, and context references before
+leaving. These are local context, not execution permission or evidence. Use a new run binding for
+a new candidate; preserve prior run history. A missing/corrupt store is a visible
+recovery issue. Native success alone does not satisfy Temari closeout, and the
+local inbox's acceptance command does not verify full feature/forge obligations.
+When running the source host dialogue, use its optional tracking file described
+in [host session tracking](docs/migrations/host-session.md#track-the-host-journey-as-a-durable-task)
+to retain progress automatically. Keep tracking metadata outside the invocation
+descriptor. A candidate-profile host receipt is a pending-closeout context link;
+never pass it through the simpler task-run verifier or infer `DONE` from host PASS.
+For public engineering start/resume in a rebuilt bundle, follow the
+[installed tracking contract](packages/workflow-runtime/public/skills/temari/references/task-tracking.md).
+Feature tracking pins the original project and public request/manifest before
+workers run; execution still uses the independently verified integration checkout.
+
 ## Local Codex parallel batches
 
 At the Temari/poteto throughput checkpoint, prepare an existing read-only or write request JSON for an independent, homogeneous batch. From the workspace root, invoke the router with one positional request path:

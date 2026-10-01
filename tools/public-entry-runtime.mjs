@@ -41,6 +41,10 @@ const publicFiles = [
     '.codex-plugin/plugin.json',
   ],
   ['packages/workflow-runtime/host/entry.mjs', 'host/entry.mjs'],
+  [
+    'packages/workflow-runtime/host/task-tracking.mjs',
+    'host/task-tracking.mjs',
+  ],
   ['packages/workflow-runtime/host/stdio.mjs', 'host/stdio.mjs'],
   ['packages/workflow-runtime/host/source.mjs', 'host/source.mjs'],
   ['packages/workflow-runtime/host/invocation.mjs', 'host/invocation.mjs'],
@@ -88,6 +92,10 @@ const publicFiles = [
   [
     'packages/workflow-runtime/public/skills/temari/SKILL.md',
     'skills/temari/SKILL.md',
+  ],
+  [
+    'packages/workflow-runtime/public/skills/temari/references/task-tracking.md',
+    'skills/temari/references/task-tracking.md',
   ],
   [
     'packages/workflow-runtime/public/skills/temari-knowledge/SKILL.md',
@@ -355,7 +363,10 @@ export async function checkPublicEntryArtifact(root, expectedManifestSha256) {
   assert(files.has('bin/temari-knowledge.mjs'));
   assert(files.has('runtime/node_modules/@temari/knowledge/src/demo.js'));
   for (const path of REGISTRAR_PAYLOAD_FILES)
-    assert(files.has(`registrar/${path}`), `Missing Registrar payload: ${path}`);
+    assert(
+      files.has(`registrar/${path}`),
+      `Missing Registrar payload: ${path}`,
+    );
   assert.equal(manifest.build.parallelBundler.name, 'bun');
   assert.match(manifest.build.parallelBundler.version, /^\d+\.\d+\.\d+/);
   for (const path of generatedFiles) assert(files.has(path));

@@ -17,8 +17,8 @@ const knowledgeCli = join(
 const defaultHome = join(homedir(), '.local', 'share', 'temari-knowledge');
 const serverName = 'temari-content-registrar';
 const registrarVersion = '0.1.0';
-// Reviewed upstream inventory is a trust anchor in this compiled launcher.
-const registrarManifestSha256 = '9e0b2cc9002bab0fb93bfb4735d554a662280be766ae998d7f08ef7b13470f4a';
+// Reviewed payload inventory, including recorded downstream changes, is a trust anchor.
+const registrarManifestSha256 = '95da2a2cc4e01de8d378dc79e9b742dd661584bbc65eaf6502caaa26b951e467';
 const registrarCommit = '760926907669ae34bd1861732edbbf8f5afaf588';
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 

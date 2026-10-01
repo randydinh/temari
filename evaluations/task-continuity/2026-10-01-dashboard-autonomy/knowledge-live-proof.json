@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "kind": "synthetic-registrar-dashboard-map",
+  "fixtureRoot": "/private/var/folders/2q/k63m84tn5q13cvh__pxjtnjm0000gn/T/temari-knowledge-K91e74",
+  "sourceRoot": "/private/var/folders/2q/k63m84tn5q13cvh__pxjtnjm0000gn/T/temari-knowledge-K91e74/sources",
+  "workspaceRoot": "/private/var/folders/2q/k63m84tn5q13cvh__pxjtnjm0000gn/T/temari-knowledge-K91e74/state",
+  "python": "/private/tmp/temari-registrar-command-smoke-20261001/bin/python",
+  "registrarSource": "/Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/packages/workflow-runtime/registrar",
+  "options": {
+    "readScope": "source-root",
+    "publications": [
+      {
+        "id": "fixture",
+        "publicationPath": "/private/var/folders/2q/k63m84tn5q13cvh__pxjtnjm0000gn/T/temari-knowledge-K91e74/task/archive-publication-f086a3cf7da8977076da5fb763841018307bf113f09b3ef5c3bc044fdf4c367b.json",
+        "sha256": "951a2965157bd89cb8e47e01693930c9ad297167e8912509a506d966097394a8"
+      }
+    ],
+    "graphs": [
+      {
+        "id": "document-links",
+        "graphId": "3606fb74e55e6326e31d37e827036c7f2045ca40a28c562e91e2e402a1d1f657",
+        "publicationIds": [
+          "fixture"
+        ]
+      }
+    ],
+    "limits": {
+      "documentsPerPublication": 30,
+      "graphRecords": 40,
+      "nodes": 200,
+      "edges": 400,
+      "responseBytes": 262144
+    }
+  },
+  "selectedGeneration": "ce74e9fbc45b45248a482a0c8a3de050",
+  "selectedManifestSha256": "efdd6e618d638e8f25bd9f12f982320c2bc78a0ac8c4e8b3c0f3da9220676011",
+  "note": "Synthetic retained archive and actual Registrar graph; original source was changed for the no-latest-fallback test. The configured map remains pinned to v1."
+}

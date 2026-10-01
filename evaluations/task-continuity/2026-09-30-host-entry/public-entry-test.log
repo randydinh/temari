@@ -1,0 +1,74 @@
+
+> nx run workflow-runtime:public-entry-test
+
+> node --test tools/public-entry-runtime.test.mjs
+
+(node:43177) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:43179) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ packages an isolated relocated outer bundle with three current public entries (2411.231208ms)
+✔ relocated QA entry runs the packaged evaluator without source-checkout access (1117.819417ms)
+✔ relocated public bundle routes workers and observes host-owned local processes (6066.529834ms)
+✔ host forge gate observes repository access and exact pull-request head (835.339708ms)
+✔ feature host proof requires architect, builder, reviewer, and forge evidence (2480.5355ms)
+✔ full feature start binds local host proof to six persisted stages (3600.440083ms)
+✔ both engineering skills reach the complete versioned QA writer inside the artifact (4.155833ms)
+✔ installed overlay checker accepts pinned external assets and refuses incompatible overlays (463.70425ms)
+✔ public policy records the exact reviewed legacy profile and playbook provenance (1.223417ms)
+✔ artifact checking requires an external expected manifest (74.03625ms)
+✔ public engineering admission refuses unsupported routes and blocks unproven capabilities (134.225125ms)
+✔ installed Temari and Poteto skills expose the bundled worker guide (0.923917ms)
+✔ closeout preflight blocks without trusted candidate selection (44.484833ms)
+✔ public entries refuse symlinked policy and request inputs (138.401ms)
+✔ failed publication removes staging and leaves no destination (4.914166ms)
+✔ concurrent publication has one exclusive owner (1490.45625ms)
+✔ outer publication is no-overwrite and rejects tampering or symlinks (170.272833ms)
+✔ installed entry refuses a six-stage PASS without source requirement evidence (335.395583ms)
+✔ installed entry rejects a renamed source evidence kind before a PASS checkpoint (361.886875ms)
+✔ installed entry rejects allowed source kinds bound to generic verification payloads (400.219375ms)
+▶ installed entry rejects wrong generic kind and reserved or duplicate source names
+  ✔ wrong-kind (305.096458ms)
+  ✔ reserved-name (327.849334ms)
+  ✔ duplicate-name (238.931458ms)
+✔ installed entry rejects wrong generic kind and reserved or duplicate source names (872.562083ms)
+✔ retained validation rejects a previously acknowledged generic payload alias (0.573625ms)
+✔ relocated public entry starts, resumes, and persists the six-stage candidate result (820.018208ms)
+✔ packaged closeout verifies an independently selected current candidate without mutating the run (703.294875ms)
+✔ packaged closeout refuses a rehashed PASS receipt with a different plan (610.643625ms)
+✔ packaged closeout refuses changed selection, product, retained records, invocation, and absent stores (2344.313959ms)
+✔ packaged closeout refuses a genuine non-PASS terminal run (349.492084ms)
+✔ restart refuses changed retained source requirement references (418.010542ms)
+✔ restart refuses a changed source profile in the retained descriptor (346.608792ms)
+▶ installed entry refuses altered artifact, request, route, obligations, capability labels, and retained evidence
+  ✔ policy (114.639334ms)
+  ✔ package (104.282459ms)
+  ✔ profile (117.348417ms)
+  ✔ playbook (110.449375ms)
+  ✔ request (122.687125ms)
+  ✔ route (137.933041ms)
+  ✔ obligations (113.976625ms)
+  ✔ capabilities (117.037292ms)
+  ✔ worker-receipt (110.804667ms)
+  ✔ qa (142.5485ms)
+  ✔ full (156.473958ms)
+  ✔ qa-template (145.731667ms)
+✔ installed entry refuses altered artifact, request, route, obligations, capability labels, and retained evidence (1936.443333ms)
+ℹ tests 45
+ℹ suites 0
+ℹ pass 45
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 28857.561958
+
+
+
+ NX   Successfully ran target public-entry-test for project workflow-runtime
+
+
+  Run duration:      28.9s
+  Cache:             0/1 hit (0%)
+  Critical path:     28.9s (1 task)
+  Recoverable time:  <1ms

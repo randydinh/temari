@@ -1,0 +1,65 @@
+
+> nx run runtime:dashboard-test
+
+> node --import @swc-node/register/esm-register --test --test-concurrency=1 tools/dashboard-controller.test.mts tools/dashboard-swarm.test.mts
+
+(node:31562) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31563) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:31563) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:31563) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ HTTP goal intake and prepared start preserve identity and reject arbitrary-goal completion (469.257708ms)
+✔ prepared candidate drift blocks execution without launching (272.442917ms)
+✔ uncertain dispatch remains blocked and cannot launch a replacement (536.357708ms)
+✔ corrupt preparation retains exact-native observe and cancellation (331.225084ms)
+✔ accepted maximum request identities remain controllable after task prefixing (116.689375ms)
+✔ resume refuses a changed exact-native identity and is hidden from controls (336.889667ms)
+✔ swarm intake binds prepared child records, preserves limits, and refuses serial acceptance (452.530583ms)
+(node:34330) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:34330) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:34330) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ prepares child references before launch and detached real worker processes survive a fresh dashboard client (2064.193375ms)
+✔ runtime retries failed transport once and retains successful siblings with unique attempt evidence (2334.3805ms)
+✔ durable cancellation stops active workers and prevents queued launches while retaining completed siblings (1764.668458ms)
+✔ tampered completed evidence preserves cancellation of an active sibling until it drains (1728.937167ms)
+✔ timeouts are bounded, semantic blockers are not retried, and terminal receipts are retained (1840.50275ms)
+✔ uncertain supervisor launch is never reclaimed or reported as cancellation (154.978ms)
+✔ expired child cancellation remains recovery-required without a matching supervisor drain proof (233.758625ms)
+✔ cancellation before any launch requires no process recovery (272.214167ms)
+✔ inspection refuses missing or tampered portable evidence and changed linked worker files (1825.291459ms)
+✔ rejects changed bindings, unsafe work, bounds, dirty candidates, and overlapping storage before launch (237.523583ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 15892.035875
+
+
+
+ NX   Successfully ran target dashboard-test for project runtime
+
+
+  Run duration:      16.0s
+  Cache:             0/1 hit (0%)
+  Critical path:     16.0s (1 task)
+  Recoverable time:  <1ms
+
+(node:31548) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31552) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31558) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31559) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31560) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:31561) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)

@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, unlink, writeFile } from 'node:fs/promises';
+import {
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  unlink,
+  writeFile,
+} from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import test, { type TestContext } from 'node:test';
@@ -29,6 +36,33 @@ const outputs = [
   'verified checks',
   'delivered evidence',
 ];
+
+test('concurrent identical evidence writes converge without temporary-file collisions', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-evidence-concurrent-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const store = await FileEvidenceStore.create(root);
+  // The old hash/PID/millisecond name deterministically collided for workers
+  // publishing identical schema/output bytes during the same clock tick.
+  t.mock.method(Date, 'now', () => 123456789);
+  const references = await Promise.all(
+    Array.from({ length: 16 }, () =>
+      store.put({
+        runId: 'concurrent-evidence',
+        revision: 'revision-1',
+        kind: 'other',
+        content: 'identical retained worker evidence',
+      }),
+    ),
+  );
+  assert(
+    references.every((reference) => reference.path === references[0]!.path),
+  );
+  assert.equal(
+    Buffer.from(await store.load(references[0]!)).toString(),
+    'identical retained worker evidence',
+  );
+  assert.deepEqual(await readdir(root), [references[0]!.sha256 + '.artifact']);
+});
 
 async function fixture(t: TestContext, sameBytes = false) {
   const root = await mkdtemp(join(tmpdir(), 'temari-stage-evidence-'));

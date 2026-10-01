@@ -1,0 +1,206 @@
+
+> nx run host-adapters:test
+
+> node --import @swc-node/register/esm-register --test libs/host-adapters/src/lib/host-adapters.test.ts libs/host-adapters/src/lib/codex-exec-worker.test.ts libs/host-adapters/src/lib/live-doctor.test.ts libs/host-adapters/src/lib/codex-model-driver.test.ts libs/host-adapters/src/lib/model-transport.test.ts libs/host-adapters/src/lib/openai-responses-driver.test.ts libs/host-adapters/src/lib/ollama-model-driver.test.ts tools/run-codex-workers.test.mts tools/run-codex-write-workers.test.mts tools/run-codex-parallel.test.mts tools/run-qa-benny-local.test.mjs
+
+(node:9381) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9382) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:9382) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:9382) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ uses argv and stdin without shell interpolation and validates the final response (279.029833ms)
+✔ missing executable fails before process launch (0.554833ms)
+✔ write worker Git commands use its clone despite inherited Git routing variables (1030.91825ms)
+(node:9383) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:9383) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:9383) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ credential-free preflight checks a fresh thread without data or a turn (571.30725ms)
+✔ only allowlisted environment and protected text reach the fresh model process (1076.709167ms)
+✔ host boundary masks prompt, screenshot extraction and tool replies through the subprocess (646.20575ms)
+✔ preflight refuses version before credentials or a turn (358.663084ms)
+✔ preflight refuses provider before credentials or a turn (564.150583ms)
+✔ preflight refuses effective-feature before credentials or a turn (444.258375ms)
+✔ preflight refuses extra-config before credentials or a turn (447.444417ms)
+✔ preflight refuses layer before credentials or a turn (321.747875ms)
+✔ preflight refuses requirements before credentials or a turn (450.059584ms)
+✔ preflight refuses native-enabled before credentials or a turn (448.618084ms)
+✔ preflight refuses feature-unknown before credentials or a turn (309.696334ms)
+✔ preflight refuses feature-missing before credentials or a turn (321.684042ms)
+✔ preflight refuses feature-duplicate before credentials or a turn (289.416333ms)
+✔ preflight refuses cursor-loop before credentials or a turn (285.414584ms)
+✔ preflight refuses profile-missing before credentials or a turn (323.36425ms)
+✔ preflight refuses profile-denied before credentials or a turn (280.589959ms)
+✔ preflight refuses persistent before credentials or a turn (286.300625ms)
+✔ preflight refuses cwd before credentials or a turn (293.029125ms)
+✔ preflight refuses model before credentials or a turn (289.118458ms)
+✔ preflight refuses network before credentials or a turn (316.926166ms)
+✔ preflight refuses roots before credentials or a turn (294.850084ms)
+✔ preflight refuses instructions before credentials or a turn (406.850958ms)
+✔ preflight refuses mcp before credentials or a turn (293.790666ms)
+✔ active turn fails closed for wrong-thread (383.182125ms)
+✔ active turn fails closed for wrong-turn (389.481167ms)
+✔ active turn fails closed for wrong-args (371.213709ms)
+✔ active turn fails closed for unknown-tool (379.170958ms)
+✔ active turn fails closed for duplicate-call (382.769583ms)
+✔ active turn fails closed for duplicate-rpc (367.302292ms)
+✔ active turn fails closed for native-item (382.270084ms)
+✔ active turn fails closed for native-event (382.991292ms)
+✔ active turn fails closed for media-user (386.081292ms)
+✔ active turn fails closed for tool-media (374.040042ms)
+✔ active turn fails closed for approval (387.036334ms)
+✔ active turn fails closed for forged-final (386.301167ms)
+✔ active turn fails closed for late-native (371.113125ms)
+✔ active turn fails closed for postflight-drift (388.764541ms)
+✔ active turn fails closed for malformed (389.231334ms)
+✔ active turn fails closed for stdout-overflow (392.717125ms)
+✔ active turn fails closed for stderr-overflow (373.827917ms)
+✔ active turn fails closed for early-exit (380.304292ms)
+✔ active turn fails closed for credential-echo (386.151959ms)
+✔ active turn fails closed for error-secret (379.115208ms)
+✔ stderr containing a credential is discarded (391.072583ms)
+✔ deadline covers a pending credential and a hung app-server (4014.219708ms)
+✔ abort during a host callback kills the subprocess and prevents a late response (395.571375ms)
+✔ pre-aborted requests never spawn or resolve credentials (0.980625ms)
+✔ refuses caller overrides, media and malformed tool definitions (490.797375ms)
+✔ independent completions use distinct homes, callbacks and lifetimes (395.631542ms)
+(node:9384) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:9384) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+✔ unknown hosts use the honest serial fallback (1.580042ms)
+✔ records adapter declarations as unproven until a host journey supplies evidence (0.192959ms)
+(node:9384) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9385) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:9385) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:9385) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Codex live doctor proves only an observed read-only child process (711.506458ms)
+✔ a successful child exit without the private token remains blocked (1113.344375ms)
+✔ Claude Code live doctor uses a read-only process and structured result (638.22875ms)
+✔ a mismatched host executable is refused before the model probe (484.0295ms)
+✔ Cursor and a missing host executable fail closed with retained reports (12.703334ms)
+(node:9386) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:9386) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:9386) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ masks prompt, file, screenshot text, schema descriptions and dynamic tool results before egress (24.3455ms)
+✔ bracketed unquoted credential values stay out of prompt, tool description and callback result (1.612625ms)
+✔ Basic authorization text stays out of all three model channels (1.217791ms)
+✔ blocks unauthorized file references, symlinks and screenshots without an extractor before dispatch (3.173541ms)
+✔ rejects an allowlisted file beneath an attacker-writable ancestor before dispatch (3.972333ms)
+✔ suppresses private tool/provider errors and never retries an unfiltered call (1.206916ms)
+✔ keeps request mappings isolated, handles cancellation, and blocks post-completion tools (0.74725ms)
+✔ keeps discovered credentials masked across unlabeled tool results and the final reply (1.578ms)
+✔ schema encoding preserves keys, arrays and scalar types without interpreting schema field names (0.387333ms)
+✔ restores protected tool property names only for the trusted callback (1.468791ms)
+✔ schema key identity survives the full ordinary callback path (1.095042ms)
+✔ schema key identity survives the full integer-index callback path (0.973334ms)
+✔ schema key identity survives the full nested integer-index callback path (1.290292ms)
+✔ ambiguous callback keys fail closed before the trusted tool runs (0.881791ms)
+✔ masks decoded output and tool schema PERSON keys and values containing quotes (1.245667ms)
+✔ masks decoded output and tool schema CREDENTIAL keys and values containing quotes (1.332458ms)
+✔ masks decoded output and tool schema PERSON keys and values containing backslashes (1.468958ms)
+✔ masks decoded output and tool schema CREDENTIAL keys and values containing backslashes (1.40975ms)
+✔ masks decoded output and tool schema PERSON keys and values containing newlines (1.003292ms)
+✔ masks decoded output and tool schema CREDENTIAL keys and values containing newlines (1.467042ms)
+✔ schema leaves reuse identities discovered in the same initial context batch (0.620875ms)
+✔ schema decoding refuses malformed tags, tuples, scalar types and duplicate keys (0.380875ms)
+✔ policy changes to schema tags or numeric leaf types fail before dispatch (1.062834ms)
+✔ without an output schema JSON-looking replies remain plain text, not semantic fields (0.166083ms)
+(node:9387) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:9387) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+✔ Ollama driver uses loopback and keeps host tool content behind masking (26.608167ms)
+✔ Ollama driver sends a JSON schema through its native API (1.844334ms)
+✔ Ollama endpoint rejects non-loopback and credentials in the URL (0.469791ms)
+(node:9387) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9388) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:9388) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+✔ Responses driver keeps provider details behind ModelDriver and host tool content masked (26.839375ms)
+✔ Responses driver sends a declared JSON schema and returns masked JSON (1.514667ms)
+✔ Responses driver rejects unknown tools, provider errors, and incomplete replies without fallback (1.553167ms)
+(node:9388) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:9389) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:9389) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:9389) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ routes read-only reports from assignment roles and returns its receipt (989.043125ms)
+✔ routes implementers to isolated write runner and returns integration receipt (1701.806875ms)
+✔ rejects mixed and ambiguous batches before starting a process (162.007792ms)
+✔ rejects mode labels on both request shapes before process or evidence (186.424875ms)
+✔ malformed request is rejected by existing parser before launch (142.449208ms)
+✔ non-PASS status and receipt are propagated (594.427416ms)
+(node:12499) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:12499) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:12499) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ CLI prints selected route and receipt, and exits nonzero for issues (772.157708ms)
+(node:9390) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:9390) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:9390) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ real child processes overlap within bound two and join in request order (1277.598792ms)
+✔ malformed JSON, exit failure, and timeout retain sibling evidence (1129.189417ms)
+✔ excessive output is bounded and retained as a blocked result (392.76825ms)
+✔ oversized final response is blocked before parsing and retains diagnostics (522.849792ms)
+✔ evidence directories and files are private on POSIX (444.37825ms)
+✔ SIGINT cancels active process groups and writes a blocked receipt for queued work (687.699ms)
+✔ SIGTERM cancels active process groups and writes a blocked receipt for queued work (579.430334ms)
+✔ an already-aborted request records every assignment without launching a process (2.480916ms)
+✔ preflight rejects missing executable and invalid role before any worker starts (0.743541ms)
+✔ public CLI accepts a request file and prints receipt path (700.808ms)
+(node:9391) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:9391) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:9391) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ disjoint write workers overlap in separate clones and join into one verified commit (2314.324834ms)
+✔ out-of-scope worker change cannot produce integration commit (1156.011375ms)
+✔ both endpoints of a staged rename must be owned (782.033458ms)
+✔ optional worker failure degrades while required patch still integrates (1348.049083ms)
+✔ tampered patch evidence cannot be applied during integration (2085.2465ms)
+✔ dirty and moved base are rejected before any worker starts (216.419959ms)
+✔ untracked worker file is captured in its patch (1376.899958ms)
+✔ failed integration verification retains checkout and never reports PASS (1247.80475ms)
+✔ verification cannot alter and re-stage a candidate file (1181.862084ms)
+✔ preparation may not move HEAD even when it leaves a clean checkout (256.046125ms)
+✔ abort during verification leaves no integration commit (1221.576792ms)
+✔ nested source checkout and inherited Git routing are handled before launch (1266.172959ms)
+✔ public write CLI isolates inherited Git routing variables at startup (1535.802875ms)
+✔ overlapping ownership and evidence inside source reject before work (150.022125ms)
+(node:9392) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:9392) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:9392) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ local Benny-derived reproduction preserves defect, pass, blocked, and ownership boundaries (445.239667ms)
+ℹ tests 121
+ℹ suites 0
+ℹ pass 121
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 23161.216875
+
+
+
+ NX   Successfully ran target test for project host-adapters
+
+
+  Run duration:      23.2s
+  Cache:             0/1 hit (0%)
+  Critical path:     23.2s (1 task)
+  Recoverable time:  <1ms

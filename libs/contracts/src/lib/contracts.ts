@@ -5,3 +5,4 @@ export * from './worker.js';
 export * from './knowledge.js';
 export * from './workflow-receipt.js';
 export * from './v4-1-compatibility.js';
+export * from './merge-reconciliation.js';
