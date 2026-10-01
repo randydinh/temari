@@ -421,6 +421,73 @@ test('ACTUAL ARCHIVE CLI: durable pre-capture binding, interrupted publication r
   );
 });
 
+test('ACTUAL ARCHIVE CLI: historical publications refuse changed or missing original capture bindings', async () => {
+  const f = await capturedForRebind();
+  const originalBytes = await readFile(f.priorPath);
+  const bindingPath = join(
+    f.prior.task.directory,
+    `archive-binding-${f.prior.binding}.json`,
+  );
+  const bindingBytes = await readFile(bindingPath);
+  const alteredPublication = JSON.parse(originalBytes.toString());
+  alteredPublication.task.id = 'forged-task';
+  await writeFile(f.priorPath, canonical(alteredPublication));
+  await assert.rejects(loadArchivePublication(f.priorPath));
+  await writeFile(f.priorPath, originalBytes);
+
+  for (
+    let version = 2, priorPublicationPath = f.priorPath;
+    version <= 3;
+    version++
+  ) {
+    await writeFile(
+      join(f.transport.registrarSource, 'src/knowledge_agent/rebind_marker.py'),
+      `READER_VERSION = ${version}\n`,
+    );
+    priorPublicationPath = (
+      await rebindArchivePublication({
+        priorPublicationPath,
+        transport: f.transport,
+      })
+    ).publicationPath;
+    if (version !== 3) continue;
+
+    for (const field of [
+      'task',
+      'source',
+      'readScope',
+      'transport',
+      'implementation',
+      'protocolSha256',
+      'registration',
+      'captureRequestKey',
+    ]) {
+      const alteredBinding = JSON.parse(bindingBytes.toString());
+      alteredBinding[field] = 'forged';
+      await writeFile(bindingPath, canonical(alteredBinding));
+      await assert.rejects(
+        loadArchivePublication(f.priorPath),
+        /Original capture binding .* changed/,
+        field,
+      );
+      await assert.rejects(
+        loadArchivePublication(priorPublicationPath),
+        /Original capture binding .* changed/,
+        field,
+      );
+    }
+
+    await rm(bindingPath);
+    await assert.rejects(loadArchivePublication(f.priorPath));
+    await assert.rejects(loadArchivePublication(priorPublicationPath));
+    await writeFile(bindingPath, bindingBytes);
+    assert.equal(
+      (await loadArchivePublication(priorPublicationPath)).generation,
+      f.prior.generation,
+    );
+  }
+});
+
 test('ACTUAL ARCHIVE CLI: rebind upgrades a retained generation after runtime change without originals or recapture', async () => {
   const f = await capturedForRebind();
   const priorBytes = await readFile(f.priorPath);

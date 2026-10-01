@@ -135,37 +135,51 @@ test('MALFORMED PROTOCOL SHIM ONLY: strict archive identity/coordinates/version/
       registrarSource,
       workspace,
     });
-    const binding = hash(variant),
-      publicationPath = join(base, `archive-publication-${binding}.json`);
+    const captureRequestKey = `temari-archive-v1:${hash(variant)}`;
+    const binding = hash(captureRequestKey);
+    const publicationPath = join(base, `archive-publication-${binding}.json`);
+    const registration = canonical({
+      source,
+      root: row.root,
+      kind: 'local',
+      enabled: true,
+      recursive: true,
+      exclude: [],
+    });
+    const publication = {
+      schema: 1,
+      kind: 'temari-archive-publication',
+      task,
+      source,
+      readScope: 'source-root',
+      transport: transport.config,
+      implementation: transport.implementation,
+      protocolSha256: transport.protocolSha256,
+      registration,
+      binding,
+      generation: pin.generation,
+      manifestSha256: pin.manifest_sha256,
+      captureRequestKey,
+      captureFingerprint: hash('fp'),
+      preservation: 'complete-admitted',
+      counts: { captured: 1 },
+      capabilities: {},
+      gaps: [],
+      currentOriginal: 'not-checked',
+    };
+    await writeFile(publicationPath, canonical(publication));
     await writeFile(
-      publicationPath,
+      join(base, `archive-binding-${binding}.json`),
       canonical({
         schema: 1,
-        kind: 'temari-archive-publication',
         task,
         source,
         readScope: 'source-root',
         transport: transport.config,
         implementation: transport.implementation,
         protocolSha256: transport.protocolSha256,
-        registration: canonical({
-          source,
-          root: row.root,
-          kind: 'local',
-          enabled: true,
-          recursive: true,
-          exclude: [],
-        }),
-        binding,
-        generation: pin.generation,
-        manifestSha256: pin.manifest_sha256,
-        captureRequestKey: `temari-archive-v1:${binding}`,
-        captureFingerprint: hash('fp'),
-        preservation: 'complete-admitted',
-        counts: { captured: 1 },
-        capabilities: {},
-        gaps: [],
-        currentOriginal: 'not-checked',
+        registration,
+        captureRequestKey,
       }),
     );
     const provider = await createArchiveRegistrar({
