@@ -1,0 +1,55 @@
+
+> nx run runtime:dashboard-test
+
+> node --import @swc-node/register/esm-register --test --test-concurrency=1 tools/dashboard-controller.test.mts tools/dashboard-swarm.test.mts
+
+(node:36021) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:36022) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:36022) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:36022) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ HTTP goal intake and prepared start preserve identity and reject arbitrary-goal completion (402.510459ms)
+✔ prepared candidate drift blocks execution without launching (194.9215ms)
+✔ uncertain dispatch remains blocked and cannot launch a replacement (312.316875ms)
+✔ corrupt preparation retains exact-native observe and cancellation (274.469459ms)
+✔ accepted maximum request identities remain controllable after task prefixing (116.815042ms)
+✔ resume refuses a changed exact-native identity and is hidden from controls (314.756791ms)
+✔ swarm intake binds prepared child records, preserves limits, and refuses serial acceptance (398.859167ms)
+✔ coding intake freezes the host plan, binds both durable groups, and refuses command injection and serial acceptance (479.255417ms)
+✔ coding configuration rejects overlapping ownership, optional workers, duplicate reviewer identity and arbitrary commands (89.043709ms)
+✔ coding plan and candidate changes refuse new execution while retaining cancellation and metadata controls (445.65325ms)
+(node:37778) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:37778) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:37778) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ prepares child references before launch and detached real worker processes survive a fresh dashboard client (1665.747542ms)
+✔ runtime retries failed transport once and retains successful siblings with unique attempt evidence (2134.157917ms)
+✔ durable cancellation stops active workers and prevents queued launches while retaining completed siblings (1637.509791ms)
+✔ tampered completed evidence preserves cancellation of an active sibling until it drains (1580.86225ms)
+✔ timeouts are bounded, semantic blockers are not retried, and terminal receipts are retained (1663.209959ms)
+✔ uncertain supervisor launch is never reclaimed or reported as cancellation (135.500375ms)
+✔ expired child cancellation remains recovery-required without a matching supervisor drain proof (206.9425ms)
+✔ cancellation before any launch requires no process recovery (208.267459ms)
+✔ inspection refuses missing or tampered portable evidence and changed linked worker files (1644.258584ms)
+✔ rejects changed bindings, unsafe work, bounds, dirty candidates, and overlapping storage before launch (197.563ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14735.874916
+
+
+
+ NX   Successfully ran target dashboard-test for project runtime
+
+
+  Run duration:      14.8s
+  Cache:             0/1 hit (0%)
+  Critical path:     14.8s (1 task)
+  Recoverable time:  <1ms

@@ -14,7 +14,15 @@ import {
 } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join } from 'node:path';
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  normalize,
+  relative,
+  sep,
+} from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -103,7 +111,7 @@ function finish(value, code = 0) {
 
 function usage() {
   throw new Error(
-    'Usage: entry policy | admit --request ABS_JSON | start|resume|run-workers --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX | temari qa --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX | closeout verify --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX --expected-current ABS_JSON --expected-current-sha256 HEX',
+    'Usage: entry policy | admit --request ABS_JSON | start|resume --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX [--task-tracking ABS_JSON --expected-task-tracking-sha256 HEX] | run-workers --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX | temari qa --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX | closeout verify --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX --expected-current ABS_JSON --expected-current-sha256 HEX',
   );
 }
 
@@ -378,147 +386,282 @@ function trustedRequest(bytes, expectedDigest) {
   return JSON.parse(utf8.decode(bytes));
 }
 
-async function startBridge(mode, request, policy, digests) {
+async function canonicalDirectory(path) {
+  assert(
+    typeof path === 'string' &&
+      isAbsolute(path) &&
+      !/[\x00-\x1f\x7f]/.test(path),
+    'Expected an absolute directory without control characters.',
+  );
+  const stat = await lstat(path);
+  assert(
+    stat.isDirectory() && !stat.isSymbolicLink(),
+    'Expected an existing nonsymlink directory.',
+  );
+  return realpath(path);
+}
+
+async function selectedRunDirectory(path, mode) {
+  assert(
+    typeof path === 'string' &&
+      isAbsolute(path) &&
+      !/[\x00-\x1f\x7f]/.test(path),
+    'Expected an absolute run directory without control characters.',
+  );
+  if (mode === 'resume') return canonicalDirectory(path);
+  const selected = normalize(path);
+  assert.notEqual(
+    dirname(selected),
+    selected,
+    'Run directory requires an existing parent.',
+  );
+  const canonical = join(
+    await canonicalDirectory(dirname(selected)),
+    basename(selected),
+  );
+  try {
+    await lstat(canonical);
+  } catch (error) {
+    if (error.code === 'ENOENT') return canonical;
+    throw error;
+  }
+  throw new Error('Run directory already exists.');
+}
+
+function assertDisjointRoots(...roots) {
+  const contains = (parent, child) => {
+    const part = relative(parent, child);
+    return (
+      part === '' ||
+      (!isAbsolute(part) && part !== '..' && !part.startsWith(`..${sep}`))
+    );
+  };
+  for (let left = 0; left < roots.length; left++)
+    for (let right = left + 1; right < roots.length; right++)
+      assert(
+        !contains(roots[left], roots[right]) &&
+          !contains(roots[right], roots[left]),
+        'Public candidate, artifact, run and feature evidence directories must be disjoint.',
+      );
+}
+
+async function startBridge(mode, request, policy, digests, trackingSelection) {
   const feature = request.route === 'full-playbook';
-  let invocation;
-  if (feature) {
-    const { runLocalFeatureHostProof, verifyLocalFeatureHostProof } =
-      await import(pathToFileURL(join(root, 'host/feature-proof.mjs')).href);
-    const hostBinding = {
-      entry: request.entry,
-      policyId: policy.policyId,
-      requestSha256: digests.requestSha256,
-      manifestSha256: digests.manifestSha256,
-    };
-    const workerInput = {
+  const sourceCandidateRoot = await canonicalDirectory(
+    request.invocation.candidate.root,
+  );
+  const runDirectory = await selectedRunDirectory(
+    request.invocation.runDirectory,
+    mode,
+  );
+  const artifactRoot = await canonicalDirectory(root);
+  const runtimeRoot = await canonicalDirectory(join(root, 'runtime'));
+  assert.match(
+    request.invocation.runId ?? '',
+    feature
+      ? /^[A-Za-z0-9][A-Za-z0-9._-]{0,109}$/
+      : /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/,
+    'Invalid public run ID.',
+  );
+  assert.match(
+    request.invocation.candidate.scopeId ?? '',
+    /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/,
+    'Invalid candidate scope ID.',
+  );
+  assert(
+    typeof request.invocation.revision === 'string' &&
+      request.invocation.revision.trim().length > 0 &&
+      Buffer.byteLength(request.invocation.revision) <= 512,
+    'Invalid public revision.',
+  );
+  const hostBinding = {
+    entry: request.entry,
+    policyId: policy.policyId,
+    requestSha256: digests.requestSha256,
+    manifestSha256: digests.manifestSha256,
+  };
+  const featureContext = feature
+    ? {
+        sourceCandidateRoot,
+        evidenceRoot: await canonicalDirectory(
+          request.featureWorkers.evidenceRoot,
+        ),
+        hostBinding,
+      }
+    : undefined;
+  assertDisjointRoots(
+    sourceCandidateRoot,
+    artifactRoot,
+    runDirectory,
+    ...(feature ? [featureContext.evidenceRoot] : []),
+  );
+  const require = createRequire(
+    pathToFileURL(join(root, 'runtime/consumer.mjs')),
+  );
+  const runtime = await import(
+    pathToFileURL(require.resolve('@temari/runtime')).href
+  );
+  const { prepareTaskTracking } = await import(
+    pathToFileURL(join(root, 'host/task-tracking.mjs')).href
+  );
+  const tracking = await prepareTaskTracking({
+    runtime,
+    runtimeRoot,
+    artifactRoot,
+    featureContext,
+    requiredSchemaVersion: feature ? 2 : 1,
+    input: {
       runId: request.invocation.runId,
       revision: request.invocation.revision,
-      candidateRoot: request.invocation.candidate.root,
-      evidenceRoot: request.featureWorkers.evidenceRoot,
-      baseCommit: request.featureWorkers.baseCommit,
-      hostBinding,
-    };
-    let proof;
-    if (mode === 'start') {
-      proof = await runLocalFeatureHostProof({
-        ...workerInput,
-        ...Object.fromEntries(
-          Object.entries(request.featureWorkers).filter(
-            ([name]) => !['evidenceRoot', 'baseCommit'].includes(name),
-          ),
-        ),
-        executable: 'codex',
-      });
-    } else {
-      const saved = await readJson(
-        join(request.invocation.runDirectory, 'config/input.json'),
-        REQUEST_BYTES,
-      );
-      assert.deepEqual(saved.featureHost?.sourceCandidate, {
-        ...request.invocation.candidate,
-        root: await realpath(request.invocation.candidate.root),
-      });
-      assert.equal(
-        saved.featureHost?.evidenceRoot,
-        await realpath(workerInput.evidenceRoot),
-      );
-      assert.equal(saved.featureHost?.baseCommit, workerInput.baseCommit);
-      assert.deepEqual(saved.featureHost?.hostBinding, hostBinding);
-      proof = await verifyLocalFeatureHostProof({
-        ...workerInput,
-        proofSha256: saved.featureHost.proofSha256,
-      });
+      runDirectory,
+      candidate: { ...request.invocation.candidate, root: sourceCandidateRoot },
+    },
+    paths: {
+      config: join(runDirectory, 'config'),
+      stores: ['receipts', 'checkpoints', 'evidence', 'manifests'].map((name) =>
+        join(runDirectory, name),
+      ),
+    },
+    ...trackingSelection,
+  });
+  let temporary;
+  let childOwnsOutcome = false;
+  try {
+    if (feature && mode === 'start') {
+      await tracking?.reserve({ exclusive: true });
+      await tracking?.start();
     }
-    invocation = {
-      schemaVersion: 1,
-      ...request.invocation,
-      candidate: {
-        ...request.invocation.candidate,
-        root: proof.integrationPath,
-      },
-      obligations: policy.feature.obligations,
-      sourceProfile: 'feature-v1',
-      featureHost: {
-        sourceCandidate: {
-          ...request.invocation.candidate,
-          root: await realpath(request.invocation.candidate.root),
-        },
-        evidenceRoot: await realpath(request.featureWorkers.evidenceRoot),
+    let invocation;
+    if (feature) {
+      const { runLocalFeatureHostProof, verifyLocalFeatureHostProof } =
+        await import(pathToFileURL(join(root, 'host/feature-proof.mjs')).href);
+      const workerInput = {
+        runId: request.invocation.runId,
+        revision: request.invocation.revision,
+        candidateRoot: request.invocation.candidate.root,
+        evidenceRoot: request.featureWorkers.evidenceRoot,
         baseCommit: request.featureWorkers.baseCommit,
         hostBinding,
-        proofSha256: proof.proofSha256,
-      },
-    };
-  } else
-    invocation = {
-      schemaVersion: 1,
-      ...request.invocation,
-      obligations:
-        request.route === 'qa-review'
-          ? policy.qa.obligations
-          : policy.lightweight.obligations,
-      ...(request.route === 'qa-review'
-        ? {}
-        : { sourceProfile: policy.entries[request.entry].supportedProfile }),
-    };
-  assert.deepEqual(
-    Object.keys(invocation.candidate).sort(),
-    ['root', 'scopeId'],
-    `Invocation candidate fields differ: ${Object.keys(invocation.candidate).join(',')}`,
-  );
-  if (mode === 'resume') {
-    const path = join(invocation.runDirectory, 'config/input.json');
-    const saved = await readJson(path, REQUEST_BYTES);
-    assert.equal(
-      saved.runId,
-      invocation.runId,
-      'Retained run ID differs from trusted invocation.',
-    );
-    assert.equal(
-      saved.revision,
-      invocation.revision,
-      'Retained revision differs from trusted invocation.',
-    );
+      };
+      let proof;
+      if (mode === 'start') {
+        proof = await runLocalFeatureHostProof({
+          ...workerInput,
+          ...Object.fromEntries(
+            Object.entries(request.featureWorkers).filter(
+              ([name]) => !['evidenceRoot', 'baseCommit'].includes(name),
+            ),
+          ),
+          executable: 'codex',
+        });
+      } else {
+        const saved = await readJson(
+          join(request.invocation.runDirectory, 'config/input.json'),
+          REQUEST_BYTES,
+        );
+        assert.deepEqual(saved.featureHost?.sourceCandidate, {
+          ...request.invocation.candidate,
+          root: await realpath(request.invocation.candidate.root),
+        });
+        assert.equal(
+          saved.featureHost?.evidenceRoot,
+          await realpath(workerInput.evidenceRoot),
+        );
+        assert.equal(saved.featureHost?.baseCommit, workerInput.baseCommit);
+        assert.deepEqual(saved.featureHost?.hostBinding, hostBinding);
+        proof = await verifyLocalFeatureHostProof({
+          ...workerInput,
+          proofSha256: saved.featureHost.proofSha256,
+        });
+      }
+      invocation = {
+        schemaVersion: 1,
+        ...request.invocation,
+        candidate: {
+          ...request.invocation.candidate,
+          root: proof.integrationPath,
+        },
+        obligations: policy.feature.obligations,
+        sourceProfile: 'feature-v1',
+        featureHost: {
+          sourceCandidate: {
+            ...request.invocation.candidate,
+            root: await realpath(request.invocation.candidate.root),
+          },
+          evidenceRoot: await realpath(request.featureWorkers.evidenceRoot),
+          baseCommit: request.featureWorkers.baseCommit,
+          hostBinding,
+          proofSha256: proof.proofSha256,
+        },
+      };
+    } else
+      invocation = {
+        schemaVersion: 1,
+        ...request.invocation,
+        obligations:
+          request.route === 'qa-review'
+            ? policy.qa.obligations
+            : policy.lightweight.obligations,
+        ...(request.route === 'qa-review'
+          ? {}
+          : { sourceProfile: policy.entries[request.entry].supportedProfile }),
+      };
     assert.deepEqual(
-      saved.candidate,
-      {
-        ...invocation.candidate,
-        root: await realpath(invocation.candidate.root),
-      },
-      'Retained candidate differs from trusted invocation.',
+      Object.keys(invocation.candidate).sort(),
+      ['root', 'scopeId'],
+      `Invocation candidate fields differ: ${Object.keys(invocation.candidate).join(',')}`,
     );
-    assert.equal(
-      saved.runDirectory,
-      await realpath(invocation.runDirectory),
-      'Retained run directory differs from trusted invocation.',
-    );
-    const require = createRequire(
-      pathToFileURL(join(root, 'runtime/consumer.mjs')),
-    );
-    const core = await import(
-      pathToFileURL(require.resolve('@temari/temari-core')).href
-    );
-    assert.deepEqual(
-      saved.plan,
-      core.createExecutionPlan(
-        feature ? policy.feature.obligations : policy.lightweight.obligations,
-      ),
-      'Retained plan differs from admitted obligations.',
-    );
-    assert.equal(
-      saved.sourceProfile,
-      invocation.sourceProfile,
-      'Retained source profile differs from admitted policy.',
-    );
-    if (feature)
-      assert.deepEqual(
-        saved.featureHost,
-        invocation.featureHost,
-        'Retained feature host proof differs from trusted invocation.',
+    if (mode === 'resume') {
+      const path = join(invocation.runDirectory, 'config/input.json');
+      const saved = await readJson(path, REQUEST_BYTES);
+      assert.equal(
+        saved.runId,
+        invocation.runId,
+        'Retained run ID differs from trusted invocation.',
       );
-  }
-  let temporary;
-  try {
+      assert.equal(
+        saved.revision,
+        invocation.revision,
+        'Retained revision differs from trusted invocation.',
+      );
+      assert.deepEqual(
+        saved.candidate,
+        {
+          ...invocation.candidate,
+          root: await realpath(invocation.candidate.root),
+        },
+        'Retained candidate differs from trusted invocation.',
+      );
+      assert.equal(
+        saved.runDirectory,
+        await realpath(invocation.runDirectory),
+        'Retained run directory differs from trusted invocation.',
+      );
+      const require = createRequire(
+        pathToFileURL(join(root, 'runtime/consumer.mjs')),
+      );
+      const core = await import(
+        pathToFileURL(require.resolve('@temari/temari-core')).href
+      );
+      assert.deepEqual(
+        saved.plan,
+        core.createExecutionPlan(
+          feature ? policy.feature.obligations : policy.lightweight.obligations,
+        ),
+        'Retained plan differs from admitted obligations.',
+      );
+      assert.equal(
+        saved.sourceProfile,
+        invocation.sourceProfile,
+        'Retained source profile differs from admitted policy.',
+      );
+      if (feature)
+        assert.deepEqual(
+          saved.featureHost,
+          invocation.featureHost,
+          'Retained feature host proof differs from trusted invocation.',
+        );
+    }
     if (mode === 'start') {
       temporary = await mkdtemp(join(tmpdir(), 'temari-public-invocation-'));
       await writeFile(
@@ -536,17 +679,32 @@ async function startBridge(mode, request, policy, digests) {
       mode === 'start'
         ? join(temporary, 'request.json')
         : invocation.runDirectory,
+      ...(trackingSelection?.sidecarPath === undefined
+        ? []
+        : [
+            '--task-tracking',
+            trackingSelection.sidecarPath,
+            '--expected-task-tracking-sha256',
+            trackingSelection.expectedSha256,
+          ]),
     ];
     const child = spawn(process.execPath, args, {
       stdio: 'inherit',
       env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '' },
     });
     const code = await new Promise((resolve, reject) => {
+      child.once('spawn', () => {
+        childOwnsOutcome = true;
+      });
       child.once('error', reject);
       child.once('close', (value) => resolve(value ?? 1));
     });
     process.exitCode = code;
     return { code, pid: child.pid };
+  } catch (error) {
+    if (tracking?.started && !childOwnsOutcome)
+      await tracking.finish(null, error);
+    throw error;
   } finally {
     if (temporary) await rm(temporary, { recursive: true, force: true });
   }
@@ -974,26 +1132,55 @@ export async function run(entry, argv = process.argv.slice(2)) {
   if (flag !== '--request') usage();
   if (!isAbsolute(argument)) usage();
   if (trusted) {
+    const names = extra.filter((_value, index) => index % 2 === 0);
+    const allowed = [
+      '--expected-request-sha256',
+      '--expected-manifest-sha256',
+      '--task-tracking',
+      '--expected-task-tracking-sha256',
+    ];
     assert(
-      extra.length === 4 &&
-        digestIndex >= 0 &&
-        requestDigestIndex >= 0 &&
-        digestIndex % 2 === 0 &&
-        requestDigestIndex % 2 === 0 &&
-        digestIndex !== requestDigestIndex,
-      'Both independent digests are required.',
+      (extra.length === 4 || extra.length === 8) &&
+        new Set(names).size === names.length &&
+        names.every((name) => allowed.includes(name)) &&
+        names.includes('--expected-request-sha256') &&
+        names.includes('--expected-manifest-sha256') &&
+        names.includes('--task-tracking') ===
+          names.includes('--expected-task-tracking-sha256'),
+      'Both independent digests and an optional complete task tracking pair are required; duplicate or unknown flags are forbidden.',
     );
+    const flags = Object.fromEntries(
+      names.map((name, index) => [name, extra[index * 2 + 1]]),
+    );
+    const trackingSelection =
+      flags['--task-tracking'] === undefined
+        ? undefined
+        : {
+            sidecarPath: flags['--task-tracking'],
+            expectedSha256: flags['--expected-task-tracking-sha256'],
+          };
+    if (trackingSelection)
+      assert(
+        isAbsolute(trackingSelection.sidecarPath),
+        'Task tracking sidecar path must be absolute.',
+      );
     const request = trustedRequest(
       await readBoundedFile(argument, REQUEST_BYTES),
-      extra[requestDigestIndex + 1],
+      flags['--expected-request-sha256'],
     );
     const result = await admitEngineering(entry, request, policy, true);
     if (result.status !== 'admitted' && result.status !== 'pending-host-proof')
       return finish(result, 1);
-    await startBridge(command, request, policy, {
-      requestSha256: extra[requestDigestIndex + 1],
-      manifestSha256: extra[digestIndex + 1],
-    });
+    await startBridge(
+      command,
+      request,
+      policy,
+      {
+        requestSha256: flags['--expected-request-sha256'],
+        manifestSha256: flags['--expected-manifest-sha256'],
+      },
+      trackingSelection,
+    );
     return;
   }
   if (extra.length) usage();

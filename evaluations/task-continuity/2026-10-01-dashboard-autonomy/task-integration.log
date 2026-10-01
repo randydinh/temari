@@ -1,0 +1,115 @@
+
+> nx run runtime:task-test
+
+> node --import @swc-node/register/esm-register --test --test-concurrency=1 libs/runtime/src/lib/task-store.test.ts libs/runtime/src/lib/task-runtime.test.ts tools/task-view.test.mts tools/task-continuity.test.mts tools/dashboard-controller.test.mts
+
+(node:45235) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:45236) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:45236) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:45236) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ native success remains open until canonical evidence and explicit acceptance (236.284625ms)
+✔ native output locations may be attached after exact run identity is known (207.163583ms)
+✔ concurrent duplicate dispatch has one side effect and retains intent first (93.729708ms)
+✔ lost dispatch response survives reopen and requires exact native reconciliation (102.450209ms)
+✔ crash window before native binding never auto-dispatches a replacement (102.804583ms)
+✔ reconciliation fails closed without independent harness identity verification (66.819583ms)
+✔ retry/replan keeps one goal, distinct runs and prior native identities (135.161791ms)
+✔ cancellation awaits actual executor confirmation and does not repeat requests (193.55625ms)
+✔ native success racing cancellation resolves intent without claiming cancellation (115.379458ms)
+✔ failed native run resolves a lost cancellation response and permits replan (126.85825ms)
+✔ resume error retains uncertainty and duplicate control does not repeat side effect (111.298042ms)
+✔ stale revision or changed plan cannot supply closeout evidence (254.741833ms)
+✔ tampered evidence revokes the DONE projection and acceptance cannot reuse it (147.848208ms)
+✔ local stage-only closeout cannot satisfy independent review or forge obligations (45.422292ms)
+✔ child projections retain successful sibling and failed assignment (146.088ms)
+✔ pickup keeps two goals in the same session ambiguous even with limit one (67.360084ms)
+✔ parallel child results project review without canonical completion (140.121833ms)
+✔ parallel child results project cancellation without canonical completion (129.500083ms)
+✔ pickup uses exact canonical workspace scope and respects explicit-task filters (62.126333ms)
+✔ unresolvable unrelated workspaces do not block a healthy pickup scope (84.6105ms)
+✔ fresh-session pickup restores the handoff without executing provider actions (71.519208ms)
+✔ positive handoff and prior acceptance cannot hide changed current evidence (157.511666ms)
+✔ pickup retains cancelled goals and unresolved native intent without dispatching again (130.444917ms)
+✔ pickup inspects only the selected current run and skips unrelated artifact stores (89.625417ms)
+✔ pickup bounds handoff text and history while omitting full event and source payloads (295.926ms)
+✔ pickup preserves maximum-length paths and identities within its encoded byte ceiling (51.888708ms)
+(node:45473) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:45473) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:45473) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ stale lock reports its owner and is never automatically taken over (1223.386125ms)
+✔ missing persisted ledger is an error for existing readers and initializers (47.067542ms)
+✔ concurrent initialization persists one empty ledger and preserves later work (108.925958ms)
+✔ one native identity cannot be attached to two Temari runs (114.627375ms)
+✔ deferred evidence roots attach once to the exact existing run (72.173833ms)
+✔ reopens one goal, immutable history and distinct run revisions (54.269584ms)
+✔ commands are idempotent but changed payload, actor and reused run IDs fail (88.434167ms)
+✔ concurrent metadata updates compare versions without losing either command (70.83425ms)
+✔ rejects unsafe IDs, unbounded metadata, invalid plans and corrupt ledgers visibly (40.540417ms)
+✔ entry atomically creates one task and links its session with replay-safe context (65.314458ms)
+✔ sessions and tasks retain many-to-many identity links without changing goals (82.988875ms)
+✔ concurrent entry and handoff reject stale updates while preserving idempotency (87.81125ms)
+✔ handoff bounds reject malformed context without changing acceptance or execution (61.782ms)
+(node:45578) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:45578) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:45578) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ HTTP goal intake and prepared start preserve identity and reject arbitrary-goal completion (383.027208ms)
+✔ prepared candidate drift blocks execution without launching (189.895458ms)
+✔ uncertain dispatch remains blocked and cannot launch a replacement (311.014125ms)
+✔ corrupt preparation retains exact-native observe and cancellation (282.846ms)
+✔ accepted maximum request identities remain controllable after task prefixing (119.8135ms)
+✔ resume refuses a changed exact-native identity and is hidden from controls (345.726ms)
+✔ swarm intake binds prepared child records, preserves limits, and refuses serial acceptance (416.375666ms)
+✔ coding intake freezes the host plan, binds both durable groups, and refuses command injection and serial acceptance (541.992375ms)
+✔ coding configuration rejects overlapping ownership, optional workers, duplicate reviewer identity and arbitrary commands (116.997917ms)
+✔ coding plan and candidate changes refuse new execution while retaining cancellation and metadata controls (468.857417ms)
+✔ natural goal retains a validated plan and prepares parallel execution on the same task with exact replay (1293.538458ms)
+✔ goal plan admission rejects changed policy, candidate and proposal identity (882.971459ms)
+✔ scheduled inspection confirms only exact start intent and execution termination without accepting evidence (283.686333ms)
+✔ goal admission recovers a published preparation after bind crash with a fresh browser request ID (1200.78375ms)
+(node:50187) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:50187) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:50187) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ fresh CLI processes recover the same task, next action and version (988.469958ms)
+✔ CLI rejects unknown commands and relative storage roots (0.46225ms)
+✔ host entry, handoff and scoped pickup survive separate CLI processes (4020.176041ms)
+(node:50610) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:50610) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:50610) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ read-only task view serves retained task data and rejects mutation and foreign hosts (44.550041ms)
+✔ task read failures stay visible instead of looking like an empty inbox (3.295958ms)
+✔ console links require a configured HTTP origin (0.26975ms)
+✔ writable dashboard delegates only POST intake and selected task actions (10.669584ms)
+✔ mutations reject missing or foreign origin, host, and token before dispatch (10.450416ms)
+✔ mutation bodies require bounded UTF-8 JSON and stalled bodies expire (5012.2265ms)
+✔ controller owns duplicate dispatch, stale versions, and validation errors (6.321583ms)
+✔ dashboard restart invalidates the prior server token (3.791917ms)
+✔ schedule mutations retain local-origin protection and knowledge selections admit only one server node ID (8.157834ms)
+ℹ tests 65
+ℹ suites 0
+ℹ pass 65
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 23768.104167
+
+
+
+ NX   Successfully ran target task-test for project runtime
+
+
+  Run duration:      23.9s
+  Cache:             0/1 hit (0%)
+  Critical path:     23.8s (1 task)
+  Recoverable time:  <1ms

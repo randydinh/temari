@@ -1,0 +1,99 @@
+
+> nx run workflow-runtime:public-entry-test
+
+> node --test tools/public-entry-runtime.test.mjs
+
+(node:15801) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15802) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ packages an isolated relocated outer bundle with three current public entries (2895.29925ms)
+✔ relocated Knowledge cold install keeps state outside the artifact and connects Codex only on request (15973.739708ms)
+✔ relocated QA entry runs the packaged evaluator without source-checkout access (1186.81425ms)
+✔ relocated public bundle routes workers and observes host-owned local processes (5706.540667ms)
+✔ host forge gate observes repository access and exact pull-request head (663.084084ms)
+✔ feature host proof requires architect, builder, reviewer, and forge evidence (2063.540542ms)
+✔ full feature start binds local host proof to six persisted stages (untracked) (3203.262125ms)
+✔ full feature start binds local host proof to six persisted stages (tracked) (3680.884667ms)
+✔ full feature start binds local host proof to six persisted stages (worker-failure) (1256.655333ms)
+✔ full feature start binds local host proof to six persisted stages (duplicate-start) (3867.423708ms)
+✔ both engineering skills reach the complete versioned QA writer inside the artifact (3.63375ms)
+✔ installed overlay checker accepts pinned external assets and refuses incompatible overlays (528.81925ms)
+✔ public policy records the exact reviewed legacy profile and playbook provenance (3.638667ms)
+✔ artifact checking requires an external expected manifest (89.200792ms)
+✔ public engineering admission refuses unsupported routes and blocks unproven capabilities (141.259291ms)
+✔ installed Temari and Poteto skills expose the bundled worker guide (1.0265ms)
+✔ closeout preflight blocks without trusted candidate selection (44.518ms)
+✔ public entries refuse symlinked policy and request inputs (231.727666ms)
+✔ failed publication removes staging and leaves no destination (21.174416ms)
+✔ concurrent publication has one exclusive owner (1567.246667ms)
+✔ outer publication is no-overwrite and rejects tampering or symlinks (213.727666ms)
+✔ installed temari retains task context through interruption and a fresh-chat resume (1045.499458ms)
+✔ installed poteto-mode retains task context through interruption and a fresh-chat resume (1027.254625ms)
+▶ installed tracking rejects invalid selection and malformed flag pairs before stage work
+  ✔ missing-digest (148.592792ms)
+  ✔ wrong-digest (163.425958ms)
+  ✔ duplicate (153.932708ms)
+  ✔ unknown (149.167375ms)
+  ✔ wrong-run (154.882208ms)
+  ✔ bundle-overlap (167.560542ms)
+  ✔ stale-version (166.254791ms)
+✔ installed tracking rejects invalid selection and malformed flag pairs before stage work (1104.784084ms)
+▶ task tracking is refused on QA, worker-only and admission commands
+  ✔ qa (143.122792ms)
+  ✔ run-workers (141.425625ms)
+  ✔ admit (110.071125ms)
+✔ task tracking is refused on QA, worker-only and admission commands (395.041792ms)
+✔ installed entry refuses a six-stage PASS without source requirement evidence (262.582917ms)
+✔ installed entry rejects a renamed source evidence kind before a PASS checkpoint (266.543084ms)
+✔ installed entry rejects allowed source kinds bound to generic verification payloads (250.625417ms)
+▶ installed entry rejects wrong generic kind and reserved or duplicate source names
+  ✔ wrong-kind (275.422167ms)
+  ✔ reserved-name (260.261208ms)
+  ✔ duplicate-name (257.331833ms)
+✔ installed entry rejects wrong generic kind and reserved or duplicate source names (793.475708ms)
+✔ retained validation rejects a previously acknowledged generic payload alias (0.558459ms)
+✔ relocated public entry starts, resumes, and persists the six-stage candidate result (859.478417ms)
+✔ packaged closeout verifies an independently selected current candidate without mutating the run (684.803416ms)
+✔ packaged closeout refuses a rehashed PASS receipt with a different plan (584.817958ms)
+✔ packaged closeout refuses changed selection, product, retained records, invocation, and absent stores (2042.8615ms)
+✔ packaged closeout refuses a genuine non-PASS terminal run (348.502292ms)
+✔ restart refuses changed retained source requirement references (448.109417ms)
+✔ restart refuses a changed source profile in the retained descriptor (390.92625ms)
+▶ installed entry refuses altered artifact, request, route, obligations, capability labels, and retained evidence
+  ✔ policy (130.10725ms)
+  ✔ package (133.377709ms)
+  ✔ profile (155.175292ms)
+  ✔ playbook (146.484417ms)
+  ✔ request (147.028958ms)
+  ✔ route (154.735042ms)
+  ✔ obligations (159.318959ms)
+  ✔ capabilities (147.001958ms)
+  ✔ worker-receipt (147.804917ms)
+  ✔ qa (159.421ms)
+  ✔ full (146.524542ms)
+  ✔ qa-template (173.909375ms)
+✔ installed entry refuses altered artifact, request, route, obligations, capability labels, and retained evidence (2305.052625ms)
+ℹ tests 63
+ℹ suites 0
+ℹ pass 63
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 56412.376084
+
+
+
+ NX   Successfully ran target public-entry-test for project workflow-runtime
+
+
+  Run duration:      56.5s
+  Cache:             0/1 hit (0%)
+  Critical path:     56.5s (1 task)
+  Recoverable time:  <1ms
+
+  Recommendations:
+    - Drastically reduce your run duration by sharing a cache across your team and CI → https://cloud.nx.app/get-started?utm_source=nx-cli&utm_medium=cli&utm_campaign=performance-report&utm_content=remote-cache.
+    - Speed up or split the longest tasks on the critical path:
+        workflow-runtime:public-entry-test    56.5s

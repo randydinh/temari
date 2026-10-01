@@ -1,0 +1,60 @@
+
+> nx run archon-harness:test
+
+> node --import @swc-node/register/esm-register --test libs/archon-harness/src/lib/managed-runtime.test.ts libs/archon-harness/src/lib/archon-harness.test.ts libs/archon-harness/src/lib/canonical-finalize.test.ts
+
+(node:10841) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:10842) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:10842) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+✔ starts a native run and binds its identity to the Temari plan (11.848958ms)
+✔ reads provider status and resumes the same native run (0.620125ms)
+✔ resume detaches the exact native run and returns its current nonterminal status (0.460291ms)
+✔ rejects malformed provider identities before invoking the CLI (0.567958ms)
+(node:10842) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ verifies the exact pinned version and commit before use (5.489958ms)
+✔ cancels the supplied exact native run and returns its observed status (0.825208ms)
+✔ rejects invalid cancellation references before invoking Archon (0.546ms)
+✔ a refused cancel command fails without reporting cancellation (0.326458ms)
+✔ cancellation does not accept a status response for a different run (0.282708ms)
+✔ recoverable launches retain reserved Temari identity and reject input overrides (0.6755ms)
+✔ recovery verifies retained native identity rather than caller fields (3.556292ms)
+✔ native project links use only a safe observed codebase identity (0.755791ms)
+(node:10843) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:10843) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:10843) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ six canonical bridge stages publish a persisted Nx receipt and match serial evidence (1628.624208ms)
+(node:10844) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:10844) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+✔ maps every supported platform to the pinned v0.10.1 release asset (0.684875ms)
+(node:10844) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ public pinned installer rejects caller-supplied size or digest changes (3.413916ms)
+✔ rejects Windows ARM64 and unknown platform combinations with a typed error (0.347167ms)
+✔ streams a tiny release asset to the native path and reuses it on repeat install (30.131ms)
+✔ rejects non-pinned URLs and redirects outside the GitHub release hosts (3.69ms)
+✔ rejects byte-count and SHA-256 mismatches and removes temporary files (4.165125ms)
+✔ refuses corrupt files, symlinks, and non-regular existing paths without fetching (6.60125ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2052.622458
+
+
+
+ NX   Successfully ran target test for project archon-harness
+
+
+  Run duration:      2.1s
+  Cache:             0/1 hit (0%)
+  Critical path:     2.1s (1 task)
+  Recoverable time:  <1ms

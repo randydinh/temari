@@ -30,3 +30,8 @@ explicit gap when a configured context source is unavailable or stale.
 5. Keep one lifecycle owner: the canonical runtime/store owns scheduling, persistence, recovery, and evidence. This skill only routes and admits work.
 
 Use `bin/poteto-mode.mjs policy` to inspect the contract. Start or resume with `--request ABSOLUTE_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX`. Both digests must come from trusted input outside the bundle and request. A blocked result stays blocked until its missing proof exists.
+
+When Temari has selected a durable engineering task, use its
+[task tracking contract](../temari/references/task-tracking.md) with public
+`start` or `resume`. Preserve the same task through recovery; task handoffs remain
+context pending trusted closeout.

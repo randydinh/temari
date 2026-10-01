@@ -1,0 +1,209 @@
+{
+  "schema": 1,
+  "verifiedAt": "2026-10-01",
+  "sourceImplementationCommit": "5a3f7ae654ef8ce8453f25ab04d8f9dd15aac629",
+  "fixtureRoot": "/private/tmp/temari-coding-dashboard-live-9zdrehfo",
+  "taskId": "task-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb",
+  "failedPlanTaskId": "task-c90ba2ae-1c5f-472f-8fac-0b5d1c44b605",
+  "baseCommit": "bffe581fe11a53b85c7a35a0a84694a8277e0859",
+  "integrationCommit": "bc72d4f9f665f46a6ac69eeef6ee91749eb00c5b",
+  "implementationState": "COMPLETE",
+  "taskStatus": "NEEDS_REVIEW",
+  "integrityIssue": null,
+  "canCancel": false,
+  "actions": [
+    "update"
+  ],
+  "peakConcurrency": 2,
+  "overlapSeconds": 21.226,
+  "processes": [
+    {
+      "path": "prepared/task-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb/implementation/run-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb/bffe581fe11a53b85c7a35a0a84694a8277e0859/workers/count-validation/37cd2c54-9002-4c66-828f-c1290d18fef0/process.json",
+      "process": {
+        "schema": 1,
+        "pid": 66680,
+        "startedAt": "2026-10-01T07:47:28.064Z",
+        "endedAt": "2026-10-01T07:47:49.290Z",
+        "exitCode": 0,
+        "signal": null,
+        "timedOut": false,
+        "cancelled": false,
+        "outputLimitExceeded": false,
+        "error": null,
+        "stdoutBytes": 4212,
+        "stderrBytes": 4843
+      }
+    },
+    {
+      "path": "prepared/task-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb/implementation/run-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb/bffe581fe11a53b85c7a35a0a84694a8277e0859/workers/phase-labels/6174683c-777f-48b6-b8c4-9f669e155659/process.json",
+      "process": {
+        "schema": 1,
+        "pid": 66679,
+        "startedAt": "2026-10-01T07:47:28.063Z",
+        "endedAt": "2026-10-01T07:47:52.594Z",
+        "exitCode": 0,
+        "signal": null,
+        "timedOut": false,
+        "cancelled": false,
+        "outputLimitExceeded": false,
+        "error": null,
+        "stdoutBytes": 4542,
+        "stderrBytes": 4843
+      }
+    },
+    {
+      "path": "prepared/task-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb/implementation/run-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb/bffe581fe11a53b85c7a35a0a84694a8277e0859/workers/independent-review/2809a51e-3518-4892-980c-efe889d7a82a/process.json",
+      "process": {
+        "schema": 1,
+        "pid": 69253,
+        "startedAt": "2026-10-01T07:47:53.244Z",
+        "endedAt": "2026-10-01T07:48:23.299Z",
+        "exitCode": 0,
+        "signal": null,
+        "timedOut": false,
+        "cancelled": false,
+        "outputLimitExceeded": false,
+        "error": null,
+        "stdoutBytes": 11643,
+        "stderrBytes": 4843
+      }
+    }
+  ],
+  "activeRestart": {
+    "at": 1790840862.234698,
+    "stoppedServer": 63937,
+    "restartLauncher": 67867,
+    "codingPids": [
+      66679,
+      66680
+    ]
+  },
+  "integrationStatus": "PASS",
+  "patches": [
+    {
+      "assignmentId": "count-validation",
+      "baseCommit": "bffe581fe11a53b85c7a35a0a84694a8277e0859",
+      "snapshotCommit": "48bd70e61eb31d5b1b2f8f20dc042f58dee6b253",
+      "changedPaths": [
+        "limits.mjs"
+      ],
+      "sha256": "34654babaeb95861addd3a4f3e53a52cf2ae1a49b314ddaff2ec940609458132",
+      "patchPath": "/private/tmp/temari-coding-dashboard-live-9zdrehfo/prepared/task-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb/implementation/run-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb/bffe581fe11a53b85c7a35a0a84694a8277e0859/workers/count-validation/37cd2c54-9002-4c66-828f-c1290d18fef0/patch.diff"
+    },
+    {
+      "assignmentId": "phase-labels",
+      "baseCommit": "bffe581fe11a53b85c7a35a0a84694a8277e0859",
+      "snapshotCommit": "bf7fa11591978f6c08b93d8b1db6b85de5eeed79",
+      "changedPaths": [
+        "labels.mjs"
+      ],
+      "sha256": "0352ae6f73e068e1e858345208fddbd134ce4a04e736689ed67495848b0f7f8a",
+      "patchPath": "/private/tmp/temari-coding-dashboard-live-9zdrehfo/prepared/task-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb/implementation/run-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb/bffe581fe11a53b85c7a35a0a84694a8277e0859/workers/phase-labels/6174683c-777f-48b6-b8c4-9f669e155659/patch.diff"
+    }
+  ],
+  "verification": [
+    {
+      "program": "/Users/randydinh/.hermes/node/bin/node",
+      "args": [
+        "--test",
+        "limits.test.mjs",
+        "labels.test.mjs"
+      ],
+      "code": 0,
+      "logPath": "/private/tmp/temari-coding-dashboard-live-9zdrehfo/prepared/task-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb/implementation/run-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb/bffe581fe11a53b85c7a35a0a84694a8277e0859/execution/verify-0.log"
+    }
+  ],
+  "review": {
+    "status": "PASS",
+    "revision": "bc72d4f9f665f46a6ac69eeef6ee91749eb00c5b",
+    "summary": "Reviewed exact candidate bc72d4f9f665f46a6ac69eeef6ee91749eb00c5b. Count validation matches limits.test.mjs:4\u201312 (limits.mjs:1\u20138); all phase labels and fallback match labels.test.mjs:4\u20139 (labels.mjs:3\u201311). Committed diff changes only the two owned helpers; tests and other files remain unchanged, and working tree is clean. No unresolved issues. Tests were not rerun (verification command: none); integration receipt was outside the permitted checkout."
+  },
+  "sourceHeadAfter": "bffe581fe11a53b85c7a35a0a84694a8277e0859",
+  "sourceStatusAfter": "",
+  "integrationStatusAfter": "",
+  "rawEvidenceReferences": [
+    {
+      "kind": "request.json",
+      "path": "/private/tmp/temari-coding-dashboard-live-9zdrehfo/prepared/task-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb/implementation/run-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb/bffe581fe11a53b85c7a35a0a84694a8277e0859/request.json",
+      "sha256": "217bb80658660d1f0cd37061424809e68e5880b0e71a8080949f927124350a1d"
+    },
+    {
+      "kind": "integration.json",
+      "path": "/private/tmp/temari-coding-dashboard-live-9zdrehfo/prepared/task-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb/implementation/run-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb/bffe581fe11a53b85c7a35a0a84694a8277e0859/integration.json",
+      "sha256": "b4d5ecf0c54600ca1904871a2dff06e9861acd56c4879073b7d37802c8d9b143"
+    },
+    {
+      "kind": "ended.json",
+      "path": "/private/tmp/temari-coding-dashboard-live-9zdrehfo/prepared/task-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb/implementation/run-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb/bffe581fe11a53b85c7a35a0a84694a8277e0859/ended.json",
+      "sha256": "1521535eb25f07f6170ae67ce2ed9e5bea68aa3e9dbe3038a2e9da7ad1335021"
+    },
+    {
+      "kind": "review-request",
+      "path": "/private/tmp/temari-coding-dashboard-live-9zdrehfo/prepared/task-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb/implementation/run-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb/bffe581fe11a53b85c7a35a0a84694a8277e0859/workers/independent-review/2809a51e-3518-4892-980c-efe889d7a82a/review-request.json",
+      "sha256": "60749f0d4479ec8609dec599bbed127d08111a7a3ba920bb499362e06922b87c"
+    }
+  ],
+  "logReferences": [
+    {
+      "label": "task-tests",
+      "rawPath": "/private/tmp/temari-coding-dashboard-task-test.log",
+      "rawSha256": "1ac0fa564518d232bbe546db16da4edf71e982a22b130fb52c289c82b8a8115f",
+      "retained": "evaluations/task-continuity/2026-10-01-dashboard-implementation/task-tests.log",
+      "retainedSha256": "bf7843107aea16a2b7ddf755c66c71226e1ecbf0dc7dd475c6d8320a14b70973"
+    },
+    {
+      "label": "host-adapters",
+      "rawPath": "/private/tmp/temari-coding-dashboard-host-adapters.log",
+      "rawSha256": "3e732c0f87f1310069cfad16ef088251cdd60980431d42bee8d9a75187726afa",
+      "retained": "evaluations/task-continuity/2026-10-01-dashboard-implementation/host-adapters.log",
+      "retainedSha256": "ea40f4245b4c931c9fe4fdd8a1d2f7b2e2bb33a1d9db5086a7e5955be6efa4cd"
+    },
+    {
+      "label": "dashboard-tests",
+      "rawPath": "/private/tmp/temari-coding-dashboard-combined-test.log",
+      "rawSha256": "a23b66e305954722f74a98fa5ac0fdd321b6f4b8d08c49b9e3151115cddc9aff",
+      "retained": "evaluations/task-continuity/2026-10-01-dashboard-implementation/dashboard-tests.log",
+      "retainedSha256": "c6b0e60cb967daffa1d94da0818a2ea487ed1d0be2cc8bb597640e76a3abbbbe"
+    },
+    {
+      "label": "implementation-tests",
+      "rawPath": "/private/tmp/temari-dashboard-implementation-test.log",
+      "rawSha256": "a3f0f4a9f64751cef9c9d4f5cee8ef81eed04fd49b890fc64c0218fdd2e2278c",
+      "retained": "evaluations/task-continuity/2026-10-01-dashboard-implementation/implementation-tests.log",
+      "retainedSha256": "12250b30c980ac1ba4439bab2d6ed96c32dbcb89bba5d1d261dbbf3510a1de25"
+    },
+    {
+      "label": "typecheck",
+      "rawPath": "/private/tmp/temari-coding-dashboard-typecheck.log",
+      "rawSha256": "01bd7b5ddcccdab2d26fd2556d13b9ed5f433d101de9be454401b581fc847694",
+      "retained": "evaluations/task-continuity/2026-10-01-dashboard-implementation/typecheck.log",
+      "retainedSha256": "6fe57d10e56a47880a8d45967497d45c4547198bb159659c25adb31ef6d7d7fa"
+    },
+    {
+      "label": "live-combined-tests",
+      "rawPath": "/private/tmp/temari-coding-dashboard-live-9zdrehfo/prepared/task-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb/implementation/run-a8fc2f18-bec7-4ed5-9825-90c1a56cd5bb/bffe581fe11a53b85c7a35a0a84694a8277e0859/execution/verify-0.log",
+      "rawSha256": "65b8cbaa91bc46dc42ed394400d116b186873efce83eceb77d6573e8ae4dd182",
+      "retained": "evaluations/task-continuity/2026-10-01-dashboard-implementation/live-combined-tests.log",
+      "retainedSha256": "d457115b8da616f755399c7e8647a651560c6643d943a0536fa4ca036ee60866"
+    },
+    {
+      "label": "live-baseline-tests",
+      "rawPath": "/private/tmp/temari-coding-dashboard-live-9zdrehfo/baseline-tests.log",
+      "rawSha256": "880e13817fd4a2e56ed2239897b9df613bba61e230a48cba5c1af527459032a0",
+      "retained": "evaluations/task-continuity/2026-10-01-dashboard-implementation/live-baseline-tests.log",
+      "retainedSha256": "e4c5e87be42d97238820a49bb9ae269a5703874d12e78da83a4c671cbcc559b7"
+    }
+  ],
+  "limitations": [
+    "Live fixture models implement two helper functions, not autonomous product planning.",
+    "Independent live reviewer assessed source at the exact commit but could not read the external host receipt. The final inline metadata delivery is separately covered by focused regression.",
+    "No source application, publication, scheduling, automatic decomposition, or Registrar map."
+  ],
+  "finalSourceSha256": {
+    "tools/dashboard-implementation.mts": "3072051749f204f45d295c9984cb6811bb8c5acae854de43745635e7feef7f35",
+    "tools/dashboard-controller.mts": "fa423c525d91deb425197223e94d765d8c1a10c43730b1762cc7555d6d3fec69",
+    "tools/run-codex-write-workers.mts": "d1bdb96b64e7ac6730fafaed3e278afc16026a39c1083d6e8a55a3918950ffd5",
+    "tools/task-view.js": "d2da5964b3b920fd0240085261c9bcd34e85bbc93265e72326bfc2c5f222283c"
+  },
+  "focusedCheckCount": 29
+}

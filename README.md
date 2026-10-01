@@ -12,10 +12,25 @@ and [component guide](docs/platform-components.md) for the full design. Use the
 [verification matrix](docs/verification-matrix.md) to trace claims to
 implementation and retained evidence.
 
-The [approved next increment](docs/system-roles-and-responsibilities.md#final-recommendation-and-first-proof)
-uses Archon for execution and console integration, with Temari owning task
-continuity and closeout. The [boundary assessment](docs/system-roles-and-responsibilities.md#how-granular-are-the-boundaries-today)
+**Start with the [local dashboard guide](docs/task-dashboard.md)** to save goals,
+plan bounded parallel implementation from a natural goal, launch investigation
+agents, run coding agents in isolated clones, or execute verification checks. It covers setup, the UI flow,
+cancellation, retained results, and recovery. The
+[implementation design and example](docs/dashboard-implementation-design.md)
+explain ownership scopes, integration, independent review, and verification gates.
+The [planning, scheduling and knowledge-map guide](docs/dashboard-autonomy.md)
+covers retained goal proposals, durable recurring checks, pinned Registrar maps
+and their recovery boundaries.
+The [task continuity guide](docs/task-continuity.md) covers agent pickup, chat links,
+handoffs, evidence, and exact-run Archon controls. Successful agent findings need
+coordinator review; only eligible canonical evidence plus explicit acceptance can
+mark a task done. The [boundary assessment](docs/system-roles-and-responsibilities.md#how-granular-are-the-boundaries-today)
 distinguishes documented roles from implemented enforcement.
+The [coding dashboard verification record](evaluations/task-continuity/dashboard-implementation-2026-10-01.md)
+retains actual agent overlap, integration checks, independent review, and restart evidence.
+The [planning, scheduling and map verification record](evaluations/task-continuity/dashboard-autonomy-2026-10-01.md)
+records live goal planning, schedule dispatch and recovery, Registrar provenance,
+browser journeys, and the remaining configuration limits.
 
 Temari owns routing, plans, evidence, and closeout. The host (Cursor,
 Codex, Claude, Hermes, or serial fallback) owns tools, models, and
@@ -24,6 +39,19 @@ tree — [docs/overlays.md](docs/overlays.md).
 
 ## Agent starting points
 
+- **Operate the dashboard:** [setup and supported journeys](docs/task-dashboard.md).
+  Choose a saved goal, verification recipe, investigation swarm, configured
+  implementation plan, or validated natural-goal proposal. Use Schedules for
+  fixed recurring checks and Knowledge map for pinned Registrar paths/anchors. Coding produces an external integration candidate for
+  coordinator review; it does not apply changes to the source checkout or publish them.
+- **Pick up unfinished work:** [task continuity and recovery](docs/task-continuity.md).
+  Use workspace-scoped `pickup` before creating work, explicitly `enter` the matching
+  task with the current host conversation, and save a `handoff` before ending a session.
+  When pickup returns choices, select the intended goal explicitly.
+  For source host execution, the [tracked host entry](docs/migrations/host-session.md#track-the-host-journey-as-a-durable-task)
+  saves recovery and outcome handoffs automatically around the existing stage dialogue.
+  Rebuilt public bundles support [installed entry tracking](packages/workflow-runtime/public/skills/temari/references/task-tracking.md)
+  for lightweight and feature engineering, including worker preparation failures.
 - **Route a request:** [Temari coordinator and worker contracts](docs/system-roles-and-responsibilities.md#decision-and-control-owners),
   [one workflow](docs/workflow.md), and the packaged
   [Temari](packages/workflow-runtime/assets/v4.1/skills/temari/SKILL.md) and
@@ -70,6 +98,13 @@ pnpm exec nx graph
 
 # Shareable walkthrough.
 pnpm nx run workflow-engine:demo
+
+# Read-only task inbox over an existing store.
+pnpm exec nx run runtime:tasks -- list
+pnpm exec nx run runtime:tasks -- serve
+
+# Enable local controls; creates the store if needed. Configure using the guide.
+pnpm exec nx run runtime:tasks -- serve --control-config /absolute/dashboard-state/control.json --archon-home /absolute/dashboard-state/archon
 ```
 
 The repository requires pnpm 11.25.0 (declared in `package.json`), which must

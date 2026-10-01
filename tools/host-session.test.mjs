@@ -31,6 +31,7 @@ before(async () => {
   await packageCanonicalRuntime(join(build, 'runtime'));
   for (const file of [
     'entry.mjs',
+    'task-tracking.mjs',
     'stdio.mjs',
     'source.mjs',
     'invocation.mjs',
@@ -60,6 +61,7 @@ async function fixture(t, changes = {}) {
   await cp(join(build, 'runtime'), artifact, { recursive: true });
   for (const file of [
     'entry.mjs',
+    'task-tracking.mjs',
     'stdio.mjs',
     'source.mjs',
     'invocation.mjs',
@@ -91,16 +93,18 @@ async function fixture(t, changes = {}) {
   const env = { ...process.env };
   delete env.NODE_OPTIONS;
   delete env.NODE_PATH;
-  const launch = (resume = false) => {
+  const launch = (resume = false, extraArgs = [], nodeArgs = []) => {
     const child = spawn(
       process.execPath,
       [
+        ...nodeArgs,
         join(root, 'entry.mjs'),
         resume ? 'resume' : 'start',
         '--runtime',
         artifact,
         resume ? '--run-directory' : '--request',
         resume ? request.runDirectory : path,
+        ...extraArgs,
       ],
       { cwd: root, env, stdio: ['pipe', 'pipe', 'pipe'] },
     );
@@ -289,6 +293,404 @@ async function drive(f, session) {
   assert.equal(final.code, 0, final.stderr);
   return requested;
 }
+
+async function taskTracking(f, changes = {}, name = 'tracking') {
+  const payload = {
+    schemaVersion: 1,
+    taskRoot: join(f.root, 'tasks'),
+    taskId: 'tracked-goal',
+    actor: 'temari-host',
+    session: { host: 'codex', sessionId: 'chat-one' },
+    expectedVersion: 0,
+    idempotencyKey: 'tracked-start',
+    create: {
+      title: 'Continue actual host work',
+      goal: 'Preserve the goal through a lost session.',
+      workspaceRoot: f.candidate,
+    },
+    expected: {
+      runId: f.request.runId,
+      revision: f.request.revision,
+      runDirectory: f.request.runDirectory,
+      candidateRoot: f.candidate,
+    },
+    ...changes,
+  };
+  if (changes.create === undefined && Object.hasOwn(changes, 'create'))
+    delete payload.create;
+  const path = join(f.root, `${name}.json`);
+  const bytes = JSON.stringify(payload);
+  await writeFile(path, bytes);
+  return {
+    payload,
+    path,
+    args: [
+      '--task-tracking',
+      path,
+      '--expected-task-tracking-sha256',
+      createHash('sha256').update(bytes).digest('hex'),
+    ],
+  };
+}
+
+async function trackedTask(f, tracking) {
+  const store = await f.api.FileTaskStore.openExisting(
+    tracking.payload.taskRoot,
+  );
+  const task = await store.load(tracking.payload.taskId);
+  return {
+    store,
+    task,
+    pickup: () =>
+      new f.api.TaskRuntime({ store }).pickup({
+        taskId: tracking.payload.taskId,
+      }),
+  };
+}
+
+test('tracked host execution automatically retains a task and pending-closeout receipt references', async (t) => {
+  const f = await fixture(t);
+  const tracking = await taskTracking(f);
+  assert.deepEqual(await drive(f, f.launch(false, tracking.args)), stages);
+  const { task, pickup } = await trackedTask(f, tracking);
+  assert.equal(task.sessions[0].sessionId, 'chat-one');
+  assert.match(task.handoff.summary, /PASS/);
+  assert.match(task.handoff.nextAction, /closeout/i);
+  const receiptPath = join(
+    f.request.runDirectory,
+    'receipts',
+    `${f.request.runId}.receipt.json`,
+  );
+  assert(task.handoff.contextRefs.some((ref) => ref.location === receiptPath));
+  assert.equal(
+    (await f.receipt()).evidenceProfile,
+    'candidate-stage-evidence-v1',
+  );
+  assert.equal(task.runs.length, 0);
+  assert.equal(task.acceptance, null);
+  assert.equal((await pickup()).selected.status, 'OPEN');
+  const descriptor = JSON.parse(
+    await readFile(
+      join(f.request.runDirectory, 'config', 'input.json'),
+      'utf8',
+    ),
+  );
+  assert.equal(Object.hasOwn(descriptor, 'taskTracking'), false);
+  assert.equal(Object.hasOwn(descriptor, 'session'), false);
+  const before = JSON.stringify(task);
+  const terminal = await f.launch(true, tracking.args).done;
+  assert.notEqual(terminal.code, 0);
+  assert(!terminal.messages.some((item) => item.type === 'stage'));
+  assert.equal(JSON.stringify((await trackedTask(f, tracking)).task), before);
+});
+
+test('tracked interruption is picked up and resumed in a second chat without repeating build', async (t) => {
+  const f = await fixture(t);
+  const tracking = await taskTracking(f);
+  const first = f.launch(false, tracking.args);
+  while (true) {
+    const message = await first.next();
+    if (message.type === 'checkpoint' && message.stage === 'build') break;
+    if (message.type === 'checkpoint') continue;
+    await respond(f, first, message);
+  }
+  first.child.stdin.end();
+  assert.notEqual((await first.done).code, 0);
+  const descriptorPath = join(f.request.runDirectory, 'config', 'input.json');
+  const descriptorBefore = await readFile(descriptorPath, 'utf8');
+  const interrupted = await trackedTask(f, tracking);
+  const brief = (await interrupted.pickup()).selected;
+  assert(
+    brief.handoff.contextRefs.some((ref) =>
+      ref.location.includes('checkpoint'),
+    ),
+  );
+  assert.match(brief.nextAction, /resume|recover|inspect/i);
+  const omitted = await f.launch(true).done;
+  assert.notEqual(omitted.code, 0);
+  assert(!omitted.messages.some((item) => item.type === 'stage'));
+  const next = await taskTracking(
+    f,
+    {
+      create: undefined,
+      expectedVersion: interrupted.task.version,
+      idempotencyKey: 'tracked-resume',
+      session: { host: 'codex', sessionId: 'chat-two' },
+    },
+    'resume-tracking',
+  );
+  const swapped = await taskTracking(
+    f,
+    { ...next.payload, taskId: 'different-goal' },
+    'swapped-tracking',
+  );
+  const wrong = await f.launch(true, swapped.args).done;
+  assert.notEqual(wrong.code, 0);
+  assert(!wrong.messages.some((item) => item.type === 'stage'));
+  assert.deepEqual(await drive(f, f.launch(true, next.args)), [
+    'review',
+    'verify',
+    'deliver',
+  ]);
+  const finished = await trackedTask(f, tracking);
+  assert.deepEqual(
+    finished.task.sessions.map((session) => session.sessionId),
+    ['chat-one', 'chat-two'],
+  );
+  assert.match(finished.task.handoff.summary, /PASS/);
+  assert.equal(await readFile(descriptorPath, 'utf8'), descriptorBefore);
+  assert.equal((await finished.pickup()).selected.status, 'OPEN');
+});
+
+test('hard process loss leaves the starting handoff and exact recovery locations', async (t) => {
+  const f = await fixture(t);
+  const tracking = await taskTracking(f);
+  const session = f.launch(false, tracking.args);
+  assert.equal((await session.next()).stage, 'investigate');
+  session.child.kill('SIGKILL');
+  await session.done;
+  const { task, pickup } = await trackedTask(f, tracking);
+  assert(
+    task.handoff.contextRefs.some(
+      (ref) =>
+        ref.location === join(f.request.runDirectory, 'config', 'input.json'),
+    ),
+  );
+  assert.match((await pickup()).selected.nextAction, /resume|recover|inspect/i);
+  await f.absentReceipt();
+  assert.deepEqual(await drive(f, f.launch(true, tracking.args)), stages);
+  const resumed = (await trackedTask(f, tracking)).task;
+  assert.equal(
+    resumed.events.filter((event) => event.change.type === 'task-entered')
+      .length,
+    1,
+  );
+  assert.equal(
+    resumed.events.filter((event) => event.change.type === 'handoff-recorded')
+      .length,
+    2,
+  );
+});
+
+test('a crash at the initial checkpoint cannot drop tracking on resume', async (t) => {
+  const f = await fixture(t);
+  const tracking = await taskTracking(f);
+  const preload = join(f.root, 'exit-after-initial-checkpoint.mjs');
+  await writeFile(
+    preload,
+    `
+    import {createRequire} from 'node:module';
+    import {pathToFileURL} from 'node:url';
+    const require = createRequire(pathToFileURL(${JSON.stringify(join(f.artifact, 'consumer.mjs'))}));
+    const api = await import(pathToFileURL(require.resolve('@temari/runtime')).href);
+    const original = api.FileWorkflowCheckpointStore.prototype.save;
+    api.FileWorkflowCheckpointStore.prototype.save = async function(checkpoint) {
+      const result = await original.call(this, checkpoint);
+      if (checkpoint.stages.length === 0) process.exit(86);
+      return result;
+    };
+  `,
+  );
+  const killed = await f.launch(false, tracking.args, ['--import', preload])
+    .done;
+  assert.equal(killed.code, 86, killed.stderr);
+  assert(!killed.messages.some((message) => message.type === 'stage'));
+  assert.deepEqual((await f.checkpoint()).stages, []);
+  assert.equal(
+    JSON.parse(
+      await readFile(join(f.request.runDirectory, 'task-binding.json'), 'utf8'),
+    ).taskId,
+    tracking.payload.taskId,
+  );
+  const untracked = await f.launch(true).done;
+  assert.notEqual(untracked.code, 0);
+  assert.match(untracked.stderr, /task-tracked/);
+  assert(!untracked.messages.some((message) => message.type === 'stage'));
+  assert.deepEqual(await drive(f, f.launch(true, tracking.args)), stages);
+});
+
+test('interrupted binding writes never publish partial final JSON and can be retried', async (t) => {
+  const f = await fixture(t);
+  const tracking = await taskTracking(f);
+  const preload = join(f.root, 'exit-during-binding-write.mjs');
+  await writeFile(
+    preload,
+    `
+    import fs from 'node:fs/promises';
+    import {syncBuiltinESMExports} from 'node:module';
+    const original = fs.open;
+    fs.open = async function(path, ...args) {
+      const handle = await original.call(this, path, ...args);
+      if (String(path).includes('.task-binding-') || String(path).endsWith('/task-binding.json')) {
+        handle.writeFile = async function(bytes) {
+          await handle.write(Buffer.from(bytes).subarray(0, 10));
+          process.exit(87);
+        };
+      }
+      return handle;
+    };
+    syncBuiltinESMExports();
+  `,
+  );
+  const killed = await f.launch(false, tracking.args, ['--import', preload])
+    .done;
+  assert.equal(killed.code, 87, killed.stderr);
+  const binding = join(f.request.runDirectory, 'task-binding.json');
+  await assert.rejects(readFile(binding), { code: 'ENOENT' });
+  await f.absentReceipt();
+  // Retry the immutable selection publication independently; an interrupted
+  // pre-checkpoint host start still follows the existing partial-start policy.
+  const { prepareTaskTracking } =
+    await import('../packages/workflow-runtime/host/task-tracking.mjs');
+  const input = JSON.parse(
+    await readFile(
+      join(f.request.runDirectory, 'config', 'input.json'),
+      'utf8',
+    ),
+  );
+  const prepared = await prepareTaskTracking({
+    runtime: f.api,
+    runtimeRoot: f.artifact,
+    input,
+    paths: {
+      config: join(f.request.runDirectory, 'config'),
+      stores: ['receipts', 'checkpoints', 'evidence', 'manifests'].map((name) =>
+        join(f.request.runDirectory, name),
+      ),
+    },
+    sidecarPath: tracking.path,
+    expectedSha256: tracking.args[3],
+  });
+  await prepared.reserve();
+  const published = await readFile(binding, 'utf8');
+  assert.equal(JSON.parse(published).taskId, tracking.payload.taskId);
+  await prepared.reserve();
+  assert.equal(await readFile(binding, 'utf8'), published);
+});
+
+test('source tracking refuses a task with canonical run history without changing its state', async (t) => {
+  const f = await fixture(t);
+  const tracking = await taskTracking(f);
+  const store = await f.api.FileTaskStore.create(tracking.payload.taskRoot);
+  await store.createTask({
+    taskId: tracking.payload.taskId,
+    actor: 'temari',
+    idempotencyKey: 'create-canonical',
+    ...tracking.payload.create,
+  });
+  const require = createRequire(
+    pathToFileURL(join(f.artifact, 'consumer.mjs')),
+  );
+  const core = await import(
+    pathToFileURL(require.resolve('@temari/temari-core')).href
+  );
+  const task = await store.bindRun({
+    taskId: tracking.payload.taskId,
+    actor: 'temari',
+    idempotencyKey: 'bind-canonical',
+    expectedVersion: 1,
+    run: {
+      runId: 'canonical-run',
+      revision: 'canonical-revision',
+      plan: core.createExecutionPlan(f.request.obligations),
+    },
+  });
+  const selected = await taskTracking(f, {
+    create: undefined,
+    expectedVersion: task.version,
+  });
+  const result = await f.launch(false, selected.args).done;
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /canonical runs or acceptance/);
+  assert(!result.messages.some((message) => message.type === 'stage'));
+  assert.deepEqual(await store.load(task.taskId), task);
+  await f.absentReceipt();
+});
+
+test('tracking refuses invalid selection before any stage or task mutation', async (t) => {
+  for (const mode of [
+    'missing-digest',
+    'wrong-digest',
+    'wrong-run',
+    'wrong-candidate',
+    'overlap',
+    'stale-version',
+  ]) {
+    await t.test(mode, async (t) => {
+      const f = await fixture(t);
+      const tracking = await taskTracking(
+        f,
+        mode === 'stale-version' ? { expectedVersion: 9 } : {},
+      );
+      let payload = tracking.payload;
+      if (mode === 'wrong-run')
+        payload = {
+          ...payload,
+          expected: { ...payload.expected, runId: 'another-run' },
+        };
+      if (mode === 'wrong-candidate')
+        payload = {
+          ...payload,
+          expected: { ...payload.expected, candidateRoot: f.root },
+        };
+      if (mode === 'overlap')
+        payload = { ...payload, taskRoot: join(f.candidate, 'tasks') };
+      const updated = await taskTracking(f, payload);
+      const args = [...updated.args];
+      if (mode === 'missing-digest') args.splice(2);
+      if (mode === 'wrong-digest') args[3] = '0'.repeat(64);
+      const result = await f.launch(false, args).done;
+      assert.notEqual(result.code, 0, mode);
+      assert(!result.messages.some((item) => item.type === 'stage'), mode);
+      try {
+        const store = await f.api.FileTaskStore.openExisting(
+          updated.payload.taskRoot,
+        );
+        assert.equal(await store.load(updated.payload.taskId), null, mode);
+      } catch (error) {
+        if (!['ENOENT'].includes(error.code)) throw error;
+      }
+      await f.absentReceipt();
+    });
+  }
+});
+
+test('a concurrent task edit survives the host result handoff and the canonical receipt remains available', async (t) => {
+  const f = await fixture(t);
+  const tracking = await taskTracking(f);
+  const session = f.launch(false, tracking.args);
+  const first = await session.next();
+  assert.equal(first.stage, 'investigate');
+  const { store, task } = await trackedTask(f, tracking);
+  await store.updateTask({
+    taskId: task.taskId,
+    actor: 'another-chat',
+    idempotencyKey: 'concurrent-edit',
+    expectedVersion: task.version,
+    nextAction: 'Keep the other chat decision.',
+    blocker: null,
+  });
+  await respond(f, session, first);
+  while (true) {
+    let message;
+    try {
+      message = await session.next();
+    } catch {
+      break;
+    }
+    if (message.type === 'checkpoint') continue;
+    if (message.type === 'complete') break;
+    await respond(f, session, message);
+  }
+  const result = await session.done;
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /version|tracking|handoff/i);
+  assert.equal((await f.receipt()).status, 'PASS');
+  assert.equal(
+    (await store.load(task.taskId)).nextAction,
+    'Keep the other chat decision.',
+  );
+});
 
 test('relocated experimental bridge runs actual candidate changes and runtime evidence', async (t) => {
   const f = await fixture(t);

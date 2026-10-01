@@ -1,0 +1,20 @@
+(node:68976) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ names each coding phase for the dashboard (0.411792ms)
+✔ unknown and failure states request attention (0.077416ms)
+(node:68977) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ allows integer counts within configured ceiling (0.408458ms)
+✔ rejects invalid counts and configured ceilings (0.264083ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 49.477333
+
+--- stderr ---
+(node:68975) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)

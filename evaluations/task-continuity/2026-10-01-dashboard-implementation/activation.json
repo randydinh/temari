@@ -1,0 +1,109 @@
+{
+  "schema": 1,
+  "sourceCommit": "8e73731d63159d61807d2a54b6c386eb62481f40",
+  "dashboardUrl": "http://127.0.0.1:3092",
+  "dashboardPid": 22223,
+  "archonUrl": "http://127.0.0.1:3091",
+  "archonPidRetained": 30202,
+  "configPath": "/Users/randydinh/Library/Application Support/Temari/dashboard/control.json",
+  "configSha256": "c8de71486ac58889e905411fed88abb74009fa1f49778b960c4b0671590fc385",
+  "implementation": {
+    "maxConcurrency": 2,
+    "timeoutMs": 300000,
+    "plans": [
+      {
+        "id": "dashboard-ui-and-guide",
+        "title": "Improve dashboard UI and operator guide",
+        "description": "Temari prepares a bounded UI change and its matching guide update. Two isolated implementers own the browser assets and guide separately; combined syntax, type and control checks precede independent review.",
+        "assignments": [
+          {
+            "id": "dashboard-ui",
+            "goal": "Implement the requested dashboard UI behavior within the three owned browser assets. Follow existing layout, accessible controls and controller API. Do not change the controller or runtime. Cite changed code and scoped verification.",
+            "owns": [
+              {
+                "kind": "file",
+                "path": "tools/task-view.js"
+              },
+              {
+                "kind": "file",
+                "path": "tools/task-view.html"
+              },
+              {
+                "kind": "file",
+                "path": "tools/task-view.css"
+              }
+            ]
+          },
+          {
+            "id": "operator-guide",
+            "goal": "Update the dashboard operator guide for the requested behavior, using current controller and UI contracts as evidence. Describe the intended experience and limitations accurately.",
+            "owns": [
+              {
+                "kind": "file",
+                "path": "docs/task-dashboard.md"
+              }
+            ]
+          }
+        ],
+        "verification": [
+          {
+            "program": "/Users/randydinh/.hermes/node/bin/node",
+            "args": [
+              "--check",
+              "tools/task-view.js"
+            ]
+          },
+          {
+            "program": "/Users/randydinh/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback/pnpm",
+            "args": [
+              "exec",
+              "nx",
+              "run",
+              "runtime:task-typecheck",
+              "--output-style=static"
+            ]
+          },
+          {
+            "program": "/Users/randydinh/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback/pnpm",
+            "args": [
+              "exec",
+              "nx",
+              "run",
+              "runtime:dashboard-test",
+              "--output-style=static"
+            ]
+          },
+          {
+            "program": "/usr/bin/git",
+            "args": [
+              "diff",
+              "--check"
+            ]
+          }
+        ],
+        "reviewer": {
+          "id": "dashboard-review",
+          "goal": "Independently review the exact integrated UI and guide changes against the overall goal, current runtime API and retained verification. Check accessibility, existing flows, and documentation accuracy. Report concrete defects with source citations or PASS with evidence."
+        }
+      }
+    ]
+  },
+  "taskIdsBefore": [
+    "temari-task-dashboard",
+    "task-7e346e45-ac5f-4c1f-b8c1-72e129272423",
+    "task-13476a2c-81b7-4192-b8d8-4ce6c835e771"
+  ],
+  "taskIdsAfter": [
+    "temari-task-dashboard",
+    "task-7e346e45-ac5f-4c1f-b8c1-72e129272423",
+    "task-13476a2c-81b7-4192-b8d8-4ce6c835e771"
+  ],
+  "browserObserved": [
+    "New goal type lists investigation, implementation and verification.",
+    "Selected coding plan previews two typed ownership assignments, combined verification and independent reviewer."
+  ],
+  "screenshots": [
+    "/Users/randydinh/.codex/visualizations/2026/09/30/01a0f0b2-c342-7a72-99ac-145edc0f45ba/dashboard-coding-plan.png",
+    "/Users/randydinh/.codex/visualizations/2026/09/30/01a0f0b2-c342-7a72-99ac-145edc0f45ba/dashboard-parallel-coding.png"
+  ]
+}

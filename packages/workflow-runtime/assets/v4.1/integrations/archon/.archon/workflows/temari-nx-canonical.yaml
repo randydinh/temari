@@ -1,6 +1,8 @@
 name: temari-nx-canonical
 description: Model-free six-stage Nx receipt conformance journey.
 inputs:
+  temari_binding:
+    required: false
   bridge:
     required: true
   finalizer:
@@ -37,4 +39,4 @@ nodes:
     depends_on: [deliver]
     always_run: true
     mutates_checkout: false
-    bash: node --import @swc-node/register/esm-register "$INPUTS_FINALIZER" --bridge "$INPUTS_BRIDGE" --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --spec "$INPUTS_SPEC"
+    bash: bun "$INPUTS_FINALIZER" --bridge "$INPUTS_BRIDGE" --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --spec "$INPUTS_SPEC"

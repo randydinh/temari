@@ -1,0 +1,32 @@
+
+> nx run runtime:dashboard-native-test
+
+> node --import @swc-node/register/esm-register --test --test-concurrency=1 tools/dashboard-native.test.mts
+
+(node:10039) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:10040) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:10040) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:10040) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"nativeRunId":"cb815a42d307798df66295b94506d89e","stages":6,"status":"DONE","restartRetained":true,"resumedExactRun":true}
+✔ real HTTP goal survives restart, resumes the exact native run, and verifies evidence before acceptance (8349.083708ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8671.541167
+
+
+
+ NX   Successfully ran target dashboard-native-test for project runtime
+
+
+  Run duration:      8.7s
+  Cache:             0/1 hit (0%)
+  Critical path:     8.7s (1 task)
+  Recoverable time:  <1ms

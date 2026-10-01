@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "observedAt": "2026-10-01T08:33:03Z",
+  "url": "http://127.0.0.1:3094",
+  "liveFixtureRoot": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo",
+  "goalPlanning": {
+    "proofPath": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/planner-result-proof.json",
+    "taskId": "task-d86b70e0-2f54-499a-bb14-4678f53ed10e"
+  },
+  "parallelCoding": {
+    "proofPath": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/coding-result-proof.json",
+    "runId": "run-goal-8faaf7baf663d7b42e8d8ecfa3d0fbcd50eefd5a7fe52672",
+    "codingOverlapMs": 14268.0,
+    "integrationCommit": "d228f708806a83e3241d132870094e6d92984d07",
+    "sourceUnchanged": true,
+    "integrationClean": true,
+    "statuses": {
+      "numbers": "PASS",
+      "independent-reviewer": "PASS",
+      "labels": "PASS"
+    }
+  },
+  "activePlannerRestart": {
+    "proofPath": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/active-planner-restart-proof.json",
+    "taskId": "task-8878cdab-f9cf-44de-884d-3837891abc81",
+    "serverPidBefore": 77262,
+    "serverPidAfter": 28612,
+    "supervisorPid": 28278,
+    "modelPid": 28347,
+    "sameProcessPid": true,
+    "sameSupervisor": true,
+    "sameLaunchIntent": true,
+    "sameManifest": true,
+    "state": "READY"
+  },
+  "taskSnapshotsAfterRestart": [
+    {
+      "taskId": "task-8878cdab-f9cf-44de-884d-3837891abc81",
+      "title": "Planner restart continuity",
+      "status": "OPEN",
+      "currentRunId": null,
+      "version": 2,
+      "nextAction": "Review the validated proposal and prepare its parallel implementation.",
+      "blocker": null
+    },
+    {
+      "taskId": "task-d86b70e0-2f54-499a-bb14-4678f53ed10e",
+      "title": "Double numbers and normalize labels",
+      "status": "NEEDS_REVIEW",
+      "currentRunId": "run-goal-8faaf7baf663d7b42e8d8ecfa3d0fbcd50eefd5a7fe52672",
+      "version": 4,
+      "nextAction": "Follow the coding, integration and independent review; inspect the retained integration candidate before deciding the next engineering step.",
+      "blocker": null
+    }
+  ],
+  "scope": "Actual local authenticated Codex planner and parallel coding processes; independent review and model-free combined verification; no source application or publication."
+}

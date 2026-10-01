@@ -5,6 +5,7 @@ import {
   mkdir,
   open,
   readFile,
+  readdir,
   realpath,
   unlink,
 } from 'node:fs/promises';
@@ -42,6 +43,13 @@ export interface ParallelWorkerReceiptStore {
     binding: ParallelWorkerReceiptBinding,
   ): Promise<string>;
   load(runId: string): Promise<ParallelWorkerReceiptRecord | null>;
+  /** Retain the highest observed reservation across invocations/restarts.
+   * Stores without this optional port report this invocation's peak only. */
+  observeConcurrency?(
+    runId: string,
+    binding: ParallelWorkerReceiptBinding,
+    concurrency: number,
+  ): Promise<number>;
 }
 
 export interface ParallelWorkerReceiptBinding {
@@ -318,6 +326,64 @@ export class FileParallelWorkerReceiptStore implements ParallelWorkerReceiptStor
       throw error;
     }
   }
+
+  async observeConcurrency(
+    runId: string,
+    binding: ParallelWorkerReceiptBinding,
+    concurrency: number,
+  ): Promise<number> {
+    assertRunId(runId);
+    assert(Number.isSafeInteger(concurrency) && concurrency >= 0);
+    const prefix = `${runId}.parallel.peak.`;
+    if (concurrency > 0) {
+      const path = join(this.root, `${prefix}${concurrency}.json`);
+      const content = canonical({ schema: 1, runId, binding, concurrency });
+      const temporary = join(this.root, `.${runId}.${randomUUID()}.tmp`);
+      const file = await open(temporary, 'wx', 0o600);
+      try {
+        try {
+          await file.writeFile(content);
+          await file.sync();
+        } finally {
+          await file.close();
+        }
+        try {
+          await link(temporary, path);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+          assert.equal(
+            await readFile(path, 'utf8'),
+            content,
+            'Parallel concurrency observation binding changed.',
+          );
+        }
+        const directory = await open(this.root, 'r');
+        try {
+          await directory.sync();
+        } finally {
+          await directory.close();
+        }
+      } finally {
+        await unlink(temporary).catch(() => undefined);
+      }
+    }
+    let peak = 0;
+    for (const name of await readdir(this.root)) {
+      if (!name.startsWith(prefix) || !name.endsWith('.json')) continue;
+      const count = Number(name.slice(prefix.length, -'.json'.length));
+      assert(
+        Number.isSafeInteger(count) && count > 0,
+        'Invalid concurrency observation.',
+      );
+      assert.deepEqual(
+        JSON.parse(await readFile(join(this.root, name), 'utf8')),
+        { schema: 1, runId, binding, concurrency: count },
+        'Parallel concurrency observation binding changed.',
+      );
+      peak = Math.max(peak, count);
+    }
+    return peak;
+  }
 }
 
 async function persistReceipt(
@@ -561,7 +627,10 @@ function outcomeForRecord(
 }
 
 async function ensureGroup(
-  request: ExecuteRestartableParallelWorkersRequest,
+  request: Pick<
+    ExecuteRestartableParallelWorkersRequest,
+    'runId' | 'revision' | 'assignments' | 'childStore' | 'owner'
+  >,
   identity: TaskIdentity,
   now: () => Date,
 ): Promise<ChildTaskGroupRecord> {
@@ -858,6 +927,61 @@ async function executeClaimed(
   }
 }
 
+/** Publish the runtime's immutable child identities before a host binds them to
+ * a parent task. Preparation never claims a lease or invokes a worker. */
+export async function prepareRestartableParallelWorkers(
+  request: Pick<
+    ExecuteRestartableParallelWorkersRequest,
+    | 'runId'
+    | 'revision'
+    | 'plan'
+    | 'capabilities'
+    | 'assignments'
+    | 'childStore'
+    | 'owner'
+    | 'maxConcurrency'
+    | 'now'
+  >,
+): Promise<{
+  readonly group: ChildTaskGroupRecord;
+  readonly tasks: readonly ChildTaskRecord[];
+}> {
+  assertRunId(request.runId);
+  assertText(request.revision, 'Revision');
+  assertText(request.owner, 'Owner');
+  const failure = capabilityFailure(request.plan, request.capabilities);
+  assert(!failure, failure?.message);
+  const declaredConcurrency = request.plan.parallelism?.maxConcurrency ?? 0;
+  const maxConcurrency = request.maxConcurrency ?? declaredConcurrency;
+  assert(
+    Number.isInteger(maxConcurrency) &&
+      maxConcurrency > 0 &&
+      maxConcurrency <= declaredConcurrency,
+    'Parallel worker maxConcurrency must be a positive integer no greater than the plan limit.',
+  );
+  preflightParallelWorkers(request.assignments);
+  const identity = taskIdentity(
+    request.runId,
+    request.revision,
+    request.plan,
+    request.assignments,
+    maxConcurrency,
+  );
+  const group = await ensureGroup(
+    request,
+    identity,
+    request.now ?? (() => new Date()),
+  );
+  const tasks = await Promise.all(
+    group.taskIds.map(async (taskId) => {
+      const task = await request.childStore.load(taskId);
+      assert(task, 'Prepared child task is missing.');
+      return task;
+    }),
+  );
+  return { group, tasks };
+}
+
 export async function executeRestartableParallelWorkers(
   request: ExecuteRestartableParallelWorkersRequest,
 ): Promise<RestartableParallelWorkersResult> {
@@ -1000,6 +1124,7 @@ export async function executeRestartableParallelWorkers(
   );
   let peakConcurrency = 0;
   while (true) {
+    const reservationTime = now();
     const reservation = await request.childStore.claimGroup({
       groupId: identity.groupId,
       runId: request.runId,
@@ -1008,14 +1133,34 @@ export async function executeRestartableParallelWorkers(
       maxConcurrency,
       owner: request.owner,
       leaseMs: request.leaseMs,
-      now: now(),
+      now: reservationTime,
     });
     const claimed = reservation.claimed.map((record) => {
       const assignment = assignmentByTaskId.get(record.taskId);
       assert(assignment);
       return { assignment, record };
     });
-    peakConcurrency = Math.max(peakConcurrency, claimed.length);
+    const activeReservations = reservation.records.filter(
+      (record) =>
+        record.status === 'RUNNING' &&
+        record.lease &&
+        Date.parse(record.lease.expiresAt) > reservationTime.getTime(),
+    ).length;
+    peakConcurrency = Math.max(peakConcurrency, activeReservations);
+    if (request.receiptStore.observeConcurrency) {
+      peakConcurrency = Math.max(
+        peakConcurrency,
+        await request.receiptStore.observeConcurrency(
+          request.runId,
+          { groupId: identity.groupId, fingerprint: identity.fingerprint },
+          activeReservations,
+        ),
+      );
+      assert(
+        peakConcurrency <= maxConcurrency,
+        'Retained concurrency exceeds the plan limit.',
+      );
+    }
 
     const leaseLost = new Set<string>();
     await Promise.all(

@@ -1,0 +1,68 @@
+{
+  "observedAt": "2026-10-01T08:40:29.818291+00:00",
+  "url": "http://127.0.0.1:3094",
+  "surface": "Codex in-app browser; CUA accessibility and screenshots",
+  "fixtureKind": "synthetic source code and synthetic Registrar content; actual authenticated Codex and Archon processes",
+  "observations": [
+    {
+      "journey": "natural goal",
+      "actions": [
+        "Plan my goal",
+        "Review proposal",
+        "Prepare this plan",
+        "Start implementers"
+      ],
+      "taskId": "task-d86b70e0-2f54-499a-bb14-4678f53ed10e",
+      "observed": [
+        "Proposal ready with numbers.mjs and labels.mjs ownership",
+        "Two implementer successes",
+        "Combined verification passed",
+        "Independent review passed at d228f708806a83e3241d132870094e6d92984d07",
+        "Task Needs review; source unchanged"
+      ],
+      "screenshot": "dashboard-autonomy-coding.png"
+    },
+    {
+      "journey": "schedule",
+      "actions": [
+        "Create recurring schedule",
+        "Pause future runs",
+        "Create once schedule",
+        "Refresh after listener restart",
+        "Resume schedule",
+        "Cancel schedule"
+      ],
+      "observed": [
+        "Terminal recurring history with coalesced slots",
+        "Single Terminal once occurrence",
+        "Pause and resume settings reflected in view",
+        "Both schedules Cancelled; history retained"
+      ],
+      "screenshot": "dashboard-autonomy-schedules.png"
+    },
+    {
+      "journey": "Registrar map",
+      "actions": [
+        "Knowledge map",
+        "Select docs/map.md",
+        "Open anchored support relationship"
+      ],
+      "observed": [
+        "16 nodes and 23 edges",
+        "Pinned generation ce74e9fbc45b45248a482a0c8a3de050",
+        "Current-original not checked; historical view",
+        "Manifest efdd6e618d638e8f25bd9f12f982320c2bc78a0ac8c4e8b3c0f3da9220676011",
+        "Relationship anchors and qualifiers with Unicode span 0-50",
+        "Explicit unsupported visual and asset gaps"
+      ],
+      "screenshots": [
+        "dashboard-registrar-map-overview.png",
+        "dashboard-registrar-map.png"
+      ]
+    }
+  ],
+  "limits": [
+    "Browser proof observes visible outcomes; subprocess crash/overlap/revocation regressions are distinct evidence.",
+    "Synthetic map is not the user's actual Registrar content."
+  ]
+}

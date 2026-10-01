@@ -1,0 +1,145 @@
+{
+  "elapsedSeconds": 3.788,
+  "controlCount": 14,
+  "mode": "writable",
+  "controls": {
+    "task-scheduled-3e51f51a60cde873863f1f8f30b072fb6ede47e9": {
+      "actions": [
+        "update",
+        "observe",
+        "verify",
+        "accept"
+      ],
+      "issue": null,
+      "candidateCurrent": true
+    },
+    "task-scheduled-26141474d4d6eab63571d0dfce70ed007de5e32f": {
+      "actions": [
+        "update",
+        "observe",
+        "verify",
+        "accept"
+      ],
+      "issue": null,
+      "candidateCurrent": true
+    },
+    "task-scheduled-b36d9702ef6e05368d48df957f678dc9f0f23a7c": {
+      "actions": [
+        "update",
+        "observe",
+        "verify",
+        "accept"
+      ],
+      "issue": null,
+      "candidateCurrent": true
+    },
+    "task-scheduled-9246ecdfad701ab85b9908380907d5e2fb2f9d6f": {
+      "actions": [
+        "update",
+        "observe",
+        "verify",
+        "accept"
+      ],
+      "issue": null,
+      "candidateCurrent": true
+    },
+    "task-8878cdab-f9cf-44de-884d-3837891abc81": {
+      "actions": [
+        "update",
+        "prepare-plan"
+      ],
+      "issue": null,
+      "candidateCurrent": true
+    },
+    "task-scheduled-5783c76353cc5ab1043ff0f62f414b62d0653f40": {
+      "actions": [
+        "update",
+        "observe",
+        "verify",
+        "accept"
+      ],
+      "issue": null,
+      "candidateCurrent": true
+    },
+    "task-scheduled-73876cd2cda84bf9e2010fa42e27d9eb39e73468": {
+      "actions": [
+        "update",
+        "observe",
+        "verify",
+        "accept"
+      ],
+      "issue": null,
+      "candidateCurrent": true
+    },
+    "task-scheduled-24411da06beceb449577993d35f069bf323f1d42": {
+      "actions": [
+        "update",
+        "observe",
+        "verify",
+        "accept"
+      ],
+      "issue": null,
+      "candidateCurrent": true
+    },
+    "task-scheduled-acb99a24f6dba4be887e51ae1b0c1eabfce3bbc8": {
+      "actions": [
+        "update",
+        "observe",
+        "verify",
+        "accept"
+      ],
+      "issue": null,
+      "candidateCurrent": true
+    },
+    "task-d86b70e0-2f54-499a-bb14-4678f53ed10e": {
+      "actions": [
+        "update"
+      ],
+      "issue": null,
+      "candidateCurrent": true
+    },
+    "task-scheduled-6177ab1ef8a4041b02123772679ea070131c2268": {
+      "actions": [
+        "update",
+        "observe",
+        "verify",
+        "accept"
+      ],
+      "issue": null,
+      "candidateCurrent": true
+    },
+    "task-scheduled-718e105f8219ebdf8203b411434dd7667afa22f3": {
+      "actions": [
+        "update",
+        "observe",
+        "verify",
+        "accept"
+      ],
+      "issue": null,
+      "candidateCurrent": true
+    },
+    "task-scheduled-e4b506cfc50254d8be4be77c88dd302a3ca7a485": {
+      "actions": [
+        "update",
+        "observe",
+        "verify",
+        "accept"
+      ],
+      "issue": null,
+      "candidateCurrent": true
+    },
+    "task-scheduled-cfe601f70514685c1a5f3a0326dea5548e2cb76c": {
+      "actions": [
+        "update",
+        "observe",
+        "verify",
+        "accept"
+      ],
+      "issue": null,
+      "candidateCurrent": true
+    }
+  },
+  "beforeSeconds": 12.92,
+  "beforeControlCount": 13,
+  "previousControlsUnchanged": true
+}

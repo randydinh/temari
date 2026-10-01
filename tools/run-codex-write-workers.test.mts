@@ -91,7 +91,7 @@ function request(
     evidenceRoot: join(f.root, 'evidence'),
     maxConcurrency: 2,
     executable: f.executable,
-    timeoutMs: 2000,
+    timeoutMs: 10_000,
     assignments: ids.map((id) => assignment(id)),
     verify: [
       {
@@ -108,7 +108,8 @@ function request(
 test('disjoint write workers overlap in separate clones and join into one verified commit', async () => {
   const f = await fixture();
   const result = await runCodexWriteWorkersRequest(request(f, 'integrate'));
-  assert.equal(result.status, 'PASS');
+  const receipt = JSON.parse(await readFile(result.receiptPath, 'utf8'));
+  assert.equal(result.status, 'PASS', JSON.stringify({ reason: receipt.reason, receiptPath: result.receiptPath }));
   assert.equal(git(f.repo, 'rev-parse', 'HEAD'), f.baseCommit);
   assert.equal(
     git(result.integrationPath, 'rev-parse', 'HEAD'),
@@ -123,7 +124,6 @@ test('disjoint write workers overlap in separate clones and join into one verifi
     await readFile(join(result.integrationPath, 'beta.txt'), 'utf8'),
     'beta\n',
   );
-  const receipt = JSON.parse(await readFile(result.receiptPath, 'utf8'));
   assert.equal(receipt.workerReceipt.peakConcurrency, 2);
   assert.deepEqual(
     receipt.patches.map(

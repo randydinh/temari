@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   link,
   lstat,
@@ -85,10 +85,7 @@ export class FileEvidenceStore implements EvidenceStore {
     );
     const sha256 = hash(content);
     const path = join(this.root, `${sha256}.artifact`);
-    const temporary = join(
-      this.root,
-      `.${sha256}.${process.pid}.${Date.now()}.tmp`,
-    );
+    const temporary = join(this.root, `.${sha256}.${randomUUID()}.tmp`);
     const file = await open(temporary, 'wx', 0o600);
     try {
       try {

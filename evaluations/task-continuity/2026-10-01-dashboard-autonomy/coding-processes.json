@@ -1,0 +1,63 @@
+{
+  "records": [
+    {
+      "assignmentId": "numbers",
+      "originalPath": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-d86b70e0-2f54-499a-bb14-4678f53ed10e/implementation/run-goal-8faaf7baf663d7b42e8d8ecfa3d0fbcd50eefd5a7fe52672/8361c0aca326ffbbb9bc8eb55661590f31dcfb7a/workers/numbers/e431b3b5-7d38-489e-b1f9-adb0d6f17fc1/process.json",
+      "sha256": "3f98b81e94c251d3892b72a03b01fbee3bf11c9bfcbee8cfd8313f24f394dc80",
+      "process": {
+        "schema": 1,
+        "pid": 69153,
+        "startedAt": "2026-10-01T08:27:44.637Z",
+        "endedAt": "2026-10-01T08:27:58.905Z",
+        "exitCode": 0,
+        "signal": null,
+        "timedOut": false,
+        "cancelled": false,
+        "outputLimitExceeded": false,
+        "error": null,
+        "stdoutBytes": 3622,
+        "stderrBytes": 4509
+      }
+    },
+    {
+      "assignmentId": "independent-reviewer",
+      "originalPath": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-d86b70e0-2f54-499a-bb14-4678f53ed10e/implementation/run-goal-8faaf7baf663d7b42e8d8ecfa3d0fbcd50eefd5a7fe52672/8361c0aca326ffbbb9bc8eb55661590f31dcfb7a/workers/independent-reviewer/f8478932-3aca-4146-97f5-c909d6635ca3/process.json",
+      "sha256": "8871d2ad8f7d8bc0a5df45a8945eedb0f2e7bd0d45450faa74c43ff5d95694fd",
+      "process": {
+        "schema": 1,
+        "pid": 71219,
+        "startedAt": "2026-10-01T08:28:00.548Z",
+        "endedAt": "2026-10-01T08:28:23.320Z",
+        "exitCode": 0,
+        "signal": null,
+        "timedOut": false,
+        "cancelled": false,
+        "outputLimitExceeded": false,
+        "error": null,
+        "stdoutBytes": 7596,
+        "stderrBytes": 4509
+      }
+    },
+    {
+      "assignmentId": "labels",
+      "originalPath": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-d86b70e0-2f54-499a-bb14-4678f53ed10e/implementation/run-goal-8faaf7baf663d7b42e8d8ecfa3d0fbcd50eefd5a7fe52672/8361c0aca326ffbbb9bc8eb55661590f31dcfb7a/workers/labels/5b46561d-d586-4876-800a-6cd36aea688d/process.json",
+      "sha256": "c3c73b9a913e69509234546c4d2e584930d7b9fbc6f3297a10ccfeb6ae29025c",
+      "process": {
+        "schema": 1,
+        "pid": 69152,
+        "startedAt": "2026-10-01T08:27:44.636Z",
+        "endedAt": "2026-10-01T08:27:59.969Z",
+        "exitCode": 0,
+        "signal": null,
+        "timedOut": false,
+        "cancelled": false,
+        "outputLimitExceeded": false,
+        "error": null,
+        "stdoutBytes": 3667,
+        "stderrBytes": 4509
+      }
+    }
+  ],
+  "codingOverlapMs": 14268.0,
+  "integrationCommit": "d228f708806a83e3241d132870094e6d92984d07"
+}

@@ -1,0 +1,75 @@
+✖ names each coding phase for the dashboard (0.868917ms)
+✖ unknown and failure states request attention (0.118834ms)
+✔ allows integer counts within configured ceiling (0.374959ms)
+✖ rejects invalid counts and configured ceilings (0.412458ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 1
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 45.994083
+
+✖ failing tests:
+
+test at labels.test.mjs:4:1
+✖ names each coding phase for the dashboard (0.868917ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + 'PREPARED'
+  - 'Ready to start'
+
+      at TestContext.<anonymous> (file:///private/tmp/temari-coding-dashboard-live-9zdrehfo/source/labels.test.mjs:6:63)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'PREPARED',
+    expected: 'Ready to start',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at labels.test.mjs:8:1
+✖ unknown and failure states request attention (0.118834ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + 'RECOVERY_REQUIRED'
+  - 'Needs attention'
+
+      at TestContext.<anonymous> (file:///private/tmp/temari-coding-dashboard-live-9zdrehfo/source/labels.test.mjs:9:83)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'RECOVERY_REQUIRED',
+    expected: 'Needs attention',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at limits.test.mjs:9:1
+✖ rejects invalid counts and configured ceilings (0.412458ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception (RangeError).
+      at TestContext.<anonymous> (file:///private/tmp/temari-coding-dashboard-live-9zdrehfo/source/limits.test.mjs:10:73)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }

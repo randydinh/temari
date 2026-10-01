@@ -42,4 +42,10 @@ read-only task.
 
 Use `bin/temari.mjs policy` to inspect the contract. Start or resume with `--request ABSOLUTE_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX`. Both digests must come from trusted input outside the bundle and request. Engineering entries forward stage dialogue to the canonical host bridge; the QA entry invokes the packaged local evaluator. A blocked or rejected result is not a successful run.
 
+For a selected durable engineering task, follow [task tracking](references/task-tracking.md)
+to retain the actual conversation, recovery point and outcome automatically.
+Select the task explicitly, preserve its current version, and keep tracking outside
+the execution request. Feature tracking uses the original project scope while
+the host verifies the integration checkout. A handoff never establishes completion.
+
 For QA, pass a versioned full assignment, review draft, canonical evidence root, and canonical invocation to `bin/temari.mjs qa` with the same external request and artifact digest flags. The result retains a QA disposition and evaluator evidence. A caller-supplied evaluator ID, round, context claim, or capability list is rejected. The route never writes to external systems.
