@@ -373,3 +373,58 @@ recomputation and Registrar publish validate retained anchors, but the
 specific negative branch remains unexercised here. Graph fact semantics,
 reviewer authentication, currentness and automatic relationship refresh are
 still open.
+
+## 04:53 PDT fresh-root delivery and next selection
+
+PR #136 merged at `c1af1cd75b87a0a842283bc999b5222c91ee94fa` after
+independent exact-head review of clean commit
+`1d2a523fabac4acdc856e6a889efbcf35afcb2cb`. The final full Nx
+integration run passed 71/71; unit tests 43/43, typecheck, clean canonical
+package/check and stock-Node export passed. GitHub reported no branch checks.
+The isolated worktree now starts a new branch from merged main. A read-only
+comparison is selecting the next bounded gap. Fresh v2 graph publication is
+operator attributed and anchor verified; semantic validity and automatic
+relationship promotion remain open.
+
+## 04:58 PDT reviewed-root evaluation selection
+
+The current unlabelled query route rejects a graph selection, while the
+existing graph trial uses the publication context supplied by its caller.
+The next bounded unit is an explicit, read-only evaluation handoff from the
+fresh-root review receipt to the graph trial under the exact v2 publication.
+It must validate the receipt and v2 graph/RevisionSet/admission, construct the
+v2 archive provider itself, pin its trial result in a metadata receipt and
+leave the default query/ranker unchanged. An actual Registrar CLI journey
+must demonstrate that a v1 graph does not read under v2, a reviewed v2 root
+adds one verified unchanged related target at top K, changed or deferred
+targets stay out, and tampered receipt or revoked admission refuses. The
+trial remains labelled with expected gold; it does not make a production
+unlabelled query decision or prove semantic correctness. Gold and any input
+lexical shortlist are operator supplied unless separately pinned to an actual
+v2 search checkpoint, so this increment must not claim BM25 lift from them.
+The case query is attribution metadata; this diagnostic does not execute a
+search for it. A persisted graph-trial checkpoint must retain its canonical,
+content-addressed identity through the summary write.
+The trial includes wall-clock timing, so repeated diagnostics may publish
+different per-run summary receipt hashes even when the graph and ranking are
+the same.
+Focused Nx checks,
+independent review, clean package and PR remain gates.
+
+## 05:11 PDT reviewed-root evaluation checkpoint
+
+The actual Registrar CLI fixture reproduced the cross-generation gap: the v1
+graph refuses under the exact v2 publication. An explicitly reviewed v2 root
+then adds one unchanged related document through an extracted link, with a
+verified archived read and no trial gaps; the changed path stays excluded.
+Tampered review receipt, invalid lexical original hash and revoked source
+admission refuse. The first candidate review found a checkpoint-integrity
+gap; the implementation now checks the private trial checkpoint's canonical
+content address and graph/provider/added/evidence/gap fields, then rechecks
+proposal, draft, publication and admission pins before its metadata summary.
+Independent re-review found no remaining logic blocker. Final full Nx
+knowledge integration passed 72/72, unit tests 43/43 and typecheck passed.
+Keep pending clean canonical package/check, commit and exact-head PR review.
+The lexical shortlist and gold are operator supplied; query text is attribution
+only. This proves a source-pinned evaluation path, not BM25 lift, independent
+task quality or an enabled unlabelled graph search route.
