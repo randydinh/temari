@@ -3,113 +3,113 @@
 
 > node --import @swc-node/register/esm-register --test --test-concurrency=1 libs/runtime/src/lib/task-store.test.ts libs/runtime/src/lib/task-runtime.test.ts tools/task-view.test.mts tools/task-continuity.test.mts tools/dashboard-controller.test.mts
 
-(node:35545) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:45235) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:35546) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:45236) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-(node:35546) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-(node:35546) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:45236) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:45236) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 (Use `node --trace-warnings ...` to show where the warning was created)
-[32m✔ native success remains open until canonical evidence and explicit acceptance [90m(269.024084ms)[39m[39m
-[32m✔ native output locations may be attached after exact run identity is known [90m(229.06175ms)[39m[39m
-[32m✔ concurrent duplicate dispatch has one side effect and retains intent first [90m(96.303792ms)[39m[39m
-[32m✔ lost dispatch response survives reopen and requires exact native reconciliation [90m(113.476834ms)[39m[39m
-[32m✔ crash window before native binding never auto-dispatches a replacement [90m(109.105583ms)[39m[39m
-[32m✔ reconciliation fails closed without independent harness identity verification [90m(75.212334ms)[39m[39m
-[32m✔ retry/replan keeps one goal, distinct runs and prior native identities [90m(145.894458ms)[39m[39m
-[32m✔ cancellation awaits actual executor confirmation and does not repeat requests [90m(199.395291ms)[39m[39m
-[32m✔ native success racing cancellation resolves intent without claiming cancellation [90m(123.089292ms)[39m[39m
-[32m✔ failed native run resolves a lost cancellation response and permits replan [90m(138.016375ms)[39m[39m
-[32m✔ resume error retains uncertainty and duplicate control does not repeat side effect [90m(113.313291ms)[39m[39m
-[32m✔ stale revision or changed plan cannot supply closeout evidence [90m(274.98625ms)[39m[39m
-[32m✔ tampered evidence revokes the DONE projection and acceptance cannot reuse it [90m(165.604625ms)[39m[39m
-[32m✔ local stage-only closeout cannot satisfy independent review or forge obligations [90m(45.271625ms)[39m[39m
-[32m✔ child projections retain successful sibling and failed assignment [90m(155.29175ms)[39m[39m
-[32m✔ pickup keeps two goals in the same session ambiguous even with limit one [90m(74.938666ms)[39m[39m
-[32m✔ parallel child results project review without canonical completion [90m(151.140666ms)[39m[39m
-[32m✔ parallel child results project cancellation without canonical completion [90m(139.381583ms)[39m[39m
-[32m✔ pickup uses exact canonical workspace scope and respects explicit-task filters [90m(58.145834ms)[39m[39m
-[32m✔ unresolvable unrelated workspaces do not block a healthy pickup scope [90m(83.667ms)[39m[39m
-[32m✔ fresh-session pickup restores the handoff without executing provider actions [90m(72.935667ms)[39m[39m
-[32m✔ positive handoff and prior acceptance cannot hide changed current evidence [90m(169.390083ms)[39m[39m
-[32m✔ pickup retains cancelled goals and unresolved native intent without dispatching again [90m(138.844042ms)[39m[39m
-[32m✔ pickup inspects only the selected current run and skips unrelated artifact stores [90m(81.004417ms)[39m[39m
-[32m✔ pickup bounds handoff text and history while omitting full event and source payloads [90m(321.050875ms)[39m[39m
-[32m✔ pickup preserves maximum-length paths and identities within its encoded byte ceiling [90m(57.329334ms)[39m[39m
-(node:36212) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+✔ native success remains open until canonical evidence and explicit acceptance (236.284625ms)
+✔ native output locations may be attached after exact run identity is known (207.163583ms)
+✔ concurrent duplicate dispatch has one side effect and retains intent first (93.729708ms)
+✔ lost dispatch response survives reopen and requires exact native reconciliation (102.450209ms)
+✔ crash window before native binding never auto-dispatches a replacement (102.804583ms)
+✔ reconciliation fails closed without independent harness identity verification (66.819583ms)
+✔ retry/replan keeps one goal, distinct runs and prior native identities (135.161791ms)
+✔ cancellation awaits actual executor confirmation and does not repeat requests (193.55625ms)
+✔ native success racing cancellation resolves intent without claiming cancellation (115.379458ms)
+✔ failed native run resolves a lost cancellation response and permits replan (126.85825ms)
+✔ resume error retains uncertainty and duplicate control does not repeat side effect (111.298042ms)
+✔ stale revision or changed plan cannot supply closeout evidence (254.741833ms)
+✔ tampered evidence revokes the DONE projection and acceptance cannot reuse it (147.848208ms)
+✔ local stage-only closeout cannot satisfy independent review or forge obligations (45.422292ms)
+✔ child projections retain successful sibling and failed assignment (146.088ms)
+✔ pickup keeps two goals in the same session ambiguous even with limit one (67.360084ms)
+✔ parallel child results project review without canonical completion (140.121833ms)
+✔ parallel child results project cancellation without canonical completion (129.500083ms)
+✔ pickup uses exact canonical workspace scope and respects explicit-task filters (62.126333ms)
+✔ unresolvable unrelated workspaces do not block a healthy pickup scope (84.6105ms)
+✔ fresh-session pickup restores the handoff without executing provider actions (71.519208ms)
+✔ positive handoff and prior acceptance cannot hide changed current evidence (157.511666ms)
+✔ pickup retains cancelled goals and unresolved native intent without dispatching again (130.444917ms)
+✔ pickup inspects only the selected current run and skips unrelated artifact stores (89.625417ms)
+✔ pickup bounds handoff text and history while omitting full event and source payloads (295.926ms)
+✔ pickup preserves maximum-length paths and identities within its encoded byte ceiling (51.888708ms)
+(node:45473) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-(node:36212) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-(node:36212) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:45473) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:45473) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 (Use `node --trace-warnings ...` to show where the warning was created)
-[32m✔ stale lock reports its owner and is never automatically taken over [90m(1149.566208ms)[39m[39m
-[32m✔ missing persisted ledger is an error for existing readers and initializers [90m(46.474459ms)[39m[39m
-[32m✔ concurrent initialization persists one empty ledger and preserves later work [90m(113.748416ms)[39m[39m
-[32m✔ one native identity cannot be attached to two Temari runs [90m(116.509583ms)[39m[39m
-[32m✔ deferred evidence roots attach once to the exact existing run [90m(80.29125ms)[39m[39m
-[32m✔ reopens one goal, immutable history and distinct run revisions [90m(57.498875ms)[39m[39m
-[32m✔ commands are idempotent but changed payload, actor and reused run IDs fail [90m(84.030583ms)[39m[39m
-[32m✔ concurrent metadata updates compare versions without losing either command [90m(70.643292ms)[39m[39m
-[32m✔ rejects unsafe IDs, unbounded metadata, invalid plans and corrupt ledgers visibly [90m(41.340708ms)[39m[39m
-[32m✔ entry atomically creates one task and links its session with replay-safe context [90m(69.078583ms)[39m[39m
-[32m✔ sessions and tasks retain many-to-many identity links without changing goals [90m(86.780959ms)[39m[39m
-[32m✔ concurrent entry and handoff reject stale updates while preserving idempotency [90m(98.097ms)[39m[39m
-[32m✔ handoff bounds reject malformed context without changing acceptance or execution [90m(68.308625ms)[39m[39m
-(node:36861) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+✔ stale lock reports its owner and is never automatically taken over (1223.386125ms)
+✔ missing persisted ledger is an error for existing readers and initializers (47.067542ms)
+✔ concurrent initialization persists one empty ledger and preserves later work (108.925958ms)
+✔ one native identity cannot be attached to two Temari runs (114.627375ms)
+✔ deferred evidence roots attach once to the exact existing run (72.173833ms)
+✔ reopens one goal, immutable history and distinct run revisions (54.269584ms)
+✔ commands are idempotent but changed payload, actor and reused run IDs fail (88.434167ms)
+✔ concurrent metadata updates compare versions without losing either command (70.83425ms)
+✔ rejects unsafe IDs, unbounded metadata, invalid plans and corrupt ledgers visibly (40.540417ms)
+✔ entry atomically creates one task and links its session with replay-safe context (65.314458ms)
+✔ sessions and tasks retain many-to-many identity links without changing goals (82.988875ms)
+✔ concurrent entry and handoff reject stale updates while preserving idempotency (87.81125ms)
+✔ handoff bounds reject malformed context without changing acceptance or execution (61.782ms)
+(node:45578) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-(node:36861) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-(node:36861) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:45578) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:45578) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 (Use `node --trace-warnings ...` to show where the warning was created)
-[32m✔ HTTP goal intake and prepared start preserve identity and reject arbitrary-goal completion [90m(415.93575ms)[39m[39m
-[32m✔ prepared candidate drift blocks execution without launching [90m(206.717417ms)[39m[39m
-[32m✔ uncertain dispatch remains blocked and cannot launch a replacement [90m(333.581834ms)[39m[39m
-[32m✔ corrupt preparation retains exact-native observe and cancellation [90m(303.350667ms)[39m[39m
-[32m✔ accepted maximum request identities remain controllable after task prefixing [90m(128.878917ms)[39m[39m
-[32m✔ resume refuses a changed exact-native identity and is hidden from controls [90m(348.908ms)[39m[39m
-[32m✔ swarm intake binds prepared child records, preserves limits, and refuses serial acceptance [90m(423.347375ms)[39m[39m
-[32m✔ coding intake freezes the host plan, binds both durable groups, and refuses command injection and serial acceptance [90m(522.9505ms)[39m[39m
-[32m✔ coding configuration rejects overlapping ownership, optional workers, duplicate reviewer identity and arbitrary commands [90m(102.652209ms)[39m[39m
-[32m✔ coding plan and candidate changes refuse new execution while retaining cancellation and metadata controls [90m(500.260584ms)[39m[39m
-[32m✔ natural goal retains a validated plan and prepares parallel execution on the same task with exact replay [90m(1399.868291ms)[39m[39m
-[32m✔ goal plan admission rejects changed policy, candidate and proposal identity [90m(1021.055208ms)[39m[39m
-[32m✔ scheduled inspection confirms only exact start intent and execution termination without accepting evidence [90m(316.242125ms)[39m[39m
-[32m✔ goal admission recovers a published preparation after bind crash with a fresh browser request ID [90m(1376.862208ms)[39m[39m
-(node:44141) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+✔ HTTP goal intake and prepared start preserve identity and reject arbitrary-goal completion (383.027208ms)
+✔ prepared candidate drift blocks execution without launching (189.895458ms)
+✔ uncertain dispatch remains blocked and cannot launch a replacement (311.014125ms)
+✔ corrupt preparation retains exact-native observe and cancellation (282.846ms)
+✔ accepted maximum request identities remain controllable after task prefixing (119.8135ms)
+✔ resume refuses a changed exact-native identity and is hidden from controls (345.726ms)
+✔ swarm intake binds prepared child records, preserves limits, and refuses serial acceptance (416.375666ms)
+✔ coding intake freezes the host plan, binds both durable groups, and refuses command injection and serial acceptance (541.992375ms)
+✔ coding configuration rejects overlapping ownership, optional workers, duplicate reviewer identity and arbitrary commands (116.997917ms)
+✔ coding plan and candidate changes refuse new execution while retaining cancellation and metadata controls (468.857417ms)
+✔ natural goal retains a validated plan and prepares parallel execution on the same task with exact replay (1293.538458ms)
+✔ goal plan admission rejects changed policy, candidate and proposal identity (882.971459ms)
+✔ scheduled inspection confirms only exact start intent and execution termination without accepting evidence (283.686333ms)
+✔ goal admission recovers a published preparation after bind crash with a fresh browser request ID (1200.78375ms)
+(node:50187) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-(node:44141) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-(node:44141) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:50187) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:50187) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 (Use `node --trace-warnings ...` to show where the warning was created)
-[32m✔ fresh CLI processes recover the same task, next action and version [90m(1167.012833ms)[39m[39m
-[32m✔ CLI rejects unknown commands and relative storage roots [90m(0.556416ms)[39m[39m
-[32m✔ host entry, handoff and scoped pickup survive separate CLI processes [90m(4465.506125ms)[39m[39m
-(node:45616) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+✔ fresh CLI processes recover the same task, next action and version (988.469958ms)
+✔ CLI rejects unknown commands and relative storage roots (0.46225ms)
+✔ host entry, handoff and scoped pickup survive separate CLI processes (4020.176041ms)
+(node:50610) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-(node:45616) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-(node:45616) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:50610) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:50610) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 (Use `node --trace-warnings ...` to show where the warning was created)
-[32m✔ read-only task view serves retained task data and rejects mutation and foreign hosts [90m(57.73625ms)[39m[39m
-[32m✔ task read failures stay visible instead of looking like an empty inbox [90m(3.248708ms)[39m[39m
-[32m✔ console links require a configured HTTP origin [90m(0.2335ms)[39m[39m
-[32m✔ writable dashboard delegates only POST intake and selected task actions [90m(12.583583ms)[39m[39m
-[32m✔ mutations reject missing or foreign origin, host, and token before dispatch [90m(14.369083ms)[39m[39m
-[32m✔ mutation bodies require bounded UTF-8 JSON and stalled bodies expire [90m(5013.031917ms)[39m[39m
-[32m✔ controller owns duplicate dispatch, stale versions, and validation errors [90m(7.432ms)[39m[39m
-[32m✔ dashboard restart invalidates the prior server token [90m(4.194834ms)[39m[39m
-[32m✔ schedule mutations retain local-origin protection and knowledge selections admit only one server node ID [90m(8.436583ms)[39m[39m
-[34mℹ tests 65[39m
-[34mℹ suites 0[39m
-[34mℹ pass 65[39m
-[34mℹ fail 0[39m
-[34mℹ cancelled 0[39m
-[34mℹ skipped 0[39m
-[34mℹ todo 0[39m
-[34mℹ duration_ms 25476.1755[39m
+✔ read-only task view serves retained task data and rejects mutation and foreign hosts (44.550041ms)
+✔ task read failures stay visible instead of looking like an empty inbox (3.295958ms)
+✔ console links require a configured HTTP origin (0.26975ms)
+✔ writable dashboard delegates only POST intake and selected task actions (10.669584ms)
+✔ mutations reject missing or foreign origin, host, and token before dispatch (10.450416ms)
+✔ mutation bodies require bounded UTF-8 JSON and stalled bodies expire (5012.2265ms)
+✔ controller owns duplicate dispatch, stale versions, and validation errors (6.321583ms)
+✔ dashboard restart invalidates the prior server token (3.791917ms)
+✔ schedule mutations retain local-origin protection and knowledge selections admit only one server node ID (8.157834ms)
+ℹ tests 65
+ℹ suites 0
+ℹ pass 65
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 23768.104167
 
 
 
  NX   Successfully ran target task-test for project runtime
 
 
-  Run duration:      25.5s
+  Run duration:      23.9s
   Cache:             0/1 hit (0%)
-  Critical path:     25.5s (1 task)
+  Critical path:     23.8s (1 task)
   Recoverable time:  <1ms

@@ -1,0 +1,113 @@
+{
+  "kind": "restart-while-planning-active",
+  "startedAt": "2026-10-01T08:31:13Z",
+  "state": "READY",
+  "watcherPid": 20742,
+  "taskId": "task-8878cdab-f9cf-44de-884d-3837891abc81",
+  "plannerRoot": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-8878cdab-f9cf-44de-884d-3837891abc81/planning",
+  "serverPidBefore": 77262,
+  "serverCommandBefore": "node --import @swc-node/register/esm-register tools/task-continuity.mts serve --root /private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/tasks --control-config /private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/control.json --archon-home /Users/randydinh/Library/Application Support/Temari/dashboard/archon --archon-url http://127.0.0.1:3091 --port 3094",
+  "supervisorPid": 28278,
+  "modelPid": 28347,
+  "supervisorCommandBefore": "/Users/randydinh/.hermes/node/bin/node --import @swc-node/register/esm-register /Users/randydinh/.codex/worktrees/system-roles-matrix/temari-next/tools/dashboard-planner.mts --supervise /private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-8878cdab-f9cf-44de-884d-3837891abc81/planning/request.json a277a6f0a9c27565b4dc65a025e0db476481e112470929b55e0395fad15748a9 c8df5abe-230e-449f-bc25-ed9561ffea9b",
+  "modelCommandBefore": "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex exec --ignore-user-config --ephemeral --sandbox read-only --cd /private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/source --output-schema /private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-8878cdab-f9cf-44de-884d-3837891abc81/planning/output-schema.json --output-last-message /private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-8878cdab-f9cf-44de-884d-3837891abc81/planning/final.json --json -",
+  "intentBefore": {
+    "at": 1790843522366,
+    "manifestSha256": "a277a6f0a9c27565b4dc65a025e0db476481e112470929b55e0395fad15748a9",
+    "nonce": "c8df5abe-230e-449f-bc25-ed9561ffea9b"
+  },
+  "requestSha256Before": "a277a6f0a9c27565b4dc65a025e0db476481e112470929b55e0395fad15748a9",
+  "modelIntentSha256Before": "636f426b10a386471d5f12cfd385429592a8b5dd9a31193d9fc198aaff29093c",
+  "processRecordExistedBefore": false,
+  "endedExistedBefore": false,
+  "restartAt": "2026-10-01T08:32:02Z",
+  "launcherPidAfter": 28489,
+  "supervisorAliveImmediatelyAfter": true,
+  "modelAliveImmediatelyAfter": true,
+  "dashboardLogAfter": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/dashboard-active-restart.log",
+  "serverPidAfter": 28612,
+  "requestSha256After": "a277a6f0a9c27565b4dc65a025e0db476481e112470929b55e0395fad15748a9",
+  "modelIntentSha256After": "636f426b10a386471d5f12cfd385429592a8b5dd9a31193d9fc198aaff29093c",
+  "intentAfter": {
+    "at": 1790843522366,
+    "manifestSha256": "a277a6f0a9c27565b4dc65a025e0db476481e112470929b55e0395fad15748a9",
+    "nonce": "c8df5abe-230e-449f-bc25-ed9561ffea9b"
+  },
+  "observedAfter": {
+    "nonce": "c8df5abe-230e-449f-bc25-ed9561ffea9b",
+    "pid": 28278
+  },
+  "supervisorAliveAtReload": true,
+  "modelAliveAtReload": true,
+  "ended": {
+    "drained": true,
+    "error": null,
+    "evidence": [
+      {
+        "bytes": 869,
+        "path": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-8878cdab-f9cf-44de-884d-3837891abc81/planning/output-schema.json",
+        "sha256": "c8ed9819d356d87c0a7d6a3c3b10773b025ed2793ea1a5c4ad4a89160915cf18"
+      },
+      {
+        "bytes": 3172,
+        "path": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-8878cdab-f9cf-44de-884d-3837891abc81/planning/prompt.txt",
+        "sha256": "ecc2f3529639a90043d0af9a5f1617a8117754d9139606dbd341b924b6fc05f9"
+      },
+      {
+        "bytes": 698,
+        "path": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-8878cdab-f9cf-44de-884d-3837891abc81/planning/model-intent.json",
+        "sha256": "636f426b10a386471d5f12cfd385429592a8b5dd9a31193d9fc198aaff29093c"
+      },
+      {
+        "bytes": 5174,
+        "path": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-8878cdab-f9cf-44de-884d-3837891abc81/planning/stdout.jsonl",
+        "sha256": "53a702362a42ca3897bb314f80361fca92b26416715df313497a3100fbbfeb04"
+      },
+      {
+        "bytes": 4509,
+        "path": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-8878cdab-f9cf-44de-884d-3837891abc81/planning/stderr.log",
+        "sha256": "74252091b50a96f355f8b31517cec9e5d032dd32a970d6dba5ccb4aa55757390"
+      },
+      {
+        "bytes": 306,
+        "path": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-8878cdab-f9cf-44de-884d-3837891abc81/planning/process.json",
+        "sha256": "4121a4f1038a20c8413f972afd763f56e29df27de4d7030a9486bb4bb5d4a608"
+      },
+      {
+        "bytes": 1721,
+        "path": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-8878cdab-f9cf-44de-884d-3837891abc81/planning/final.json",
+        "sha256": "b703232dbe8788f9810e2f7f7eff6e301af5636bf2f05023ceec036472fc3d32"
+      },
+      {
+        "bytes": 1722,
+        "path": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-8878cdab-f9cf-44de-884d-3837891abc81/planning/proposal.json",
+        "sha256": "008db1b38b1a3396017e89c071b560802cfb790c02880561b3cadfc5df8870dd"
+      }
+    ],
+    "manifestSha256": "a277a6f0a9c27565b4dc65a025e0db476481e112470929b55e0395fad15748a9",
+    "nonce": "c8df5abe-230e-449f-bc25-ed9561ffea9b",
+    "proposalSha256": "b703232dbe8788f9810e2f7f7eff6e301af5636bf2f05023ceec036472fc3d32"
+  },
+  "process": {
+    "drained": true,
+    "endedAt": "2026-10-01T08:32:30.360Z",
+    "error": null,
+    "exitCode": 0,
+    "interrupted": false,
+    "nonce": "c8df5abe-230e-449f-bc25-ed9561ffea9b",
+    "outputLimitExceeded": false,
+    "pid": 28347,
+    "schema": 1,
+    "signal": null,
+    "startedAt": "2026-10-01T08:32:02.668Z",
+    "stderrBytes": 4509,
+    "stdoutBytes": 5174,
+    "timedOut": false
+  },
+  "sameProcessPid": true,
+  "sameSupervisor": true,
+  "sameLaunchIntent": true,
+  "sameManifest": true,
+  "sameModelIntent": true,
+  "finishedAt": "2026-10-01T08:32:30Z"
+}

@@ -28,6 +28,9 @@ mark a task done. The [boundary assessment](docs/system-roles-and-responsibiliti
 distinguishes documented roles from implemented enforcement.
 The [coding dashboard verification record](evaluations/task-continuity/dashboard-implementation-2026-10-01.md)
 retains actual agent overlap, integration checks, independent review, and restart evidence.
+The [planning, scheduling and map verification record](evaluations/task-continuity/dashboard-autonomy-2026-10-01.md)
+records live goal planning, schedule dispatch and recovery, Registrar provenance,
+browser journeys, and the remaining configuration limits.
 
 Temari owns routing, plans, evidence, and closeout. The host (Cursor,
 Codex, Claude, Hermes, or serial fallback) owns tools, models, and

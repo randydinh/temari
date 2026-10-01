@@ -1,0 +1,139 @@
+{
+  "taskId": "task-d86b70e0-2f54-499a-bb14-4678f53ed10e",
+  "runId": "run-goal-8faaf7baf663d7b42e8d8ecfa3d0fbcd50eefd5a7fe52672",
+  "integrationReceiptPath": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-d86b70e0-2f54-499a-bb14-4678f53ed10e/implementation/run-goal-8faaf7baf663d7b42e8d8ecfa3d0fbcd50eefd5a7fe52672/8361c0aca326ffbbb9bc8eb55661590f31dcfb7a/execution/receipt.json",
+  "integrationReceiptSha256": "120faf84ec2111cce6608e9c833e2cf6335a09ec76857536744e6f12a8497024",
+  "integrationStatus": "PASS",
+  "integratedCommit": "d228f708806a83e3241d132870094e6d92984d07",
+  "actualIntegrationHead": "d228f708806a83e3241d132870094e6d92984d07",
+  "integrationStatusPorcelain": "",
+  "sourceHead": "8361c0aca326ffbbb9bc8eb55661590f31dcfb7a",
+  "sourceStatusPorcelain": "",
+  "changedPaths": [
+    "labels.mjs",
+    "numbers.mjs"
+  ],
+  "patches": [
+    {
+      "assignmentId": "numbers",
+      "baseCommit": "8361c0aca326ffbbb9bc8eb55661590f31dcfb7a",
+      "snapshotCommit": "3b9aedbd9304660e2a730c0bfb1a549dcdf7647b",
+      "changedPaths": [
+        "numbers.mjs"
+      ],
+      "sha256": "9e2df87cd4524d187fc43da15f940045f701e833d859a30424638b9812910ce5",
+      "patchPath": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-d86b70e0-2f54-499a-bb14-4678f53ed10e/implementation/run-goal-8faaf7baf663d7b42e8d8ecfa3d0fbcd50eefd5a7fe52672/8361c0aca326ffbbb9bc8eb55661590f31dcfb7a/workers/numbers/e431b3b5-7d38-489e-b1f9-adb0d6f17fc1/patch.diff"
+    },
+    {
+      "assignmentId": "labels",
+      "baseCommit": "8361c0aca326ffbbb9bc8eb55661590f31dcfb7a",
+      "snapshotCommit": "b5d55737ddb5b222ef82ac46ebdc2924a91eaed8",
+      "changedPaths": [
+        "labels.mjs"
+      ],
+      "sha256": "b3e094b6792fdbae8ef43843edc559ba93af4dbb91d4ac1734110aefe923791c",
+      "patchPath": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-d86b70e0-2f54-499a-bb14-4678f53ed10e/implementation/run-goal-8faaf7baf663d7b42e8d8ecfa3d0fbcd50eefd5a7fe52672/8361c0aca326ffbbb9bc8eb55661590f31dcfb7a/workers/labels/5b46561d-d586-4876-800a-6cd36aea688d/patch.diff"
+    }
+  ],
+  "verification": [
+    {
+      "program": "/Users/randydinh/.hermes/node/bin/node",
+      "args": [
+        "--test",
+        "behavior.test.mjs"
+      ],
+      "code": 0,
+      "logPath": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-d86b70e0-2f54-499a-bb14-4678f53ed10e/implementation/run-goal-8faaf7baf663d7b42e8d8ecfa3d0fbcd50eefd5a7fe52672/8361c0aca326ffbbb9bc8eb55661590f31dcfb7a/execution/verify-0.log"
+    }
+  ],
+  "workerResults": [
+    {
+      "assignmentId": "numbers",
+      "result": {
+        "status": "PASS",
+        "summary": "Updated only numbers.mjs: double(value) returns value * 2 and throws TypeError for NaN. Required numeric behavior test passed."
+      },
+      "providerMetadata": [
+        {
+          "type": "thread.started",
+          "thread_id": "01a0f693-9ea8-7ca1-a10a-792729cb712b"
+        },
+        {
+          "type": "turn.completed",
+          "usage": {
+            "input_tokens": 55673,
+            "cached_input_tokens": 36352,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 198,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "processPath": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-d86b70e0-2f54-499a-bb14-4678f53ed10e/implementation/run-goal-8faaf7baf663d7b42e8d8ecfa3d0fbcd50eefd5a7fe52672/8361c0aca326ffbbb9bc8eb55661590f31dcfb7a/workers/numbers/e431b3b5-7d38-489e-b1f9-adb0d6f17fc1/process.json"
+    },
+    {
+      "assignmentId": "independent-reviewer",
+      "result": {
+        "status": "PASS",
+        "summary": "Reviewed exact commit d228f708806a83e3241d132870094e6d92984d07 against the base. numbers.mjs:2\u20135 rejects NaN and doubles finite numeric inputs. labels.mjs:2 trims, lowercases, and collapses whitespace into hyphens. Only these two modules changed; exports remain intact and implementations are independent. behavior.test.mjs is unchanged. Host-observed combined verification passed with exit code 0; no additional verification was run. No unresolved findings."
+      },
+      "providerMetadata": [
+        {
+          "type": "thread.started",
+          "thread_id": "01a0f693-dccf-7750-a6b2-57c695bcd98d"
+        },
+        {
+          "type": "turn.completed",
+          "usage": {
+            "input_tokens": 37577,
+            "cached_input_tokens": 17536,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 290,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "processPath": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-d86b70e0-2f54-499a-bb14-4678f53ed10e/implementation/run-goal-8faaf7baf663d7b42e8d8ecfa3d0fbcd50eefd5a7fe52672/8361c0aca326ffbbb9bc8eb55661590f31dcfb7a/workers/independent-reviewer/f8478932-3aca-4146-97f5-c909d6635ca3/process.json"
+    },
+    {
+      "assignmentId": "labels",
+      "result": {
+        "status": "PASS",
+        "summary": "Updated only labels.mjs: slug(value) trims, lowercases, and collapses whitespace into hyphens. Whitespace-only input returns an empty string. Required labels test passed."
+      },
+      "providerMetadata": [
+        {
+          "type": "thread.started",
+          "thread_id": "01a0f693-9ea9-7bc2-b1b8-2aa3b191381e"
+        },
+        {
+          "type": "turn.completed",
+          "usage": {
+            "input_tokens": 55675,
+            "cached_input_tokens": 36352,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 182,
+            "reasoning_output_tokens": 0
+          }
+        }
+      ],
+      "processPath": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-d86b70e0-2f54-499a-bb14-4678f53ed10e/implementation/run-goal-8faaf7baf663d7b42e8d8ecfa3d0fbcd50eefd5a7fe52672/8361c0aca326ffbbb9bc8eb55661590f31dcfb7a/workers/labels/5b46561d-d586-4876-800a-6cd36aea688d/process.json"
+    }
+  ],
+  "reviewReceipt": {
+    "binding": {
+      "fingerprint": "12fa5f6d2aecd3d1eceded30fdea89c22ab920faf1248f1ece9f7a47a2fee2e9",
+      "groupId": "pwg-12fa5f6d2aecd3d1eceded30fdea89c22ab920faf1248f1e"
+    },
+    "concurrency": 1,
+    "runId": "run-goal-8faaf7baf663d7b42e8d8ecfa3d0fbcd50eefd5a7fe52672",
+    "schema": 1
+  },
+  "codingOverlapMs": 14268.0,
+  "ended": {
+    "nonce": "62edf032-f6d9-4c3c-8ee2-64c2d257be6f",
+    "error": null,
+    "workersDrained": true,
+    "completed": true
+  }
+}

@@ -1,0 +1,87 @@
+[
+  {
+    "file": "live-proof-summary.json",
+    "source": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/live-proof-summary.json",
+    "sha256": "683676e675d7cc291918fbf3fd57906181b50908d76f616513976ca44e1585b6"
+  },
+  {
+    "file": "planner-result-proof.json",
+    "source": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/planner-result-proof.json",
+    "sha256": "217d3ee2ddca57071f96aeee16b06cdd7aff96403c0a7d37d1dd48452e04bbac"
+  },
+  {
+    "file": "coding-result-proof.json",
+    "source": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/coding-result-proof.json",
+    "sha256": "31221faf126ead2abb3fc010863aaa23ccf24b25ee08a5f19434ad07b5b63739"
+  },
+  {
+    "file": "active-planner-restart-proof.json",
+    "source": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/active-planner-restart-proof.json",
+    "sha256": "f49f2dba4a06af7d15d325eb4536bd34dea6e69e7802b1ed6e551a3c88ed0091"
+  },
+  {
+    "file": "schedules-before-final-restart.json",
+    "source": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/schedules-before-final-restart.json",
+    "sha256": "7e3aa5265dd3ae8e91307a174b962693b03adfd8206963c94537865aacbaa7ef"
+  },
+  {
+    "file": "dashboard-before-performance.json",
+    "source": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/dashboard-before-performance.json",
+    "sha256": "99a159023a98267fa0322a057ab58345d253ee70fac55b08837f3c96157366de"
+  },
+  {
+    "file": "knowledge-live-proof.json",
+    "source": "/private/tmp/temari-dashboard-knowledge-proof.json",
+    "sha256": "428acb237534570ae9ed94320d4591cc81c18dab2f702744b58402bf388bec43"
+  },
+  {
+    "file": "schedule-restart-proof.json",
+    "source": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/schedule-restart-proof.json",
+    "sha256": "452bd6f13ad0f714258b1b1586c28e9ed7dc268c7aefc1f368b68030e4d1f765"
+  },
+  {
+    "file": "schedule-live-proof.json",
+    "source": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/schedule-live-proof.json",
+    "sha256": "b8667b3b9bb510ebe167ad527e44245e2705cfd0f5fcce3b34fc087d7301cbb4"
+  },
+  {
+    "file": "dashboard-after-performance.json",
+    "source": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/dashboard-after-performance.json",
+    "sha256": "856f8241d3d77c57a0f4404d2d4b17cd4609f7406a3501074cfe1e7f858aa364"
+  },
+  {
+    "file": "final-fixture-refresh.json",
+    "source": "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/final-fixture-refresh.json",
+    "sha256": "e9a844ba1d776af4cb90d1e58a4e926f82e06cb0b78ee4dfadd9a60c13678d6b"
+  },
+  {
+    "file": "dashboard-autonomy-coding.png",
+    "source": "/Users/randydinh/.codex/visualizations/2026/09/30/01a0f0b2-c342-7a72-99ac-145edc0f45ba/dashboard-autonomy-coding.png",
+    "sha256": "0215dbefd637723de786082fb47e3068fac8f54812938d36a9b43c4135e851ec"
+  },
+  {
+    "file": "dashboard-autonomy-schedules.png",
+    "source": "/Users/randydinh/.codex/visualizations/2026/09/30/01a0f0b2-c342-7a72-99ac-145edc0f45ba/dashboard-autonomy-schedules.png",
+    "sha256": "cecec82631b6eafc9507c9cc9df576dc95475f71eac3b500a505c5339bbe1473"
+  },
+  {
+    "file": "dashboard-registrar-map-overview.png",
+    "source": "/Users/randydinh/.codex/visualizations/2026/09/30/01a0f0b2-c342-7a72-99ac-145edc0f45ba/dashboard-registrar-map-overview.png",
+    "sha256": "eb7741a1365f82fd70a5336c38c00ebad0462d2cbbffb744f5f6ac6a124f3da1"
+  },
+  {
+    "file": "dashboard-registrar-map.png",
+    "source": "/Users/randydinh/.codex/visualizations/2026/09/30/01a0f0b2-c342-7a72-99ac-145edc0f45ba/dashboard-registrar-map.png",
+    "sha256": "80c768e7a173db7b715c01e80257bd681dd74108e07938db7b76c0cdbd90e1ae"
+  },
+  {
+    "file": "coding-processes.json",
+    "source": "Aggregate of original actual model process records",
+    "sourceRecords": [
+      "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-d86b70e0-2f54-499a-bb14-4678f53ed10e/implementation/run-goal-8faaf7baf663d7b42e8d8ecfa3d0fbcd50eefd5a7fe52672/8361c0aca326ffbbb9bc8eb55661590f31dcfb7a/workers/numbers/e431b3b5-7d38-489e-b1f9-adb0d6f17fc1/process.json",
+      "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-d86b70e0-2f54-499a-bb14-4678f53ed10e/implementation/run-goal-8faaf7baf663d7b42e8d8ecfa3d0fbcd50eefd5a7fe52672/8361c0aca326ffbbb9bc8eb55661590f31dcfb7a/workers/independent-reviewer/f8478932-3aca-4146-97f5-c909d6635ca3/process.json",
+      "/private/tmp/temari-dashboard-autonomy-live-0bzf5pxo/prepared/task-d86b70e0-2f54-499a-bb14-4678f53ed10e/implementation/run-goal-8faaf7baf663d7b42e8d8ecfa3d0fbcd50eefd5a7fe52672/8361c0aca326ffbbb9bc8eb55661590f31dcfb7a/workers/labels/5b46561d-d586-4876-800a-6cd36aea688d/process.json"
+    ],
+    "sha256": "4e1442a2d9ec737c447029bf2d0f05c38ae3d64ef44e20e2f96c43a27b72c6ac"
+  }
+]

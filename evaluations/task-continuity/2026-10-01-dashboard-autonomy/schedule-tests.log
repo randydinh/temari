@@ -3,53 +3,56 @@
 
 > node --import @swc-node/register/esm-register --test --test-concurrency=1 libs/runtime/src/lib/schedule-store.test.ts tools/dashboard-scheduler.test.mts
 
-(node:1883) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:9864) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:1884) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:9915) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-(node:1884) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-(node:1884) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:9915) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:9915) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 (Use `node --trace-warnings ...` to show where the warning was created)
-[32m✔ durable schedule creation and optimistic status commands are idempotent across reopening [90m(123.160417ms)[39m[39m
-[32m✔ concurrent transactions preserve every independently created schedule [90m(292.612125ms)[39m[39m
-[32m✔ occurrence intent, exact dispatch version and cursor are durable and immutable [90m(98.650333ms)[39m[39m
-[32m✔ one tick owns external effects; concurrent callers do not wait and launch twice [90m(34.258083ms)[39m[39m
-[32m✔ restart recovers a proven dead local tick owner without stealing a foreign/live owner [90m(69.200208ms)[39m[39m
-[32m✔ missing, corrupt and workspace-mismatched retained ledgers fail visibly [90m(53.919083ms)[39m[39m
-[32m✔ symlink ledger and untyped extra schedule fields are rejected [90m(23.554042ms)[39m[39m
-(node:1898) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+✔ durable schedule creation and optimistic status commands are idempotent across reopening (138.522208ms)
+✔ concurrent transactions preserve every independently created schedule (309.96975ms)
+✔ occurrence intent, exact dispatch version and cursor are durable and immutable (142.4695ms)
+✔ identical occurrence observations preserve bytes, timestamps and optimistic version while actual changes remain durable (273.784458ms)
+✔ future controls accept only occurrence telemetry drift and preserve exact replay while rejecting settings races (201.53ms)
+✔ one tick owns external effects; concurrent callers do not wait and launch twice (54.889417ms)
+✔ restart recovers a proven dead local tick owner without stealing a foreign/live owner (108.835709ms)
+✔ missing, corrupt and workspace-mismatched retained ledgers fail visibly (73.308917ms)
+✔ symlink ledger and untyped extra schedule fields are rejected (24.789541ms)
+(node:10645) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-(node:1898) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-(node:1898) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:10645) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:10645) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 (Use `node --trace-warnings ...` to show where the warning was created)
-[32m✔ once recipe executes from durable intent exactly once across restart and retains review separation [90m(140.4785ms)[39m[39m
-[32m✔ missed intervals coalesce latest, skip overlapping active execution and never rewind on clock rollback [90m(198.673667ms)[39m[39m
-[32m✔ concurrent ticks on two scheduler instances launch one occurrence [90m(106.106167ms)[39m[39m
-[32m✔ crash after canonical create resumes the same deterministic task rather than creating another [90m(113.930208ms)[39m[39m
-[32m✔ restart between retained start and invocation uses the original command/version once [90m(103.437208ms)[39m[39m
-[32m✔ restart after start reached executor recognizes exact receipt and never invokes start twice [90m(94.49325ms)[39m[39m
-[32m✔ uncertain and pending starts block later occurrences without automatically retrying or cancelling owned work [90m(148.592333ms)[39m[39m
-[32m✔ a changed task version before invocation is quarantined rather than replacing the retained version [90m(89.900875ms)[39m[39m
-[32m✔ pause prevents dispatch, resume coalesces elapsed time, and cancellation does not invoke an active-task cancel [90m(137.210583ms)[39m[39m
-[32m✔ cancellation during preparation prevents the previously admitted start from running [90m(96.853875ms)[39m[39m
-[32m✔ removed or changed host recipe pins block new effects while retained running tasks remain observable [90m(114.599125ms)[39m[39m
-[32m✔ scheduler input cannot inject commands, paths, coding modes or malformed clock policies [90m(34.648542ms)[39m[39m
-[32m✔ next due and available actions are read projections without changing durable history [90m(192.445167ms)[39m[39m
-[34mℹ tests 20[39m
-[34mℹ suites 0[39m
-[34mℹ pass 20[39m
-[34mℹ fail 0[39m
-[34mℹ cancelled 0[39m
-[34mℹ skipped 0[39m
-[34mℹ todo 0[39m
-[34mℹ duration_ms 2810.388792[39m
+✔ once recipe executes from durable intent exactly once across restart and retains review separation (199.9265ms)
+✔ missed intervals coalesce latest, skip overlapping active execution and never rewind on clock rollback (268.50575ms)
+✔ concurrent ticks on two scheduler instances launch one occurrence (177.347333ms)
+✔ one-second ticks with advancing canonical task versions do not grow unchanged schedule history (345.44725ms)
+✔ crash after canonical create resumes the same deterministic task rather than creating another (127.259ms)
+✔ restart between retained start and invocation uses the original command/version once (129.889125ms)
+✔ restart after start reached executor recognizes exact receipt and never invokes start twice (103.105959ms)
+✔ uncertain and pending starts block later occurrences without automatically retrying or cancelling owned work (158.358917ms)
+✔ a changed task version before invocation is quarantined rather than replacing the retained version (113.149916ms)
+✔ pause prevents dispatch, resume coalesces elapsed time, and cancellation does not invoke an active-task cancel (183.429125ms)
+✔ cancellation during preparation prevents the previously admitted start from running (110.1205ms)
+✔ removed or changed host recipe pins block new effects while retained running tasks remain observable (121.613583ms)
+✔ scheduler input cannot inject commands, paths, coding modes or malformed clock policies (38.506125ms)
+✔ next due and available actions are read projections without changing durable history (199.728208ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 23
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4442.311834
 
 
 
  NX   Successfully ran target dashboard-schedule-test for project runtime
 
 
-  Run duration:      2.9s
+  Run duration:      4.5s
   Cache:             0/1 hit (0%)
-  Critical path:     2.9s (1 task)
+  Critical path:     4.5s (1 task)
   Recoverable time:  <1ms

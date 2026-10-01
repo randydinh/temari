@@ -203,5 +203,7 @@ rather than silently skip when those prerequisites are absent.
 The [overnight contract](dashboard-overnight-contract.md) defines the finish
 condition. The decision trail and verification record distinguish subprocess
 fixtures, actual Registrar/native execution, live model calls and browser proof.
+See the [retained verification record](../evaluations/task-continuity/dashboard-autonomy-2026-10-01.md)
+for executed checks, actual parallel overlap, restart identity and configuration limits.
 The runtime owns recurrence with Archon 0.10.1; adopting upstream native triggers
 would require an explicit owner migration and a separately verified pinned upgrade.
