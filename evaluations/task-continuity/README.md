@@ -1,6 +1,8 @@
 # Task continuity: first local increment
 
-The latest [dashboard controls and parallel-agent record](dashboard-controls-2026-09-30.md)
+The latest [parallel coding dashboard record](dashboard-implementation-2026-10-01.md)
+verifies isolated implementers, combined checks, exact-commit review and active
+dashboard restart recovery. The earlier [dashboard controls and parallel-agent record](dashboard-controls-2026-09-30.md)
 verifies the writable UI, real Codex overlap, native verification and restart recovery.
 
 For the subsequent main integration, host entry, scoped pickup, and handoff

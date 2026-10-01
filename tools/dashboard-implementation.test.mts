@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   chmod,
   mkdtemp,
@@ -160,9 +161,21 @@ async function finish(handle: DashboardImplementationHandle) {
 }
 
 test('isolated real implementers integrate exact patches then independent reviewer binds exact commit; duplicate start and fresh client retain one execution', async (t) => {
-  const f = await fixture(t),
-    input = request(f),
-    handle = await prepareDashboardImplementation(input);
+  const f = await fixture(t);
+  const initialRequest = request(f);
+  const input = {
+    ...initialRequest,
+    verify: [
+      {
+        ...initialRequest.verify[0]!,
+        args: [
+          '-e',
+          `${initialRequest.verify[0]!.args[1]};console.log(['host','raw','log'].join('-'))`,
+        ],
+      },
+    ],
+  };
+  const handle = await prepareDashboardImplementation(input);
   assert.deepEqual(await prepareDashboardImplementation(input), handle);
   const initial = await inspectDashboardImplementation(handle);
   assert.equal(initial.state, 'PREPARED');
@@ -195,6 +208,49 @@ test('isolated real implementers integrate exact patches then independent review
   assert.equal(reviewer.head, result.integration?.integratedCommit);
   assert.match(reviewer.prompt, new RegExp(reviewer.head));
   assert.equal(result.review?.revision, reviewer.head);
+  const resolvedPath = result.review!.result!.evidencePaths.find((path) =>
+    path.endsWith('/review-request.json'),
+  )!;
+  const resolved = JSON.parse(await readFile(resolvedPath, 'utf8'));
+  const summaryMatch = resolved.assignment.brief.context.match(
+    /Host-observed verification summary \(JSON; no raw logs\):\n([\s\S]*?)\nEnd host verification summary\./,
+  );
+  assert(
+    summaryMatch,
+    'Resolved reviewer input must contain inline host verification results.',
+  );
+  const verification = result.integration!.verification[0]!;
+  const log = await readFile(verification.logPath);
+  const digest = createHash('sha256').update(log).digest('hex');
+  assert.deepEqual(JSON.parse(summaryMatch[1]), {
+    status: 'PASS',
+    commands: [
+      {
+        program: input.verify[0]!.program,
+        args: input.verify[0]!.args,
+        exitCode: 0,
+        retainedLogPath: verification.logPath,
+        logSha256: digest,
+      },
+    ],
+  });
+  assert.equal(
+    resolved.integration.files.find(
+      (file: { path: string }) => file.path === verification.logPath,
+    ).reference.sha256,
+    digest,
+  );
+  assert(reviewer.prompt.includes(summaryMatch[1]));
+  assert.match(
+    reviewer.prompt,
+    /independent source assessment.*coordinator's semantic acceptance remain separate/,
+  );
+  assert(log.toString().includes('host-raw-log'));
+  assert(
+    !reviewer.prompt.includes('host-raw-log'),
+    'Raw log contents must not be injected into the reviewer prompt.',
+  );
+
   const head = (
     await exec('git', ['rev-parse', 'HEAD'], { cwd: f.workspaceRoot })
   ).stdout.trim();
@@ -509,4 +565,60 @@ test('completed lifecycle remains observed while missing required artifacts bloc
       null,
     );
   }
+});
+
+test('oversized inline verification metadata blocks reviewer launch without dropping sealed host results', async (t) => {
+  const f = await fixture(t),
+    input = request(f);
+  const handle = await prepareDashboardImplementation({
+    ...input,
+    verify: [
+      {
+        program: process.execPath,
+        args: ['-e', input.verify[0]!.args[1]!, 'x'.repeat(16 * 1024)],
+      },
+    ],
+  });
+  await startDashboardImplementation(handle);
+  const result = await finish(handle);
+  assert.equal(result.state, 'FAILED');
+  assert.equal(result.integration?.status, 'PASS');
+  assert.equal(result.review?.result?.status, 'BLOCKED');
+  assert.match(
+    result.review!.result!.summary,
+    /verification summary exceeds 16 KiB/,
+  );
+  assert.equal((await calls(f.root)).length, 2);
+});
+
+test('observed supervisor awaiting its first heartbeat stays starting only within the launch window', async (t) => {
+  const f = await fixture(t),
+    handle = await prepareDashboardImplementation(request(f));
+  const root = dirname(handle.requestPath),
+    intent = {
+      nonce: 'initial-heartbeat',
+      at: Date.now(),
+      manifestSha256: handle.manifestSha256,
+    };
+  await writeFile(join(root, 'intent.json'), JSON.stringify(intent));
+  await writeFile(
+    join(root, 'observed.json'),
+    JSON.stringify({ nonce: intent.nonce, pid: process.pid }),
+  );
+  const starting = await inspectDashboardImplementation(handle);
+  assert.equal(starting.state, 'STARTING');
+  assert.equal(starting.canCancel, true);
+  await writeFile(
+    join(root, 'intent.json'),
+    JSON.stringify({ ...intent, at: Date.now() - 10_000 }),
+  );
+  assert.equal(
+    (await inspectDashboardImplementation(handle)).state,
+    'RECOVERY_REQUIRED',
+  );
+  assert.equal(
+    (await startDashboardImplementation(handle)).state,
+    'RECOVERY_REQUIRED',
+  );
+  assert.equal((await calls(f.root)).length, 0);
 });

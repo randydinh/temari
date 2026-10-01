@@ -1,0 +1,69 @@
+
+> nx run runtime:dashboard-implementation-test
+
+> node --import @swc-node/register/esm-register --test --test-concurrency=1 tools/dashboard-implementation.test.mts tools/run-codex-write-workers.test.mts
+
+(node:97624) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:97626) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:97626) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:97626) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ isolated real implementers integrate exact patches then independent reviewer binds exact commit; duplicate start and fresh client retain one execution (2586.945875ms)
+✔ preflight rejects overlapping scopes and dirty candidate before any launch (140.272ms)
+✔ out of scope worker cannot integrate; successful sibling and blocked durable reviewer remain visible (1776.151209ms)
+✔ verification mutation prevents commit and resolves reviewer without invoking it (2128.70675ms)
+✔ tampered successful sibling retains lifecycle and cancellation drains a hanging implementer (1829.18825ms)
+✔ cancellation drains an in-progress fixed verification command without starting reviewer (2164.91775ms)
+✔ review cancellation is durable and drains the independently owned read-only process (2480.532875ms)
+✔ completed candidate tamper produces integrity issue without changing observed completion or relaunching (2585.885667ms)
+✔ reviewer changing its candidate cannot produce a usable reviewed integration (2481.427334ms)
+✔ unobserved old launch is recovery required; cancellation never proves old process absence (245.935917ms)
+✔ manifest or handle tamper fails before launch and prepared cancellation launches nothing (244.864625ms)
+✔ portable evidence and reviewer binding tamper are detected; late cancellation preserves completed observations (2461.742625ms)
+✔ completed lifecycle remains observed while missing required artifacts block use of its results (2877.154208ms)
+✔ oversized inline verification metadata blocks reviewer launch without dropping sealed host results (2223.765542ms)
+✔ observed supervisor awaiting its first heartbeat stays starting only within the launch window (199.037ms)
+(node:11436) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:11436) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:11436) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ disjoint write workers overlap in separate clones and join into one verified commit (1305.464209ms)
+✔ out-of-scope worker change cannot produce integration commit (668.418292ms)
+✔ both endpoints of a staged rename must be owned (678.788958ms)
+✔ optional worker failure degrades while required patch still integrates (1295.112ms)
+✔ tampered patch evidence cannot be applied during integration (1714.086458ms)
+✔ dirty and moved base are rejected before any worker starts (246.215458ms)
+✔ untracked worker file is captured in its patch (1238.540042ms)
+✔ failed integration verification retains checkout and never reports PASS (1057.129334ms)
+✔ verification cannot alter and re-stage a candidate file (1128.186375ms)
+✔ preparation may not move HEAD even when it leaves a clean checkout (275.928292ms)
+✔ abort during verification leaves no integration commit (1125.832292ms)
+✔ nested source checkout and inherited Git routing are handled before launch (1203.243125ms)
+✔ public write CLI isolates inherited Git routing variables at startup (1404.148042ms)
+✔ overlapping ownership and evidence inside source reject before work (149.916459ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 40450.014708
+
+
+
+ NX   Successfully ran target dashboard-implementation-test for project runtime
+
+
+  Run duration:      40.6s
+  Cache:             0/1 hit (0%)
+  Critical path:     40.5s (1 task)
+  Recoverable time:  <1ms
+
+  Recommendations:
+    - Drastically reduce your run duration by sharing a cache across your team and CI → https://cloud.nx.app/get-started?utm_source=nx-cli&utm_medium=cli&utm_campaign=performance-report&utm_content=remote-cache.
+    - Speed up or split the longest tasks on the critical path:
+        runtime:dashboard-implementation-test    40.5s

@@ -23,6 +23,8 @@ handoffs, evidence, and exact-run Archon controls. Successful agent findings nee
 coordinator review; only eligible canonical evidence plus explicit acceptance can
 mark a task done. The [boundary assessment](docs/system-roles-and-responsibilities.md#how-granular-are-the-boundaries-today)
 distinguishes documented roles from implemented enforcement.
+The [coding dashboard verification record](evaluations/task-continuity/dashboard-implementation-2026-10-01.md)
+retains actual agent overlap, integration checks, independent review, and restart evidence.
 
 Temari owns routing, plans, evidence, and closeout. The host (Cursor,
 Codex, Claude, Hermes, or serial fallback) owns tools, models, and

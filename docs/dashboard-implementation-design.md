@@ -95,6 +95,15 @@ The server adds the overall goal as context to fixed briefs, without expanding
 their paths or actions. Changing a pinned goal, plan or base requires a new
 prepared request; reusing an idempotency key cannot silently change the work.
 
+### Scope worker acceptance separately from combined verification
+
+Each implementer starts from the same unchanged base. Define its acceptance
+criteria around its owned change; tests that require a sibling's patch belong in
+the host's `verify` commands after integration. An expected failure in an unowned
+sibling implementation should be reported as context, not treated as failure of
+the worker's completed scope. The independent reviewer assesses the combined
+candidate and its retained verification evidence.
+
 ## Configure a small coding plan
 
 This macOS/Linux example creates a control file outside the current repository.
