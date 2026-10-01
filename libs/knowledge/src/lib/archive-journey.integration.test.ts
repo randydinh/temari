@@ -14,6 +14,208 @@ import {
 import { loadArchivePublication } from './archive-intake.js';
 import { canonical, hash } from './codec.js';
 
+async function setCurrentSharing(
+  python: string,
+  registrarSource: string,
+  workspace: string,
+  sourceId: string,
+  mode: 'registered-sources' | 'local-only',
+): Promise<void> {
+  const { stdout } = await promisify(execFile)(
+    python,
+    [
+      '-B',
+      '-m',
+      'knowledge_agent.cli',
+      'sources',
+      '--workspace',
+      workspace,
+      'set-sharing',
+      sourceId,
+      mode,
+    ],
+    {
+      env: {
+        PATH: '/usr/bin:/bin',
+        PYTHONPATH: join(registrarSource, 'src'),
+        PYTHONNOUSERSITE: '1',
+        PYTHONDONTWRITEBYTECODE: '1',
+      },
+      timeout: 30000,
+      maxBuffer: 65536,
+    },
+  );
+  assert.equal(JSON.parse(stdout).sharing, mode);
+}
+
+test('ACTUAL Registrar: live sharing revocation blocks direct, labeled and retry Jev calls', async () => {
+  const f = await actualFixture();
+  const task = {
+    id: 'sharing-gate',
+    directory: join(f.base, 'task'),
+    authorityRef: 'synthetic-live-sharing',
+  };
+  const workspace = join(f.base, 'state');
+  const intake = await runArchiveIntake({
+    task,
+    intakes: [
+      {
+        task,
+        source: f.source,
+        readScope: 'source-root',
+        requestKey: 'sharing-v1',
+        transport: {
+          python: f.config.python,
+          registrarSource: f.config.registrarSource,
+          workspace,
+        },
+      },
+    ],
+  });
+  assert(intake.handoffPath);
+  await setCurrentSharing(
+    f.config.python,
+    f.config.registrarSource,
+    workspace,
+    f.source.id,
+    'local-only',
+  );
+  let keyLookups = 0;
+  let fetches = 0;
+  const options = {
+    keyResolver: async () => {
+      keyLookups++;
+      return 'synthetic-key';
+    },
+    fetcher: async () => {
+      fetches++;
+      throw Error('revoked source reached TypeSafe');
+    },
+  };
+  const direct = await runArchiveQuery(
+    {
+      handoffPath: intake.handoffPath,
+      id: 'current-local-only',
+      query: 'Proposal',
+      sourceIds: [f.source.id],
+      topK: 2,
+      discoveryMode: 'bm25',
+    },
+    options,
+  );
+  assert.equal(direct.report.query.jevSharing, 'current-local-only');
+  assert.equal(direct.report.query.jev?.sharing, 'current-local-only');
+  assert(
+    direct.report.query.jev?.judgments.every(
+      (item) => item.gap === 'current-local-only',
+    ),
+  );
+  assert(
+    direct.report.query.gaps.some(
+      (gap) => gap.subject === 'jev-shadow' && gap.kind === 'scope-refused',
+    ),
+  );
+  const labeled = await evaluateArchiveSearch(
+    {
+      handoffPath: intake.handoffPath,
+      cases: [
+        {
+          id: 'labeled-current-local-only',
+          query: 'Proposal',
+          sourceIds: [f.source.id],
+          expected: [{ sourceId: f.source.id, path: 'plan.txt' }],
+          topK: 1,
+          discoveryMode: 'bm25',
+        },
+      ],
+    },
+    options,
+  );
+  assert.equal(labeled.report.cases[0].jevSharing, 'current-local-only');
+  assert.equal(keyLookups, 0);
+  assert.equal(fetches, 0);
+
+  await setCurrentSharing(
+    f.config.python,
+    f.config.registrarSource,
+    workspace,
+    f.source.id,
+    'registered-sources',
+  );
+  let retryFetches = 0;
+  const retried = await runArchiveQuery(
+    {
+      handoffPath: intake.handoffPath,
+      id: 'sharing-changed-after-429',
+      query: 'Proposal',
+      sourceIds: [f.source.id],
+      topK: 2,
+      discoveryMode: 'bm25',
+    },
+    {
+      apiKey: 'synthetic-key',
+      sleep: async () => {},
+      fetcher: async () => {
+        retryFetches++;
+        await setCurrentSharing(
+          f.config.python,
+          f.config.registrarSource,
+          workspace,
+          f.source.id,
+          'local-only',
+        );
+        return new Response('', { status: 429 });
+      },
+    },
+  );
+  assert.equal(retryFetches, 1);
+  assert.equal(retried.report.query.jevSharing, 'current-local-only');
+  assert.equal(retried.report.query.jev?.sharing, 'current-local-only');
+  assert(
+    retried.report.query.jev?.judgments.every(
+      (item) => item.gap === 'current-local-only',
+    ),
+  );
+
+  await setCurrentSharing(
+    f.config.python,
+    f.config.registrarSource,
+    workspace,
+    f.source.id,
+    'registered-sources',
+  );
+  let lastFetches = 0;
+  const changedAfterLastAttempt = await runArchiveQuery(
+    {
+      handoffPath: intake.handoffPath,
+      id: 'sharing-changed-after-last-response',
+      query: 'Proposal',
+      sourceIds: [f.source.id],
+      topK: 1,
+      discoveryMode: 'bm25',
+    },
+    {
+      apiKey: 'synthetic-key',
+      fetcher: async () => {
+        lastFetches++;
+        await setCurrentSharing(
+          f.config.python,
+          f.config.registrarSource,
+          workspace,
+          f.source.id,
+          'local-only',
+        );
+        return new Response('', { status: 503 });
+      },
+    },
+  );
+  assert.equal(lastFetches, 1);
+  assert.equal(
+    changedAfterLastAttempt.report.query.jevSharing,
+    'current-local-only',
+  );
+});
+
 test('ACTUAL CLI: explicit OCR mode is retained in the archive publication', async () => {
   const f = await actualFixture();
   const task = {
@@ -438,7 +640,10 @@ test('ACTUAL CLI: graph one-hop trial recovers a lexical miss from a pinned rela
       { path: 'seed.txt', bytes: Buffer.from('Signal signal signal relay.\n') },
       { path: 'decoy.txt', bytes: Buffer.from('Signal signal unrelated.\n') },
       { path: 'target.txt', bytes: Buffer.from('Charger location record.\n') },
-      { path: 'inferred.txt', bytes: Buffer.from('Unverified relation target.\n') },
+      {
+        path: 'inferred.txt',
+        bytes: Buffer.from('Unverified relation target.\n'),
+      },
     ],
   });
   const task = {

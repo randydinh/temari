@@ -16,6 +16,10 @@ import {
 } from './archive-intake.js';
 import { createArchiveRegistrar } from './archive-registrar.js';
 import {
+  checkCurrentJevSharing,
+  currentJevSharingGuard,
+} from './current-jev-sharing.js';
+import {
   evaluateArchiveGraphTrial,
   type ArchiveGraphTrial,
 } from './archive-graph-trial.js';
@@ -101,7 +105,12 @@ export interface ArchiveCaseResult {
   readonly querySha256: string;
   readonly discoveryMode: 'exact' | 'bm25';
   readonly sourceIds: readonly string[];
-  readonly jevSharing: 'allowed' | 'local-only' | 'case-opt-out';
+  readonly jevSharing:
+    | 'allowed'
+    | 'local-only'
+    | 'case-opt-out'
+    | 'current-local-only'
+    | 'policy-unavailable';
   readonly expected: ArchiveEvaluationCase['expected'];
   readonly sourceCapabilityGaps: readonly KnowledgeGap[];
   readonly discoveryCheckpointPath: string;
@@ -415,7 +424,7 @@ async function searchArchiveCore(
 ): Promise<CoreContext> {
   const caseStarted = performance.now();
   validateQuery(c, handoff);
-  const jevSharing: ArchiveCaseResult['jevSharing'] = c.sourceIds.some(
+  let jevSharing: ArchiveCaseResult['jevSharing'] = c.sourceIds.some(
     (id: string) => handoff.jevPolicy?.localOnlySourceIds.includes(id),
   )
     ? 'local-only'
@@ -424,6 +433,10 @@ async function searchArchiveCore(
       : 'allowed';
   const selectedPublications = handoff.publications.filter((_path, index) =>
     c.sourceIds.includes(publications[index].source.id),
+  );
+  const sharingGuard = currentJevSharingGuard(
+    selectedPublications,
+    c.sourceIds,
   );
   const provider = await createArchiveRegistrar({
     publications: selectedPublications,
@@ -577,9 +590,30 @@ async function searchArchiveCore(
           ...(jevSharing === 'allowed' ? {} : { denialReason: jevSharing }),
           candidates: shortlist,
         },
-        jevOptions,
+        { ...jevOptions, currentSharingGuard: sharingGuard },
       );
       jevMs = Math.max(0, Math.round(performance.now() - jevStarted));
+    }
+  }
+  if (jevSharing === 'allowed') {
+    // A prior allowed check authorizes that attempt only. Re-read policy for
+    // the report so a change during key lookup or the last response is visible.
+    const current =
+      jev?.sharing === 'current-local-only' ||
+      jev?.sharing === 'policy-unavailable'
+        ? jev.sharing
+        : await checkCurrentJevSharing(sharingGuard);
+    if (current === 'current-local-only' || current === 'policy-unavailable') {
+      jevSharing = current;
+      gaps.push({
+        kind:
+          current === 'current-local-only' ? 'scope-refused' : 'unavailable',
+        subject: 'jev-shadow',
+        detail:
+          current === 'current-local-only'
+            ? 'Current Registrar sharing policy keeps selected source text local.'
+            : 'Current Registrar sharing policy could not be verified.',
+      });
     }
   }
   const result: CoreCaseResult = {
