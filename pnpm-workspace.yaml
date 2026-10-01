@@ -4,3 +4,4 @@ packages:
 allowBuilds:
   '@swc/core': false
   nx: false
+  protobufjs: false

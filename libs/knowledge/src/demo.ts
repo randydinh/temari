@@ -33,6 +33,11 @@ import {
   type ArchiveIntakePlan,
   type ArchiveSearchPlan,
 } from './lib/archive-journey.js';
+import { runRetrievalGate } from './lib/archive-evaluation-gate.js';
+import {
+  publishArchiveStructure,
+  type ArchiveStructurePlan,
+} from './lib/archive-structure.js';
 
 const help = `Knowledge demo (explicit local files; no model or semantic approval):
   pnpm nx run knowledge:demo -- capture --input /absolute/intake.json
@@ -41,6 +46,8 @@ const help = `Knowledge demo (explicit local files; no model or semantic approva
   pnpm nx run knowledge:demo -- archive-assess --input /absolute/investigation.json --assessment /absolute/assessment.json
   pnpm nx run knowledge:demo -- journey-intake --input /absolute/intake-plan.json
   pnpm nx run knowledge:demo -- journey-search --input /absolute/search-plan.json
+  pnpm nx run knowledge:demo -- journey-gate --input /absolute/sealed-questions.json --sha256 QUESTION_SET_SHA256
+  pnpm nx run knowledge:demo -- structure-publish --input /absolute/structure-plan.json
   pnpm nx run knowledge:demo -- --help
   pnpm nx run knowledge:demo -- prepare --manifest /absolute/selected-documents.json --python /absolute/python --registrar-source /absolute/registrar-repo
   pnpm nx run knowledge:demo -- collect --input /absolute/input.json [--resume /absolute/knowledge-HASH.json] [--assessment /absolute/assessment.json]
@@ -81,6 +88,20 @@ async function main(): Promise<void> {
     ) as ArchiveSearchPlan;
     process.stdout.write(
       JSON.stringify(await evaluateArchiveSearch(input), null, 2) + '\n',
+    );
+    return;
+  }
+  if (command === 'journey-gate') {
+    process.stdout.write(JSON.stringify(
+      await runRetrievalGate(arg('--input'), arg('--sha256')), null, 2) + '\n');
+    return;
+  }
+  if (command === 'structure-publish') {
+    const input = JSON.parse(
+      await readFile(arg('--input'), 'utf8'),
+    ) as ArchiveStructurePlan;
+    process.stdout.write(
+      JSON.stringify(await publishArchiveStructure(input), null, 2) + '\n',
     );
     return;
   }

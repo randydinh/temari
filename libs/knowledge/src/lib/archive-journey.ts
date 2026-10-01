@@ -18,6 +18,10 @@ import {
   evaluateArchiveGraphTrial,
   type ArchiveGraphTrial,
 } from './archive-graph-trial.js';
+import {
+  publishArchiveStructure,
+  type ArchiveStructurePlan,
+} from './archive-structure.js';
 import { canonical, checkBasis, hash, integer, object, text } from './codec.js';
 import { publishJson, readJson } from './durable.js';
 import {
@@ -30,12 +34,23 @@ import { collectKnowledge, loadRetrieval } from './retrieval.js';
 export interface ArchiveIntakePlan {
   readonly task: InvestigationTask;
   readonly intakes: readonly ArchiveIntakeOptions[];
+  /** Sources retained locally for Jev; all other admitted sources use Jev by default. */
+  readonly localOnlySourceIds?: readonly string[];
+  readonly structures?: readonly (Omit<
+    ArchiveStructurePlan,
+    'publicationPath'
+  > & { sourceId: string })[];
 }
 export interface ArchiveIntakeHandoff {
   readonly schema: 1;
   readonly kind: 'temari-archive-intake-handoff';
   readonly task: InvestigationTask;
   readonly publications: readonly string[];
+  /** Absent only on legacy handoffs, which retain per-case approval semantics. */
+  readonly jevPolicy?: {
+    readonly mode: 'registered-sources';
+    readonly localOnlySourceIds: readonly string[];
+  };
   readonly sources: readonly {
     id: string;
     generation: string;
@@ -43,11 +58,17 @@ export interface ArchiveIntakeHandoff {
     preservation: string;
     gapCount: number;
   }[];
+  readonly structures?: readonly {
+    sourceId: string;
+    graphId: string;
+    receiptPath: string;
+  }[];
 }
 export interface ArchiveIntakeBatchResult {
   readonly status: 'published' | 'blocked';
   readonly handoffPath: string | null;
   readonly outcomes: readonly ArchiveIntakeOutcome[];
+  readonly structures?: ArchiveIntakeHandoff['structures'];
 }
 export interface ArchiveEvaluationCase {
   readonly id: string;
@@ -56,8 +77,8 @@ export interface ArchiveEvaluationCase {
   readonly expected: readonly { sourceId: string; path: string }[];
   readonly topK: number;
   readonly discoveryMode: 'exact' | 'bm25';
-  /** Never inferred from task authority. Explicit approval is required per case. */
-  readonly hostedTextApproved: boolean;
+  /** Optional per-case opt-out; true cannot override a local-only source. */
+  readonly hostedTextApproved?: boolean;
   /** Optional one-hop graph ablation; lexical ranking remains the baseline. */
   readonly graphId?: string;
 }
@@ -70,6 +91,7 @@ export interface ArchiveCaseResult {
   readonly querySha256: string;
   readonly discoveryMode: 'exact' | 'bm25';
   readonly sourceIds: readonly string[];
+  readonly jevSharing: 'allowed' | 'local-only' | 'case-opt-out';
   readonly expected: ArchiveEvaluationCase['expected'];
   readonly sourceCapabilityGaps: readonly KnowledgeGap[];
   readonly discoveryCheckpointPath: string;
@@ -121,6 +143,14 @@ export async function runArchiveIntake(
     new Set(selected.intakes.map((item) => item.requestKey)).size ===
       selected.intakes.length,
   );
+  const localOnlySourceIds = selected.localOnlySourceIds ?? [];
+  assert(Array.isArray(localOnlySourceIds));
+  assert.equal(new Set(localOnlySourceIds).size, localOnlySourceIds.length);
+  for (const sourceId of localOnlySourceIds)
+    assert(
+      selected.intakes.some((item) => item.source.id === sourceId),
+      'Local-only source outside intake',
+    );
   for (const item of selected.intakes) {
     assert(same(item.task, selected.task), 'Intake task mismatch');
     assert(
@@ -139,11 +169,43 @@ export async function runArchiveIntake(
     return { status: 'blocked', handoffPath: null, outcomes };
   const publications = outcomes.map((item) => item.publicationPath!);
   const loaded = await Promise.all(publications.map(loadArchivePublication));
+  const structures: {
+    sourceId: string;
+    graphId: string;
+    receiptPath: string;
+  }[] = [];
+  assert((selected.structures?.length ?? 0) <= 8);
+  for (const structure of selected.structures ?? []) {
+    const index = loaded.findIndex(
+      (item) => item.source.id === structure.sourceId,
+    );
+    assert(index >= 0, 'Structure source outside intake');
+    assert(
+      !structures.some((item) => item.sourceId === structure.sourceId),
+      'One structural graph per source',
+    );
+    const published = await publishArchiveStructure({
+      publicationPath: publications[index],
+      artifactPath: structure.artifactPath,
+      kind: structure.kind,
+      paths: structure.paths,
+      maxEdges: structure.maxEdges,
+    });
+    structures.push({
+      sourceId: structure.sourceId,
+      graphId: published.graphId,
+      receiptPath: published.receiptPath,
+    });
+  }
   const handoff: ArchiveIntakeHandoff = {
     schema: 1,
     kind: 'temari-archive-intake-handoff',
     task: selected.task,
     publications,
+    jevPolicy: {
+      mode: 'registered-sources',
+      localOnlySourceIds: [...localOnlySourceIds].sort(),
+    },
     sources: loaded.map((item) => ({
       id: item.source.id,
       generation: item.generation,
@@ -151,16 +213,22 @@ export async function runArchiveIntake(
       preservation: item.preservation,
       gapCount: item.gaps.length,
     })),
+    ...(structures.length ? { structures } : {}),
   };
   const handoffPath = join(
     selected.task.directory,
     `archive-handoff-${hash(canonical(handoff))}.json`,
   );
   await publishJson(handoffPath, handoff);
-  return { status: 'published', handoffPath, outcomes };
+  return {
+    status: 'published',
+    handoffPath,
+    outcomes,
+    ...(structures.length ? { structures } : {}),
+  };
 }
 
-async function loadHandoff(path: string): Promise<ArchiveIntakeHandoff> {
+export async function loadArchiveHandoff(path: string): Promise<ArchiveIntakeHandoff> {
   assert(isAbsolute(path));
   const value = object(await readJson(path)) as unknown as ArchiveIntakeHandoff;
   assert.equal(value.schema, 1);
@@ -176,6 +244,45 @@ async function loadHandoff(path: string): Promise<ArchiveIntakeHandoff> {
       value.publications.length <= 8,
   );
   assert.equal(value.sources.length, value.publications.length);
+  if (value.jevPolicy !== undefined) {
+    assert.equal(value.jevPolicy.mode, 'registered-sources');
+    const ids = value.jevPolicy.localOnlySourceIds;
+    assert(Array.isArray(ids) && ids.length <= value.sources.length);
+    assert.equal(new Set(ids).size, ids.length);
+    for (const id of ids)
+      assert(
+        value.sources.some((source) => source.id === id),
+        'Local-only source outside handoff',
+      );
+  }
+  if (value.structures !== undefined) {
+    assert(
+      Array.isArray(value.structures) &&
+        value.structures.length <= value.sources.length,
+    );
+    assert.equal(
+      new Set(value.structures.map((item) => item.sourceId)).size,
+      value.structures.length,
+    );
+    for (const item of value.structures) {
+      assert(value.sources.some((source) => source.id === item.sourceId));
+      assert(/^[a-f0-9]{64}$/.test(item.graphId));
+      assert(
+        isAbsolute(item.receiptPath) &&
+          dirname(item.receiptPath) === value.task.directory,
+      );
+      const receipt = object(await readJson(item.receiptPath));
+      assert.equal(
+        basename(item.receiptPath),
+        `archive-structure-${hash(canonical(receipt))}.json`,
+      );
+      assert.equal(receipt['graphId'], item.graphId);
+      assert.equal(receipt['sourceId'], item.sourceId);
+      const pin = value.sources.find((source) => source.id === item.sourceId)!;
+      assert.equal(receipt['generation'], pin.generation);
+      assert.equal(receipt['manifestSha256'], pin.manifestSha256);
+    }
+  }
   const loaded = await Promise.all(
     value.publications.map(loadArchivePublication),
   );
@@ -203,7 +310,7 @@ export async function evaluateArchiveSearch(
       selected.cases.length >= 1 &&
       selected.cases.length <= 32,
   );
-  const handoff = await loadHandoff(selected.handoffPath);
+  const handoff = await loadArchiveHandoff(selected.handoffPath);
   assert(
     new Set(selected.cases.map((item) => item.id)).size ===
       selected.cases.length,
@@ -220,7 +327,15 @@ export async function evaluateArchiveSearch(
     assert(text(c.id).length <= 128 && text(c.query).length <= 512);
     integer(c.topK, 1, 8);
     assert(['exact', 'bm25'].includes(c.discoveryMode));
-    assert(typeof c.hostedTextApproved === 'boolean');
+    assert(
+      c.hostedTextApproved === undefined ||
+        typeof c.hostedTextApproved === 'boolean',
+    );
+    if (!handoff.jevPolicy)
+      assert(
+        typeof c.hostedTextApproved === 'boolean',
+        'Legacy handoff requires per-case Jev approval',
+      );
     assert(
       Array.isArray(c.sourceIds) &&
         c.sourceIds.length >= 1 &&
@@ -229,6 +344,13 @@ export async function evaluateArchiveSearch(
     assert.equal(new Set(c.sourceIds).size, c.sourceIds.length);
     for (const sourceId of c.sourceIds)
       assert(sourceById.has(sourceId), 'Case source outside handoff');
+    const jevSharing: ArchiveCaseResult['jevSharing'] = c.sourceIds.some(
+      (id: string) => handoff.jevPolicy?.localOnlySourceIds.includes(id),
+    )
+      ? 'local-only'
+      : c.hostedTextApproved === false
+        ? 'case-opt-out'
+        : 'allowed';
     assert(
       Array.isArray(c.expected) &&
         c.expected.length >= 1 &&
@@ -409,7 +531,8 @@ export async function evaluateArchiveSearch(
         jev = await judgeJevShadow(
           {
             query: c.query,
-            hostedTextApproved: c.hostedTextApproved,
+            hostedTextApproved: jevSharing === 'allowed',
+            ...(jevSharing === 'allowed' ? {} : { denialReason: jevSharing }),
             candidates: shortlist,
           },
           jevOptions,
@@ -417,11 +540,17 @@ export async function evaluateArchiveSearch(
         jevMs = Math.max(0, Math.round(performance.now() - jevStarted));
       }
     }
+    const selectedGraphId =
+      c.graphId ??
+      (c.sourceIds.length === 1
+        ? handoff.structures?.find((item) => item.sourceId === c.sourceIds[0])
+            ?.graphId
+        : undefined);
     const graph =
-      c.graphId === undefined
+      selectedGraphId === undefined
         ? undefined
         : await evaluateArchiveGraphTrial({
-            graphId: c.graphId,
+            graphId: selectedGraphId,
             publications: selectedPublications,
             scope,
             provider,
@@ -438,6 +567,7 @@ export async function evaluateArchiveSearch(
       querySha256: hash(c.query),
       discoveryMode: c.discoveryMode,
       sourceIds: [...c.sourceIds],
+      jevSharing,
       expected: [...c.expected],
       sourceCapabilityGaps: publications
         .filter((item) => c.sourceIds.includes(item.source.id))

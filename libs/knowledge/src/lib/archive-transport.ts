@@ -87,7 +87,9 @@ export async function archiveTransport(options: ArchiveTransportOptions) {
       | 'discover'
       | 'list'
       | 'graph-read'
-      | 'graph-projection',
+      | 'graph-projection'
+      | 'graph-publish'
+      | 'graph-retract',
     args: string[],
     responseBytes = maxStdoutBytes,
   ): Promise<Record<string, unknown>> {

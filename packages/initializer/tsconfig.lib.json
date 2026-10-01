@@ -9,6 +9,9 @@
   "include": ["src/**/*.ts"],
   "references": [
     {
+      "path": "../../libs/host-adapters/tsconfig.lib.json"
+    },
+    {
       "path": "../../libs/archon-harness/tsconfig.lib.json"
     }
   ]

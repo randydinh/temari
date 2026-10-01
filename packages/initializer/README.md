@@ -41,6 +41,30 @@ architectures remain available to host-provided or alternate harnesses. A
 supported-platform download or digest failure makes initialization fail rather
 than recording an unverified binary as ready.
 
+After `init`, run an explicit live host probe from the selected host environment:
+
+```sh
+pnpm temari:doctor --live --host codex
+# or: pnpm temari:doctor --live --host claude-code
+# or: pnpm temari:doctor --live --host cursor
+```
+
+Live doctor creates a private synthetic `challenge.txt` under the user-local
+Temari state directory. For Codex CLI and Claude Code it launches a bounded,
+read-only child process and checks that the child returned the token it read
+from that file. It retains process evidence and `doctor-report.json` in the
+printed run directory. Cursor currently has no bounded noninteractive Nx probe,
+so its live result is `BLOCKED`. A missing executable, failed response,
+timeout, or wrong token is also `BLOCKED`. The ordinary `doctor` command never
+launches a model or writes live proof.
+
+An observed live result establishes only the local child-worker mechanism for
+installation preflight. Forge, model diversity, isolation, durable delivery,
+and parallelism remain unproven. Feature admission still requires fresh proof
+bound to its own invocation and candidate; it never imports the doctor report
+as authority. The live probe may make a model call and does not inspect a user
+project.
+
 Receipts contain tool versions, install commands, exit codes, hashes of
 captured output, and Archon's pinned source/platform/runtime digest. They do
 not store command output, credentials, or environment variables.

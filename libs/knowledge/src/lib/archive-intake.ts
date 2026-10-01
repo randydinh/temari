@@ -30,6 +30,8 @@ export interface ArchiveIntakeOptions {
   readonly readScope: 'source-root';
   readonly transport: ArchiveTransportOptions;
   readonly requestKey: string;
+  /** Explicit on-device PNG OCR; omitted means Registrar's ordinary capture. */
+  readonly ocrMode?: 'macos-vision';
   readonly limits?: {
     readonly entries?: number;
     readonly file_bytes?: number;
@@ -425,6 +427,7 @@ export async function captureArchive(
   source(o.source);
   assert.equal(o.readScope, 'source-root');
   assert(/^[A-Za-z0-9_.:-]{1,128}$/.test(o.requestKey));
+  assert(o.ocrMode === undefined || o.ocrMode === 'macos-vision');
   const attempt = randomUUID(),
     attemptPath = join(o.task.directory, `archive-attempt-${attempt}.json`),
     resultPath = join(o.task.directory, `archive-result-${attempt}.json`);
@@ -467,18 +470,21 @@ export async function captureArchive(
       implementation: transport.implementation,
       protocolSha256: transport.protocolSha256,
       registration,
+      ...(o.ocrMode ? { ocrMode: o.ocrMode } : {}),
     };
     await publishJson(
       join(o.task.directory, `archive-binding-${bindingId}.json`),
       binding,
     );
-    const r = await transport.invoke('capture', [
+    const captureArgs = [
       o.source.id,
       '--request-key',
       captureRequestKey,
       '--limits',
       canonical(limits),
-    ]);
+      ...(o.ocrMode ? ['--ocr-mode', o.ocrMode] : []),
+    ];
+    const r = await transport.invoke('capture', captureArgs);
     assert.equal(r['status'], 'complete');
     assert.equal(r['source_id'], o.source.id);
     assert.equal(r['request_key'], captureRequestKey);
@@ -515,7 +521,7 @@ export async function captureArchive(
       for (const [key, expected] of Object.entries({
         retrieval: 'exact-lexical',
         visual: 'unsupported',
-        ocr: 'unsupported',
+        ocr: o.ocrMode === 'macos-vision' ? 'macos-vision-optional' : 'unsupported',
         asset_inventory: 'partial-or-unknown',
         structural_navigation: 'unsupported',
       })) {

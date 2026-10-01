@@ -37,8 +37,9 @@ opt-in SQLite FTS5 BM25 over the selected retained generations; exact remains th
 default. Temari can rebind an existing archived publication after a verified runtime
 upgrade, select BM25 discovery, and read graph pages/projections only when every
 RevisionSet generation and manifest matches its selected publications. A separate
-Jev adapter produces typed judgments in shadow mode from explicitly approved,
-bounded text. It does not change the evidence order used for decisions.
+Jev adapter produces typed judgments in shadow mode from bounded, verified text.
+Registered sources may use the TypeSafe key by default unless marked local-only.
+It does not change the evidence order used for decisions.
 
 Synthetic local checks cover Nx and ordinary repository layouts, text and Office
 documents, searchable and scanned PDFs, and images with explicit extraction gaps.
@@ -48,6 +49,14 @@ mocked Jev responses and no private corpus. Native Graphify execution, Graft cod
 navigation, OCR/visual interpretation, full graph relationship extraction and a
 measured complete-task gain remain unproven. These are material limits on any
 claim of lossless semantic recall or production readiness.
+
+The later [bounded real-corpus pilot](evidence/knowledge-system/real-corpus-pilot-2026-09-30.md)
+exercised an Nx repository, a non-Nx Python repository, selected documents,
+live TypeSafe Jev, Nx/Graft graph imports and optional on-device PNG OCR.
+An actual-CLI synthetic integration separately verified operator-reviewed
+graph retraction. These later measurements supersede the
+synthetic test counts above; the incomplete modalities and retrieval limits
+remain explicit in the pilot record.
 
 ## Delivery decision: complete the knowledge journey before plugin packaging
 
@@ -64,7 +73,7 @@ Build order now:
 1. Finish a useful admitted-source journey: captured originals, extraction
    accounting, exact/BM25 and graph-assisted retrieval, verified citations,
    explicit gaps and real task evaluation. Keep Jev as the only hosted model;
-   approved text is still required before a live call.
+   registered source text may be sent unless marked local-only.
 2. Validate Nx and non-Nx code structure and document modalities against
    pinned archives. Compare graph-assisted search with lexical ranking at the
    same candidate budget before changing the default ranker.
@@ -75,21 +84,39 @@ Build order now:
    deletion remains a separate purge decision. An uninstall preference must
    survive upgrades. No silent model substitution is permitted.
 
-The current local pilot in merged PR #92 recovered 14/14 admitted originals
+The earlier local pilot in merged PR #92 recovered 14/14 admitted originals
 byte-for-byte and found the expected document in the top K for 6/8 annotated
-queries. PDF and image-text misses, separate Nx/Graft probes, lack of native
-Graphify non-code execution, and no live Jev validation remain open. These
-results do not certify lossless semantic retrieval or a production deployment.
+queries. The [2026-09-30 bounded real-corpus pilot](evidence/knowledge-system/real-corpus-pilot-2026-09-30.md)
+then exercised a pinned Nx snapshot, a non-Nx Python snapshot, six document
+formats, live Jev judgments, and source-anchored Nx/Graft graph imports.
+It found concrete retrieval and format gaps. Neither pilot certifies lossless
+semantic retrieval or a production deployment.
 
-This increment trials one-hop archived graph candidates alongside
-unchanged lexical ranking. It reports both top-K results, preserves the
-publication and source scope, verifies every added excerpt against the retained
-archive, and keeps graph evidence in private checkpoints. This tests the graph
-serving boundary; it does not yet import Nx or Graft structure or promote graph
-ranking by default. A private single-edge non-Nx code pilot used an inferred Graft
-link published by an operator: at K=2, lexical search missed the annotated related
-document and the graph trial found it. That one query is a feasibility check, not
-a quality estimate or evidence that Graft ingestion is automated.
+The next increment adds bounded Nx and Graft artifact import to the intake
+authority. It converts admitted structural edges to pinned Registrar graph
+assertions only when both endpoints can be found in retained archive text,
+the current source bytes match the retained originals, and the asserted edge
+is independently supported by those bytes. Graft call edges are published as
+`call-name-candidate`: the archived span fingerprint must match, and a Swift
+call spelling must occur outside comments in a Swift file with no string
+delimiter, slash/hash expression syntax or non-ASCII code. This conservative profile
+omits string interpolation and regex literals until a syntax parser is
+available. It does not resolve overloads or dynamic dispatch. Containment
+requires the complete Graft file fingerprint and a matching child span
+fingerprint.
+Nx dependencies cite the exact declaration entry. The bounded profile accepts
+these candidate calls, file containment and Nx declared dependencies;
+other relations are omitted with a reason. An optional intake-plan
+entry publishes the graph and places its ID in the immutable handoff; a
+single-source search case automatically trials that graph alongside unchanged
+BM25. The import does not generate Nx/Graft artifacts, schedule agents, or
+promote graph ranking by default. The private real Nx pilot published one
+project dependency edge; at K=2 the expected related package was absent from
+BM25 and present in graph-assisted results. The private curated Swift pilot
+published 32 source-anchored Graft edges in the earlier feasibility run; a
+targeted inferred call edge yielded
+the same 0-to-1 recall change for one query at K=2. These are feasibility checks,
+not quality estimates or proof of semantic correctness.
 
 ## Decisions, uncertainty and lineage
 

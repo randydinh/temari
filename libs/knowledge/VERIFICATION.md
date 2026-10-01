@@ -75,3 +75,24 @@ The selected macOS host reports `pdf-memory-boundary-unavailable`: PDF originals
 are retained and recovered, but no successful PDF archive text extraction is
 claimed. DOCX text and its visual omissions are asserted through the real CLI.
 Standalone and scanned-image fixtures do not supply visual understanding.
+
+## Structural intake continuation (2026-09-30)
+
+The exact continuation passed `knowledge:typecheck`, 36 unit tests and 28
+actual-Registrar integration tests through the isolated Nx helper. A new
+synthetic integration case publishes both Graft and Nx edges, reads the pinned
+graph back, verifies that a single-source intake handoff automatically exposes
+its graph to search, and refuses an edited source file, a stale edge whose
+endpoints still exist, and call spellings found only in Swift comments, raw
+strings, multiline strings, interpolation or Swift regex literals. The Graphify design
+ledger readback and `git diff --check` passed.
+
+Two curated local feasibility checks used the real archive and structure
+artifacts. The Nx graph provided one source-anchored `depends-on` edge. The
+Graft wiring provided 32 source-anchored edges in the earlier feasibility run,
+including one inferred call. The stricter AST-span and call-name checks were
+verified against the synthetic archive; the private pilot count is historical.
+For one annotated query in each corpus at K=2, BM25 alone had expected-document
+recall 0 and the graph trial had recall 1. These counts do not estimate general
+retrieval quality, prove runtime calls, or establish visual/text coverage.
+Private reports and source manifests remain outside this repository.

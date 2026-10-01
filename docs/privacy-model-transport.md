@@ -21,6 +21,8 @@ The plan returns the model-bound payload and a local preview with masked categor
 
 To reduce repeated prompts, the host can record each explicit one-submission allow with `recordPrivacyOverride`. The stored observation is a keyed fingerprint, not the raw value. The host may show “save for this scope” on the first approval; after the same exact value has been allowed twice in that scope, the API suggests it proactively. `resolvePrivacyOverride` honors `save`, `not-now`, and `never-suggest`; not-now delays the next offer and never-suggest suppresses it for that scoped value. Only a user choice of save creates a standing allow rule. The host must save the returned preferences and let the user remove saved rules later.
 
+The [privacy learning experiment](privacy-learning.md) defines synthetic cases for evaluating group suggestions with SkillOpt before any learned rule can reach this boundary.
+
 This is a privacy-library increment. The current host adapters do not yet expose a settings UI, load saved rules, or apply this planner across prompts, files, screenshot text, and later tool results. A host integration must do that before treating a setting as active. The generated standalone Archon copy also needs synchronization after the authoritative source change. Until the selected driver passes its independent live-use gates, these settings are for synthetic and local planning only.
 
 ## Host integration

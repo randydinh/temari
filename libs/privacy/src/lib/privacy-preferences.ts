@@ -39,6 +39,8 @@ export type PrivacyPreferences = {
   readonly rules: readonly PrivacyRule[];
   /** Opaque local memory of repeated one-submission approvals. */
   readonly approvalMemory?: PrivacyApprovalMemory;
+  /** Explicit user decisions used only for local group suggestions. */
+  readonly learningMemory?: PrivacyLearningMemory;
 };
 
 export type PrivacyApprovalMemory = {
@@ -49,6 +51,18 @@ export type PrivacyApprovalMemory = {
     /** Null means the user chose not to see this suggestion again. */
     readonly nextOfferAt: number | null;
   }[];
+};
+
+export type PrivacyLearningMemory = {
+  readonly key: string;
+  readonly events: readonly {
+    readonly id: string;
+    readonly scope: { readonly workspaceId: string; readonly sourceId: string };
+    readonly category: PrivateKind;
+    readonly decision: 'allow' | 'mask';
+    readonly fingerprint: string;
+  }[];
+  readonly suppressedProposalIds: readonly string[];
 };
 
 export type PrivacyPersistenceOffer = {
@@ -216,6 +230,51 @@ function checkApprovalMemory(value: unknown): void {
   }
 }
 
+function checkLearningMemory(value: unknown): void {
+  if (!record(value))
+    throw new PrivacyError('Invalid privacy learning memory.');
+  exactKeys(value, ['key', 'events', 'suppressedProposalIds']);
+  if (
+    typeof value.key !== 'string' ||
+    !/^[A-Za-z0-9_-]{43}$/.test(value.key) ||
+    Buffer.from(value.key, 'base64url').length !== 32 ||
+    !Array.isArray(value.events) ||
+    value.events.length > 256 ||
+    !Array.isArray(value.suppressedProposalIds) ||
+    value.suppressedProposalIds.length > 64
+  )
+    throw new PrivacyError('Invalid privacy learning memory.');
+  const eventIds = new Set<string>();
+  for (const event of value.events) {
+    if (!record(event))
+      throw new PrivacyError('Invalid privacy learning event.');
+    exactKeys(event, ['id', 'scope', 'category', 'decision', 'fingerprint']);
+    const scope = checkScope(event.scope);
+    if (
+      typeof event.id !== 'string' ||
+      !identifier.test(event.id) ||
+      eventIds.has(event.id) ||
+      scope.sourceId === undefined ||
+      !categories.has(event.category as PrivateKind) ||
+      !['allow', 'mask'].includes(String(event.decision)) ||
+      typeof event.fingerprint !== 'string' ||
+      !/^[a-f0-9]{64}$/.test(event.fingerprint)
+    )
+      throw new PrivacyError('Invalid privacy learning event.');
+    eventIds.add(event.id);
+  }
+  const suppressed = new Set<string>();
+  for (const id of value.suppressedProposalIds) {
+    if (
+      typeof id !== 'string' ||
+      !/^[a-f0-9]{64}$/.test(id) ||
+      suppressed.has(id)
+    )
+      throw new PrivacyError('Invalid suppressed privacy group.');
+    suppressed.add(id);
+  }
+}
+
 export function validatePrivacyPreferences(value: unknown): PrivacyPreferences {
   assertJsonValue(value);
   if (Buffer.byteLength(JSON.stringify(value)) > 1024 * 1024)
@@ -227,6 +286,7 @@ export function validatePrivacyPreferences(value: unknown): PrivacyPreferences {
     'permissiveAcknowledged',
     'rules',
     'approvalMemory',
+    'learningMemory',
   ]);
   if (
     value.schemaVersion !== 1 ||
@@ -243,6 +303,8 @@ export function validatePrivacyPreferences(value: unknown): PrivacyPreferences {
     throw new PrivacyError('Duplicate privacy rule ID.');
   if (value.approvalMemory !== undefined)
     checkApprovalMemory(value.approvalMemory);
+  if (value.learningMemory !== undefined)
+    checkLearningMemory(value.learningMemory);
   return structuredClone(value) as PrivacyPreferences;
 }
 

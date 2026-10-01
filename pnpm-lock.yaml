@@ -134,6 +134,9 @@ importers:
       '@temari/archon-harness':
         specifier: workspace:*
         version: link:../../libs/archon-harness
+      '@temari/host-adapters':
+        specifier: workspace:^
+        version: link:../../libs/host-adapters
 
   packages/workflow-runtime: {}
 

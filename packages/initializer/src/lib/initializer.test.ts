@@ -14,6 +14,7 @@ import test from 'node:test';
 import {
   doctor,
   findExecutable,
+  formatInitialization,
   initialize,
   parseVersion,
   type CommandResult,
@@ -28,7 +29,7 @@ const manifest: DependencyManifest = {
   schema: 1,
   version: 'test',
   tools: {
-    pnpm: { command: 'pnpm', required: true, minimumMajor: 9 },
+    pnpm: { command: 'pnpm', required: true, minimumMajor: 11 },
     bun: { command: 'bun', required: true, minimumMajor: 1 },
     git: { command: 'git', required: true },
   },
@@ -243,7 +244,7 @@ test('init runs locked installs and writes a receipt without shell-specific comm
       environment: { PATH: root },
       runner: runnerFor(
         {
-          pnpm: 'pnpm 9.15.9',
+          pnpm: 'pnpm 11.25.0',
           bun: 'bun 1.4.2',
           git: 'git version 2.0.0',
           archon: 'Archon CLI v0.10.1\n  Git commit: 9820785c\n',
@@ -299,6 +300,10 @@ test('init runs locked installs and writes a receipt without shell-specific comm
     };
     assert.equal(stored.status, 'SUCCEEDED');
     assert.equal(result.receipt.status, 'SUCCEEDED');
+    assert.match(
+      formatInitialization(result),
+      /next=temari doctor --live --host <codex\|claude-code\|cursor>/,
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }
