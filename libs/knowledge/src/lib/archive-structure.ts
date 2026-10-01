@@ -1,5 +1,6 @@
 /** Operator-side import of structural candidates into a pinned Registrar graph. */
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { lstat, readFile, realpath } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,6 +35,21 @@ interface CandidateEdge {
   predicate: string;
   provenance: 'extracted' | 'inferred' | 'ambiguous';
   nxType?: 'static' | 'dynamic' | 'implicit';
+}
+interface PythonDefinition {
+  readonly name: string;
+  readonly kind: 'function' | 'method' | 'class';
+  readonly parent: 'module' | 'function' | 'method' | 'class';
+  readonly line: number;
+  readonly endLine: number;
+  readonly decorated: boolean;
+  readonly bound: readonly string[];
+  readonly enclosingBound: readonly string[];
+  readonly calls: readonly { name: string; line: number; column: number }[];
+}
+interface PythonSyntax {
+  readonly definitions: readonly PythonDefinition[];
+  readonly moduleOtherBindings: readonly string[];
 }
 type Anchor = {
   source_id: string;
@@ -215,6 +231,127 @@ function spanBody(body: string, node: CandidateNode): string | null {
     return node.line === 1 && node.endLine === lines.length ? body : null;
   if (node.endLine > lines.length) return null;
   return lines.slice(node.line - 1, node.endLine).join('\n');
+}
+
+// Python only parses the exact, bounded archived text. -I ignores user Python
+// configuration; -S avoids site imports. The child has no source path or key.
+const pythonAstScript = String.raw`
+import ast, json, sys
+raw = sys.stdin.buffer.read(65537)
+if len(raw) > 65536:
+    raise ValueError('source bound')
+source = raw.decode('utf8')
+tree = ast.parse(source)
+lines = source.splitlines()
+def binding_names(statements):
+    names = set()
+    class Bindings(ast.NodeVisitor):
+        def visit_FunctionDef(self, node): names.add(node.name)
+        def visit_AsyncFunctionDef(self, node): names.add(node.name)
+        def visit_ClassDef(self, node): names.add(node.name)
+        def visit_Lambda(self, node): pass
+        def visit_Name(self, node):
+            if isinstance(node.ctx, (ast.Store, ast.Del)): names.add(node.id)
+        def visit_Import(self, node):
+            for alias in node.names: names.add(alias.asname or alias.name.split('.')[0])
+        def visit_ImportFrom(self, node):
+            for alias in node.names: names.add(alias.asname or alias.name)
+        def visit_ExceptHandler(self, node):
+            if node.name: names.add(node.name)
+            self.generic_visit(node)
+        def visit_Global(self, node): names.update(node.names)
+        def visit_Nonlocal(self, node): names.update(node.names)
+        def visit_MatchAs(self, node):
+            if node.name: names.add(node.name)
+            self.generic_visit(node)
+        def visit_MatchStar(self, node):
+            if node.name: names.add(node.name)
+        def visit_MatchMapping(self, node):
+            if node.rest: names.add(node.rest)
+            self.generic_visit(node)
+    visitor = Bindings()
+    for statement in statements: visitor.visit(statement)
+    return names
+def calls_in(statements):
+    found = []
+    class Calls(ast.NodeVisitor):
+        def visit_FunctionDef(self, node): pass
+        def visit_AsyncFunctionDef(self, node): pass
+        def visit_ClassDef(self, node): pass
+        def visit_Lambda(self, node): pass
+        def visit_ListComp(self, node): pass
+        def visit_SetComp(self, node): pass
+        def visit_DictComp(self, node): pass
+        def visit_GeneratorExp(self, node): pass
+        def visit_Call(self, node):
+            if isinstance(node.func, ast.Name):
+                prefix = lines[node.func.lineno - 1].encode('utf8')[:node.func.col_offset]
+                column = len(prefix.decode('utf8'))
+                found.append({'name': node.func.id, 'line': node.func.lineno, 'column': column})
+            self.generic_visit(node)
+    visitor = Calls()
+    for statement in statements: visitor.visit(statement)
+    return found
+definitions = []
+def collect(statements, parent, enclosing):
+    for node in statements:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            kind = 'class' if isinstance(node, ast.ClassDef) else ('method' if parent == 'class' else 'function')
+            bound = binding_names(node.body)
+            if not isinstance(node, ast.ClassDef):
+                bound.update(arg.arg for arg in node.args.posonlyargs + node.args.args + node.args.kwonlyargs)
+                if node.args.vararg: bound.add(node.args.vararg.arg)
+                if node.args.kwarg: bound.add(node.args.kwarg.arg)
+            definitions.append({'name': node.name, 'kind': kind, 'parent': parent, 'line': node.lineno,
+                'endLine': node.end_lineno, 'decorated': bool(node.decorator_list),
+                'bound': sorted(bound), 'enclosingBound': sorted(enclosing),
+                'calls': calls_in(node.body) if kind != 'class' else []})
+            collect(node.body, kind, enclosing | bound)
+        elif isinstance(node, (ast.If, ast.Try, ast.With, ast.AsyncWith, ast.For, ast.AsyncFor, ast.While)):
+            collect(getattr(node, 'body', []), parent, enclosing)
+            collect(getattr(node, 'orelse', []), parent, enclosing)
+            collect(getattr(node, 'finalbody', []), parent, enclosing)
+            for handler in getattr(node, 'handlers', []): collect(handler.body, parent, enclosing)
+collect(tree.body, 'module', set())
+module_other_bindings = binding_names([node for node in tree.body
+    if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))])
+print(json.dumps({'definitions': definitions, 'moduleOtherBindings': sorted(module_other_bindings)}, separators=(',', ':')))
+`;
+
+async function pythonSyntax(python: string, body: string): Promise<PythonSyntax | null> {
+  if (Buffer.byteLength(body, 'utf8') > 65536) return null;
+  return new Promise((resolve) => {
+    const output: Buffer[] = [];
+    let outputBytes = 0;
+    let failed = false;
+    const child = spawn(python, ['-I', '-S', '-c', pythonAstScript], {
+      stdio: ['pipe', 'pipe', 'ignore'],
+      env: { PATH: '/usr/bin:/bin', PYTHONNOUSERSITE: '1' },
+    });
+    const timer = setTimeout(() => child.kill('SIGKILL'), 5000);
+    child.on('error', () => { failed = true; });
+    child.stdout.on('data', (chunk: Buffer) => {
+      outputBytes += chunk.length;
+      if (outputBytes > 2_000_000) {
+        failed = true;
+        child.kill('SIGKILL');
+        return;
+      }
+      output.push(chunk);
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      if (failed || code !== 0) return resolve(null);
+      try {
+        const parsed = object(JSON.parse(Buffer.concat(output).toString('utf8')));
+        if (!Array.isArray(parsed['definitions']) || !Array.isArray(parsed['moduleOtherBindings']))
+          return resolve(null);
+        resolve(parsed as unknown as PythonSyntax);
+      } catch { resolve(null); }
+    });
+    child.stdin.on('error', () => { failed = true; });
+    child.stdin.end(body);
+  });
 }
 
 /** Keep offsets stable while hiding Swift comments from call checks. */
@@ -513,6 +650,12 @@ export async function publishArchiveStructure(plan: ArchiveStructurePlan) {
     string,
     { body: string; first: KnowledgeEvidence } | null
   >();
+  const pythonCache = new Map<string, Promise<PythonSyntax | null>>();
+  const pythonFor = (path: string, body: string) => {
+    if (!pythonCache.has(path))
+      pythonCache.set(path, pythonSyntax(publication.transport.python, body));
+    return pythonCache.get(path)!;
+  };
   const unavailable = new Set<string>();
   const skipped: Record<string, number> = {};
   const skip = (reason: string) => {
@@ -604,11 +747,11 @@ export async function publishArchiveStructure(plan: ArchiveStructurePlan) {
     quote,
     quote_sha256: hash(quote),
   });
-  const edgeSupport = (
+  const edgeSupport = async (
     edge: CandidateEdge,
     source: { node: CandidateNode; anchor: Anchor },
     target: { node: CandidateNode; anchor: Anchor },
-  ): Anchor[] | null => {
+  ): Promise<Anchor[] | null> => {
     const sourceNode = source.node,
       targetNode = target.node;
     const sourceText = sourceTexts.get(sourceNode.path);
@@ -714,6 +857,47 @@ export async function publishArchiveStructure(plan: ArchiveStructurePlan) {
     )
       return null;
     if (edge.predicate === 'calls') {
+      if (sourceNode.path.endsWith('.py') && targetNode.path.endsWith('.py')) {
+        // A matching name in another file is not evidence that Python binds
+        // this call to that definition. Module/import mapping is deferred.
+        if (sourceNode.path !== targetNode.path) return null;
+        const sourceSyntax = await pythonFor(sourceNode.path, sourceText);
+        const targetSyntax = await pythonFor(targetNode.path, targetText);
+        if (!sourceSyntax || !targetSyntax) return null;
+        const matches = (syntax: PythonSyntax, node: CandidateNode) =>
+          syntax.definitions.filter((definition) =>
+            definition.name === node.label &&
+            definition.kind === node.kind &&
+            definition.line === node.line &&
+            definition.endLine === node.endLine &&
+            !definition.decorated,
+          );
+        const sources = matches(sourceSyntax, sourceNode);
+        const targets = matches(targetSyntax, targetNode);
+        if (
+          sources.length !== 1 || targets.length !== 1 ||
+          targetSyntax.definitions.filter((definition) =>
+            definition.name === targetNode.label).length !== 1 ||
+          targets[0].parent !== 'module' ||
+          sources[0].kind === 'class' ||
+          sources[0].bound.includes(targetNode.label) ||
+          sources[0].enclosingBound.includes(targetNode.label) ||
+          sourceSyntax.moduleOtherBindings.includes(targetNode.label)
+        ) return null;
+        const calls = sources[0].calls.filter((call) => call.name === targetNode.label);
+        if (calls.length !== 1) return null;
+        const call = calls[0];
+        const lines = sourceText.split('\n');
+        if (!Number.isSafeInteger(call.line) || !Number.isSafeInteger(call.column) ||
+          call.line < 1 || call.line > lines.length || call.column < 0)
+          return null;
+        const prefix = lines.slice(0, call.line - 1).join('\n') +
+          (call.line > 1 ? '\n' : '');
+        const index = prefix.length + Array.from(lines[call.line - 1]).slice(0, call.column).join('').length;
+        if (sourceText.slice(index, index + targetNode.label.length) !== targetNode.label)
+          return null;
+        return [cite(source.anchor, sourceText, index, targetNode.label), target.anchor];
+      }
       if (
         !sourceNode.path.endsWith('.swift') ||
         !targetNode.path.endsWith('.swift')
@@ -773,7 +957,9 @@ export async function publishArchiveStructure(plan: ArchiveStructurePlan) {
       continue;
     }
     if (!nodeFor(edge.source) || !nodeFor(edge.target)) {
-      skip('unresolved-node');
+      skip(plan.kind === 'graft' && edge.predicate === 'imports'
+        ? 'import-target-without-node'
+        : 'unresolved-node');
       continue;
     }
     const source = await resolve(
@@ -789,7 +975,7 @@ export async function publishArchiveStructure(plan: ArchiveStructurePlan) {
       skip('unanchored-or-stale');
       continue;
     }
-    const support = edgeSupport(edge, source, target);
+    const support = await edgeSupport(edge, source, target);
     if (!support) {
       skip('unverified-relation');
       continue;
