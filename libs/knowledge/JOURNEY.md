@@ -197,6 +197,12 @@ idempotent capture: concurrent retries can share it, so this operation does
 not promise a separate generation per invocation. It does not schedule source
 changes, assert continuous freshness, or publish a refreshed graph.
 
+The historical publication loader checks the original task-scoped capture
+binding, including when loading a later rebind. Keep that binding with the
+publication during local recovery; a missing or inconsistent binding refuses
+readers. This is a consistency check between retained local artifacts, not
+protection against rewriting both artifacts or proof of current source bytes.
+
 ## Audit one local source at a point in time
 
 To compare a complete archived generation with the currently admitted local

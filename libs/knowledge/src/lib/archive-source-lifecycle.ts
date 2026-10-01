@@ -23,7 +23,7 @@ import {
   type ArchiveGraphImpactReceipt,
 } from './archive-graph-impact.js';
 import { archiveTransport } from './archive-transport.js';
-import { publishJson, readJson, readJsonWithBytes } from './durable.js';
+import { publishJson, readJsonWithBytes } from './durable.js';
 
 export interface ArchiveSourceRecaptureInput {
   readonly beforePublicationPath: string;
@@ -118,56 +118,6 @@ async function exactReceipt(path: string, receipt: unknown): Promise<string> {
   return hash(bytes);
 }
 
-async function verifyOriginalBinding(
-  publication: ArchivePublication,
-): Promise<void> {
-  let current = publication;
-  const seen = new Set<string>();
-  while (current.rebind) {
-    const path = current.rebind.priorPublicationPath;
-    assert(seen.size < 16 && !seen.has(path), 'Invalid publication ancestry');
-    seen.add(path);
-    const prior = await exactPublication(path);
-    assert.equal(
-      prior.pin.publicationSha256,
-      current.rebind.priorPublicationSha256,
-      'Prior publication pin changed',
-    );
-    assert.equal(
-      prior.publication.binding,
-      current.rebind.priorBinding,
-      'Prior publication binding changed',
-    );
-    current = prior.publication;
-  }
-  assert.equal(
-    hash(current.captureRequestKey),
-    current.binding,
-    'Original capture binding ID changed',
-  );
-  const binding = (await readJson(
-    join(current.task.directory, `archive-binding-${current.binding}.json`),
-  )) as Record<string, unknown>;
-  assert.equal(binding['schema'], 1);
-  for (const key of [
-    'task',
-    'source',
-    'readScope',
-    'transport',
-    'implementation',
-    'protocolSha256',
-    'registration',
-    'captureRequestKey',
-  ]) {
-    const fields = current as unknown as Record<string, unknown>;
-    assert.equal(
-      canonical(binding[key]),
-      canonical(fields[key]),
-      `Original capture binding ${key} changed`,
-    );
-  }
-}
-
 async function unusedBinding(path: string): Promise<void> {
   try {
     await lstat(path);
@@ -200,7 +150,6 @@ export async function recaptureArchiveSource(
   const { publication: before, pin: beforePin } = await exactPublication(
     input.beforePublicationPath,
   );
-  await verifyOriginalBinding(before);
   assert.equal(
     before.preservation,
     'complete-admitted',

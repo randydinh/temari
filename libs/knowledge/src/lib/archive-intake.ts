@@ -178,43 +178,117 @@ async function loadArchivePublicationChain(
 ): Promise<ArchivePublication> {
   assert(seen.size < 16 && !seen.has(path), 'Invalid publication ancestry');
   seen.add(path);
-  const { value } = loaded ?? await readJsonWithBytes(path);
+  const { value } = loaded ?? (await readJsonWithBytes(path));
   validatePublication(value);
   assert.equal(dirname(path), value.task.directory);
   assert.equal(basename(path), `archive-publication-${value.binding}.json`);
   if (value.rebind) {
-    const { priorPublicationPath, priorPublicationSha256, priorBinding, auditPath } = value.rebind;
-    assert.equal(auditPath, join(value.task.directory, `archive-rebind-${value.binding}.json`));
+    const {
+      priorPublicationPath,
+      priorPublicationSha256,
+      priorBinding,
+      auditPath,
+    } = value.rebind;
+    assert.equal(
+      auditPath,
+      join(value.task.directory, `archive-rebind-${value.binding}.json`),
+    );
     const audit = object(await readJson(auditPath));
     assert.equal(audit['schema'], 1);
     assert.equal(audit['kind'], 'temari-archive-rebind');
-    assert.equal(audit['publicationSha256'], hash(canonical(value)), 'Rebound publication changed');
+    assert.equal(
+      audit['publicationSha256'],
+      hash(canonical(value)),
+      'Rebound publication changed',
+    );
     assert.equal(audit['binding'], value.binding);
     assert.equal(audit['priorPublicationPath'], priorPublicationPath);
     assert.equal(audit['priorPublicationSha256'], priorPublicationSha256);
     assert.equal(audit['priorBinding'], priorBinding);
     const priorBytes = await readJsonWithBytes(priorPublicationPath);
-    assert.equal(hash(priorBytes.bytes), priorPublicationSha256,
-      'Earlier publication changed');
-    const prior = await loadArchivePublicationChain(priorPublicationPath, seen, priorBytes);
+    assert.equal(
+      hash(priorBytes.bytes),
+      priorPublicationSha256,
+      'Earlier publication changed',
+    );
+    const prior = await loadArchivePublicationChain(
+      priorPublicationPath,
+      seen,
+      priorBytes,
+    );
     assert.equal(prior.binding, priorBinding);
-    for (const key of ['task', 'source', 'readScope', 'generation', 'manifestSha256',
-      'captureRequestKey', 'captureFingerprint', 'preservation', 'counts', 'currentOriginal']) {
+    for (const key of [
+      'task',
+      'source',
+      'readScope',
+      'generation',
+      'manifestSha256',
+      'captureRequestKey',
+      'captureFingerprint',
+      'preservation',
+      'counts',
+      'currentOriginal',
+    ]) {
       const nextFields = value as unknown as Record<string, unknown>;
       const priorFields = prior as unknown as Record<string, unknown>;
-      assert.equal(canonical(nextFields[key]), canonical(priorFields[key]),
-        `Rebound ${key} changed`);
+      assert.equal(
+        canonical(nextFields[key]),
+        canonical(priorFields[key]),
+        `Rebound ${key} changed`,
+      );
     }
-    for (const key of ['task', 'source', 'readScope', 'generation', 'manifestSha256',
-      'captureRequestKey', 'captureFingerprint', 'preservation', 'counts',
-      'registration', 'implementation', 'protocolSha256']) {
+    for (const key of [
+      'task',
+      'source',
+      'readScope',
+      'generation',
+      'manifestSha256',
+      'captureRequestKey',
+      'captureFingerprint',
+      'preservation',
+      'counts',
+      'registration',
+      'implementation',
+      'protocolSha256',
+    ]) {
       const fields = value as unknown as Record<string, unknown>;
-      assert.equal(canonical(audit[key]), canonical(fields[key]),
-        `Rebind audit ${key} changed`);
+      assert.equal(
+        canonical(audit[key]),
+        canonical(fields[key]),
+        `Rebind audit ${key} changed`,
+      );
     }
     assert.equal(audit['priorImplementation'], prior.implementation);
     assert.equal(audit['priorProtocolSha256'], prior.protocolSha256);
     assert.equal(audit['currentOriginal'], 'not-checked');
+  } else {
+    assert.equal(
+      hash(value.captureRequestKey),
+      value.binding,
+      'Original capture binding ID changed',
+    );
+    const binding = object(
+      await readJson(
+        join(value.task.directory, `archive-binding-${value.binding}.json`),
+      ),
+    );
+    assert.equal(binding['schema'], 1);
+    const fields = value as unknown as Record<string, unknown>;
+    for (const key of [
+      'task',
+      'source',
+      'readScope',
+      'transport',
+      'implementation',
+      'protocolSha256',
+      'registration',
+      'captureRequestKey',
+    ])
+      assert.equal(
+        canonical(binding[key]),
+        canonical(fields[key]),
+        `Original capture binding ${key} changed`,
+      );
   }
   return value;
 }
@@ -235,26 +309,13 @@ export async function rebindArchivePublication(
   const o = JSON.parse(canonical(options)) as ArchiveRebindOptions;
   const ancestry = new Set<string>();
   const priorArtifact = await readJsonWithBytes(o.priorPublicationPath);
-  const prior = await loadArchivePublicationChain(o.priorPublicationPath, ancestry, priorArtifact);
+  const prior = await loadArchivePublicationChain(
+    o.priorPublicationPath,
+    ancestry,
+    priorArtifact,
+  );
   assert(ancestry.size < 16, 'Rebind ancestry limit');
   const priorPublicationSha256 = hash(priorArtifact.bytes);
-  if (!prior.rebind) {
-    const oldBinding = object(
-      await readJson(join(prior.task.directory, `archive-binding-${prior.binding}.json`)),
-    );
-    // The binding was durably written before the original capture. A publication
-    // edited after that point must never become an upgrade authority.
-    assert.equal(oldBinding['schema'], 1);
-    const priorFields = prior as unknown as Record<string, unknown>;
-    for (const key of ['task', 'source', 'readScope', 'transport', 'implementation',
-      'protocolSha256', 'registration', 'captureRequestKey'])
-      assert.equal(canonical(oldBinding[key]), canonical(priorFields[key]));
-    assert.equal(
-      hash(prior.captureRequestKey),
-      prior.binding,
-      'Prior capture binding mismatch',
-    );
-  }
   const transport = await archiveTransport(o.transport);
   const registration = await registrationFor(transport, prior.source);
   assert.equal(registration, prior.registration, 'Source admission changed');
@@ -334,18 +395,23 @@ export async function rebindArchivePublication(
     });
   assert.equal(canonical(gaps), canonical(prior.gaps), 'Capture gaps changed');
 
-  const binding = hash(canonical({
-    schema: 1,
-    operation: 'archive-rebind',
-    priorPublicationSha256,
-    priorBinding: prior.binding,
-    transport: transport.config,
-    implementation: transport.implementation,
-    protocolSha256: transport.protocolSha256,
-    registration,
-    pin,
-  }));
-  const auditPath = join(prior.task.directory, `archive-rebind-${binding}.json`);
+  const binding = hash(
+    canonical({
+      schema: 1,
+      operation: 'archive-rebind',
+      priorPublicationSha256,
+      priorBinding: prior.binding,
+      transport: transport.config,
+      implementation: transport.implementation,
+      protocolSha256: transport.protocolSha256,
+      registration,
+      pin,
+    }),
+  );
+  const auditPath = join(
+    prior.task.directory,
+    `archive-rebind-${binding}.json`,
+  );
   const publicationPath = join(
     prior.task.directory,
     `archive-publication-${binding}.json`,
@@ -521,7 +587,10 @@ export async function captureArchive(
       for (const [key, expected] of Object.entries({
         retrieval: 'exact-lexical',
         visual: 'unsupported',
-        ocr: o.ocrMode === 'macos-vision' ? 'macos-vision-optional' : 'unsupported',
+        ocr:
+          o.ocrMode === 'macos-vision'
+            ? 'macos-vision-optional'
+            : 'unsupported',
         asset_inventory: 'partial-or-unknown',
         structural_navigation: 'unsupported',
       })) {

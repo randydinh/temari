@@ -214,7 +214,22 @@ diff/impact receipt hashes. It says `currentOriginal: not-checked` and
 without a handoff; the typed error exposes its persisted capture paths. One
 request key denotes one logical idempotent capture, so concurrent retries can
 share it. This does not schedule changes, serialize all recaptures, rebuild a
-graph or prove continuous source freshness. The binding check is scoped to
-this API; applying it to all historical publication readers needs separate
-compatibility review. Production backup/restore and macOS searchable-PDF text
-remain open.
+graph or prove continuous source freshness. The shared historical publication
+loader also checks the original binding, as described below. Production
+backup/restore and macOS searchable-PDF text remain open.
+
+## Original capture binding consistency
+
+The shared publication loader now requires the original task-scoped capture
+binding and checks its request-key-derived ID, schema and eight publication
+fields. Its ancestry walk applies the same check beneath rebinds. An actual
+Registrar CLI case failed against the old loader, then passed after the fix:
+changed original publication, each shared binding field and a missing binding
+are refused for direct and two-step rebind reads. Synthetic parser and Jev
+privacy fixtures now include realistic binding artifacts. Final checks passed:
+`knowledge:integration` 65/65, `knowledge:test` 43/43, a post-final focused
+integration rerun 3/3, and `knowledge:typecheck`. A manually constructed legacy
+publication without the binding now refuses; migration needs an explicit
+decision. This checks local artifact consistency, not authenticity against a
+writer who can rewrite both files. Limits and OCR mode are outside the shared
+publication fields and are not certified by this check.

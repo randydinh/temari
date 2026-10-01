@@ -197,3 +197,40 @@ persisted without a handoff. The global historical-publication loader does
 not yet perform this original-binding check; widening that rule requires a
 separate compatibility review. Continuous freshness, graph mutation, safe
 backup/restore, Windows behavior and macOS searchable-PDF text remain open.
+
+## 03:27 PDT recapture delivery and next investigation
+
+PR #132 merged at `2d094e6257133688b206b100e5ca233ef717ec04` after
+independent exact-head review of clean commit
+`c23aa7163cb7929e1ec1260f798646a063ca8bf1`. The final 64/64 actual-CLI
+integration suite, 43/43 unit tests, typecheck, canonical package/check, and
+stock-Node export smoke passed. GitHub reported no branch checks. The isolated
+worktree now starts a new branch from merged main. Next, inspect whether the
+shared historical publication loader should enforce the immutable original
+capture binding for every consumer, including rebind ancestry. A compatibility
+review and a demonstrated failing case must precede any global change.
+
+The bounded binding unit is complete when the shared loader refuses an
+original publication whose immutable task-scoped binding is missing or
+inconsistent, both directly and through multi-step rebind ancestry. It must
+still read actual Registrar CLI captures and keep the synthetic parser and
+Jev privacy fixtures valid with realistic binding artifacts. Focused and
+full Nx knowledge checks, package verification, independent exact-head review
+and a reviewable PR are required. This checks two local artifacts for
+consistency; it does not authenticate a writer who can rewrite both, establish
+currentness, or change hosted sharing policy. Manually made legacy
+publications without bindings will refuse and need an explicit migration
+decision rather than an implicit bypass.
+
+## 03:40 PDT original binding checkpoint
+
+An actual-CLI negative test failed against the old loader and passed after
+global original-binding validation. The shared loader now checks the original
+capture request ID and eight shared fields against its task-scoped binding,
+including beneath two rebinds. Synthetic parser and Jev privacy fixtures were
+updated to write matching bindings. The builder's full knowledge integration
+suite passed 65/65 before final assertion-only strengthening; the final
+focused integration rerun passed 3/3, unit tests 43/43 and typecheck passed.
+An independent in-flight review found no blocker. Keep the candidate pending
+canonical package/check and exact-head review. This remains artifact
+consistency, not tamper-proof authenticity or live currentness.

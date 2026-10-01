@@ -79,7 +79,21 @@ before(async () => {
     maxStdoutBytes: 1_048_576,
   };
   const implementation = await archiveTransport(transport);
-  const binding = hash('synthetic-jevs-policy-binding');
+  const captureRequestKey = `temari-archive-v1:${hash('request')}`;
+  const binding = hash(captureRequestKey);
+  const task = {
+    id: 'jev-unit',
+    directory: taskDirectory,
+    authorityRef: 'synthetic-policy',
+  };
+  const registration = canonical({
+    source,
+    root: sourceRoot,
+    kind: 'local',
+    recursive: true,
+    exclude: [],
+    enabled: true,
+  });
   const publicationPath = join(
     taskDirectory,
     `archive-publication-${binding}.json`,
@@ -87,34 +101,34 @@ before(async () => {
   await publishJson(publicationPath, {
     schema: 1,
     kind: 'temari-archive-publication',
-    task: {
-      id: 'jev-unit',
-      directory: taskDirectory,
-      authorityRef: 'synthetic-policy',
-    },
+    task,
     source,
     readScope: 'source-root',
-    transport,
+    transport: implementation.config,
     implementation: implementation.implementation,
     protocolSha256: implementation.protocolSha256,
-    registration: canonical({
-      source,
-      root: sourceRoot,
-      kind: 'local',
-      recursive: true,
-      exclude: [],
-      enabled: true,
-    }),
+    registration,
     binding,
     generation: 'a'.repeat(32),
     manifestSha256: hash('manifest'),
-    captureRequestKey: `temari-archive-v1:${hash('request')}`,
+    captureRequestKey,
     captureFingerprint: hash('fingerprint'),
     preservation: 'complete-admitted',
     counts: {},
     capabilities: {},
     gaps: [],
     currentOriginal: 'not-checked',
+  });
+  await publishJson(join(taskDirectory, `archive-binding-${binding}.json`), {
+    schema: 1,
+    task,
+    source,
+    readScope: 'source-root',
+    transport: implementation.config,
+    implementation: implementation.implementation,
+    protocolSha256: implementation.protocolSha256,
+    registration,
+    captureRequestKey,
   });
   allowedGuard = currentJevSharingGuard([publicationPath], [source.id]);
 });
