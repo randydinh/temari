@@ -79,8 +79,14 @@ into the sidecar or claim that worker success completes the task.
   handoff, which may still be the starting handoff. Read the task's current
   version, checkpoint and evidence before choosing the next action.
 - A fresh chat uses the same task with a new idempotency key, the current version
-  and its actual conversation identity. An unfinished identical attempt can reuse
-  its original sidecar when no outcome or concurrent progress has been recorded.
+  and its actual conversation identity. An unfinished identical canonical run can
+  reuse its original sidecar on `resume` when no outcome or concurrent progress
+  has been recorded.
+- A tracked feature `start` reserves preparation exclusively. A duplicate start
+  refuses before forge or workers, even with identical tracking. A crash after
+  reservation but before the initial task handoff does not release that reservation.
+  Inspect the binding and worker evidence; use canonical `resume` only if its
+  checkpoint exists, otherwise select a new run and evidence scope.
 - A feature preparation failure may occur before a canonical run exists. Inspect
   worker evidence and use the existing recovery rules; do not invent a checkpoint
   or relaunch workers automatically. A completed or partial preparation may need

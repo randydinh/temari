@@ -528,7 +528,7 @@ async function startBridge(mode, request, policy, digests, trackingSelection) {
   let childOwnsOutcome = false;
   try {
     if (feature && mode === 'start') {
-      await tracking?.reserve();
+      await tracking?.reserve({ exclusive: true });
       await tracking?.start();
     }
     let invocation;

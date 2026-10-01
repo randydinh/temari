@@ -14,6 +14,8 @@ import { exactFields, readBoundedFile, readBoundedJson } from './stdio.mjs';
 
 const SIDECAR_BYTES = 128 * 1024;
 const BINDING_BYTES = 64 * 1024;
+const FEATURE_RESERVATION_CONFLICT =
+  'Feature worker preparation is already reserved for this run. Inspect the retained feature evidence; use a new run ID instead of relaunching workers.';
 const utf8 = new TextDecoder('utf-8', { fatal: true });
 
 function text(value, label, limit) {
@@ -201,7 +203,7 @@ function validateSidecar(value, runtime) {
   }
 }
 
-async function writeBinding(path, binding) {
+async function writeBinding(path, binding, exclusive = false) {
   const bytes = Buffer.from(`${JSON.stringify(binding)}\n`);
   assert(bytes.length <= BINDING_BYTES, 'Task binding exceeds the byte limit.');
   const temporary = join(dirname(path), `.task-binding-${randomUUID()}.tmp`);
@@ -218,6 +220,7 @@ async function writeBinding(path, binding) {
       await link(temporary, path);
     } catch (error) {
       if (error.code !== 'EEXIST') throw error;
+      assert(!exclusive, FEATURE_RESERVATION_CONFLICT);
       assert.deepEqual(
         await readBoundedJson(path, BINDING_BYTES),
         binding,
@@ -451,19 +454,20 @@ export async function prepareTaskTracking({
     get started() {
       return started;
     },
-    async reserve() {
+    async reserve({ exclusive = false } = {}) {
       assert.equal(
         await taskRoot(sidecar.taskRoot),
         root,
         'Task root resolution changed.',
       );
-      if (await exists(bindingPath))
+      if (await exists(bindingPath)) {
+        assert(!exclusive, FEATURE_RESERVATION_CONFLICT);
         assert.deepEqual(
           await readBoundedJson(bindingPath, BINDING_BYTES),
           binding,
           'Host run task binding changed.',
         );
-      else await writeBinding(bindingPath, binding);
+      } else await writeBinding(bindingPath, binding, exclusive);
     },
     async start() {
       if (started) return;

@@ -922,7 +922,12 @@ process.stdin.on('end', () => {
   }
 });
 
-for (const trackingMode of ['untracked', 'tracked', 'worker-failure']) {
+for (const trackingMode of [
+  'untracked',
+  'tracked',
+  'worker-failure',
+  'duplicate-start',
+]) {
   test(`full feature start binds local host proof to six persisted stages (${trackingMode})`, async (t) => {
     if (process.platform === 'win32')
       return t.skip('The fake host tools are POSIX executable scripts.');
@@ -986,9 +991,18 @@ const sandbox = args[args.indexOf('--sandbox') + 1];
 let prompt = '';
 process.stdin.on('data', chunk => prompt += chunk);
 process.stdin.on('end', () => {
+  const finish = () => {
   const id = prompt.match(/Goal: ([A-Za-z]+)/)?.[1] ?? 'unknown';
   if (sandbox === 'workspace-write') fs.writeFileSync(id + '.txt', id + '\\n');
   fs.writeFileSync(final, JSON.stringify({status:process.env.FAKE_WORKER_FAIL === 'yes' ? 'ISSUES' : 'PASS',summary:id}));
+  };
+  if (process.env.FAKE_WAIT_GATE && !fs.existsSync(process.env.FAKE_WAIT_GATE)) {
+    const timer = setInterval(() => {
+      if (!fs.existsSync(process.env.FAKE_WAIT_GATE)) return;
+      clearInterval(timer);
+      finish();
+    }, 10);
+  } else finish();
 });
 `,
     );
@@ -1092,6 +1106,10 @@ process.stdin.on('end', () => {
             FAKE_FORGE_LOG: join(root, 'forge-calls.log'),
             FAKE_WORKER_LOG: join(root, 'worker-calls.log'),
             FAKE_WORKER_FAIL: trackingMode === 'worker-failure' ? 'yes' : 'no',
+            FAKE_WAIT_GATE:
+              trackingMode === 'duplicate-start'
+                ? join(root, 'release-workers')
+                : '',
             NODE_OPTIONS: '',
             NODE_PATH: '',
           },
@@ -1186,6 +1204,39 @@ process.stdin.on('end', () => {
       }
     }
     let session = launch('start');
+    if (trackingMode === 'duplicate-start') {
+      const deadline = Date.now() + 5000;
+      while (true) {
+        try {
+          await lstat(join(root, 'worker-calls.log'));
+          break;
+        } catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+          assert(
+            Date.now() < deadline,
+            'Original feature worker did not start.',
+          );
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+      }
+      const before = (await installedTask(fixture, tracking)).task;
+      assert.equal(before.version, 2);
+      const workersBefore = await readFile(join(root, 'worker-calls.log'));
+      const forgeBefore = await readFile(join(root, 'forge-calls.log'));
+      const duplicate = launch('start');
+      assert.notEqual(await duplicate.done, 0);
+      assert.match(duplicate.stderr(), /reserved|already/i);
+      assert.deepEqual((await installedTask(fixture, tracking)).task, before);
+      assert.deepEqual(
+        await readFile(join(root, 'worker-calls.log')),
+        workersBefore,
+      );
+      assert.deepEqual(
+        await readFile(join(root, 'forge-calls.log')),
+        forgeBefore,
+      );
+      await writeFile(join(root, 'release-workers'), 'continue\n');
+    }
     if (trackingMode === 'worker-failure') {
       assert.notEqual(await session.done, 0);
       const failed = await installedTask(fixture, tracking);
