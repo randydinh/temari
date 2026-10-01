@@ -138,6 +138,22 @@ canonical package/check, and a relocated stock-Node import of
 `planArchiveGraphImpact` passed. Independent review found no remaining blocking
 issue after the historical-only and changed-path repairs.
 
+## Read-only v2 graph anchor proposal, 2026-10-01
+
+The repin increment passed `knowledge:integration` 67/67, `knowledge:test`
+43/43, `knowledge:typecheck`, formatting and diff checks. Actual Registrar CLI
+fixtures verify an unchanged node and relationship, including support and
+contrary anchor positions. A long unchanged anchor and its dependent
+relationship defer explicitly; a pinned 4 KiB transport shortens a v2 read
+and also defers. Tampered impact, v2 publication or capture binding, and
+revoked registration refuse the proposal. The v1 graph remains unreadable
+under v2; no graph is published. Independent exact-head review and canonical
+package/check remain delivery gates at this checkpoint.
+
+The metadata-only receipt partitions every bounded `needRepin` ID into
+`eligible` or `deferred`; it does not certify relationship meaning, live
+currentness, cross-source graph migration or a default search improvement.
+
 ## Point-in-time local currentness audit, 2026-10-01
 
 The next isolated increment passed `knowledge:typecheck`, 43 unit tests and

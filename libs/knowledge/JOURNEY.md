@@ -165,6 +165,28 @@ graphs are refused until every selected source has an explicit revision
 comparison. The receipt retains `currentOriginal: not-checked` and does not
 prove the live source is still current.
 
+To check replacement anchors in a complete v2 capture, pass that impact
+receipt to the read-only repin proposal:
+
+```ts
+import { proposeArchiveGraphRepins } from '@temari/knowledge';
+
+const proposal = await proposeArchiveGraphRepins({
+  impactReceiptPath: '/absolute/private-task/archive-graph-impact-HASH.json',
+});
+```
+
+The proposal checks each `needRepin` record against retained v2 text at the
+old code-point coordinates. `eligible` contains the verified path, hashes,
+coordinates, and node/support/contrary position; `deferred` names records
+whose anchors or endpoints could not be verified. The receipt retains the
+impact plan's review, historical-only and discovery queues. It contains no
+quote text and is capped at 64 candidate records, 128 unique anchors, 2,048
+code points per anchor and 1 MiB of receipt bytes. It says `proposal-only`,
+`graphMutation: none`, `afterGraphId: null` and `currentOriginal: not-checked`.
+An operator must review meaning and build a separate v2 graph; the old graph
+remains v1-only. No hosted model is called by this operation.
+
 ## Hand off an operator-triggered recapture
 
 Use a new request key to capture the same registered local source into a new

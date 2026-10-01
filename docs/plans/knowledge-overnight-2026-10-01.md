@@ -234,3 +234,42 @@ focused integration rerun passed 3/3, unit tests 43/43 and typecheck passed.
 An independent in-flight review found no blocker. Keep the candidate pending
 canonical package/check and exact-head review. This remains artifact
 consistency, not tamper-proof authenticity or live currentness.
+
+## 03:44 PDT binding delivery and relationship proposal selection
+
+PR #133 merged at `bb4b3aac792bc9fc775bdd5e00f7b2a65256ab5b` after
+independent exact-head review of clean commit
+`eaff13ebef0b046832d7ebb9e1d2b857a5f8b497`. Canonical package/check
+reported `dirty: false`; the stock-Node export smoke passed. GitHub reported
+no branch checks. The isolated worktree now starts a new branch from merged
+main. The next candidate is a bounded, read-only v2 anchor proposal for
+records that the graph-impact plan marks `needRepin`. It must verify each
+candidate against actual retained v2 bytes and keep changed, dependent and
+retracted records out of any eligible set. It will publish no active graph.
+Registrar's current lineage rules make direct v1-to-v2 graph carry-forward
+unsafe; a future graph publication needs its own reviewed mapping design.
+
+The repin unit finishes when an actual Registrar CLI fixture moves one source
+from v1 to v2 and every `needRepin` record is partitioned into a verified
+anchor proposal or an explicit deferral. An unchanged node and relationship
+must yield v2 citation pins; changed/removed or dependent endpoints must stay
+in review; retired assertions remain historical. A shortened v2 read,
+representation mismatch, tampered pin or revoked registration cannot produce
+an eligible proposal. The receipt is bounded, content addressed and contains
+anchor hashes/coordinates without source text. It must say `proposal-only`,
+`graphMutation: none`, and `afterGraphId: null`; no new active graph is
+published. Focused actual-CLI and Nx checks plus independent exact-head PR
+review are required. This does not prove that an unchanged excerpt still
+supports the same meaning; operator review remains necessary.
+
+## 04:11 PDT repin checkpoint
+
+The metadata-only v2 repin proposal passed the final 67/67 actual-CLI
+knowledge integration suite, 43/43 unit suite, typecheck, formatting and
+diff checks. The fixture verifies unchanged node, support and contrary
+anchors; a 2,300-code-point anchor and dependent relationship defer; a
+4 KiB pinned transport shortens a v2 read and defers; tampered impact,
+publication and binding artifacts and revoked admission refuse. The old graph
+still refuses under v2. An independent in-flight reviewer found no blocker
+after the deferral fixtures were added. Keep pending canonical package/check
+and exact-head review. No active v2 graph or semantic correctness is claimed.

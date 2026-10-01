@@ -69,7 +69,8 @@ async function verifyPublicationPin(pin: ArchiveGenerationDiffPin) {
   return publication;
 }
 
-async function readAllGraphRecords(
+/** Bounded, exact-RevisionSet graph read shared with read-only review proposals. */
+export async function readAllGraphRecords(
   reader: Awaited<ReturnType<typeof createArchiveGraphReader>>,
   graphId: string,
   source: Awaited<ReturnType<typeof loadArchivePublication>>['source'],
