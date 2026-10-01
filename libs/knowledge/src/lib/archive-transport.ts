@@ -43,6 +43,9 @@ export async function archiveTransport(options: ArchiveTransportOptions) {
   };
   async function implementationDigest() {
     const paths: string[] = [];
+    const adapterExtension = fileURLToPath(import.meta.url).endsWith('.ts')
+      ? '.ts'
+      : '.js';
     async function walk(path: string): Promise<void> {
       for (const entry of (await readdir(path, { withFileTypes: true })).sort(
         (a, b) => a.name.localeCompare(b.name),
@@ -68,7 +71,9 @@ export async function archiveTransport(options: ArchiveTransportOptions) {
       'durable',
       'codec',
     ])
-      paths.push(fileURLToPath(new URL(`./${name}.ts`, import.meta.url)));
+      paths.push(
+        fileURLToPath(new URL(`./${name}${adapterExtension}`, import.meta.url)),
+      );
     return hash(
       canonical(
         await Promise.all(paths.map(async (p) => [p, hash(await readFile(p))])),

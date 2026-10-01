@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "upstream": {
+    "repository": "randydinh/content-registrar",
+    "commit": "760926907669ae34bd1861732edbbf8f5afaf588"
+  },
+  "files": [
+    {
+      "path": "docs/design/source-archive-contract-v1.json",
+      "sha256": "68b2b511eeb099160313a562d1474349709e86fde7280ce5e78a5dccd31b58b0"
+    },
+    {
+      "path": "pyproject.toml",
+      "sha256": "74146555bebcde136cf3b415cfbf349a765d48811e7c1ee89001364e7a29d7ec"
+    },
+    {
+      "path": "src/knowledge_agent/__init__.py",
+      "sha256": "ea8226545c7b959e5ca932ee942683bdf4e82ded15038a1c2b02700c8b21bf92"
+    },
+    {
+      "path": "src/knowledge_agent/archive_cli.py",
+      "sha256": "36df9455622d3770f09dc9ea36e7e0fc44cfc8cdceb18413b07fba59eb503a1d"
+    },
+    {
+      "path": "src/knowledge_agent/archive_worker.py",
+      "sha256": "fc4423616e599053246cd93d1f91ac1e1de017efb904f2146758dfb28bd51fc9"
+    },
+    {
+      "path": "src/knowledge_agent/archived_graph.py",
+      "sha256": "f2c8b937cd62169682bcf36441befa536b62ae751c43d1e398b860b52652a970"
+    },
+    {
+      "path": "src/knowledge_agent/claim_support.py",
+      "sha256": "93ea909f6618b1abfad6272f6a00bb87a0ff419b43f9223a4137c87974662dd5"
+    },
+    {
+      "path": "src/knowledge_agent/cli.py",
+      "sha256": "e7fda0ab450b463812850c75d6b4f461a8ef0700f9ad832afbead570c7667415"
+    },
+    {
+      "path": "src/knowledge_agent/consumer_access.py",
+      "sha256": "cadaabbee06bfd740ec46f891852dd9d810bdf1cf34c4dacc3358f4e710153a9"
+    },
+    {
+      "path": "src/knowledge_agent/consumer_mcp.py",
+      "sha256": "bf8bf1f3aa9abeec09fe75333d9c8bd57b22df5c0d79866126e2b2cacd059d47"
+    },
+    {
+      "path": "src/knowledge_agent/evidence.py",
+      "sha256": "c4ef674a8311f1385434916b138b0b11f1a23465a9586b2e16b46be86886dc40"
+    },
+    {
+      "path": "src/knowledge_agent/knowledge.py",
+      "sha256": "3eee7d8b81ae1a00353ddfd1089ea4790061b46f230868b5b5da5dcda5d1f9c2"
+    },
+    {
+      "path": "src/knowledge_agent/knowledge_cache.py",
+      "sha256": "b131cf3f9e31d8d4ec7282c5de61592d1693a662052eefdb951838af859e5dd3"
+    },
+    {
+      "path": "src/knowledge_agent/knowledge_projection.py",
+      "sha256": "175a2e8b49478cbf63902e1cd459ffb19d45b69ff5f04bfdb281052721ce7e2a"
+    },
+    {
+      "path": "src/knowledge_agent/macos_ocr.py",
+      "sha256": "56bc98501dcc1a7f029570291cb0269610ab360ddb1012f31d814938731eac6f"
+    },
+    {
+      "path": "src/knowledge_agent/mcp_server.py",
+      "sha256": "9b7ec52c7d8dc7c0a349f3351e818cc157e0c843f6dd79611ef6da40315d9567"
+    },
+    {
+      "path": "src/knowledge_agent/notion.py",
+      "sha256": "1336d00af7d373be1391b2ff71b5908593820eae27fac894b5a1f4fac5920612"
+    },
+    {
+      "path": "src/knowledge_agent/provider_worker.py",
+      "sha256": "ac422a80ef007921d30dc50aaba63ff62ff82959eb14f1d7a810eeb27f522594"
+    },
+    {
+      "path": "src/knowledge_agent/providers.py",
+      "sha256": "3cda341fcedfac6df5716f1c505024fd9fe5f4f891d98f6b15da585cf934fafa"
+    },
+    {
+      "path": "src/knowledge_agent/remote_access.py",
+      "sha256": "b000a34f6b71aa888322bc1e16e1758ef6f6a707b991a6f1bcd503b9ff27ee53"
+    },
+    {
+      "path": "src/knowledge_agent/remote_sources.py",
+      "sha256": "19e8c0bdb2e74ebeb0839ec9f30ab29d2a7fcd5d1a667bf58de3f10ca80dc5b9"
+    },
+    {
+      "path": "src/knowledge_agent/retrieval.py",
+      "sha256": "0c609766f4163c56a78b45f8d44ed913e6c19174d63deaaa32b4a94576321d11"
+    },
+    {
+      "path": "src/knowledge_agent/shortcut.py",
+      "sha256": "388ec10b3e507dfc8a67cc7154a197e44c68a6e15783c27a8c95de20fb077664"
+    },
+    {
+      "path": "src/knowledge_agent/source_archive.py",
+      "sha256": "12125466909760b685d1b2179fea0102400358922e4dd9cd3e9391d6b443b54f"
+    },
+    {
+      "path": "src/knowledge_agent/source_registry.py",
+      "sha256": "b4d52fe0c2b4ca09b901b192844e5c96fb392b5b7d2c120ae27539f99807beb8"
+    },
+    {
+      "path": "src/knowledge_agent/structure.py",
+      "sha256": "0de5cb846cd734c3378ebaa0d4751beb567987211ace3d4820ddb8c7efab016b"
+    },
+    {
+      "path": "src/knowledge_agent/testmo.py",
+      "sha256": "c9ecba427b847e199c476d6827c3eb8e8aee08621e1f5f7938b9405a7dad5ad8"
+    },
+    {
+      "path": "uv.lock",
+      "sha256": "a51cb38fa813912bc950e8075c53b50b93ba09856d42ac9101a3f8f42765509a"
+    }
+  ]
+}

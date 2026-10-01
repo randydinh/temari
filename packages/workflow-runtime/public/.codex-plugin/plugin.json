@@ -1,19 +1,19 @@
 {
   "name": "temari",
-  "version": "0.15.3+codex.1",
-  "description": "Temari's current Nx public engineering entry surfaces.",
+  "version": "0.15.4+codex.1",
+  "description": "Temari's Nx workflow entries and bundled source-backed knowledge capability.",
   "author": {
     "name": "Randy Dinh"
   },
   "homepage": "https://github.com/randydinh/temari",
   "repository": "https://github.com/randydinh/temari",
   "license": "MIT",
-  "keywords": ["temari", "pstack", "engineering", "nx"],
+  "keywords": ["temari", "pstack", "engineering", "nx", "knowledge"],
   "skills": "./skills/",
   "interface": {
     "displayName": "Temari",
-    "shortDescription": "Route work through current Nx workflow contracts.",
-    "longDescription": "Temari exposes the current Nx workflow runtime through explicit public entries. Unsupported routes and unproven host capabilities are refused.",
+    "shortDescription": "Route Nx work and use source-backed knowledge.",
+    "longDescription": "Temari exposes the current Nx workflow runtime through three explicit public entries and bundles a separate source-backed knowledge skill with Content Registrar. Unsupported routes and unproven host capabilities are refused.",
     "developerName": "Randy Dinh",
     "category": "Productivity",
     "capabilities": [],

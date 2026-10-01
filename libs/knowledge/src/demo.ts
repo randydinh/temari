@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { lstat, readFile, realpath, writeFile } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
@@ -60,6 +61,7 @@ import {
 } from './lib/archive-graph-reviewed-change.js';
 
 const help = `Knowledge demo (explicit local files; no model or semantic approval):
+  node /absolute/artifact/node_modules/@temari/knowledge/src/demo.js <command> [--flag value]
   pnpm nx run knowledge:demo -- capture --input /absolute/intake.json
   pnpm nx run knowledge:demo -- rebind --input /absolute/rebind.json
   pnpm nx run knowledge:demo -- archive-collect --input /absolute/retrieval.json [--resume /absolute/retrieval-HASH.json]
