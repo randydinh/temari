@@ -9,6 +9,7 @@ import {
 } from '../libs/archon-harness/src/index.js';
 import {
   FileTaskStore,
+  FileMergeReconciliationStore,
   TaskRuntime,
   taskDigest,
   type HarnessSelection,
@@ -19,6 +20,10 @@ import {
   DashboardController,
   loadDashboardConfig,
 } from './dashboard-controller.mjs';
+import {
+  MergeReconciliationDashboard,
+  createObservedGitReconciliationBindingReader,
+} from './merge-reconciliation-dashboard.mjs';
 import { FileScheduleStore } from '../libs/runtime/src/lib/schedule-store.js';
 import {
   createDashboardScheduler,
@@ -79,6 +84,8 @@ console URL for that same installation. --control-config ABSOLUTE_JSON enables
 goal intake and configured local verification controls; it requires --archon-home.
 The trusted config fixes the workspace, preparation directory, and verification
 recipes. Browser requests cannot supply executable commands or evidence paths.
+Reconciliation controls are unavailable unless that config also supplies its
+explicit reconciliation store, source, candidate, check, and comparison inputs.
 See docs/task-continuity.md for full examples and recovery rules.
 `;
 
@@ -100,6 +107,49 @@ async function inputFile(
   if (!data || typeof data !== 'object' || Array.isArray(data))
     throw new Error('Task command must be a JSON object.');
   return data as Record<string, unknown>;
+}
+
+/**
+ * Reconciliation is deliberately opt-in: the dashboard receives no facade
+ * until its host config supplies each trusted source. Browser payloads never
+ * participate in the current binding.
+ */
+export async function createTaskContinuityReconciliationDashboard(
+  config: Awaited<ReturnType<typeof loadDashboardConfig>>,
+  runtime: TaskRuntime,
+): Promise<MergeReconciliationDashboard | undefined> {
+  const reconciliation = config.reconciliation;
+  if (!reconciliation) return undefined;
+  return new MergeReconciliationDashboard(
+    await FileMergeReconciliationStore.create(reconciliation.storeRoot),
+    createObservedGitReconciliationBindingReader({
+      repositoryRoot: reconciliation.sourceRoot,
+      snapshotReader: {
+        async readCurrentSnapshot({ expected }) {
+          const task = await runtime.snapshot(expected.taskId);
+          if (task.workspaceRoot !== config.workspaceRoot) {
+            throw new Error('Current reconciliation task is outside the configured workspace.');
+          }
+          const run = task.runs.find((item) => item.runId === task.currentRunId);
+          if (!run) throw new Error('Current reconciliation task has no bound current run.');
+          return {
+            taskId: task.taskId,
+            taskVersion: String(task.version),
+            runId: run.runId,
+            revision: run.revision,
+            // This retained immutable ID has no mutable host equivalent.
+            observationId: expected.observationId,
+            candidateId: reconciliation.candidate.id,
+            candidateSha256: reconciliation.candidate.sha256,
+            candidateRoot: reconciliation.candidate.root,
+            resolutionIntent: reconciliation.resolutionIntent,
+            requiredChecks: reconciliation.requiredChecks,
+            expectedComparison: reconciliation.expectedComparison,
+          };
+        },
+      },
+    }),
+  );
 }
 
 /** CLI and optional local dashboard share the same runtime mutation boundary. */
@@ -229,6 +279,9 @@ export async function runTaskCommand(
     return runtime.snapshot(values.task);
   }
   if (command === 'serve') {
+    const reconciliation = dashboardConfig
+      ? await createTaskContinuityReconciliationDashboard(dashboardConfig, runtime)
+      : undefined;
     const controller = dashboardConfig
       ? new DashboardController({
           config: dashboardConfig,
@@ -241,6 +294,7 @@ export async function runTaskCommand(
           finalizerPath: resolve(
             'libs/archon-harness/src/lib/canonical-finalize.ts',
           ),
+          ...(reconciliation ? { reconciliation } : {}),
           readNative: async (reference) => {
             const result = await promisify(execFile)(
               nativeExecutable!,

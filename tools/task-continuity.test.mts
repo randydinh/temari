@@ -5,9 +5,26 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import test from 'node:test';
-import { runTaskCommand } from './task-continuity.mjs';
+import {
+  createTaskContinuityReconciliationDashboard,
+  runTaskCommand,
+} from './task-continuity.mjs';
 
 const run = promisify(execFile);
+
+test('task-continuity leaves reconciliation controls unavailable without explicit host configuration', async () => {
+  const dashboard = await createTaskContinuityReconciliationDashboard(
+    {
+      schema: 1 as const,
+      workspaceRoot: '/configured-workspace',
+      preparationRoot: '/configured-preparations',
+      recipes: [],
+    },
+    {} as never,
+  );
+  assert.equal(dashboard, undefined);
+});
+
 test('fresh CLI processes recover the same task, next action and version', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'temari-task-cli-'));
   t.after(() => rm(root, { recursive: true, force: true }));

@@ -59,7 +59,7 @@
       "test": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 libs/runtime/src/lib/runtime.test.ts libs/runtime/src/lib/run-store.test.ts libs/runtime/src/lib/child-task-store.test.ts libs/runtime/src/lib/parallel-runtime.test.ts libs/runtime/src/lib/harness-selector.test.ts libs/runtime/src/lib/harness-runtime.test.ts libs/runtime/src/lib/archon-receipt-parity.test.ts libs/runtime/src/lib/v4-1-route-replay.test.ts libs/runtime/src/lib/migration-acceptance.test.ts libs/runtime/src/lib/stage-evidence.test.ts libs/runtime/src/lib/candidate.test.ts libs/runtime/src/lib/nx05-control-conformance.test.ts libs/runtime/src/lib/nx05-dispatch-contract.test.ts libs/runtime/src/lib/task-store.test.ts libs/runtime/src/lib/task-runtime.test.ts",
+          "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 libs/runtime/src/lib/runtime.test.ts libs/runtime/src/lib/run-store.test.ts libs/runtime/src/lib/child-task-store.test.ts libs/runtime/src/lib/parallel-runtime.test.ts libs/runtime/src/lib/harness-selector.test.ts libs/runtime/src/lib/harness-runtime.test.ts libs/runtime/src/lib/archon-receipt-parity.test.ts libs/runtime/src/lib/v4-1-route-replay.test.ts libs/runtime/src/lib/migration-acceptance.test.ts libs/runtime/src/lib/stage-evidence.test.ts libs/runtime/src/lib/candidate.test.ts libs/runtime/src/lib/nx05-control-conformance.test.ts libs/runtime/src/lib/nx05-dispatch-contract.test.ts libs/runtime/src/lib/task-store.test.ts libs/runtime/src/lib/task-runtime.test.ts libs/runtime/src/lib/merge-reconciliation-store.test.ts",
           "cwd": "{workspaceRoot}"
         }
       },
@@ -91,7 +91,7 @@
         "executor": "nx:run-commands",
         "cache": false,
         "options": {
-          "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 tools/dashboard-controller.test.mts tools/dashboard-swarm.test.mts",
+          "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 tools/dashboard-controller.test.mts tools/dashboard-swarm.test.mts tools/merge-reconciliation-dashboard.test.mts",
           "cwd": "{workspaceRoot}"
         }
       },

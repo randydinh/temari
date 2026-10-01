@@ -20,6 +20,7 @@ import {
 } from '../libs/contracts/src/index.js';
 import {
   FileTaskStore,
+  FileMergeReconciliationStore,
   TaskRuntime,
   taskDigest,
 } from '../libs/runtime/src/index.js';
@@ -29,6 +30,7 @@ import {
   type DashboardImplementationPlan,
 } from './dashboard-controller.mjs';
 import { startTaskViewServer } from './task-view.mjs';
+import { MergeReconciliationDashboard } from './merge-reconciliation-dashboard.mjs';
 
 const run = promisify(execFile);
 function implementationPlan(): DashboardImplementationPlan {
@@ -219,6 +221,10 @@ process.stdin.on('end', () => {
     async verifyRunIdentity() {},
   };
   const store = await FileTaskStore.create(join(root, 'tasks'));
+  const reconciliationStore = await FileMergeReconciliationStore.create(
+    join(root, 'reconciliation'),
+  );
+  let reconciliationBindingDrift = false;
   const runtime = new TaskRuntime({
     store,
     selection: {
@@ -234,6 +240,13 @@ process.stdin.on('end', () => {
     bridgePath,
     finalizerPath,
     archonHome,
+    reconciliation: new MergeReconciliationDashboard(reconciliationStore, {
+      async readCurrentBinding({ expected }) {
+        return reconciliationBindingDrift
+          ? { ...expected, revision: 'trusted-reader-observed-drift' }
+          : expected;
+      },
+    }),
     readNative: async (ref) => {
       const saved = refs.get(ref.externalRunId)!;
       const { externalRunId: _id, startedAt: _at, ...binding } = saved;
@@ -281,9 +294,11 @@ process.stdin.on('end', () => {
     preparationRoot,
     bridgePath,
     store,
+    reconciliationStore,
     runtime,
     controller,
     post,
+    base,
     config,
     harness,
     archonHome,
@@ -297,8 +312,168 @@ process.stdin.on('end', () => {
     setStatus: (status: HarnessRunStatus) => {
       nativeStatus = status;
     },
+    driftReconciliationBinding: () => {
+      reconciliationBindingDrift = true;
+    },
   };
 }
+
+const reconciliationSha = 'a'.repeat(64);
+const reconciliationDigest = 'b'.repeat(64);
+function reconciliationEvidence(id: string) {
+  return [
+    {
+      schema: 1 as const,
+      id,
+      sha256: reconciliationSha,
+      bytes: 3,
+      mediaType: 'application/json',
+    },
+  ];
+}
+function reconciliationScope(version: string) {
+  return {
+    schema: 1 as const,
+    sourceRoot: { id: 'source-root', sha256: 'c'.repeat(64) },
+    candidateRoot: { id: `candidate-root-${version}`, sha256: 'd'.repeat(64) },
+    baseHead: { id: 'base-head', sha256: 'e'.repeat(64) },
+    operationHead: { id: 'operation-head', sha256: 'f'.repeat(64) },
+    affectedPaths: [{
+      path: 'tools/dashboard-controller.mts', classification: 'unmerged' as const,
+      pathSha256: '1'.repeat(64),
+      indexBlobs: [{ stage: 1 as const, mode: '100644', objectId: '2'.repeat(64) }],
+      unmergedStages: [{ stage: 1 as const, mode: '100644', objectId: '2'.repeat(64) }],
+      worktreeKind: 'file' as const, worktreeSha256: '3'.repeat(64), diffSha256: '4'.repeat(64),
+    }],
+    resolutionIntent: 'preserve' as const,
+    requiredChecks: [{ id: 'dashboard-check', definitionSha256: '0'.repeat(64) }],
+    expectedComparison: {
+      candidateEvidence: reconciliationEvidence(`candidate-comparison-${version}`)[0]!,
+      verificationEvidence: reconciliationEvidence(`verification-comparison-${version}`)[0]!,
+    },
+  };
+}
+function reconciliationRequest(version: string, key: string) {
+  const observation = {
+    schema: 1 as const,
+    observationId: `observation-${version}`,
+    taskId: 'reconciliation-task',
+    taskVersion: version,
+    runId: 'reconciliation-run',
+    revision: 'reconciliation-revision',
+    candidate: {
+      schema: 'reconciliation-candidate-v1' as const,
+      id: 'reconciliation-candidate',
+      sha256: reconciliationSha,
+    },
+    scope: reconciliationScope(version),
+    observedAt: '2026-10-01T12:00:00.000Z',
+    kind: 'mixed' as const,
+    evidence: reconciliationEvidence(`observation-evidence-${version}`),
+  };
+  const plan = {
+    schema: 1 as const,
+    id: `plan-${version}`,
+    taskId: observation.taskId,
+    taskVersion: observation.taskVersion,
+    runId: observation.runId,
+    revision: observation.revision,
+    observationId: observation.observationId,
+    candidate: observation.candidate,
+    scope: observation.scope,
+    classification: 'requires-confirmation' as const,
+    status: 'awaiting-confirmation' as const,
+    request: {
+      idempotencyKey: key,
+      canonicalRequestDigestAlgorithm: 'canonical-json-sha256-v1' as const,
+      canonicalRequestSha256: reconciliationDigest,
+    },
+    summary: 'Retain observed reconciliation evidence.',
+    actions: [
+      {
+        id: 'preserve-observation',
+        kind: 'preserve' as const,
+        targetId: observation.taskId,
+      },
+    ],
+    evidence: reconciliationEvidence(`plan-evidence-${version}`),
+  };
+  const confirmation = {
+    schema: 1 as const,
+    confirmationId: `confirmation-${version}`,
+    planId: plan.id,
+    observationId: observation.observationId,
+    canonicalRequestSha256: reconciliationDigest,
+    confirmedAt: '2026-10-01T12:01:00.000Z',
+    confirmedBy: 'dashboard-operator',
+    evidence: reconciliationEvidence(`confirmation-evidence-${version}`),
+  };
+  return { observation, plan, confirmation };
+}
+
+test('dashboard reconciliation routes retain intent state without task completion', async (t) => {
+  const f = await fixture(t);
+  const first = reconciliationRequest('v1', 'reconcile-v1');
+  const created = await f.post('/api/reconciliation', {
+    idempotencyKey: 'reconcile-v1',
+    observation: first.observation,
+    plan: first.plan,
+  });
+  assert.equal(created.status, 200);
+  assert.equal(created.body.state, 'awaiting-confirmation');
+  assert.equal(created.body.canConfirm, true);
+  const attemptId = created.body.attemptId as string;
+  const read = await fetch(`${f.base}/api/reconciliation/${attemptId}`);
+  assert.equal(read.status, 200);
+  assert.equal((await read.json() as any).state, 'awaiting-confirmation');
+  const wrongConfirmation = await f.post(
+    `/api/reconciliation/${attemptId}/confirm`,
+    {
+      confirmation: {
+        ...first.confirmation,
+        canonicalRequestSha256: 'c'.repeat(64),
+      },
+    },
+  );
+  assert.equal(wrongConfirmation.status, 400);
+  const ready = await f.post(`/api/reconciliation/${attemptId}/confirm`, {
+    confirmation: first.confirmation,
+  });
+  assert.equal(ready.status, 200);
+  assert.deepEqual(
+    {
+      state: ready.body.state,
+      readiness: ready.body.candidate.readiness,
+      terminal: ready.body.terminal,
+    },
+    { state: 'observed', readiness: 'not-ready', terminal: false },
+  );
+  assert.equal((await f.runtime.listSnapshots()).length, 0);
+
+  const stale = reconciliationRequest('v2', 'reconcile-v2');
+  const second = await f.post('/api/reconciliation', {
+    idempotencyKey: 'reconcile-v2',
+    observation: stale.observation,
+    plan: stale.plan,
+  });
+  const clientBindingRejected = await f.post(`/api/reconciliation/${attemptId}/confirm`, {
+    confirmation: first.confirmation,
+    current: {},
+  });
+  assert.equal(clientBindingRejected.status, 400);
+  f.driftReconciliationBinding();
+  const staleResult = await f.post(`/api/reconciliation/${second.body.attemptId}/invalidate`, {});
+  assert.equal(staleResult.status, 200);
+  assert.equal(staleResult.body.state, 'blocked');
+  assert.match(staleResult.body.blockedReason, /task, run, revision, candidate, or observation binding changed/i);
+  const rejected = await f.post('/api/reconciliation', {
+    idempotencyKey: 'reconcile-v3',
+    observation: first.observation,
+    plan: first.plan,
+    unexpected: true,
+  });
+  assert.equal(rejected.status, 400);
+});
 
 test('HTTP goal intake and prepared start preserve identity and reject arbitrary-goal completion', async (t) => {
   const f = await fixture(t);

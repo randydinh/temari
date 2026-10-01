@@ -61,6 +61,7 @@ Keep implementation details out of the map. Name only user paths, stable handles
 - [Poteto-mode playbooks](./poteto-mode-playbooks.md) covers the playbook files `/poteto-mode` matches and their links from `skills/poteto-mode/SKILL.md`.
 - [Seq log review](./seq-log-review.md) covers bounded read-only investigation of Seq logs and traces, evidence handling, and optional approved project overlays.
 - [Integration discovery](./integration-discovery.md) covers the required provider census, lifecycle states, decision receipt, and checker before external-service integration work.
+- [Merge reconciliation](./merge-reconciliation.md) covers preserving an interrupted task, explicit confirmation, isolated integration, and current-candidate closeout.
 - [Archon installation](./archon-installation.md) covers local foundation installation, current checks, relocation and native deterministic verification. It requires the optional Archon distribution.
 - [Bounded live pilot](./archon-live-pilot.md) covers caller-supplied planning, isolated Codex implementation, sandboxed target tests and fresh read-only review. It requires the optional Archon distribution and separate explicit live execution.
 - [Routing chain](./routing-chain.md) covers the temari-to-poteto-mode delegation contract, the host adapter entries, and install drift.

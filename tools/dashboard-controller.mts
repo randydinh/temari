@@ -10,12 +10,14 @@ import {
   realpath,
   unlink,
 } from 'node:fs/promises';
-import { dirname, isAbsolute, join, relative, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 import {
+  assertMergeObservation,
   DEFAULT_STAGES,
   minimalPlan,
   type HarnessRunRef,
+  type ReconciliationScope,
   type WorkerAssignment,
 } from '../libs/contracts/src/index.js';
 import {
@@ -63,6 +65,10 @@ import {
   type DashboardKnowledgeOptions,
 } from './dashboard-knowledge.mjs';
 import type { ScheduledTaskInspection } from './dashboard-scheduler.mjs';
+import {
+  MergeReconciliationDashboard,
+  type ReconciliationConfirmationIntent,
+} from './merge-reconciliation-dashboard.mjs';
 
 const runFile = promisify(execFile);
 const sha = (value: string | Uint8Array) =>
@@ -118,6 +124,19 @@ export interface DashboardConfig {
   };
   scheduling?: { tickMs: number };
   knowledge?: DashboardKnowledgeOptions;
+  /** Explicit host-owned inputs required to enable reconciliation controls. */
+  reconciliation?: {
+    storeRoot: string;
+    sourceRoot: string;
+    candidate: {
+      id: string;
+      sha256: string;
+      root: ReconciliationScope['candidateRoot'];
+    };
+    resolutionIntent: ReconciliationScope['resolutionIntent'];
+    requiredChecks: ReconciliationScope['requiredChecks'];
+    expectedComparison: ReconciliationScope['expectedComparison'];
+  };
 }
 type Candidate = { head: string; fingerprint: string };
 interface Preparation {
@@ -171,6 +190,8 @@ export interface DashboardControllerOptions {
   finalizerPath: string;
   archonHome: string;
   readNative(reference: HarnessRunRef): Promise<Record<string, any>>;
+  /** Optional intent-only reconciliation facade; it has no task-closeout authority. */
+  reconciliation?: MergeReconciliationDashboard;
 }
 function object(value: unknown): Record<string, any> {
   assert(
@@ -207,6 +228,13 @@ function id(value: unknown, max = 96): asserts value is string {
       value.length <= max &&
       /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(value),
     'Invalid request identity.',
+  );
+}
+function reconciliationAttemptId(value: unknown): asserts value is string {
+  assert(
+    typeof value === 'string' &&
+      /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(value),
+    'Invalid reconciliation attempt identity.',
   );
 }
 function within(parent: string, child: string): boolean {
@@ -474,7 +502,7 @@ export async function validateDashboardConfig(
   fields(
     config,
     ['schema', 'workspaceRoot', 'preparationRoot', 'recipes'],
-    ['swarm', 'implementation', 'planning', 'scheduling', 'knowledge'],
+    ['swarm', 'implementation', 'planning', 'scheduling', 'knowledge', 'reconciliation'],
   );
   assert.equal(config.schema, 1);
   for (const key of ['workspaceRoot', 'preparationRoot']) {
@@ -542,6 +570,53 @@ export async function validateDashboardConfig(
   }
   if (config.knowledge !== undefined)
     config.knowledge = parseDashboardKnowledgeOptions(config.knowledge);
+  if (config.reconciliation !== undefined) {
+    const reconciliation = object(config.reconciliation);
+    fields(reconciliation, [
+      'storeRoot', 'sourceRoot', 'candidate', 'resolutionIntent',
+      'requiredChecks', 'expectedComparison',
+    ]);
+    for (const key of ['storeRoot', 'sourceRoot']) {
+      text(reconciliation[key]);
+      assert(isAbsolute(reconciliation[key]), `reconciliation.${key} must be absolute.`);
+    }
+    assert((await lstat(reconciliation.sourceRoot)).isDirectory(), 'Reconciliation sourceRoot must be a directory.');
+    reconciliation.sourceRoot = await realpath(reconciliation.sourceRoot);
+    reconciliation.storeRoot = resolve(reconciliation.storeRoot);
+    // Reuse the contract validator so candidate/root/check/comparison values
+    // remain portable immutable identities rather than executable input.
+    assertMergeObservation({
+      schema: 1,
+      observationId: 'config-observation',
+      taskId: 'config-task',
+      taskVersion: 'config-version',
+      runId: 'config-run',
+      revision: 'config-revision',
+      candidate: {
+        schema: 'reconciliation-candidate-v1',
+        id: reconciliation.candidate.id,
+        sha256: reconciliation.candidate.sha256,
+      },
+      scope: {
+        schema: 1,
+        sourceRoot: { id: 'configured-source-root', sha256: '0'.repeat(64) },
+        candidateRoot: reconciliation.candidate.root,
+        baseHead: { id: 'configured-base-head', sha256: '1'.repeat(64) },
+        operationHead: { id: 'configured-operation-head', sha256: '2'.repeat(64) },
+        affectedPaths: [{
+          path: 'configured-path', classification: 'tracked',
+          pathSha256: '4'.repeat(64), indexBlobs: [], unmergedStages: [],
+          worktreeKind: 'missing', worktreeSha256: null, diffSha256: '5'.repeat(64),
+        }],
+        resolutionIntent: reconciliation.resolutionIntent,
+        requiredChecks: reconciliation.requiredChecks,
+        expectedComparison: reconciliation.expectedComparison,
+      },
+      observedAt: '2026-01-01T00:00:00.000Z',
+      kind: 'clean',
+      evidence: [{ schema: 1, id: 'config-evidence', sha256: '3'.repeat(64), bytes: 0, mediaType: 'application/json' }],
+    });
+  }
   if (config.swarm !== undefined) {
     const swarm = object(config.swarm);
     fields(swarm, ['executable', 'maxConcurrency', 'maxWorkers', 'timeoutMs']);
@@ -667,6 +742,58 @@ export class DashboardController implements TaskViewController {
       'Task is outside this dashboard workspace.',
     );
     return task;
+  }
+
+  async reconciliationView(attemptId: string): Promise<unknown> {
+    return this.checked(async () => {
+      reconciliationAttemptId(attemptId);
+      assert(this.options.reconciliation, 'Merge reconciliation is not configured.');
+      return this.options.reconciliation.view(attemptId);
+    });
+  }
+
+  async reconciliationCreate(input: unknown): Promise<unknown> {
+    return this.checked(async () => {
+      const request = object(input);
+      fields(request, ['idempotencyKey', 'observation', 'plan']);
+      assert(this.options.reconciliation, 'Merge reconciliation is not configured.');
+      return this.options.reconciliation.submitIntent({
+        idempotencyKey: request.idempotencyKey,
+        observation: request.observation,
+        plan: request.plan,
+      } as Parameters<MergeReconciliationDashboard['submitIntent']>[0]);
+    });
+  }
+
+  async reconciliationInvalidate(
+    attemptId: string,
+    input: unknown,
+  ): Promise<unknown> {
+    return this.checked(async () => {
+      reconciliationAttemptId(attemptId);
+      const request = object(input);
+      fields(request, []);
+      assert(this.options.reconciliation, 'Merge reconciliation is not configured.');
+      return this.options.reconciliation.invalidateIntent({
+        attemptId,
+      });
+    });
+  }
+
+  async reconciliationConfirm(
+    attemptId: string,
+    input: unknown,
+  ): Promise<unknown> {
+    return this.checked(async () => {
+      reconciliationAttemptId(attemptId);
+      const request = object(input);
+      fields(request, ['confirmation']);
+      assert(this.options.reconciliation, 'Merge reconciliation is not configured.');
+      return this.options.reconciliation.confirmIntent({
+        attemptId,
+        confirmation: request.confirmation,
+      } as ReconciliationConfirmationIntent);
+    });
   }
 
   private async swarmPreparation(

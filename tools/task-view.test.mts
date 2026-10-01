@@ -287,6 +287,60 @@ test('writable dashboard delegates only POST intake and selected task actions', 
   ]);
 });
 
+test('task view exposes reconciliation reads and delegates only intent controls', async (t) => {
+  const calls: unknown[] = [];
+  const view = {
+    attemptId: 'attempt-reconcile-1',
+    state: 'awaiting-confirmation',
+    blockedReason: null,
+    candidate: { readiness: 'not-ready' },
+    terminal: false,
+  };
+  const { base, headers } = await writableServer(t, {
+    describe: () => ({}),
+    create: async () => ({}),
+    action: async () => ({}),
+    reconciliationView: async (attemptId) =>
+      attemptId === view.attemptId ? view : null,
+    reconciliationCreate: async (input) => {
+      calls.push(['create', input]);
+      return view;
+    },
+    reconciliationInvalidate: async (attemptId, input) => {
+      calls.push(['invalidate', attemptId, input]);
+      return { ...view, state: 'blocked', blockedReason: 'binding changed' };
+    },
+    reconciliationConfirm: async (attemptId, input) => {
+      calls.push(['confirm', attemptId, input]);
+      return { ...view, state: 'observed', candidate: { readiness: 'not-ready' }, terminal: false };
+    },
+  });
+  const read = await fetch(`${base}/api/reconciliation/${view.attemptId}`);
+  assert.equal(read.status, 200);
+  assert.equal((await read.json() as typeof view).terminal, false);
+  assert.equal(
+    (await fetch(`${base}/api/reconciliation/missing`)).status,
+    404,
+  );
+  const created = await fetch(`${base}/api/reconciliation`, {
+    method: 'POST', headers, body: JSON.stringify({ idempotencyKey: 'intent-1' }),
+  });
+  assert.equal(created.status, 200);
+  const blocked = await fetch(`${base}/api/reconciliation/${view.attemptId}/invalidate`, {
+    method: 'POST', headers, body: JSON.stringify({}),
+  });
+  assert.equal(blocked.status, 200);
+  const confirmed = await fetch(`${base}/api/reconciliation/${view.attemptId}/confirm`, {
+    method: 'POST', headers, body: JSON.stringify({ confirmation: {} }),
+  });
+  assert.equal(confirmed.status, 200);
+  assert.deepEqual(calls, [
+    ['create', { idempotencyKey: 'intent-1' }],
+    ['invalidate', view.attemptId, {}],
+    ['confirm', view.attemptId, { confirmation: {} }],
+  ]);
+});
+
 test('mutations reject missing or foreign origin, host, and token before dispatch', async (t) => {
   let calls = 0;
   const { base, headers } = await writableServer(t, {

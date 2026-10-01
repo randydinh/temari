@@ -31,6 +31,10 @@ export interface TaskViewController {
   describe(): unknown | Promise<unknown>;
   create(input: unknown): Promise<unknown>;
   action(taskId: string, input: unknown): Promise<unknown>;
+  reconciliationView?(attemptId: string): Promise<unknown>;
+  reconciliationCreate?(input: unknown): Promise<unknown>;
+  reconciliationInvalidate?(attemptId: string, input: unknown): Promise<unknown>;
+  reconciliationConfirm?(attemptId: string, input: unknown): Promise<unknown>;
 }
 
 export class TaskViewControllerError extends Error {
@@ -222,6 +226,14 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
         /^\/api\/schedules\/([A-Za-z0-9][A-Za-z0-9._-]{0,127})\/actions$/.exec(
           url.pathname,
         );
+      const reconciliationViewMatch =
+        /^\/api\/reconciliation\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})$/.exec(
+          url.pathname,
+        );
+      const reconciliationActionMatch =
+        /^\/api\/reconciliation\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/(invalidate|confirm)$/.exec(
+          url.pathname,
+        );
       if (
         request.method !== 'GET' &&
         request.method !== 'HEAD' &&
@@ -245,7 +257,9 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
           (url.pathname !== '/api/tasks' &&
             !actionMatch &&
             url.pathname !== '/api/schedules' &&
-            !scheduleMatch)
+            !scheduleMatch &&
+            url.pathname !== '/api/reconciliation' &&
+            !reconciliationActionMatch)
         ) {
           send(404, { error: 'Not found.' });
           return;
@@ -266,7 +280,26 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
           !options.schedules
         )
           throw new RequestError(400, 'Scheduling is not configured.');
-        const result = scheduleMatch
+        if (
+          (url.pathname === '/api/reconciliation' || reconciliationActionMatch) &&
+          (!options.controller?.reconciliationCreate ||
+            !options.controller.reconciliationInvalidate ||
+            !options.controller.reconciliationConfirm)
+        )
+          throw new RequestError(400, 'Merge reconciliation is not configured.');
+        const result = reconciliationActionMatch
+          ? reconciliationActionMatch[2] === 'invalidate'
+            ? await options.controller!.reconciliationInvalidate!(
+                reconciliationActionMatch[1]!,
+                input,
+              )
+            : await options.controller!.reconciliationConfirm!(
+                reconciliationActionMatch[1]!,
+                input,
+              )
+          : url.pathname === '/api/reconciliation'
+            ? await options.controller!.reconciliationCreate!(input)
+          : scheduleMatch
           ? await options.schedules!.update(scheduleMatch[1]!, input)
           : url.pathname === '/api/schedules'
             ? await options.schedules!.create(input)
@@ -298,6 +331,17 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
             ? await options.schedules.describe()
             : { configured: false, schedules: [], targets: [] },
         );
+        return;
+      }
+      if (reconciliationViewMatch) {
+        if (!options.controller?.reconciliationView)
+          throw new RequestError(400, 'Merge reconciliation is not configured.');
+        if (url.search)
+          throw new RequestError(400, 'Unexpected reconciliation query.');
+        const view = await options.controller.reconciliationView(
+          reconciliationViewMatch[1]!,
+        );
+        send(view ? 200 : 404, view ?? { error: 'Reconciliation attempt not found.' });
         return;
       }
       if (

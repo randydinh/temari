@@ -659,6 +659,22 @@
       "transformation": null
     },
     {
+      "path": "skills/merge-reconciliation/SKILL.md",
+      "lane": "portable",
+      "sourceSha256": "e288f197ed7de169504ff86e8c19fabd64ad799e5d7cbe27bef031e7c43aff9e",
+      "artifactSha256": "e288f197ed7de169504ff86e8c19fabd64ad799e5d7cbe27bef031e7c43aff9e",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "skills/merge-reconciliation/references/reconciliation-contract.md",
+      "lane": "portable",
+      "sourceSha256": "cc37d811c6a283bebd1c8252d4f5b6d4a02d113ce6f6fa1578a9b61c36f49723",
+      "artifactSha256": "cc37d811c6a283bebd1c8252d4f5b6d4a02d113ce6f6fa1578a9b61c36f49723",
+      "executable": false,
+      "transformation": null
+    },
+    {
       "path": "skills/no-comments/SKILL.md",
       "lane": "portable",
       "sourceSha256": "5c5b0882297d704c3a9720c52b7a793c68b013eaf717989f0945624efdfe2b05",
@@ -1454,9 +1470,9 @@
       "path": "skills/temari/SKILL.md",
       "lane": "portable",
       "sourceSha256": "4309ed9237767f9a25cea2ff8da1322ccc19abfd990e65074e86ad6e80a30206",
-      "artifactSha256": "1f07cef474bc1b11f7583c0d8cafc1c7533521d93c256e37e9ec9dac756a8d8c",
+      "artifactSha256": "4a73ec29a725a0f3c51959a21756f5bf7d06828d8b09d64308e9f69afd719cc7",
       "executable": false,
-      "transformation": "Retain the previously accepted semantic skill-selection and invocation policy sentence assigning policy to Temari and translation to the host adapter; source revision removed it. Vendored content is unchanged."
+      "transformation": "Retain the previously accepted semantic skill-selection and invocation policy sentence assigning policy to Temari and translation to the host adapter; source revision removed it. Add the merge-reconciliation route while preserving the vendored policy."
     },
     {
       "path": "skills/temari/references/credentials.md",
@@ -1622,17 +1638,17 @@
       "path": "verification/verify-temari/SKILL.md",
       "lane": "portable",
       "sourceSha256": "c823ac770d9ccf56d703d7e33784c8033b8e30ba91860cca18d70e2a5f63b956",
-      "artifactSha256": "bf58e583b03d74c935d6b323372b1cee74fe01fca21fe3b8d601f93d2c03862c",
+      "artifactSha256": "f83b62b85511f2e083be50454cda2cc261695342710911b23422128ac1e6513e",
       "executable": false,
-      "transformation": "Replace excluded repository-only evaluation commands with fresh isolated installation checks; distinguish independent copy equality from unperformed same-tree/symlink comparison."
+      "transformation": "Replace excluded repository-only evaluation commands with fresh isolated installation checks; distinguish independent copy equality from unperformed same-tree/symlink comparison; add the merge-reconciliation map."
     },
     {
       "path": "verification/verify-temari/features/README.md",
       "lane": "portable",
       "sourceSha256": "00c916adaccf39ffe8f44925bdbe30b8e50d92b5954aeafd4f143c6ce27dd797",
-      "artifactSha256": "180f781336a7b924ac56229bea04233c2073ebd9d46bccc1d218985d00fefd21",
+      "artifactSha256": "5169e45ebb3fd0f412882dee0c5f121164ce7547b4524cd52f9ed7684df5ba91",
       "executable": false,
-      "transformation": "Declare optional Archon and project-overlay boundaries."
+      "transformation": "Declare optional Archon and project-overlay boundaries; add the merge-reconciliation feature map."
     },
     {
       "path": "verification/verify-temari/features/archon-installation.md",
@@ -1679,6 +1695,14 @@
       "lane": "portable",
       "sourceSha256": "7fd0fac8b4568d17ca6541f91d503446cc1dd54e7cdac8884a58ad31cc8042bc",
       "artifactSha256": "7fd0fac8b4568d17ca6541f91d503446cc1dd54e7cdac8884a58ad31cc8042bc",
+      "executable": false,
+      "transformation": null
+    },
+    {
+      "path": "verification/verify-temari/features/merge-reconciliation.md",
+      "lane": "portable",
+      "sourceSha256": "04f67e77480ca0d247bcc2b15d8d97b84fc0d5eec72467798f61745ba943a7e4",
+      "artifactSha256": "04f67e77480ca0d247bcc2b15d8d97b84fc0d5eec72467798f61745ba943a7e4",
       "executable": false,
       "transformation": null
     },
