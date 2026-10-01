@@ -283,6 +283,63 @@ blocks promotion even when BM25 improves the remaining indexed documents. If
 the runner itself fails, no passing receipt is published; inspect the private
 task reports and rerun only after the cause is resolved.
 
+## Sealed graph diagnostic gate
+
+Use this after publishing a graph from the same pinned archive capture. Seal a
+new development and untouched holdout question set before inspecting graph
+results. The runner checks the exact question-set and intake-handoff SHA-256,
+requires an explicit graph ID, disjoint normalized questions and disjoint gold
+paths, and uses BM25 at the same `topK` as the one-hop graph trial. Each case
+opts out of Jev. The graph ID is never silently taken from a handoff default.
+
+```json
+{
+  "schema": 1,
+  "handoffPath": "/absolute/private-task/archive-handoff-HASH.json",
+  "graphId": "64-lowercase-hex-digest",
+  "topK": 3,
+  "cohorts": {
+    "development": [{
+      "id": "question-1", "query": "bounded search terms",
+      "sourceIds": ["REGISTERED_SOURCE_ID"],
+      "expected": [{"sourceId": "REGISTERED_SOURCE_ID", "path": "relative/file.md"}]
+    }],
+    "holdout": [{
+      "id": "question-2", "query": "separate search terms",
+      "sourceIds": ["REGISTERED_SOURCE_ID"],
+      "expected": [{"sourceId": "REGISTERED_SOURCE_ID", "path": "relative/other.md"}]
+    }]
+  }
+}
+```
+
+```sh
+shasum -a 256 /absolute/sealed-graph-questions.json /absolute/private-task/archive-handoff-HASH.json
+pnpm nx run knowledge:demo -- graph-gate --input /absolute/sealed-graph-questions.json --sha256 QUESTION_SET_SHA256 --handoff-sha256 HANDOFF_SHA256
+```
+
+The gate inspects text coverage, checks a complete BM25 top-K discovery page,
+verifies the BM25 shortlist and the content-addressed graph checkpoint, and
+records both selected excerpt bytes and Unicode codepoints. The selected
+excerpt totals are the texts in the final K positions. They are **not** equal
+total-work budgets: graph projection and extra target reads add physical work.
+The one-hop trial caps target read attempts at `topK - 1`; the receipt reports
+those attempts and projected node counts separately. A graph trial with gaps or
+an unverified shortlist cannot pass its case. Each arm's final selected context
+must stay within `topK × 1000` Unicode codepoints and `topK × 4000` UTF-8 bytes.
+Private reports and checkpoints retain paths and excerpts; the gate receipt
+retains hashes, IDs, counts, and report paths without source text or gold paths.
+
+The status is always diagnostic: `coverage-blocked`, `insufficient-sample`,
+`rejected`, or `diagnostic-improvement`. Even a fully verified improvement across
+at least five independent questions in both cohorts, with a non-improving graph
+expansion exercised in each cohort, never makes graph ranking
+promotion eligible. A reused or inspected holdout must become development
+evidence; seal another holdout before a later decision. The existing graph
+policy may displace a BM25 gold result. A lost BM25 gold path counts as a
+regression even when another gold path replaces it at the same K. Inspect
+regressions and actual selected-context sizes before a ranker change.
+
 Graft and Nx artifact generation remain operator-owned. Native Graphify
 non-code extraction, image interpretation, a scheduled pair of autonomous
 agents and semantic answer quality remain separate

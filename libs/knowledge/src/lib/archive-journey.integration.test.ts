@@ -450,6 +450,8 @@ test('ACTUAL CLI: graph one-hop trial recovers a lexical miss from a pinned rela
     ['target.txt'],
   );
   assert.equal(result.graph?.verifiedEvidenceCount, 1);
+  assert.equal(result.graph?.targetReadAttempts, 1);
+  assert((result.graph?.projectionNodeCount ?? 0) > 0);
   assert(result.graph?.checkpointPath);
   assert.equal(report.cases[1].graph?.status, 'gap');
   assert.deepEqual(report.cases[1].graph?.ranked, report.cases[1].ranked);
