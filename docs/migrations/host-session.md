@@ -89,6 +89,9 @@ and its invocation digest stay unchanged.
 The task's workspace must resolve to the selected candidate. The task store must
 be disjoint from the candidate, run directory and compiled runtime. Use an
 existing task's current `version` and omit `create` when continuing a goal.
+Existing tasks must have no canonical `TaskRun` history or acceptance. Continue
+those tasks through their existing run controls and closeout; source host tracking
+cannot reopen them or replace their execution state.
 The parent of a new task root must exist. Supply the SHA-256 of the reviewed file
 independently of its contents, then launch from the checkout:
 
@@ -101,15 +104,19 @@ The hash pins the selected bytes; it is not authentication or permission.
 An invalid digest, identity, task scope, or stale task version refuses work.
 Omit both tracking flags for an ordinary untracked start.
 
-The entry links the actual chat to the task and saves a starting handoff before
-requesting a stage. It includes locations for the retained invocation,
-checkpoint, receipt and evidence. These locations may not yet have final output.
-A bounded binding beside the host run pins the chosen task across resume. A
-tracked run cannot silently resume untracked or move to another task. A fresh
-chat uses that same task with its current version and a new idempotency key.
+The entry atomically pins a bounded task binding beside the host run before the
+initial checkpoint. After runtime admission, it links the actual chat to the task
+and saves a starting handoff before requesting a stage. The handoff includes
+locations for the retained invocation, checkpoint, receipt and evidence. These
+locations may not yet have final output. A tracked run cannot silently resume
+untracked or move to another task, including after a crash before stage dispatch.
+A fresh chat uses that same task with its current version and a new idempotency
+key.
 
 Normal completion or interruption records a handoff automatically. A hard process
-kill leaves the starting handoff and runtime checkpoints available for recovery.
+kill preserves the task binding, any saved handoff and runtime checkpoints for
+recovery. A crash during the initial binding write leaves no partial final binding;
+the original host recovery rules still apply if no initial checkpoint was saved.
 If another chat changes the task during execution, the final handoff refuses to
 overwrite that change. The process reports the tracking failure; any already
 persisted canonical receipt remains available. Inspect that receipt and reconcile

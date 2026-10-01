@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import { lstat, open, realpath } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import { link, lstat, open, realpath, unlink } from 'node:fs/promises';
 import {
   basename,
   dirname,
@@ -178,18 +178,36 @@ function validateSidecar(value, runtime) {
 async function writeBinding(path, binding) {
   const bytes = Buffer.from(`${JSON.stringify(binding)}\n`);
   assert(bytes.length <= BINDING_BYTES, 'Task binding exceeds the byte limit.');
-  const file = await open(path, 'wx', 0o600);
+  const temporary = join(dirname(path), `.task-binding-${randomUUID()}.tmp`);
+  const file = await open(temporary, 'wx', 0o600);
   try {
-    await file.writeFile(bytes);
-    await file.sync();
+    try {
+      await file.writeFile(bytes);
+      await file.sync();
+    } finally {
+      await file.close();
+    }
+    // Publish complete bytes without replacing a concurrent task selection.
+    try {
+      await link(temporary, path);
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      assert.deepEqual(
+        await readBoundedJson(path, BINDING_BYTES),
+        binding,
+        'Host run task binding changed during publication.',
+      );
+    }
+    const parent = await open(dirname(path), 'r');
+    try {
+      await parent.sync();
+    } finally {
+      await parent.close();
+    }
   } finally {
-    await file.close();
-  }
-  const parent = await open(dirname(path), 'r');
-  try {
-    await parent.sync();
-  } finally {
-    await parent.close();
+    await unlink(temporary).catch((error) => {
+      if (error.code !== 'ENOENT') throw error;
+    });
   }
 }
 
@@ -289,6 +307,10 @@ export async function prepareTaskTracking({
   async function validateTask() {
     const task = store ? await store.load(sidecar.taskId) : null;
     if (task) {
+      assert(
+        task.runs.length === 0 && task.acceptance === null,
+        'Source host tracking cannot replace or reopen a task with canonical runs or acceptance. Use its existing task-run controls and closeout.',
+      );
       assert.equal(
         await directory(task.workspaceRoot),
         input.candidate.root,
@@ -344,10 +366,7 @@ export async function prepareTaskTracking({
     get started() {
       return started;
     },
-    async start() {
-      if (started) return;
-      // Recheck after the runtime validates the invocation, before any worker.
-      await validateTask();
+    async reserve() {
       assert.equal(
         await taskRoot(sidecar.taskRoot),
         root,
@@ -360,6 +379,12 @@ export async function prepareTaskTracking({
           'Host run task binding changed.',
         );
       else await writeBinding(bindingPath, binding);
+    },
+    async start() {
+      if (started) return;
+      // Recheck after the runtime validates the invocation, before any worker.
+      await validateTask();
+      await this.reserve();
       store ??= await runtime.FileTaskStore.create(root);
       await store.enterTask(enter);
       await store.handoffTask({

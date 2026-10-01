@@ -155,6 +155,9 @@ When executing the existing local host dialogue, use its
 Temari selects the task and real conversation identity once; the entry writes the
 starting recovery handoff and outcome automatically. Resume stays with that same
 task, and concurrent edits cannot be overwritten by a late result.
+This path supports new tasks and existing tasks without canonical run history or
+acceptance. Tasks with canonical runs continue through their existing run controls
+and closeout; source tracking cannot reopen or supersede them.
 
 The host's candidate-profile receipt remains a context reference pending trusted
 closeout. It does not become `DONE` through this tracking integration. Ordinary

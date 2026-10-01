@@ -93,10 +93,11 @@ async function fixture(t, changes = {}) {
   const env = { ...process.env };
   delete env.NODE_OPTIONS;
   delete env.NODE_PATH;
-  const launch = (resume = false, extraArgs = []) => {
+  const launch = (resume = false, extraArgs = [], nodeArgs = []) => {
     const child = spawn(
       process.execPath,
       [
+        ...nodeArgs,
         join(root, 'entry.mjs'),
         resume ? 'resume' : 'start',
         '--runtime',
@@ -469,6 +470,141 @@ test('hard process loss leaves the starting handoff and exact recovery locations
       .length,
     2,
   );
+});
+
+test('a crash at the initial checkpoint cannot drop tracking on resume', async (t) => {
+  const f = await fixture(t);
+  const tracking = await taskTracking(f);
+  const preload = join(f.root, 'exit-after-initial-checkpoint.mjs');
+  await writeFile(
+    preload,
+    `
+    import {createRequire} from 'node:module';
+    import {pathToFileURL} from 'node:url';
+    const require = createRequire(pathToFileURL(${JSON.stringify(join(f.artifact, 'consumer.mjs'))}));
+    const api = await import(pathToFileURL(require.resolve('@temari/runtime')).href);
+    const original = api.FileWorkflowCheckpointStore.prototype.save;
+    api.FileWorkflowCheckpointStore.prototype.save = async function(checkpoint) {
+      const result = await original.call(this, checkpoint);
+      if (checkpoint.stages.length === 0) process.exit(86);
+      return result;
+    };
+  `,
+  );
+  const killed = await f.launch(false, tracking.args, ['--import', preload])
+    .done;
+  assert.equal(killed.code, 86, killed.stderr);
+  assert(!killed.messages.some((message) => message.type === 'stage'));
+  assert.deepEqual((await f.checkpoint()).stages, []);
+  assert.equal(
+    JSON.parse(
+      await readFile(join(f.request.runDirectory, 'task-binding.json'), 'utf8'),
+    ).taskId,
+    tracking.payload.taskId,
+  );
+  const untracked = await f.launch(true).done;
+  assert.notEqual(untracked.code, 0);
+  assert.match(untracked.stderr, /task-tracked/);
+  assert(!untracked.messages.some((message) => message.type === 'stage'));
+  assert.deepEqual(await drive(f, f.launch(true, tracking.args)), stages);
+});
+
+test('interrupted binding writes never publish partial final JSON and can be retried', async (t) => {
+  const f = await fixture(t);
+  const tracking = await taskTracking(f);
+  const preload = join(f.root, 'exit-during-binding-write.mjs');
+  await writeFile(
+    preload,
+    `
+    import fs from 'node:fs/promises';
+    import {syncBuiltinESMExports} from 'node:module';
+    const original = fs.open;
+    fs.open = async function(path, ...args) {
+      const handle = await original.call(this, path, ...args);
+      if (String(path).includes('.task-binding-') || String(path).endsWith('/task-binding.json')) {
+        handle.writeFile = async function(bytes) {
+          await handle.write(Buffer.from(bytes).subarray(0, 10));
+          process.exit(87);
+        };
+      }
+      return handle;
+    };
+    syncBuiltinESMExports();
+  `,
+  );
+  const killed = await f.launch(false, tracking.args, ['--import', preload])
+    .done;
+  assert.equal(killed.code, 87, killed.stderr);
+  const binding = join(f.request.runDirectory, 'task-binding.json');
+  await assert.rejects(readFile(binding), { code: 'ENOENT' });
+  await f.absentReceipt();
+  // Retry the immutable selection publication independently; an interrupted
+  // pre-checkpoint host start still follows the existing partial-start policy.
+  const { prepareTaskTracking } =
+    await import('../packages/workflow-runtime/host/task-tracking.mjs');
+  const input = JSON.parse(
+    await readFile(
+      join(f.request.runDirectory, 'config', 'input.json'),
+      'utf8',
+    ),
+  );
+  const prepared = await prepareTaskTracking({
+    runtime: f.api,
+    runtimeRoot: f.artifact,
+    input,
+    paths: {
+      config: join(f.request.runDirectory, 'config'),
+      stores: ['receipts', 'checkpoints', 'evidence', 'manifests'].map((name) =>
+        join(f.request.runDirectory, name),
+      ),
+    },
+    sidecarPath: tracking.path,
+    expectedSha256: tracking.args[3],
+  });
+  await prepared.reserve();
+  const published = await readFile(binding, 'utf8');
+  assert.equal(JSON.parse(published).taskId, tracking.payload.taskId);
+  await prepared.reserve();
+  assert.equal(await readFile(binding, 'utf8'), published);
+});
+
+test('source tracking refuses a task with canonical run history without changing its state', async (t) => {
+  const f = await fixture(t);
+  const tracking = await taskTracking(f);
+  const store = await f.api.FileTaskStore.create(tracking.payload.taskRoot);
+  await store.createTask({
+    taskId: tracking.payload.taskId,
+    actor: 'temari',
+    idempotencyKey: 'create-canonical',
+    ...tracking.payload.create,
+  });
+  const require = createRequire(
+    pathToFileURL(join(f.artifact, 'consumer.mjs')),
+  );
+  const core = await import(
+    pathToFileURL(require.resolve('@temari/temari-core')).href
+  );
+  const task = await store.bindRun({
+    taskId: tracking.payload.taskId,
+    actor: 'temari',
+    idempotencyKey: 'bind-canonical',
+    expectedVersion: 1,
+    run: {
+      runId: 'canonical-run',
+      revision: 'canonical-revision',
+      plan: core.createExecutionPlan(f.request.obligations),
+    },
+  });
+  const selected = await taskTracking(f, {
+    create: undefined,
+    expectedVersion: task.version,
+  });
+  const result = await f.launch(false, selected.args).done;
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /canonical runs or acceptance/);
+  assert(!result.messages.some((message) => message.type === 'stage'));
+  assert.deepEqual(await store.load(task.taskId), task);
+  await f.absentReceipt();
 });
 
 test('tracking refuses invalid selection before any stage or task mutation', async (t) => {

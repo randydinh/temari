@@ -657,6 +657,9 @@ async function main(session) {
     sidecarPath: extra[1],
     expectedSha256: extra[3],
   });
+  // Pin selected bookkeeping before even the initial resumable checkpoint.
+  // Task progress itself still waits for runtime admission at the first handler.
+  await tracking?.reserve();
   let trackingFailure;
   const store = {
     load: (id) => receipts.load(id),
