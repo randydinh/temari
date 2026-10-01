@@ -165,6 +165,29 @@ graphs are refused until every selected source has an explicit revision
 comparison. The receipt retains `currentOriginal: not-checked` and does not
 prove the live source is still current.
 
+## Audit one local source at a point in time
+
+To compare a complete archived generation with the currently admitted local
+root, run a separate read-only audit:
+
+```ts
+import { auditArchiveCurrentness } from '@temari/knowledge';
+
+const { receiptPath, receipt } = await auditArchiveCurrentness({
+  publicationPath: '/absolute/private-task/archive-publication-HASH.json',
+});
+```
+
+The Registrar rereads admitted regular files with the capture's file, total
+and entry limits. The metadata-only receipt separates added, removed, changed,
+unchanged and `unavailable` paths. Oversized, unreadable, symlink and other
+nonregular files are unknown or refused; they never count as unchanged.
+Tampered archive pins and revoked or changed source registration refuse the
+audit. `observedAt` and `declared-selection-not-atomic` describe one bounded
+observation, not continuous freshness or an atomic filesystem snapshot. The
+audit does not recapture the source, update a graph or use Jev. Historical
+archive reads still use their original generation.
+
 ## Pinned Markdown links
 
 An operator can publish explicit links between Markdown documents already in

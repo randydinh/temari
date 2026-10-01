@@ -7,6 +7,9 @@
       "$ref": "#/$defs/receipt"
     },
     {
+      "$ref": "#/$defs/currentness"
+    },
+    {
       "$ref": "#/$defs/read"
     },
     {
@@ -32,6 +35,27 @@
     }
   ],
   "$defs": {
+    "currentness": {
+      "type": "object",
+      "properties": {
+        "schema": { "const": 1 },
+        "kind": { "const": "archive-currentness-audit" },
+        "status": { "enum": ["complete", "partial"] },
+        "source_id": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "generation": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+        "manifest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "observed_at": { "type": "string" },
+        "consistency": { "const": "declared-selection-not-atomic" },
+        "evidence": { "const": "point-in-time-local-observation" },
+        "added": { "type": "array", "maxItems": 1000 },
+        "removed": { "type": "array", "maxItems": 1000 },
+        "changed": { "type": "array", "maxItems": 1000 },
+        "unchanged": { "type": "array", "maxItems": 1000 },
+        "unavailable": { "type": "array", "maxItems": 1000 }
+      },
+      "required": ["schema", "kind", "status", "source_id", "generation", "manifest_sha256", "observed_at", "consistency", "evidence", "added", "removed", "changed", "unchanged", "unavailable"],
+      "additionalProperties": true
+    },
     "receipt": {
       "type": "object",
       "properties": {

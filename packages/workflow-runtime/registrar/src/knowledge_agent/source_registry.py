@@ -330,6 +330,10 @@ class SourceRegistry:
         from knowledge_agent.source_archive import source_generation
         return source_generation(self, *args, **kwargs)
 
+    def audit_current_source(self, *args, **kwargs):
+        from knowledge_agent.source_archive import audit_current_source
+        return audit_current_source(self, *args, **kwargs)
+
     def read_snapshot(self, *args, **kwargs):
         from knowledge_agent.source_archive import read_snapshot
         return read_snapshot(self, *args, **kwargs)

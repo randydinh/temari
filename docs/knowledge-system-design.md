@@ -99,6 +99,15 @@ changed paths for new relationship discovery. It refuses multi-source graphs
 until every source revision is accounted for. The plan leaves the historical
 graph intact; building and evaluating a child graph remains open.
 
+A separate local currentness audit compares one complete pinned generation
+with a bounded observation of the currently admitted source root. It hashes
+regular file originals and reports added, removed, changed, unchanged and
+unavailable paths without document bodies. A partial audit keeps unreadable,
+oversized or nonregular files unknown. The result is explicitly non-atomic and
+has an observation time; it does not turn the earlier generation diff or graph
+impact plan into a continuous freshness guarantee. The audit does not invoke
+Jev or publish a new graph.
+
 ## Delivery decisions
 
 ### Installed capability decision — 2026-10-01
