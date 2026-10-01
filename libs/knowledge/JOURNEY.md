@@ -131,11 +131,39 @@ publications must be complete, use the same enabled registration and compatible
 Registrar implementation, and pass pinned manifest inspection. Excluded files
 are outside this comparison. `removed` means an original was retained in the
 first capture but not the second; it does not prove a live file was deleted.
-A changed path can guide an operator to rebuild
-affected graph relationships, but the receipt does not do that rebuild. It
+A changed path can guide an operator to rebuild affected graph relationships,
+but the receipt does not do that rebuild. It
 always says `currentOriginal: not-checked`: it compares two archived snapshots,
 without checking whether the source has changed since either capture. Historic
 readers remain pinned to their selected generation.
+
+## Plan graph work after a capture
+
+For a graph pinned to one source's **before** publication, inspect which old
+records need attention after the explicit new capture:
+
+```ts
+import { planArchiveGraphImpact } from '@temari/knowledge';
+
+const { receiptPath, receipt } = await planArchiveGraphImpact({
+  beforePublicationPath:
+    '/absolute/private-task/archive-publication-BEFORE.json',
+  afterPublicationPath: '/absolute/private-task/archive-publication-AFTER.json',
+  beforeGraphId: 'OLD_GRAPH_ID',
+});
+```
+
+The durable receipt contains record IDs and path names, not source excerpts.
+`needsReview` covers changed or removed anchors and relationships depending on
+them. `needRepin` covers remaining old records: even unchanged original bytes
+cannot make an old generation and manifest anchor valid in the new graph.
+`historicalOnly` keeps retracted assertion IDs out of the new work queue.
+`needDiscovery` lists added and changed paths as places to inspect for new facts,
+without claiming any new relationship. This is a work plan only; it leaves the old graph readable
+under its original publication and publishes no child graph. Multi-source
+graphs are refused until every selected source has an explicit revision
+comparison. The receipt retains `currentOriginal: not-checked` and does not
+prove the live source is still current.
 
 ## Pinned Markdown links
 

@@ -16,3 +16,4 @@ export * from './lib/archive-jobs.js';
 export * from './lib/archive-query-feedback.js';
 export * from './lib/archive-graph-reviewed-change.js';
 export * from './lib/archive-generation-diff.js';
+export * from './lib/archive-graph-impact.js';

@@ -37,3 +37,20 @@ The next selected unit is a diff between two **explicitly captured** generations
 ## 01:27 PDT checkpoint
 
 The diff unit passed its actual-CLI checks, including a valid leading-dash path added after independent review. Final local checks: knowledge typecheck, 43 unit tests, 55 actual Registrar integration tests, 15 canonical-package tests, canonical package/check, and relocated stock-Node export smoke. The reviewer found no further blocking issue. Commit, PR and tested-head review are still required before calling this increment delivered. The first macOS searchable-PDF predicate remains open.
+
+## 01:39 PDT continuation
+
+PR #127 merged at `e7a2723a35ed9ac22d6620889c4418b5e596cf9f` after exact-head review. The existing isolated worktree now uses a new branch from that merged main. Its Graphify snapshot is absent, so the next source selection uses the current design and scoped knowledge code with that coverage gap recorded. A read-only architect is comparing the smallest source-refresh and graph-impact increment. No live-currentness or graph-correctness claim is promoted by the previous diff receipt alone.
+
+The selected next unit is a read-only, single-source graph-impact plan. Its finish predicate is an actual Registrar CLI v1 graph and v2 source capture where changed/removed anchor records and dependent relationships enter `needsReview`, untouched old anchors enter `needRepin`, retracted assertions stay `historicalOnly`, and added/changed paths enter `needDiscovery`; the historical graph remains readable only under its old RevisionSet. A multi-source graph, tampered pin, or revoked registration must refuse planning. The receipt contains only metadata, claims no graph mutation or live currentness, passes focused Nx integration and typecheck, and receives independent exact-head review before a PR.
+
+## 01:59 PDT graph impact checkpoint
+
+The repaired graph-impact increment passed knowledge typecheck, 43 unit tests,
+56 actual Registrar CLI integration tests, 15 canonical runtime tests,
+canonical package/check, and a relocated stock-Node export smoke. Independent
+review found no blocking issue. The first integration attempt exposed a bad
+negative fixture that tried to reactivate retired IDs; the fixture was repaired
+without changing the Registrar rule, then the full suite passed. Commit, PR,
+and exact-head review remain before delivery. Mac searchable-PDF text and the
+broader production finish predicate remain open.

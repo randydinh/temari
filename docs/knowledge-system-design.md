@@ -92,6 +92,13 @@ It reports `currentOriginal: not-checked`; it neither observes later live
 changes nor rebuilds graph relationships. The macOS searchable-PDF extraction
 gap remains open until a hard worker memory boundary can be demonstrated.
 
+A read-only graph-impact planner now combines that diff with a graph pinned to
+the before publication of one source. It lists old records for review or
+revalidation, keeps retracted assertions historical, and flags added or
+changed paths for new relationship discovery. It refuses multi-source graphs
+until every source revision is accounted for. The plan leaves the historical
+graph intact; building and evaluating a child graph remains open.
+
 ## Delivery decisions
 
 ### Installed capability decision — 2026-10-01

@@ -120,3 +120,20 @@ this macOS host. It requires scanned PDF and PNG fixtures to yield no invented
 text. Linux assertions were not executed on this macOS run. The macOS worker
 cannot establish a hard address-space, data or resident-memory limit through
 `setrlimit`; no successful macOS searchable-PDF extraction is claimed.
+
+## Archived graph impact plan, 2026-10-01
+
+The next isolated increment compares an explicit, complete v1 graph with a
+complete v2 archive capture for one registered source. An actual Registrar CLI
+test publishes the graph, retracts assertions, recaptures edited/removed/added
+documents, and checks the metadata-only plan's review, repin, historical-only,
+and discovery queues. The old graph remains readable under v1 but is refused
+under v2. A multi-source graph, tampered publication, and disabled registration
+also refuse planning. The planner does not mutate the graph, establish live
+source currentness, or claim refreshed relationship correctness.
+
+The repaired candidate passed `knowledge:typecheck`, 43 unit tests, and 56
+actual-Registrar integration tests through Nx. The 15 canonical runtime tests,
+canonical package/check, and a relocated stock-Node import of
+`planArchiveGraphImpact` passed. Independent review found no remaining blocking
+issue after the historical-only and changed-path repairs.
