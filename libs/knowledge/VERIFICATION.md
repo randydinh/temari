@@ -267,3 +267,28 @@ hashes. It labels v1 as operator-selected during resume; those artifacts do
 not prove a previous call selected that v1 or even failed. This is a local,
 no-capture completion path, not automatic scheduling, crash recovery without
 a result, production restore or continuous source freshness.
+
+## Operator-attributed fresh v2 graph root, 2026-10-01
+
+`publishReviewedArchiveGraphRoot` requires an explicit subset of the verified
+v2 repin proposal and an operator-supplied reviewer reference and reason. It
+rechecks pinned publications, the old graph and current admission, rereads
+selected v2 anchor spans, and publishes a fresh `parent: null` graph through
+the actual Registrar CLI with new deterministic record IDs. The receipt maps
+old IDs to new IDs and lists excluded review, historical and discovery queues.
+It reports `semanticCorrectness: not-verified`,
+`reviewerAuthenticated: false` and `currentOriginal: not-checked`; unchanged
+quotes alone do not establish that a relationship still means the same thing.
+
+The actual-CLI fixture checks selected nodes and a relationship with contrary
+evidence, changed/dependent/retracted/superseding exclusions, missing endpoint
+refusal, exact v2 RevisionSet read, historical v1 read, deterministic repeat,
+post-publish receipt-collision recovery, and tampered publication or revoked
+admission refusal. The final full Nx integration suite passed 71/71 after the
+last edits; focused integration passed 1/1, unit tests 43/43, and typecheck
+passed. The
+quote-bearing publish draft is retained in the task directory as a bounded
+mode-0600 artifact for deterministic replay. Generated receipt evidence is
+metadata only; the reviewer reference and reason are operator-supplied free
+text. This does not authenticate the reviewer, promote graph facts
+automatically, or establish continuous source freshness.
