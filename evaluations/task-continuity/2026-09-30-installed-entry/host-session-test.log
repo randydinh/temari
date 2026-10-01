@@ -1,0 +1,85 @@
+
+> nx run workflow-runtime:host-session-test
+
+> node --test tools/host-session.test.mjs
+
+(node:78169) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:78205) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ tracked host execution automatically retains a task and pending-closeout receipt references (2953.252541ms)
+✔ tracked interruption is picked up and resumed in a second chat without repeating build (842.676667ms)
+✔ hard process loss leaves the starting handoff and exact recovery locations (522.239583ms)
+✔ a crash at the initial checkpoint cannot drop tracking on resume (618.230416ms)
+✔ interrupted binding writes never publish partial final JSON and can be retried (128.57375ms)
+✔ source tracking refuses a task with canonical run history without changing its state (180.991459ms)
+▶ tracking refuses invalid selection before any stage or task mutation
+  ✔ missing-digest (95.468084ms)
+  ✔ wrong-digest (113.082958ms)
+  ✔ wrong-run (120.457208ms)
+  ✔ wrong-candidate (139.94975ms)
+  ✔ overlap (140.826666ms)
+  ✔ stale-version (129.82275ms)
+✔ tracking refuses invalid selection before any stage or task mutation (740.712959ms)
+✔ a concurrent task edit survives the host result handoff and the canonical receipt remains available (387.801709ms)
+✔ relocated experimental bridge runs actual candidate changes and runtime evidence (513.314667ms)
+✔ EOF after acknowledged build resumes exact runtime prefix in a fresh session (504.63475ms)
+✔ EOF before work retains empty intent and permits an unchanged restart (449.217875ms)
+✔ unacknowledged build mutation cannot become a new initial candidate on resume (401.484083ms)
+✔ required capabilities remain unavailable rather than accepting caller declarations (255.786584ms)
+▶ malformed, stale, duplicated and oversized connected replies never yield PASS
+  ✔ json (300.013583ms)
+  ✔ nonce (178.800375ms)
+  ✔ stage (220.08175ms)
+  ✔ duplicate (241.315833ms)
+  ✔ oversize (221.918584ms)
+  ✔ command (148.967708ms)
+✔ malformed, stale, duplicated and oversized connected replies never yield PASS (1312.6305ms)
+▶ result bytes reject escaping paths, symlinks, oversized files and forged runtime records
+  ✔ escape (138.151084ms)
+  ✔ symlink (169.585375ms)
+  ✔ oversize (261.446375ms)
+  ✔ metadata (167.959584ms)
+  ✔ binding (139.808291ms)
+  ✔ unknown (148.087667ms)
+  ✔ nonce (150.333458ms)
+✔ result bytes reject escaping paths, symlinks, oversized files and forged runtime records (1176.379ms)
+✔ a genuine nonpass is terminal, not an interruption or retry instruction (225.735042ms)
+✔ fresh run destination is exclusive and candidate-overlapping writes are refused (175.481834ms)
+✔ SIGINT leaves pending work unacknowledged and no manufactured terminal receipt (157.552416ms)
+✔ an orphan manifest remains a runtime refusal rather than transport recovery (264.692375ms)
+✔ leftover result files cannot answer a new session without matching identities (259.0715ms)
+▶ caller-authored capabilities and unknown obligations refuse before reserving a run
+  ✔ capabilities (130.132875ms)
+  ✔ route (119.818583ms)
+  ✔ workType (108.037ms)
+  ✔ obligation (101.990375ms)
+✔ caller-authored capabilities and unknown obligations refuse before reserving a run (460.7065ms)
+▶ resume refuses changed retained intent and runtime manifest before dispatch
+  ✔ manifest (207.516667ms)
+  ✔ initial (228.905959ms)
+  ✔ plan (254.202916ms)
+  ✔ missing-checkpoint (215.246542ms)
+✔ resume refuses changed retained intent and runtime manifest before dispatch (906.609375ms)
+✔ retained stage mutation refuses before requesting new work (308.365334ms)
+✔ closed output terminates the session without manufacturing completion (290.656416ms)
+✔ identical bytes at a substituted candidate root do not redirect retained work (325.798708ms)
+✔ a control byte in a pipe is malformed input, not a keyboard interruption (223.101292ms)
+ℹ tests 53
+ℹ suites 0
+ℹ pass 53
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14933.129958
+
+
+
+ NX   Successfully ran target host-session-test for project workflow-runtime
+
+
+  Run duration:      15.0s
+  Cache:             0/1 hit (0%)
+  Critical path:     15.0s (1 task)
+  Recoverable time:  <1ms

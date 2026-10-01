@@ -5,6 +5,8 @@ increment, see the [compatibility and verification record](main-compatibility-20
 The results below remain the historical evidence for the first increment.
 The next [source host entry record](host-entry-2026-09-30.md) covers automatic
 recovery and outcome handoffs around actual stage dialogue.
+The [public entry record](installed-entry-2026-09-30.md) extends this journey to
+rebuilt public bundles, including full-feature worker preparation.
 
 Verified on 2026-09-30, macOS arm64, against implementation candidate
 `2656e8420e33e25894bec32d5764b5b270a68440`. Base:
