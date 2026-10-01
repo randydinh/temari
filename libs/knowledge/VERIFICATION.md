@@ -192,3 +192,29 @@ cohorts were authored with the synthetic fixture, so the result validates gate
 mechanics and a specific lexical comparison, not untouched real-task holdout
 quality or a default-ranker change. No-answer, image-only and searchable-PDF
 coverage remain open.
+
+## Operator-triggered source recapture handoff, 2026-10-01
+
+A new local API composes a complete pinned v1 capture, an explicit v2 capture,
+the retained-original generation diff and optional read-only graph impact.
+Four focused actual Registrar CLI cases passed after the final repairs. The
+full `knowledge:integration` suite passed 64/64, `knowledge:test` passed 43/43,
+and `knowledge:typecheck` passed on the final source. The tests edit, add and
+remove files while preserving unchanged files and historical v1 reads; check
+diff counts and optional graph review; and refuse a reused key, changed task,
+source or transport, disabled registration, forged task authority, tampered
+manifest, invalid v1 graph and incomplete v2 without a successful handoff.
+A 16 KiB pinned transport case also passes. Independent read-only review found
+no remaining blocker after adding pre-capture original-binding and graph
+checks and a final graph-impact receipt digest recheck.
+
+The successful handoff is bounded metadata with v1/v2 publication pins and
+diff/impact receipt hashes. It says `currentOriginal: not-checked` and
+`graphMutation: none`. A failed downstream step can leave a complete v2 capture
+without a handoff; the typed error exposes its persisted capture paths. One
+request key denotes one logical idempotent capture, so concurrent retries can
+share it. This does not schedule changes, serialize all recaptures, rebuild a
+graph or prove continuous source freshness. The binding check is scoped to
+this API; applying it to all historical publication readers needs separate
+compatibility review. Production backup/restore and macOS searchable-PDF text
+remain open.

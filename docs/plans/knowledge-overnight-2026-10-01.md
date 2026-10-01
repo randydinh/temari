@@ -151,3 +151,49 @@ gate-mechanics increment pending commit and exact-head review. The fixture
 cohorts were authored together, so they cannot certify independent task
 quality or justify switching the default ranker. No-answer and unsupported
 visual/PDF modalities remain separate coverage gaps.
+
+## 03:05 PDT retrieval delivery and lifecycle selection
+
+PR #131 merged at `e6f0c03a1348fba457223461195b82d7ac72865b` after
+independent exact-head review of clean commit `6749b0f2c7b2c77e2240630f4a70b05f44c20c52`.
+GitHub reported no branch checks. The isolated worktree now starts a new branch
+from that merged main. An architect is comparing operator-triggered recapture,
+archive recovery evidence and relationship feedback as the next bounded unit.
+The synthetic retrieval fixture is evaluation plumbing, not an independent
+real-task holdout or default-ranker promotion. The macOS PDF text boundary and
+production losslessness remain open.
+
+## 03:08 PDT source recapture handoff experiment
+
+An operator can capture two generations, compare originals and plan graph
+review, but must currently coordinate those separate APIs manually. The next
+increment will join them for one registered source under an explicit fresh
+request key. It must verify the pinned complete v1 publication, exact task,
+source, transport and current admission before capture; retain a blocked or
+incomplete v2 attempt without publishing a successful handoff; and produce a
+bounded metadata-only receipt with v1/v2 publication, diff and optional graph
+impact pins. The actual Registrar CLI test must edit, add and remove files,
+preserve an unchanged file and historical v1 read, and verify optional graph
+review queues. Reused keys, changed admission, tampered pins and incomplete v2
+must refuse a successful handoff. The receipt will say
+`currentOriginal: not-checked` and `graphMutation: none`. This is an operator-triggered local
+sequence, not scheduling, atomic freshness, graph refresh or recovery.
+
+Archive export/import is deferred: the current archive-only import does not
+establish an erasure/authorization ledger or restore derived views, so a safe
+production recovery claim needs a wider, separately reviewed design.
+
+## 03:23 PDT recapture checkpoint
+
+The repaired operator-triggered handoff passed four focused actual-CLI tests,
+the final 64/64 knowledge integration suite, 43/43 unit tests and typecheck.
+Independent review found no remaining blocking issue after pre-capture graph
+and original-binding checks, final impact-digest recheck, independently tested
+task and manifest tampering, and a smaller pinned transport fixture. The
+decision is to keep this metadata-only local sequence pending clean package
+and exact-head PR review. A request key denotes one idempotent capture;
+concurrent invocations can share it, and a downstream refusal can leave v2
+persisted without a handoff. The global historical-publication loader does
+not yet perform this original-binding check; widening that rule requires a
+separate compatibility review. Continuous freshness, graph mutation, safe
+backup/restore, Windows behavior and macOS searchable-PDF text remain open.
