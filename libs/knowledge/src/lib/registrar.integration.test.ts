@@ -397,3 +397,4 @@ import './archive-journey.integration.test.js';
 import './archive-evaluation-gate.integration.test.js';
 import './archive-graph-evaluation-gate.integration.test.js';
 import './archive-document-links.integration.test.js';
+import './archive-jobs.integration.test.js';

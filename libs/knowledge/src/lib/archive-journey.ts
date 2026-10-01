@@ -145,6 +145,8 @@ export type ArchiveQueryResult = Omit<
   ArchiveCaseResult,
   'expected' | 'expectedRecallAtK' | 'graph' | 'jev'
 > & {
+  /** The exact shortlist budget requested by this operational query. */
+  readonly topK: number;
   readonly jev: ArchiveQueryJevAdvice | null;
 };
 export interface ArchiveQueryReport {
@@ -751,7 +753,7 @@ export async function runArchiveQuery(
     kind: 'temari-archive-query',
     handoffPath: selected.handoffPath,
     task: handoff.task,
-    query: { ...core.result, jev },
+    query: { ...core.result, topK: selected.topK, jev },
   };
   const reportPath = join(
     handoff.task.directory,

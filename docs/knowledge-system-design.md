@@ -58,6 +58,17 @@ graph retraction. These later measurements supersede the
 synthetic test counts above; the incomplete modalities and retrieval limits
 remain explicit in the pilot record.
 
+The [two-job pilot](evidence/knowledge-system/two-job-pilot-2026-10-01.md)
+then ran intake and unlabelled BM25/Jev retrieval as dependent children in the
+existing runtime store. Exact capture and report bindings, leases, bounded
+retries and an uncertain-hosted-call block make explicit ticks resumable. The
+live three-source intake succeeded; its narrowed search returned a verified
+excerpt and Jev judgment with explicit gaps, correctly ending `ISSUES`.
+This is an operator-run workflow, not unattended agent scheduling or a
+complete-task quality claim. Reviewed graph additions, feedback regression
+cases, held-out ranking promotion, PDF boundary support and plugin lifecycle
+remain open.
+
 ## Delivery decision: complete the knowledge journey before plugin packaging
 
 On 2026-09-30 the owner chose to keep building the knowledge system before

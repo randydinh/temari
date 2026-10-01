@@ -202,6 +202,7 @@ test('ACTUAL CLI: intake handoff through exact/BM25 search, pinned reads and Jev
     },
   );
   assert.equal(query.report.kind, 'temari-archive-query');
+  assert.equal(query.report.query.topK, 2);
   assert.equal(query.report.query.ranked.length, 2);
   assert.equal(query.report.query.shortlistVerified, true);
   assert.equal(query.report.query.verifiedEvidenceCount, 2);

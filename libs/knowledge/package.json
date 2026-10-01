@@ -41,7 +41,8 @@
     }
   },
   "dependencies": {
-    "@temari/contracts": "workspace:*"
+    "@temari/contracts": "workspace:*",
+    "@temari/runtime": "workspace:*"
   },
   "devDependencies": {
     "@temari/workflow-engine": "workspace:*"
