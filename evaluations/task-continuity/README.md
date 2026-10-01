@@ -1,5 +1,9 @@
 # Task continuity: first local increment
 
+For the subsequent main integration, host entry, scoped pickup, and handoff
+increment, see the [compatibility and verification record](main-compatibility-2026-09-30.md).
+The results below remain the historical evidence for the first increment.
+
 Verified on 2026-09-30, macOS arm64, against implementation candidate
 `2656e8420e33e25894bec32d5764b5b270a68440`. Base:
 `a2d33b9b496f83e6fbebbbb9ce1c3e518895c749`.

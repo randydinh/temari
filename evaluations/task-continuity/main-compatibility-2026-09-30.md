@@ -46,4 +46,44 @@ include the installed Bun. The native fixture now resolves and validates Bun
 from PATH or standard local installation paths. Both real Archon tests then
 passed without changing execution behavior.
 
-Final test and independent review results are recorded below after execution.
+## Verification and review
+
+Implementation candidate: `c8386625a3d0b9651c7014e3955065120e897a66`.
+Reviewed correction: `8070596c0a35f9038bd027c907b6ee3341341e3c`.
+Executed on macOS arm64 with the pinned pnpm 11.25.0.
+
+| Check                                     | Result                                                                                                                         | Evidence                                                                                |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| `runtime:test`                            | 257 passed, no failures or skips, on the implementation candidate                                                              | [Retained output](2026-09-30-host-pickup/runtime-test.log)                              |
+| `runtime:task-test`                       | 43 passed after the narrow review correction                                                                                   | [Retained output](2026-09-30-host-pickup/task-checks.log)                               |
+| `runtime:task-typecheck` and dependencies | Passed after the correction                                                                                                    | Same retained focused output; three unchanged dependencies used local cache             |
+| `runtime:task-native-test`                | Both real Archon tests passed after fixing the fixture's Bun discovery                                                         | Scoped builder execution report; [executable fixture](../../tools/task-native.test.mts) |
+| Browser                                   | Retained real task, linked chat, saved handoff, prepared brief, copy confirmation, and unchanged-refresh preservation verified | In-app browser at 1280×720, loopback port 3092; no warning/error logs observed          |
+
+These suites overlap; counts are not additive. Native tests use isolated local
+homes and no model calls. The full runtime suite preceded the final narrow path
+filter correction; the focused suite covers that correction and the new CLI/HTTP
+journey. No additional broad regression was needed for that change.
+
+The independent reviewer reproduced one issue on `c838662`: an unrelated retained
+workspace resolving through a file could abort pickup in a healthy workspace.
+The correction excludes unavailable historical roots (missing, no longer a
+directory, symlink loop, or inaccessible) while keeping errors for the requested
+root and unexpected I/O visible. Tests cover recovery and exact-ID access.
+Independent re-review of `8070596` reported **resolved, no residual finding**.
+The reviewer used source/test inspection and a focused filesystem reproduction;
+the reviewer did not run the broad suites or browser checks.
+
+The same review found no conflict with main's knowledge-sharing gate, retrieval
+default, ownership boundaries, or packaging sequence. The matrix now names
+**archive intake handoffs** explicitly where the knowledge-sharing policy
+applies. Task handoffs remain context-only records.
+
+## Remaining boundaries
+
+This is a local source-workspace implementation, not automatic interception of
+all host conversations or an installed plugin release. It does not add a model,
+knowledge provider, scheduler, map, authentication layer, or second execution
+service. The inbox remains read-only. Native status and handoff prose do not
+establish canonical Temari completion. This evidence is not a trusted packaged
+`feature-v1` PASS receipt. No new mobile or Windows execution claim is made.

@@ -1,0 +1,120 @@
+
+ NX   Running targets task-test, task-typecheck for project runtime and 4 tasks it depends on:
+
+- runtime
+
+
+
+> nx run contracts:typecheck  [local cache]
+
+> tsc --build tsconfig.json --emitDeclarationOnly
+
+
+> nx run temari-core:typecheck  [local cache]
+
+> tsc --build tsconfig.json --emitDeclarationOnly
+
+
+> nx run workflow-engine:typecheck  [local cache]
+
+> tsc --build tsconfig.json --emitDeclarationOnly
+
+
+> nx run runtime:typecheck
+
+> tsc --build tsconfig.json --emitDeclarationOnly
+
+
+> nx run runtime:task-typecheck
+
+> tsc --ignoreConfig --noEmit --module nodenext --moduleResolution nodenext --target es2022 --types node --strict --skipLibCheck tools/task-view.mts tools/task-continuity.mts tools/task-view.test.mts tools/task-continuity.test.mts tools/task-native.test.mts
+
+
+> nx run runtime:task-test
+
+> node --import @swc-node/register/esm-register --test --test-concurrency=1 libs/runtime/src/lib/task-store.test.ts libs/runtime/src/lib/task-runtime.test.ts tools/task-view.test.mts tools/task-continuity.test.mts
+
+(node:13421) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:13427) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:13427) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:13427) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ native success remains open until canonical evidence and explicit acceptance (250.713375ms)
+✔ native output locations may be attached after exact run identity is known (216.512167ms)
+✔ concurrent duplicate dispatch has one side effect and retains intent first (94.018708ms)
+✔ lost dispatch response survives reopen and requires exact native reconciliation (104.786958ms)
+✔ crash window before native binding never auto-dispatches a replacement (100.366541ms)
+✔ reconciliation fails closed without independent harness identity verification (71.110542ms)
+✔ retry/replan keeps one goal, distinct runs and prior native identities (145.479083ms)
+✔ cancellation awaits actual executor confirmation and does not repeat requests (197.701042ms)
+✔ native success racing cancellation resolves intent without claiming cancellation (117.372959ms)
+✔ failed native run resolves a lost cancellation response and permits replan (126.180333ms)
+✔ resume error retains uncertainty and duplicate control does not repeat side effect (116.65525ms)
+✔ stale revision or changed plan cannot supply closeout evidence (269.04225ms)
+✔ tampered evidence revokes the DONE projection and acceptance cannot reuse it (146.681959ms)
+✔ local stage-only closeout cannot satisfy independent review or forge obligations (41.982416ms)
+✔ child projections retain successful sibling and failed assignment (141.168584ms)
+✔ pickup keeps two goals in the same session ambiguous even with limit one (67.744417ms)
+✔ pickup uses exact canonical workspace scope and respects explicit-task filters (57.140041ms)
+✔ unresolvable unrelated workspaces do not block a healthy pickup scope (77.9905ms)
+✔ fresh-session pickup restores the handoff without executing provider actions (66.9195ms)
+✔ positive handoff and prior acceptance cannot hide changed current evidence (157.152084ms)
+✔ pickup retains cancelled goals and unresolved native intent without dispatching again (132.90625ms)
+✔ pickup inspects only the selected current run and skips unrelated artifact stores (80.7345ms)
+✔ pickup bounds handoff text and history while omitting full event and source payloads (287.351916ms)
+✔ pickup preserves maximum-length paths and identities within its encoded byte ceiling (50.88425ms)
+(node:13473) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:13473) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:13473) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ stale lock reports its owner and is never automatically taken over (1144.378917ms)
+✔ missing persisted ledger is an error for existing readers and initializers (41.412416ms)
+✔ concurrent initialization persists one empty ledger and preserves later work (104.627791ms)
+✔ one native identity cannot be attached to two Temari runs (108.797667ms)
+✔ deferred evidence roots attach once to the exact existing run (71.805875ms)
+✔ reopens one goal, immutable history and distinct run revisions (55.504042ms)
+✔ commands are idempotent but changed payload, actor and reused run IDs fail (80.421333ms)
+✔ concurrent metadata updates compare versions without losing either command (67.437792ms)
+✔ rejects unsafe IDs, unbounded metadata, invalid plans and corrupt ledgers visibly (40.669208ms)
+✔ entry atomically creates one task and links its session with replay-safe context (64.778542ms)
+✔ sessions and tasks retain many-to-many identity links without changing goals (86.902458ms)
+✔ concurrent entry and handoff reject stale updates while preserving idempotency (88.861375ms)
+✔ handoff bounds reject malformed context without changing acceptance or execution (61.359666ms)
+(node:13508) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:13508) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:13508) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ fresh CLI processes recover the same task, next action and version (905.230417ms)
+✔ CLI rejects unknown commands and relative storage roots (0.496667ms)
+✔ host entry, handoff and scoped pickup survive separate CLI processes (3429.9975ms)
+(node:13576) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:13576) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:13576) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ read-only task view serves retained task data and rejects mutation and foreign hosts (33.647125ms)
+✔ task read failures stay visible instead of looking like an empty inbox (3.291542ms)
+✔ console links require a configured HTTP origin (0.20725ms)
+ℹ tests 43
+ℹ suites 0
+ℹ pass 43
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10551.209708
+
+
+
+ NX   Successfully ran targets task-test, task-typecheck for project runtime and 4 tasks it depends on
+
+Nx read the output from the cache instead of running the command for 3 out of 6 tasks.
+
+  Run duration:      10.6s
+  Cache:             3/6 hit (50%)
+  Critical path:     10.6s (1 task)
+  Recoverable time:  <1ms
