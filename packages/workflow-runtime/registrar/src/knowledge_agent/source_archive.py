@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 from contextlib import closing, contextmanager
 from datetime import datetime, timezone
+import errno
 import fnmatch
 import hashlib
 import json
@@ -556,6 +557,106 @@ def source_generation(registry, source_id, generation, *, manifest_sha256=None, 
                        documents=manifest['documents'][offset:offset+limit],
                        next_offset=offset+limit if offset+limit < len(manifest['documents']) else None)
         _recheck(registry, db, source_id, manifest)
+        return bounded(receipt, max_bytes)
+
+
+def _audit_file(root, path, limit, file_limit):
+    """Read at most the remaining audit budget without following source symlinks."""
+    try:
+        raw, length = _read_file(root, path, limit)
+    except OSError as exc:
+        # A path disappearing or becoming a symlink during an admitted-file read
+        # is a changed selection, not evidence that its archived bytes vanished.
+        if exc.errno in (errno.ENOENT, errno.ENOTDIR, errno.ELOOP):
+            raise ValueError('source path changed during currentness audit') from exc
+        return ('unavailable', None, None, 'source-unavailable')
+    if raw is None:
+        return ('unavailable', None, length,
+                'file-byte-limit' if length > file_limit else 'total-byte-limit')
+    return ('read', digest(raw), len(raw), None)
+
+
+def audit_current_source(registry, source_id, generation, *, manifest_sha256, max_bytes=MAX_RESPONSE):
+    """Compare one complete archived generation with a bounded local observation.
+
+    This does not produce an atomic filesystem snapshot or alter archived state.
+    An unavailable current file is unknown, never presumed unchanged or removed.
+    """
+    if not isinstance(source_id, str) or not 1 <= len(source_id) <= 80:
+        raise ValueError('invalid archive source identity')
+    _hash_id(manifest_sha256)
+    _integer(max_bytes, 1024, MAX_RESPONSE, 'response bytes')
+    with registry._db() as db:
+        source = registry._source(db, source_id)
+        manifest = _load(registry, db, source_id, generation)
+        if digest(canonical(manifest)) != manifest_sha256:
+            raise ValueError('archive manifest pin mismatch')
+        if manifest['preservation'] != 'complete-admitted':
+            raise ValueError('currentness audit requires a complete archived generation')
+        limits = _limits(manifest['limits'])
+        archive = {item['path']: item['original'] for item in manifest['documents']
+                   if item['status'] == 'captured'}
+        membership = _enumerate(source, limits['entries'])
+        current = {path: kind for path, kind in membership if kind != 'excluded'}
+        added, removed, changed, unchanged, unavailable = [], [], [], [], []
+        observations = {}
+        total = 0
+        for path in sorted(set(archive) | set(current)):
+            prior = archive.get(path)
+            kind = current.get(path)
+            if kind is None:
+                if prior is not None:
+                    removed.append(dict(path=path, archived=prior))
+                continue
+            if kind != 'file':
+                if prior is not None or kind in ('symlink', 'not-regular-file'):
+                    entry = dict(path=path, reason='current-not-regular-file')
+                    if prior is not None:
+                        entry['archived'] = prior
+                    unavailable.append(entry)
+                continue
+            remaining = max(0, limits['total_bytes'] - total)
+            read_limit = min(limits['file_bytes'], remaining)
+            observation = _audit_file(source['root'], path, read_limit, limits['file_bytes'])
+            observations[path] = (read_limit, observation)
+            state, sha, length, reason = observation
+            if state != 'read':
+                entry = dict(path=path, reason=reason)
+                if prior is not None:
+                    entry['archived'] = prior
+                if length is not None:
+                    entry['current'] = dict(bytes=length)
+                unavailable.append(entry)
+                continue
+            total += length
+            observed = dict(sha256=sha, bytes=length)
+            if prior is None:
+                added.append(dict(path=path, current=observed))
+            elif prior == observed:
+                unchanged.append(dict(path=path, archived=prior, current=observed))
+            else:
+                changed.append(dict(path=path, archived=prior, current=observed))
+        if membership != _enumerate(source, limits['entries']):
+            raise ValueError('source membership changed during currentness audit')
+        for path, (read_limit, observation) in observations.items():
+            if observation != _audit_file(source['root'], path, read_limit, limits['file_bytes']):
+                raise ValueError('source bytes or availability changed during currentness audit')
+        if membership != _enumerate(source, limits['entries']):
+            raise ValueError('source membership changed during currentness audit')
+        if registry._source(db, source_id) != source:
+            raise ValueError('source registration changed during currentness audit')
+        _access(source, manifest)
+        if digest(canonical(_load(registry, db, source_id, generation))) != manifest_sha256:
+            raise ValueError('archive manifest changed during currentness audit')
+        receipt = dict(schema=1, kind='archive-currentness-audit',
+                       status='partial' if unavailable else 'complete',
+                       source_id=source_id, generation=generation,
+                       manifest_sha256=manifest_sha256,
+                       observed_at=datetime.now(timezone.utc).isoformat(),
+                       consistency='declared-selection-not-atomic',
+                       evidence='point-in-time-local-observation',
+                       added=added, removed=removed, changed=changed,
+                       unchanged=unchanged, unavailable=unavailable)
         return bounded(receipt, max_bytes)
 
 

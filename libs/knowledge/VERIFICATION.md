@@ -137,3 +137,20 @@ actual-Registrar integration tests through Nx. The 15 canonical runtime tests,
 canonical package/check, and a relocated stock-Node import of
 `planArchiveGraphImpact` passed. Independent review found no remaining blocking
 issue after the historical-only and changed-path repairs.
+
+## Point-in-time local currentness audit, 2026-10-01
+
+The next isolated increment passed `knowledge:typecheck`, 43 unit tests and
+57 actual-Registrar integration tests through Nx. Its new case compares one
+complete pinned archive with a later local edit, addition and deletion,
+checks unchanged hashes, tests oversized and symlink unknowns, refuses a
+tampered pin and disabled registration, and confirms the historical archived
+read still returns v1 text. It asserts the audit receipt has no document body.
+The bundled Registrar's focused Python regression forces a byte change
+between scan passes and confirms refusal without modifying the archived
+manifest or blob count. The 15 canonical runtime tests also passed.
+
+The audit is a bounded, non-atomic observation of the local root. A file that
+cannot be verified is `unavailable`, so a partial result cannot certify the
+whole source as unchanged. The result does not schedule recapture, repin a
+graph, establish continuous freshness, or resolve the macOS PDF text gap.

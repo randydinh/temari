@@ -87,6 +87,7 @@ export async function archiveTransport(options: ArchiveTransportOptions) {
   async function invoke(
     operation:
       | 'capture'
+      | 'audit-current'
       | 'inspect'
       | 'read'
       | 'discover'

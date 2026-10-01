@@ -54,3 +54,30 @@ negative fixture that tried to reactivate retired IDs; the fixture was repaired
 without changing the Registrar rule, then the full suite passed. Commit, PR,
 and exact-head review remain before delivery. Mac searchable-PDF text and the
 broader production finish predicate remain open.
+
+## 02:09 PDT currentness experiment
+
+PR #128 merged at `557893e3333d62a8e40f758dbfa2de81fa78746a` after exact-head
+review. The isolated worktree now starts the next branch from that merge.
+The selected unit is a read-only, point-in-time audit of one complete pinned
+archive against its currently admitted local root. Its finish predicate is an
+actual Registrar CLI comparison after edit/add/delete and an unchanged file,
+with hash and byte metadata only; a too-large or nonregular file must be
+explicitly unknown, not unchanged. Tampered pins and disabled registration
+must refuse; source membership or bytes changing during the scan must refuse
+or remain unknown. Historical archive read must still work. Temari must expose
+the bounded result with its observation time and non-atomic qualifier. The
+final candidate needs typecheck, focused actual-CLI integration, independent
+review, and a reviewable PR. It will not claim continuous freshness or graph
+refresh.
+
+## 02:16 PDT currentness checkpoint
+
+The read-only audit candidate passed typecheck, 43 unit tests, 57 actual
+Registrar integration tests, 15 canonical runtime tests and a focused Python
+race regression. An independent reviewer found no blocking false-unchanged,
+scope or pinning issue, then verified the race test. The audit's single-response
+1 MiB cap can refuse a large valid source rather than return a truncated
+result. The scan is non-atomic and cannot assert continuous freshness. Commit,
+clean packaged export and exact-head PR review are still required. The macOS
+searchable-PDF boundary and broader production gates remain open.

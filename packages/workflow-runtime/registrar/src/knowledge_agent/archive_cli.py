@@ -19,11 +19,13 @@ def main(argv=None):
     generations = commands.add_parser('generations')
     generations.add_argument('source_id')
     inspect = commands.add_parser('inspect')
+    audit = commands.add_parser('audit-current')
     read = commands.add_parser('read')
     recover = commands.add_parser('recover')
-    for command in (inspect, read, recover):
+    for command in (inspect, read, recover, audit):
         command.add_argument('source_id')
         command.add_argument('generation')
+    audit.add_argument('--manifest-sha256', required=True)
     for command in (read, recover):
         command.add_argument('path')
     recover.add_argument('destination', type=Path)
@@ -49,6 +51,7 @@ def main(argv=None):
     restore.add_argument('bundle', type=Path)
     for command in (generations, inspect, read, discover):
         command.add_argument('--max-bytes', type=int, default=16000)
+    audit.add_argument('--max-bytes', type=int, default=1024 * 1024)
     for name, argument in [('graph-publish', 'batch'), ('graph-import-okf', 'package')]:
         commands.add_parser(name).add_argument(argument, type=Path)
     for name in ('graph-read', 'graph-projection', 'graph-check', 'graph-export-okf'):
@@ -90,6 +93,7 @@ def main(argv=None):
         if command == 'import':
             args['bundle_path'] = args.pop('bundle')
         method = dict(capture='capture_source', generations='source_generations', inspect='source_generation',
+            **{'audit-current':'audit_current_source'},
             read='read_snapshot', discover='discover_snapshot', recover='recover_original',
             export='export_archive', **{'import':'import_archive',
             'graph-publish':'publish_graph', 'graph-read':'read_graph',
