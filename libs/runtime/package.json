@@ -44,7 +44,7 @@
           "typecheck"
         ],
         "options": {
-          "command": "tsc --ignoreConfig --noEmit --module nodenext --moduleResolution nodenext --target es2022 --types node --strict --skipLibCheck tools/task-view.mts tools/task-continuity.mts tools/task-view.test.mts tools/task-continuity.test.mts tools/task-native.test.mts tools/dashboard-controller.mts tools/dashboard-controller.test.mts tools/dashboard-swarm.mts tools/dashboard-swarm.test.mts tools/dashboard-native.test.mts",
+          "command": "tsc --ignoreConfig --noEmit --module nodenext --moduleResolution nodenext --target es2022 --types node --strict --skipLibCheck tools/task-view.mts tools/task-continuity.mts tools/task-view.test.mts tools/task-continuity.test.mts tools/task-native.test.mts tools/dashboard-controller.mts tools/dashboard-controller.test.mts tools/dashboard-swarm.mts tools/dashboard-swarm.test.mts tools/dashboard-native.test.mts tools/dashboard-implementation.mts tools/dashboard-implementation.test.mts",
           "cwd": "{workspaceRoot}"
         }
       },
@@ -108,6 +108,14 @@
         "cache": false,
         "options": {
           "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 libs/runtime/src/lib/parallel-runtime.test.ts libs/runtime/src/lib/stage-evidence.test.ts",
+          "cwd": "{workspaceRoot}"
+        }
+      },
+      "dashboard-implementation-test": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 tools/dashboard-implementation.test.mts tools/run-codex-write-workers.test.mts",
           "cwd": "{workspaceRoot}"
         }
       }

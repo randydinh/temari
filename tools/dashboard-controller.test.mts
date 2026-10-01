@@ -26,11 +26,46 @@ import {
 import {
   DashboardController,
   validateDashboardConfig,
+  type DashboardImplementationPlan,
 } from './dashboard-controller.mjs';
 import { startTaskViewServer } from './task-view.mjs';
 
 const run = promisify(execFile);
-async function fixture(t: TestContext) {
+function implementationPlan(): DashboardImplementationPlan {
+  const assignment = (id: string, role: 'implementer' | 'reviewer') => ({
+    id,
+    role,
+    required: true,
+    brief: {
+      goal:
+        role === 'reviewer'
+          ? 'Independently review the combined candidate.'
+          : `Implement the ${id} portion.`,
+      context: 'Use the prepared plan and retain concrete evidence.',
+      scope: `${id}.txt`,
+      acceptanceCriteria: ['Retain a source-backed result.'],
+      verificationCommand: null,
+      reportFormat: 'json' as const,
+      forbiddenActions: ['Do not publish or edit unowned paths.'],
+    },
+  });
+  return {
+    id: 'two-parts',
+    title: 'Implement two isolated parts',
+    description: 'Combine disjoint edits and verify the exact candidate.',
+    assignments: ['first', 'second'].map((id) => ({
+      worker: assignment(id, 'implementer'),
+      owns: [{ kind: 'file' as const, path: `${id}.txt` }],
+    })),
+    prepare: [],
+    verify: [
+      { program: process.execPath, args: ['--version'], timeoutMs: 3000 },
+    ],
+    reviewer: assignment('independent-review', 'reviewer'),
+  };
+}
+
+async function fixture(t: TestContext, coding = false) {
   const root = await realpath(
     await mkdtemp(join(tmpdir(), 'temari-dashboard-controller-')),
   );
@@ -84,6 +119,16 @@ async function fixture(t: TestContext) {
         ),
       },
     ],
+    ...(coding
+      ? {
+          implementation: {
+            executable: process.execPath,
+            maxConcurrency: 2,
+            timeoutMs: 3000,
+            plans: [implementationPlan()],
+          },
+        }
+      : {}),
   });
   let starts = 0;
   let cancels = 0;
@@ -477,4 +522,181 @@ test('swarm intake binds prepared child records, preserves limits, and refuses s
     ((await controller.describe()) as any).controls[task.taskId].swarm.state,
     'CANCELLED',
   );
+});
+
+test('coding intake freezes the host plan, binds both durable groups, and refuses command injection and serial acceptance', async (t) => {
+  const f = await fixture(t, true);
+  const request = {
+    requestId: 'coding',
+    mode: 'implementation',
+    planId: 'two-parts',
+    title: 'Build two parts',
+    goal: 'Implement both parts for the saved goal.',
+  };
+  assert.equal(
+    (await f.post('/api/tasks', { ...request, executable: '/bin/sh' })).status,
+    400,
+  );
+  assert.equal(
+    (await f.post('/api/tasks', { ...request, assignments: [] })).status,
+    400,
+  );
+  assert.equal(
+    (await f.post('/api/tasks', { ...request, planId: 'unknown' })).status,
+    400,
+  );
+  const prepared = await f.post('/api/tasks', request);
+  assert.equal(prepared.status, 200);
+  const task = prepared.body;
+  assert.equal(task.version, 2);
+  assert.equal(task.goal, request.goal);
+  assert.equal(task.runs[0].childRefs.length, 2);
+  assert.equal(task.runSnapshots[0].children.length, 3);
+  assert.equal(task.semanticAcceptance, false);
+  assert.equal((await f.post('/api/tasks', request)).body.version, 2);
+  const definition = (await f.controller.describe()) as any;
+  assert.equal(definition.implementation.plans[0].assignments.length, 2);
+  assert.deepEqual(definition.implementation.plans[0].assignments[0].owns, [
+    { kind: 'file', path: 'first.txt' },
+  ]);
+  assert.equal(
+    definition.controls[task.taskId].implementation.state,
+    'PREPARED',
+  );
+  assert(
+    definition.controls[task.taskId].actions.includes('implementation-start'),
+  );
+  assert(!definition.controls[task.taskId].actions.includes('accept'));
+  const reference = task.runs[0].sourceRefs[0];
+  const preparation = JSON.parse(await readFile(reference.location, 'utf8'));
+  const manifest = JSON.parse(
+    await readFile(preparation.handle.requestPath, 'utf8'),
+  );
+  assert.equal(manifest.request.workspaceRoot, f.workspaceRoot);
+  assert(
+    manifest.request.assignments[0].worker.brief.context.includes(
+      JSON.stringify(request.goal),
+    ),
+  );
+  assert.equal(
+    manifest.request.assignments[0].worker.brief.verificationCommand,
+    null,
+  );
+  assert.notEqual(preparation.handle.groupId, preparation.handle.reviewGroupId);
+  const refuse = await f.post(`/api/tasks/${task.taskId}/actions`, {
+    action: 'accept',
+    requestId: 'coding-accept',
+    expectedVersion: task.version,
+    reason: 'All workers passed',
+  });
+  assert.equal(refuse.status, 400);
+  assert.match(refuse.body.error, /coordinator review/);
+  const cancelled = await f.post(`/api/tasks/${task.taskId}/actions`, {
+    action: 'implementation-cancel',
+    requestId: 'coding-cancel',
+    expectedVersion: task.version,
+  });
+  assert.equal(cancelled.status, 200);
+  assert.equal(cancelled.body.status, 'CANCELLED');
+  const after = (await f.controller.describe()) as any;
+  assert.equal(after.controls[task.taskId].implementation.state, 'CANCELLED');
+  assert(!after.controls[task.taskId].actions.includes('implementation-start'));
+});
+
+test('coding configuration rejects overlapping ownership, optional workers, duplicate reviewer identity and arbitrary commands', async (t) => {
+  const f = await fixture(t, true);
+  for (const [alter, pattern] of [
+    [
+      (config: any) => {
+        config.implementation.plans[0].assignments[1].owns = [
+          { kind: 'file', path: 'FIRST.txt' },
+        ];
+      },
+      /overlap/,
+    ],
+    [
+      (config: any) => {
+        config.implementation.plans[0].assignments[1].worker.required = false;
+      },
+      /required/,
+    ],
+    [
+      (config: any) => {
+        config.implementation.plans[0].reviewer.id = 'first';
+      },
+      /distinct/,
+    ],
+    [
+      (config: any) => {
+        config.implementation.plans[0].reviewer.role = 'implementer';
+      },
+      /reviewer/,
+    ],
+    [
+      (config: any) => {
+        config.implementation.plans[0].verify[0].program = 'node';
+      },
+      /absolute/,
+    ],
+    [
+      (config: any) => {
+        config.implementation.plans[0].assignments[0].worker.brief.verificationCommand =
+          'rm -rf .';
+      },
+      /host configuration/,
+    ],
+  ] as const) {
+    const changed = structuredClone(f.config);
+    alter(changed);
+    await assert.rejects(validateDashboardConfig(changed), pattern);
+  }
+});
+
+test('coding plan and candidate changes refuse new execution while retaining cancellation and metadata controls', async (t) => {
+  const f = await fixture(t, true);
+  const request = {
+    requestId: 'pinned-coding',
+    mode: 'implementation',
+    planId: 'two-parts',
+    title: 'Pinned coding',
+    goal: 'Retain the chosen plan and revision.',
+  };
+  const task = await f.controller.create(request);
+  (f.config.implementation!.plans[0]!.verify[0] as any).args = ['--help'];
+  await assert.rejects(f.controller.create(request), /plan changed/);
+  await writeFile(
+    join(f.workspaceRoot, 'untracked.txt'),
+    'another operator changed the candidate\n',
+  );
+  const controls = ((await f.controller.describe()) as any).controls[
+    task.taskId
+  ];
+  assert.equal(controls.candidateCurrent, false);
+  assert(!controls.actions.includes('implementation-start'));
+  assert(controls.actions.includes('implementation-cancel'));
+  await assert.rejects(
+    f.controller.action(task.taskId, {
+      action: 'implementation-start',
+      requestId: 'stale-candidate',
+      expectedVersion: task.version,
+    }),
+    /uncommitted/,
+  );
+  const updated = await f.controller.action(task.taskId, {
+    action: 'update',
+    requestId: 'retain-next',
+    expectedVersion: task.version,
+    nextAction: 'Inspect the changed source before preparing a fresh task.',
+  });
+  assert.equal(
+    updated.nextAction,
+    'Inspect the changed source before preparing a fresh task.',
+  );
+  assert.equal(updated.runs[0]!.revision, task.runs[0]!.revision);
+  const cancelled = await f.controller.action(task.taskId, {
+    action: 'implementation-cancel',
+    requestId: 'cancel-changed',
+    expectedVersion: updated.version,
+  });
+  assert.equal(cancelled.status, 'CANCELLED');
 });

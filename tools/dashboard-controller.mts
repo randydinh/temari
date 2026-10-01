@@ -16,6 +16,7 @@ import {
   DEFAULT_STAGES,
   minimalPlan,
   type HarnessRunRef,
+  type WorkerAssignment,
 } from '../libs/contracts/src/index.js';
 import {
   FileTaskStore,
@@ -34,6 +35,19 @@ import {
   cancelDashboardSwarm,
   type DashboardSwarmHandle,
 } from './dashboard-swarm.mjs';
+import {
+  prepareDashboardImplementation,
+  startDashboardImplementation,
+  inspectDashboardImplementation,
+  cancelDashboardImplementation,
+  type DashboardImplementationHandle,
+} from './dashboard-implementation.mjs';
+import {
+  parseWriteRunRequest,
+  type WriteAssignment,
+  type CommandSpec,
+} from './run-codex-write-workers.mjs';
+import { parseCodexWorkersRequest } from './run-codex-workers.mjs';
 
 const runFile = promisify(execFile);
 const sha = (value: string | Uint8Array) =>
@@ -56,6 +70,15 @@ export interface DashboardRecipe {
   goal: string;
   stages: Record<string, Command>;
 }
+export interface DashboardImplementationPlan {
+  id: string;
+  title: string;
+  description: string;
+  assignments: WriteAssignment[];
+  prepare: CommandSpec[];
+  verify: CommandSpec[];
+  reviewer: WorkerAssignment;
+}
 export interface DashboardConfig {
   schema: 1;
   workspaceRoot: string;
@@ -66,6 +89,12 @@ export interface DashboardConfig {
     maxConcurrency: number;
     maxWorkers: number;
     timeoutMs: number;
+  };
+  implementation?: {
+    executable: string;
+    maxConcurrency: number;
+    timeoutMs: number;
+    plans: DashboardImplementationPlan[];
   };
 }
 type Candidate = { head: string; fingerprint: string };
@@ -88,6 +117,16 @@ interface SwarmPreparation {
   taskId: string;
   candidate: Candidate;
   handle: DashboardSwarmHandle;
+}
+interface ImplementationPreparation {
+  schema: 1;
+  taskId: string;
+  candidate: Candidate;
+  planId: string;
+  planTitle: string;
+  planSha256: string;
+  goal: string;
+  handle: DashboardImplementationHandle;
 }
 export interface DashboardControllerOptions {
   config: DashboardConfig;
@@ -219,6 +258,182 @@ export async function loadDashboardConfig(
   assert(isAbsolute(path), 'Control configuration requires an absolute path.');
   return validateDashboardConfig(await json(path));
 }
+
+function boundedAssignment(
+  value: unknown,
+  role: 'implementer' | 'reviewer',
+): void {
+  const assignment = object(value);
+  fields(assignment, ['id', 'role', 'required', 'brief']);
+  id(assignment.id);
+  assert.equal(assignment.role, role, `Expected a required ${role}.`);
+  assert.equal(
+    assignment.required,
+    true,
+    'Every coding and review assignment is required.',
+  );
+  const brief = object(assignment.brief);
+  fields(brief, [
+    'goal',
+    'context',
+    'scope',
+    'acceptanceCriteria',
+    'verificationCommand',
+    'reportFormat',
+    'forbiddenActions',
+  ]);
+  for (const key of ['goal', 'context', 'scope']) text(brief[key], 8192);
+  for (const key of ['acceptanceCriteria', 'forbiddenActions']) {
+    assert(
+      Array.isArray(brief[key]) &&
+        brief[key].length >= 1 &&
+        brief[key].length <= 20,
+      'Assignment criteria and boundaries must be bounded lists.',
+    );
+    for (const item of brief[key]) text(item, 2048);
+  }
+  assert.equal(
+    brief.verificationCommand,
+    null,
+    'Coding plans select verification commands through the host configuration.',
+  );
+  assert.equal(brief.reportFormat, 'json');
+}
+
+async function validateImplementationConfig(
+  value: unknown,
+  workspaceRoot: string,
+  preparationRoot: string,
+): Promise<void> {
+  const config = object(value);
+  fields(config, ['executable', 'maxConcurrency', 'timeoutMs', 'plans']);
+  text(config.executable);
+  assert(
+    isAbsolute(config.executable) && (await lstat(config.executable)).isFile(),
+    'Implementation requires the installed Codex executable.',
+  );
+  assert(
+    Number.isSafeInteger(config.maxConcurrency) &&
+      config.maxConcurrency >= 1 &&
+      config.maxConcurrency <= 4,
+    'Coding concurrency must be from one to four.',
+  );
+  assert(
+    Number.isSafeInteger(config.timeoutMs) &&
+      config.timeoutMs >= 1000 &&
+      config.timeoutMs <= 30 * 60 * 1000,
+    'Invalid coding time bound.',
+  );
+  assert(
+    Array.isArray(config.plans) &&
+      config.plans.length >= 1 &&
+      config.plans.length <= 20,
+    'Configure one to twenty implementation plans.',
+  );
+  const seen = new Set<string>();
+  for (const raw of config.plans) {
+    const item = object(raw);
+    fields(item, [
+      'id',
+      'title',
+      'description',
+      'assignments',
+      'prepare',
+      'verify',
+      'reviewer',
+    ]);
+    id(item.id);
+    text(item.title, 256);
+    text(item.description, 4096);
+    assert(!seen.has(item.id), 'Duplicate implementation plan.');
+    seen.add(item.id);
+    assert(
+      Array.isArray(item.assignments) &&
+        item.assignments.length >= 2 &&
+        item.assignments.length <= 4,
+      'Implementation plans require two to four implementers.',
+    );
+    for (const rawAssignment of item.assignments) {
+      const assignment = object(rawAssignment);
+      fields(assignment, ['worker', 'owns']);
+      boundedAssignment(assignment.worker, 'implementer');
+      assert(
+        Array.isArray(assignment.owns) &&
+          assignment.owns.length >= 1 &&
+          assignment.owns.length <= 20,
+        'Each implementer needs bounded ownership scopes.',
+      );
+      for (const rawScope of assignment.owns)
+        fields(object(rawScope), ['kind', 'path']);
+    }
+    boundedAssignment(item.reviewer, 'reviewer');
+    assert(
+      !item.assignments.some(
+        (assignment: WriteAssignment) =>
+          assignment.worker.id === item.reviewer.id,
+      ),
+      'The independent reviewer needs a distinct identity.',
+    );
+    for (const key of ['prepare', 'verify']) {
+      assert(
+        Array.isArray(item[key]) &&
+          item[key].length <= 10 &&
+          (key !== 'verify' || item[key].length >= 1),
+        'Implementation plans require bounded preparation and nonempty verification.',
+      );
+      for (const rawCommand of item[key]) {
+        const command = object(rawCommand);
+        fields(command, ['program', 'args', 'timeoutMs']);
+        text(command.program);
+        assert(
+          isAbsolute(command.program) &&
+            (await lstat(command.program)).isFile(),
+          'Implementation commands require existing absolute executable paths.',
+        );
+        assert(
+          Array.isArray(command.args) &&
+            command.args.length <= 100 &&
+            command.args.every(
+              (arg: unknown) =>
+                typeof arg === 'string' &&
+                arg.length <= 8192 &&
+                !arg.includes('\0'),
+            ),
+          'Invalid implementation command arguments.',
+        );
+        assert(
+          Number.isSafeInteger(command.timeoutMs) &&
+            command.timeoutMs >= 1 &&
+            command.timeoutMs <= 30 * 60 * 1000,
+          'Implementation commands require bounded timeouts.',
+        );
+      }
+    }
+    parseWriteRunRequest({
+      runId: 'validate-coding-plan',
+      sourceRepo: workspaceRoot,
+      baseCommit: '0'.repeat(40),
+      evidenceRoot: preparationRoot,
+      maxConcurrency: Math.min(config.maxConcurrency, item.assignments.length),
+      executable: config.executable,
+      timeoutMs: config.timeoutMs,
+      assignments: item.assignments,
+      prepare: item.prepare,
+      verify: item.verify,
+    });
+    parseCodexWorkersRequest({
+      runId: 'validate-coding-review',
+      revision: '0'.repeat(40),
+      workspaceRoot,
+      evidenceRoot: preparationRoot,
+      maxConcurrency: 1,
+      executable: config.executable,
+      timeoutMs: config.timeoutMs,
+      assignments: [item.reviewer],
+    });
+  }
+}
+
 export async function validateDashboardConfig(
   value: unknown,
 ): Promise<DashboardConfig> {
@@ -226,7 +441,7 @@ export async function validateDashboardConfig(
   fields(
     config,
     ['schema', 'workspaceRoot', 'preparationRoot', 'recipes'],
-    ['swarm'],
+    ['swarm', 'implementation'],
   );
   assert.equal(config.schema, 1);
   for (const key of ['workspaceRoot', 'preparationRoot']) {
@@ -246,6 +461,12 @@ export async function validateDashboardConfig(
     'At most 20 recipes are supported.',
   );
   const seen = new Set();
+  if (config.implementation !== undefined)
+    await validateImplementationConfig(
+      config.implementation,
+      workspaceRoot,
+      preparationRoot,
+    );
   if (config.swarm !== undefined) {
     const swarm = object(config.swarm);
     fields(swarm, ['executable', 'maxConcurrency', 'maxWorkers', 'timeoutMs']);
@@ -317,8 +538,8 @@ export async function validateDashboardConfig(
   }) as DashboardConfig;
 }
 
-/** Goal intake and bounded, host-configured verification. Archon remains the
- * sole executor; TaskRuntime remains the only run-control/acceptance writer. */
+/** Host-prepared local work. Native execution uses Archon; worker groups and
+ * canonical acceptance remain owned by the existing runtime stores. */
 export class DashboardController implements TaskViewController {
   constructor(private readonly options: DashboardControllerOptions) {}
 
@@ -411,20 +632,106 @@ export class DashboardController implements TaskViewController {
     return prepared;
   }
 
+  private async implementationPreparation(
+    task: TaskSnapshot,
+  ): Promise<ImplementationPreparation | null> {
+    const run = task.runs.find((item) => item.runId === task.currentRunId);
+    const ref = run?.sourceRefs?.find(
+      (item) => item.sourceId === 'dashboard-implementation',
+    );
+    if (!run || !ref) return null;
+    assert(
+      within(this.options.config.preparationRoot, ref.location),
+      'Implementation preparation lies outside configured storage.',
+    );
+    assert.equal(
+      await realpath(ref.location),
+      ref.location,
+      'Implementation preparation resolution changed.',
+    );
+    const content = await bytes(ref.location);
+    assert.equal(
+      sha(content),
+      ref.publicationId,
+      'Implementation preparation changed.',
+    );
+    const prepared = JSON.parse(
+      content.toString(),
+    ) as ImplementationPreparation;
+    assert.equal(prepared.schema, 1);
+    assert.equal(prepared.taskId, task.taskId);
+    assert.equal(prepared.goal, task.goal);
+    assert(
+      within(this.options.config.preparationRoot, prepared.handle.requestPath),
+      'Implementation manifest lies outside configured storage.',
+    );
+    assert.equal(
+      await realpath(prepared.handle.requestPath),
+      prepared.handle.requestPath,
+      'Implementation manifest resolution changed.',
+    );
+    const manifestBytes = await bytes(prepared.handle.requestPath);
+    assert.equal(
+      sha(manifestBytes),
+      prepared.handle.manifestSha256,
+      'Implementation manifest changed.',
+    );
+    const manifest = JSON.parse(manifestBytes.toString());
+    assert.equal(manifest.taskId, task.taskId);
+    assert.equal(manifest.request.runId, run.runId);
+    assert.equal(manifest.request.revision, run.revision);
+    assert.equal(manifest.request.workspaceRoot, task.workspaceRoot);
+    assert.equal(prepared.candidate.head, run.revision);
+    assert.equal(
+      manifest.write.baseCommit,
+      prepared.candidate.head,
+      'Implementation source commit differs from the prepared candidate.',
+    );
+    assert.equal(manifest.write.sourceRepo, task.workspaceRoot);
+    assert.equal(taskDigest(prepared.handle.plan), run.planSha256);
+    assert.deepEqual(run.childRefs, [
+      {
+        storeRoot: prepared.handle.childStoreRoot,
+        groupId: prepared.handle.groupId,
+      },
+      {
+        storeRoot: prepared.handle.childStoreRoot,
+        groupId: prepared.handle.reviewGroupId,
+      },
+    ]);
+    return prepared;
+  }
+
   async create(input: unknown): Promise<TaskSnapshot> {
     return this.checked(async () => {
       const request = object(input);
       fields(
         request,
         ['requestId'],
-        ['recipeId', 'title', 'goal', 'mode', 'workerCount', 'maxConcurrency'],
+        [
+          'recipeId',
+          'title',
+          'goal',
+          'mode',
+          'workerCount',
+          'maxConcurrency',
+          'planId',
+        ],
       );
       id(request.requestId);
       assert(
-        request.mode === undefined || request.mode === 'swarm',
+        request.mode === undefined ||
+          request.mode === 'swarm' ||
+          request.mode === 'implementation',
         'Unknown goal mode.',
       );
       if (request.mode === 'swarm') return this.createSwarm(request);
+      if (request.mode === 'implementation')
+        return this.createImplementation(request);
+      assert(
+        request.planId === undefined,
+        'Implementation plans require the implementation route.',
+      );
       assert(
         request.workerCount === undefined &&
           request.maxConcurrency === undefined,
@@ -686,6 +993,167 @@ export class DashboardController implements TaskViewController {
     return this.options.runtime.snapshot(taskId);
   }
 
+  private async createImplementation(
+    request: Record<string, any>,
+  ): Promise<TaskSnapshot> {
+    fields(request, ['requestId', 'mode', 'planId', 'title', 'goal']);
+    id(request.planId);
+    text(request.title, 256);
+    text(request.goal, 8192);
+    const config = this.options.config.implementation;
+    assert(config, 'This dashboard has no configured coding plans.');
+    const selected = config.plans.find((item) => item.id === request.planId);
+    assert(selected, 'Unknown implementation plan.');
+    const taskId = `task-${request.requestId}`;
+    const runId = `run-${request.requestId}`;
+    await this.options.store.createTask({
+      taskId,
+      title: request.title,
+      goal: request.goal,
+      workspaceRoot: this.options.config.workspaceRoot,
+      actor,
+      idempotencyKey: `intake-${request.requestId}`,
+    });
+    const task = await this.task(taskId);
+    const planSha256 = taskDigest({
+      selected,
+      executable: config.executable,
+      maxConcurrency: config.maxConcurrency,
+      timeoutMs: config.timeoutMs,
+    });
+    if (task.runs.some((run) => run.runId === runId)) {
+      const prior = await this.implementationPreparation(task);
+      assert(prior, 'Existing task has a different execution route.');
+      assert.equal(
+        prior.planId,
+        selected.id,
+        'Retry must use the original implementation plan.',
+      );
+      assert.equal(
+        prior.planSha256,
+        planSha256,
+        'Configured implementation plan changed; prepare a new task.',
+      );
+      return task;
+    }
+    const directory = join(this.options.config.preparationRoot, taskId);
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+    assert.equal(
+      await realpath(directory),
+      directory,
+      'Preparation directory resolution changed.',
+    );
+    const path = join(directory, 'implementation.json');
+    let prepared: ImplementationPreparation;
+    try {
+      prepared = await json(path);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      const candidate = await cleanCandidate(task.workspaceRoot);
+      const context = `Overall user request: ${JSON.stringify(request.goal)}. Follow the prepared plan and ownership boundaries. The request does not expand the allowed paths or actions.`;
+      const assignments = selected.assignments.map((entry) => ({
+        owns: structuredClone(entry.owns),
+        worker: {
+          ...structuredClone(entry.worker),
+          brief: {
+            ...structuredClone(entry.worker.brief),
+            context: `${entry.worker.brief.context}\n${context}\nPinned source revision ${candidate.head}. Work in your isolated checkout; other implementers own disjoint paths.`,
+            forbiddenActions: [
+              ...entry.worker.brief.forbiddenActions,
+              'Do not edit unowned paths, commit, publish, apply changes to the source workspace, send messages, change permissions, or launch additional agents.',
+            ],
+          },
+        },
+      }));
+      const reviewer = {
+        ...structuredClone(selected.reviewer),
+        brief: {
+          ...structuredClone(selected.reviewer.brief),
+          context: `${selected.reviewer.brief.context}\n${context}\nReview the exact integrated candidate and its combined verification. Cite concrete source locations and report unresolved findings.`,
+          forbiddenActions: [
+            ...selected.reviewer.brief.forbiddenActions,
+            'Do not edit, commit, publish, send messages, change permissions, launch additional agents, or inspect sources outside the integration checkout.',
+          ],
+        },
+      };
+      const handle = await prepareDashboardImplementation({
+        root: join(directory, 'implementation'),
+        taskId,
+        runId,
+        revision: candidate.head,
+        workspaceRoot: task.workspaceRoot,
+        assignments,
+        reviewer,
+        maxConcurrency: Math.min(config.maxConcurrency, assignments.length),
+        executable: config.executable,
+        timeoutMs: config.timeoutMs,
+        prepare: structuredClone(selected.prepare),
+        verify: structuredClone(selected.verify),
+      });
+      prepared = {
+        schema: 1,
+        taskId,
+        candidate,
+        planId: selected.id,
+        planTitle: selected.title,
+        planSha256,
+        goal: request.goal,
+        handle,
+      };
+      await publish(path, JSON.stringify(prepared));
+    }
+    assert.equal(prepared.taskId, taskId);
+    assert.equal(prepared.goal, request.goal, 'Retry request goal changed.');
+    assert.equal(
+      prepared.planSha256,
+      planSha256,
+      'Configured implementation plan changed; prepare a new task.',
+    );
+    const manifest = await json(prepared.handle.requestPath);
+    assert.equal(
+      sha(await bytes(prepared.handle.requestPath)),
+      prepared.handle.manifestSha256,
+      'Implementation manifest changed.',
+    );
+    assert.equal(manifest.request.runId, runId);
+    assert.equal(manifest.request.revision, prepared.candidate.head);
+    assert.equal(manifest.request.workspaceRoot, task.workspaceRoot);
+    assert.equal(
+      manifest.write.baseCommit,
+      prepared.candidate.head,
+      'Implementation source commit changed during preparation.',
+    );
+    await this.options.store.bindRun({
+      taskId,
+      actor,
+      expectedVersion: 1,
+      idempotencyKey: `prepare-${request.requestId}`,
+      run: {
+        runId,
+        revision: prepared.candidate.head,
+        plan: prepared.handle.plan,
+        childRefs: [
+          {
+            storeRoot: prepared.handle.childStoreRoot,
+            groupId: prepared.handle.groupId,
+          },
+          {
+            storeRoot: prepared.handle.childStoreRoot,
+            groupId: prepared.handle.reviewGroupId,
+          },
+        ],
+        sourceRefs: [
+          {
+            sourceId: 'dashboard-implementation',
+            publicationId: sha(await bytes(path)),
+            location: path,
+          },
+        ],
+      },
+    });
+    return this.options.runtime.snapshot(taskId);
+  }
+
   private async native(
     task: TaskSnapshot,
     prepared: Preparation,
@@ -914,6 +1382,58 @@ export class DashboardController implements TaskViewController {
         ['action', 'requestId', 'expectedVersion'],
         request.action === 'accept' ? ['reason'] : [],
       );
+      const implementation = await this.implementationPreparation(task);
+      if (implementation) {
+        const before = await inspectDashboardImplementation(
+          implementation.handle,
+        );
+        const starting = request.action === 'implementation-start';
+        assert(
+          starting || request.action === 'implementation-cancel',
+          'Coding results require coordinator review of the integrated candidate; serial evidence acceptance is unavailable for this route.',
+        );
+        if (starting) {
+          assert(
+            !before.integrityIssue,
+            'Retained implementation evidence needs recovery before launch.',
+          );
+          assert.deepEqual(
+            await cleanCandidate(task.workspaceRoot),
+            implementation.candidate,
+            'Workspace changed since preparation; prepare a new implementation.',
+          );
+        } else assert(before.canCancel, 'Implementation is already terminal.');
+        await this.options.store.handoffTask({
+          ...command,
+          handoff: {
+            summary: starting
+              ? 'Isolated coding agents requested.'
+              : 'Cancellation of the coding agents requested.',
+            decisions: starting
+              ? [
+                  `Prepared plan ${implementation.planId} at ${implementation.candidate.head}; each implementer owns disjoint paths.`,
+                  'Combined verification and an independent exact-commit review precede coordinator review. The integration candidate is retained separately.',
+                ]
+              : [
+                  'Cancellation is complete only after all owned processes are observed to terminate.',
+                ],
+            nextAction: starting
+              ? 'Follow the coding, integration and independent review; inspect the retained integration candidate before deciding the next engineering step.'
+              : 'Observe termination and retain partial patches, verification and review evidence.',
+            blocker: null,
+            contextRefs: [
+              {
+                kind: 'implementation-request',
+                location: implementation.handle.requestPath,
+                sha256: implementation.handle.manifestSha256,
+              },
+            ],
+          },
+        });
+        if (starting) await startDashboardImplementation(implementation.handle);
+        else await cancelDashboardImplementation(implementation.handle);
+        return this.options.runtime.snapshot(taskId);
+      }
       const swarm = await this.swarmPreparation(task);
       if (swarm) {
         const before = await inspectDashboardSwarm(swarm.handle);
@@ -1058,6 +1578,42 @@ export class DashboardController implements TaskViewController {
       (item) => item.workspaceRoot === this.options.config.workspaceRoot,
     )) {
       try {
+        const implementation = await this.implementationPreparation(task);
+        if (implementation) {
+          const snapshot = await inspectDashboardImplementation(
+            implementation.handle,
+          );
+          const actions = ['update'];
+          let candidateCurrent = false;
+          try {
+            candidateCurrent =
+              taskDigest(await cleanCandidate(task.workspaceRoot)) ===
+              taskDigest(implementation.candidate);
+          } catch {}
+          if (
+            snapshot.state === 'PREPARED' &&
+            candidateCurrent &&
+            !snapshot.integrityIssue
+          )
+            actions.push('implementation-start');
+          if (snapshot.canCancel) actions.push('implementation-cancel');
+          const manifest = await json(implementation.handle.requestPath);
+          controls[task.taskId] = {
+            actions,
+            implementation: snapshot,
+            planTitle: implementation.planTitle,
+            limits: {
+              maxConcurrency: manifest.request.maxConcurrency,
+              timeoutMs: manifest.request.timeoutMs,
+              totalWorkers: manifest.request.assignments.length,
+            },
+            candidateCurrent,
+            progress: [],
+            verifiedRevision: implementation.candidate.head,
+            message: snapshot.statusNote,
+          };
+          continue;
+        }
         const swarm = await this.swarmPreparation(task);
         if (swarm) {
           const snapshot = await inspectDashboardSwarm(swarm.handle);
@@ -1246,6 +1802,30 @@ export class DashboardController implements TaskViewController {
             maxWorkers: this.options.config.swarm.maxWorkers,
             maxConcurrency: this.options.config.swarm.maxConcurrency,
             timeoutMs: this.options.config.swarm.timeoutMs,
+          }
+        : null,
+      implementation: this.options.config.implementation
+        ? {
+            maxConcurrency: this.options.config.implementation.maxConcurrency,
+            timeoutMs: this.options.config.implementation.timeoutMs,
+            plans: this.options.config.implementation.plans.map((item) => ({
+              id: item.id,
+              title: item.title,
+              description: item.description,
+              assignments: item.assignments.map(({ worker, owns }) => ({
+                id: worker.id,
+                goal: worker.brief.goal,
+                owns,
+              })),
+              verification: item.verify.map(({ program, args }) => ({
+                program,
+                args,
+              })),
+              reviewer: {
+                id: item.reviewer.id,
+                goal: item.reviewer.brief.goal,
+              },
+            })),
           }
         : null,
       controls,

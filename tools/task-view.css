@@ -298,6 +298,7 @@ h1 {
 }
 .badge.blocked,
 .badge.failed,
+.badge.issues,
 .badge.uncertain {
   background: #fff0df;
   color: #a26827;
@@ -803,4 +804,114 @@ dialog textarea[readonly] {
 .badge.recovery_required {
   background: #ffe8df;
   color: #8a4337;
+}
+.implementation-preview {
+  padding: 15px;
+  margin: 18px 0;
+  border: 1px solid #d9e3d2;
+  border-radius: 8px;
+  background: #f7f9f4;
+}
+.implementation-preview .section-heading {
+  margin-top: 0;
+  align-items: flex-start;
+  gap: 12px;
+}
+.plan-assignment {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.plan-assignment h4 {
+  margin: 0 0 7px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.plan-assignment p {
+  margin: 5px 0;
+  overflow-wrap: anywhere;
+}
+.ownership-list {
+  padding-left: 18px;
+  font:
+    11px/1.8 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  color: #607255;
+  overflow-wrap: anywhere;
+}
+.implementation-phases {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+  margin: 15px 0;
+  list-style: none;
+  counter-reset: implementation-step;
+}
+.implementation-phases li {
+  counter-increment: implementation-step;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 10px;
+  color: #8a9483;
+}
+.implementation-phases li::before {
+  content: counter(implementation-step) ' · ';
+}
+.implementation-phases .reached {
+  color: #506b42;
+  background: #f3f7ef;
+}
+.implementation-phases .current {
+  color: #365a40;
+  background: #e8f1e2;
+  border-color: #bed0b1;
+  font-weight: 600;
+}
+.integration-candidate,
+.implementation-review {
+  border-top: 1px solid var(--border);
+  margin-top: 18px;
+}
+.verification-check {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f2ed;
+}
+.verification-command {
+  color: #506244;
+  font:
+    11px/1.7 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  overflow-wrap: anywhere;
+}
+.verification-check .artifact-path {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.implementation-review pre {
+  padding: 12px;
+  background: #f4f6f1;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 340px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.review-required {
+  padding: 12px;
+  border-radius: 6px;
+  background: #eef0fc;
+  color: #59669d;
+  font-size: 12px;
+  line-height: 1.7;
 }

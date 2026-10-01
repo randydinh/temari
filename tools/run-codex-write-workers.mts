@@ -60,7 +60,7 @@ export interface WriteRunRequest {
   readonly verify: readonly CommandSpec[];
   readonly assignments: readonly WriteAssignment[];
 }
-interface WorkerPatch {
+export interface WorkerPatch {
   readonly assignmentId: string;
   readonly baseCommit: string;
   readonly snapshotCommit: string;
@@ -609,101 +609,25 @@ async function patchFor(
     patch,
   };
 }
-export async function runCodexWriteWorkersRequest(
-  value: unknown,
+/** Shared exact-patch integration boundary. The integration clone must already be prepared. */
+export async function integrateWriteWorkerPatches(
+  request: WriteRunRequest,
+  runPath: string,
+  workerReceipt: ParallelWorkerReceipt,
+  patchList: readonly WorkerPatch[],
   signal?: AbortSignal,
-): Promise<{
-  status: string;
-  integratedCommit: string | null;
-  integrationPath: string;
-  receiptPath: string;
-}> {
-  const request = parseWriteRunRequest(value);
-  const source = await preflight(request);
-  const executable = await resolveCodexExecutable(request.executable);
-  const runPath = join(request.evidenceRoot, request.runId);
-  await mkdir(runPath, { mode: 0o700 });
+  onPhase?: (phase: 'integrating' | 'verifying') => Promise<void>,
+): Promise<WriteRunReceipt> {
+  const source = request.sourceRepo;
   const integrationPath = join(runPath, 'integration');
-  const receiptPath = join(runPath, 'receipt.json');
-  let workerReceipt: ParallelWorkerReceipt | null = null;
-  const patches = new Map<string, WorkerPatch>();
+  const patches = new Map(
+    patchList.map((patch) => [patch.assignmentId, patch]),
+  );
   const verification: WriteRunReceipt['verification'][number][] = [];
   let status: WriteRunReceipt['status'] = 'BLOCKED';
   let reason: string | null = null;
   let integratedCommit: string | null = null;
   try {
-    await clone(source, request.baseCommit, integrationPath, signal);
-    await prepare(
-      integrationPath,
-      request.prepare ?? [],
-      request.baseCommit,
-      signal,
-    );
-    const workerPaths = new Map(
-      request.assignments.map((entry) => [
-        entry.worker.id,
-        join(runPath, `worker-${entry.worker.id}`),
-      ]),
-    );
-    for (const entry of request.assignments) {
-      const path = workerPaths.get(entry.worker.id)!;
-      await clone(source, request.baseCommit, path, signal);
-      await prepare(path, request.prepare ?? [], request.baseCommit, signal);
-    }
-    const plan = reconcilePlan({
-      workType: 'feature',
-      parallelism: { maxConcurrency: request.maxConcurrency },
-    });
-    const capabilities: HostCapabilityReport = {
-      host: 'codex-exec-write-local',
-      available: ['parallelism'],
-      missing: [
-        'subagents',
-        'model_diversity',
-        'worktree_isolation',
-        'durable_delivery',
-        'forge',
-      ],
-      notes: { parallelism: 'Local isolated Codex processes.' },
-      provenance: {
-        parallelism: {
-          status: 'unproven',
-          source: 'real Codex overlap has not been verified',
-        },
-      },
-    };
-    workerReceipt = await runParallelWorkers({
-      runId: request.runId,
-      revision: request.baseCommit,
-      plan,
-      capabilities,
-      assignments: request.assignments.map((entry) => entry.worker),
-      handler: async (worker) => {
-        const entry = request.assignments.find(
-          (item) => item.worker.id === worker.id,
-        )!;
-        const evidenceDir = join(runPath, `evidence-${worker.id}`);
-        const result = await runCodexExecWriteWorker(worker, {
-          executable,
-          workspaceRoot: workerPaths.get(worker.id)!,
-          evidenceDirectory: evidenceDir,
-          timeoutMs: request.timeoutMs,
-          outputLimitBytes: request.outputLimitBytes,
-          signal,
-          baseCommit: request.baseCommit,
-          owns: entry.owns,
-        });
-        const validated = await patchFor(
-          request,
-          entry,
-          workerPaths.get(worker.id)!,
-          evidenceDir,
-          result,
-        );
-        if (validated.patch) patches.set(worker.id, validated.patch);
-        return validated.result;
-      },
-    });
     if (signal?.aborted) throw new Error('Run interrupted.');
     if (workerReceipt.status !== 'PASS') {
       status = workerReceipt.status === 'ISSUES' ? 'ISSUES' : 'BLOCKED';
@@ -724,9 +648,16 @@ export async function runCodexWriteWorkersRequest(
         throw new Error(
           'Source checkout moved or became dirty during worker run.',
         );
+      await onPhase?.('integrating');
       for (const entry of request.assignments) {
         const patch = patches.get(entry.worker.id);
-        if (!patch) continue;
+        if (!patch) {
+          if (entry.worker.required)
+            throw new Error(
+              `Required patch is missing for ${entry.worker.id}.`,
+            );
+          continue;
+        }
         const patchBytes = await readFile(patch.patchPath);
         if (
           createHash('sha256').update(patchBytes).digest('hex') !== patch.sha256
@@ -762,6 +693,7 @@ export async function runCodexWriteWorkersRequest(
         ).length
       )
         throw new Error('Integration candidate contains untracked files.');
+      await onPhase?.('verifying');
       for (const [index, command] of request.verify.entries()) {
         const output = await runArgv(
           command.program,
@@ -866,6 +798,164 @@ export async function runCodexWriteWorkersRequest(
         );
       status = 'PASS';
     }
+  } catch (error) {
+    status = 'BLOCKED';
+    reason = error instanceof Error ? error.message : String(error);
+  }
+  const receipt: WriteRunReceipt = {
+    schema: 1,
+    runId: request.runId,
+    baseCommit: request.baseCommit,
+    status,
+    reason,
+    workerReceipt,
+    patches: patchList,
+    integratedCommit,
+    integrationPath,
+    verification,
+  };
+  await writeFile(
+    join(runPath, 'receipt.json'),
+    `${JSON.stringify(receipt, null, 2)}\n`,
+    { mode: 0o600 },
+  );
+  return receipt;
+}
+
+/** Host-owned building blocks; all callers use the same write and scope guards. */
+export {
+  preflight as preflightWriteRun,
+  clone as cloneWriteWorkspace,
+  prepare as prepareWriteWorkspace,
+  patchFor as captureWriteWorkerPatch,
+};
+
+export async function assertWriteCandidate(
+  path: string,
+  revision: string,
+): Promise<void> {
+  if (
+    (await git(['rev-parse', 'HEAD'], path)).toString('utf8').trim() !==
+    revision
+  )
+    throw new Error('Candidate HEAD changed.');
+  if (
+    (
+      await git(
+        ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+        path,
+      )
+    ).length
+  )
+    throw new Error('Candidate working tree changed.');
+}
+
+export async function runCodexWriteWorkersRequest(
+  value: unknown,
+  signal?: AbortSignal,
+): Promise<{
+  status: string;
+  integratedCommit: string | null;
+  integrationPath: string;
+  receiptPath: string;
+}> {
+  const request = parseWriteRunRequest(value);
+  const source = await preflight(request);
+  const executable = await resolveCodexExecutable(request.executable);
+  const runPath = join(request.evidenceRoot, request.runId);
+  await mkdir(runPath, { mode: 0o700 });
+  const integrationPath = join(runPath, 'integration');
+  const receiptPath = join(runPath, 'receipt.json');
+  let workerReceipt: ParallelWorkerReceipt | null = null;
+  const patches = new Map<string, WorkerPatch>();
+  const verification: WriteRunReceipt['verification'][number][] = [];
+  let status: WriteRunReceipt['status'] = 'BLOCKED';
+  let reason: string | null = null;
+  let integratedCommit: string | null = null;
+  try {
+    await clone(source, request.baseCommit, integrationPath, signal);
+    await prepare(
+      integrationPath,
+      request.prepare ?? [],
+      request.baseCommit,
+      signal,
+    );
+    const workerPaths = new Map(
+      request.assignments.map((entry) => [
+        entry.worker.id,
+        join(runPath, `worker-${entry.worker.id}`),
+      ]),
+    );
+    for (const entry of request.assignments) {
+      const path = workerPaths.get(entry.worker.id)!;
+      await clone(source, request.baseCommit, path, signal);
+      await prepare(path, request.prepare ?? [], request.baseCommit, signal);
+    }
+    const plan = reconcilePlan({
+      workType: 'feature',
+      parallelism: { maxConcurrency: request.maxConcurrency },
+    });
+    const capabilities: HostCapabilityReport = {
+      host: 'codex-exec-write-local',
+      available: ['parallelism'],
+      missing: [
+        'subagents',
+        'model_diversity',
+        'worktree_isolation',
+        'durable_delivery',
+        'forge',
+      ],
+      notes: { parallelism: 'Local isolated Codex processes.' },
+      provenance: {
+        parallelism: {
+          status: 'unproven',
+          source: 'real Codex overlap has not been verified',
+        },
+      },
+    };
+    workerReceipt = await runParallelWorkers({
+      runId: request.runId,
+      revision: request.baseCommit,
+      plan,
+      capabilities,
+      assignments: request.assignments.map((entry) => entry.worker),
+      handler: async (worker) => {
+        const entry = request.assignments.find(
+          (item) => item.worker.id === worker.id,
+        )!;
+        const evidenceDir = join(runPath, `evidence-${worker.id}`);
+        const result = await runCodexExecWriteWorker(worker, {
+          executable,
+          workspaceRoot: workerPaths.get(worker.id)!,
+          evidenceDirectory: evidenceDir,
+          timeoutMs: request.timeoutMs,
+          outputLimitBytes: request.outputLimitBytes,
+          signal,
+          baseCommit: request.baseCommit,
+          owns: entry.owns,
+        });
+        const validated = await patchFor(
+          request,
+          entry,
+          workerPaths.get(worker.id)!,
+          evidenceDir,
+          result,
+        );
+        if (validated.patch) patches.set(worker.id, validated.patch);
+        return validated.result;
+      },
+    });
+    const integrated = await integrateWriteWorkerPatches(
+      request,
+      runPath,
+      workerReceipt,
+      [...patches.values()],
+      signal,
+    );
+    status = integrated.status;
+    reason = integrated.reason;
+    integratedCommit = integrated.integratedCommit;
+    verification.push(...integrated.verification);
   } catch (error) {
     status = 'BLOCKED';
     reason = error instanceof Error ? error.message : String(error);

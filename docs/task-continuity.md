@@ -3,17 +3,17 @@
 Temari keeps a durable task above individual execution runs. Return to the same
 goal after a new chat, restart, failed attempt, or replan, with its next action and
 history intact. Archon owns native workflow execution and logs; the runtime owns
-task state and durable child work. The read-only investigation swarm uses local
-Codex processes and the existing runtime child store.
+task state and durable child work. Investigation and configured implementation
+agents use local Codex processes and the existing runtime child store.
 
 This guide is for the agent operating a local Temari checkout. It implements the
 [approved first increment](system-roles-and-responsibilities.md#final-recommendation-and-first-proof)
 and its continuation work. For browser setup and daily operation, start with the
 [dashboard guide](task-dashboard.md). `serve` is read-only by default;
-`--control-config` enables goal intake, configured verification, and optional
-bounded investigation agents. This guide covers the underlying CLI and agent
-handoffs. Automatic capture of every chat, autonomous implementation swarms,
-schedules, and the Registrar graph view remain follow-up work.
+`--control-config` enables goal intake, configured verification, bounded
+investigation agents, and configured implementation plans. This guide covers the
+underlying CLI and agent handoffs. Automatic capture of every chat, automatic task
+decomposition, schedules, and the Registrar graph view remain follow-up work.
 
 ## Supported dashboard journeys
 
@@ -22,13 +22,21 @@ schedules, and the Registrar graph view remain follow-up work.
 | New goal for Temari              | Saves a goal, next action, and continuation context.                                            | Remains open until Temari admits an execution plan.                                                 |
 | Configured verification recipe   | Runs the host-configured checks through Archon against a pinned clean workspace.                | Verified canonical serial evidence and explicit coordinator acceptance can produce `DONE`.          |
 | Investigate with parallel agents | Runs 2–4 read-only Codex investigator/reviewer assignments, with configured concurrency of 1–4. | Retained findings require coordinator review; the parallel receipt cannot produce canonical `DONE`. |
+| Configured implementation plan | Runs 2–4 implementers in isolated clones, integrates accepted patches, verifies the result, and runs a separate read-only reviewer. | The external integration candidate requires coordinator review. No generic `DONE`, source application or publication is performed. |
 
 The browser offers only the actions available for that task. Native workflows
-support start, observation, exact-run resume, and cancel. Investigation agents
-support preparation, start, and cancellation; an ambiguous supervisor is not
+support start, observation, exact-run resume, and cancel. Investigation and
+implementation agents support preparation, start, and cancellation; an ambiguous supervisor is not
 automatically restarted. There is no Pause control. See the
 [configuration and limits](task-dashboard.md#control-configuration-reference)
 before enabling execution.
+
+For implementation, the coordinator selects the host-configured plan and pins
+the user's goal with its typed ownership scopes and verification commands. Bind
+both implementer and reviewer groups to the logical task. Child success does not
+authorize serial stage acceptance. Preserve integration/review receipts and use
+the handoff to identify the exact candidate for the next coordinator action. See
+the [implementation contract and verification scope](dashboard-implementation-design.md).
 
 ## Current continuation: host pickup and handoff
 
@@ -385,7 +393,11 @@ available through `pnpm exec nx run runtime:dashboard-test`; fixture results are
 not evidence of live model execution. Consult the retained evaluation for the
 checks actually performed against the reviewed revision.
 
-The dashboard adds bounded local investigation, not a new scheduler. Scheduled
-work, autonomous implementation swarms, route-specific parallel acceptance,
-provider budget telemetry, and the Registrar knowledge map remain outside this
-increment. See the [roles matrix](system-roles-and-responsibilities.md) for ownership.
+The dashboard adds bounded investigation and coding from host-configured plans.
+Implementation uses isolated clones and returns a verified, independently reviewed
+integration candidate for coordinator assessment. Automatic decomposition,
+scheduled work, source application, route-specific semantic acceptance, provider
+budget telemetry, and the Registrar knowledge map remain outside this increment.
+See the [roles matrix](system-roles-and-responsibilities.md) for ownership and the
+[coding verification scope](dashboard-implementation-design.md#verification-scope)
+for the evidence required by this route.

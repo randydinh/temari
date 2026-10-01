@@ -45,27 +45,38 @@ const statusNames = {
   RECOVERY_REQUIRED: 'Recovery required',
 };
 function displayedStatus(task) {
-  const swarm = state.dashboard?.config?.controls?.[task.taskId]?.swarm;
-  if (!swarm) return task.status;
+  const control = state.dashboard?.config?.controls?.[task.taskId];
+  const execution = control?.implementation ?? control?.swarm;
+  if (!execution) return task.status;
   if (
-    swarm.integrityIssue ||
-    ['RECOVERY_REQUIRED', 'FAILED'].includes(swarm.state)
+    execution.integrityIssue ||
+    ['RECOVERY_REQUIRED', 'FAILED'].includes(execution.state)
   )
     return 'BLOCKED';
-  if (swarm.state === 'PREPARED') return 'OPEN';
-  if (['STARTING', 'RUNNING'].includes(swarm.state))
-    return swarm.workers.some(({ events }) =>
+  if (execution.state === 'PREPARED') return 'OPEN';
+  if (['STARTING', 'RUNNING'].includes(execution.state))
+    return execution.workers.some(({ events }) =>
       events.some((event) => event.type === 'task-cancellation-requested'),
     )
       ? 'CANCELLING'
       : 'RUNNING';
+  if (control.implementation) {
+    const results = [
+      execution.integration?.status,
+      execution.review?.result?.status,
+      ...execution.workers.map(({ task: child }) => child.status),
+    ];
+    if (results.some((result) => ['BLOCKED', 'FAILED'].includes(result)))
+      return 'BLOCKED';
+    if (results.includes('ISSUES')) return 'ISSUES';
+  }
   return task.status;
 }
-const badge = (status) =>
+const badge = (status, label) =>
   el(
     'span',
     `badge ${String(status).toLowerCase()}`,
-    statusNames[status] ?? status,
+    label ?? statusNames[status] ?? status,
   );
 const relativeTime = (value) => {
   const minutes = Math.max(
@@ -360,7 +371,7 @@ function renderDetail() {
     );
     detail.append(handoff);
   }
-  if (!control?.swarm)
+  if (!control?.swarm && !control?.implementation)
     detail.append(
       section(
         'Workflow',
@@ -380,7 +391,7 @@ function renderDetail() {
     );
     stageGrid.append(card);
   }
-  if (!control?.swarm) detail.append(stageGrid);
+  if (!control?.swarm && !control?.implementation) detail.append(stageGrid);
   detail.append(section('Runs', 'One goal, retained history'));
   if (control?.progress?.length) {
     const progress = el('div', 'native-progress');
@@ -415,9 +426,15 @@ function renderDetail() {
     top.append(
       el('span', 'run-id', run.runId),
       badge(
-        run.runId === task.currentRunId && control?.swarm
-          ? control.swarm.state
-          : (run.nativeSnapshot?.status ?? snap?.receiptStatus ?? 'PENDING'),
+        run.runId === task.currentRunId && control?.implementation
+          ? control.implementation.state
+          : run.runId === task.currentRunId && control?.swarm
+            ? control.swarm.state
+            : (run.nativeSnapshot?.status ?? snap?.receiptStatus ?? 'PENDING'),
+        run.runId === task.currentRunId &&
+          control?.implementation?.state === 'COMPLETE'
+          ? 'Candidate ready'
+          : undefined,
       ),
     );
     const info = el('div', 'run-info');
@@ -458,11 +475,13 @@ function renderDetail() {
       el(
         'div',
         'evidence-note',
-        run.runId === task.currentRunId && control?.swarm
-          ? 'Investigation findings are retained per agent. Temari reviews them before deciding the next step.'
-          : snap?.evidence?.verified
-            ? 'Retained stage evidence verified. Task completion also requires Temari acceptance.'
-            : `Evidence incomplete${snap?.evidence?.issues?.length ? ` · ${snap.evidence.issues.join(' ')}` : '.'}`,
+        run.runId === task.currentRunId && control?.implementation
+          ? 'Worker patches, combined verification, and independent review are retained with the integration candidate. Temari reviews the candidate against the goal.'
+          : run.runId === task.currentRunId && control?.swarm
+            ? 'Investigation findings are retained per agent. Temari reviews them before deciding the next step.'
+            : snap?.evidence?.verified
+              ? 'Retained stage evidence verified. Task completion also requires Temari acceptance.'
+              : `Evidence incomplete${snap?.evidence?.issues?.length ? ` · ${snap.evidence.issues.join(' ')}` : '.'}`,
       ),
     );
     for (const operation of run.operations.filter(
@@ -624,14 +643,263 @@ async function perform(task, action, extra = {}) {
     byId('error').hidden = false;
   }
 }
+function ownershipList(owns) {
+  const list = el('ul', 'ownership-list');
+  for (const scope of owns ?? [])
+    list.append(el('li', '', `${scope.kind} · ${scope.path}`));
+  return list;
+}
+function retainedArtifacts(paths) {
+  const artifacts = el('details', 'worker-artifacts');
+  artifacts.append(
+    el('summary', '', `Retained logs and artifacts (${paths.length})`),
+  );
+  for (const path of paths) artifacts.append(el('p', 'artifact-path', path));
+  return artifacts;
+}
+function renderWorkerOutcomes(task, workers) {
+  const outcomes = el('div', 'swarm-outcomes');
+  for (const { assignment, task: child, events } of workers) {
+    const row = el('details', 'log-capture');
+    const key = `${task.taskId}/${assignment.id}`;
+    row.open = state.expanded.has(key);
+    row.addEventListener('toggle', () => {
+      if (row.isConnected)
+        row.open ? state.expanded.add(key) : state.expanded.delete(key);
+    });
+    const summary = el('summary');
+    summary.append(
+      el(
+        'span',
+        '',
+        `${assignment.id} · ${assignment.role ?? 'implementer'} · attempt ${child.attempt} `,
+      ),
+      badge(child.status),
+    );
+    row.append(summary);
+    row.append(
+      el('p', 'event-detail', assignment.brief?.context ?? assignment.goal),
+    );
+    if (assignment.owns?.length) {
+      row.append(el('p', 'event-detail', 'Owns these paths:'));
+      row.append(ownershipList(assignment.owns));
+    }
+    if (child.result?.summary)
+      row.append(el('pre', '', plainLog(child.result.summary)));
+    if (child.error) row.append(el('p', 'blocker', child.error));
+    if (
+      events.some((event) => event.type === 'task-cancellation-requested') &&
+      ![
+        'CANCELLED',
+        'SUCCEEDED',
+        'FAILED',
+        'ISSUES',
+        'BLOCKED',
+        'DROPPED',
+      ].includes(child.status)
+    )
+      row.append(
+        el(
+          'p',
+          'event-detail',
+          'Stop requested. Waiting for the worker process to exit.',
+        ),
+      );
+    const history = el('ul', 'worker-history');
+    for (const event of events.filter(
+      (item) => item.type !== 'task-lease-renewed',
+    ))
+      history.append(
+        el(
+          'li',
+          '',
+          `${new Date(event.at).toLocaleTimeString()} · ${event.type.replace(/^task-/, '').replaceAll('-', ' ')}`,
+        ),
+      );
+    row.append(history);
+    const paths = child.result?.evidencePaths ?? [];
+    if (paths.length) row.append(retainedArtifacts(paths));
+    outcomes.append(row);
+  }
+  return outcomes;
+}
+const implementationPhases = [
+  ['prepared', 'Prepared'],
+  ['implementing', 'Implementers'],
+  ['integrating', 'Integration'],
+  ['verifying', 'Verification'],
+  ['reviewing', 'Independent review'],
+  ['complete', 'Candidate ready'],
+];
+function renderImplementation(task, control) {
+  const implementation = control.implementation;
+  const panel = el('div', 'implementation-work');
+  const limits = control.limits;
+  panel.append(
+    el(
+      'p',
+      'event-detail',
+      `${limits.totalWorkers} implementers · at most ${limits.maxConcurrency} running at once · ${Math.round(limits.timeoutMs / 1000)}s per attempt · one attempt per implementer · independent reviewer after combined verification.`,
+    ),
+  );
+  const phases = el('ol', 'implementation-phases');
+  phases.setAttribute('aria-label', 'Implementation progress');
+  const currentPhase = implementationPhases.findIndex(
+    ([phase]) => phase === implementation.phase,
+  );
+  implementationPhases.forEach(([phase, title], index) => {
+    const row = el(
+      'li',
+      phase === implementation.phase
+        ? 'current'
+        : index < currentPhase
+          ? 'reached'
+          : '',
+      title,
+    );
+    if (phase === implementation.phase)
+      row.setAttribute('aria-current', 'step');
+    phases.append(row);
+  });
+  panel.append(phases);
+  if (implementation.statusNote)
+    panel.append(el('p', 'event-detail', implementation.statusNote));
+  if (implementation.integrityIssue)
+    panel.append(el('p', 'blocker', implementation.integrityIssue));
+  if (implementation.state === 'RECOVERY_REQUIRED')
+    panel.append(
+      el(
+        'p',
+        'blocker',
+        'Temari needs to reconcile the retained worker identities and integration artifacts before work can continue.',
+      ),
+    );
+  panel.append(
+    section('Implementer outcomes', 'Isolated workspaces · assigned ownership'),
+    renderWorkerOutcomes(task, implementation.workers),
+  );
+  const integration = implementation.integration;
+  if (integration) {
+    const candidate = el('section', 'integration-candidate');
+    const heading = section('Integration candidate');
+    if (integration.status) heading.append(badge(integration.status));
+    candidate.append(heading);
+    if (integration.integrationPath)
+      candidate.append(
+        el('p', 'event-detail', 'Review this integration workspace:'),
+        el('p', 'artifact-path', integration.integrationPath),
+      );
+    if (integration.integratedCommit)
+      candidate.append(
+        el('p', 'event-detail', 'Exact candidate commit:'),
+        el('p', 'artifact-path', integration.integratedCommit),
+      );
+    if (integration.patches?.length) {
+      const patches = el('details', 'worker-artifacts');
+      patches.append(
+        el(
+          'summary',
+          '',
+          `Retained worker patches (${integration.patches.length})`,
+        ),
+      );
+      for (const patch of integration.patches) {
+        patches.append(el('p', 'event-detail', patch.assignmentId));
+        const paths = el('ul', 'ownership-list');
+        for (const path of patch.changedPaths) paths.append(el('li', '', path));
+        patches.append(
+          paths,
+          el('p', 'artifact-path', patch.patchPath),
+          el('p', 'artifact-path', `sha256 ${patch.sha256}`),
+        );
+      }
+      candidate.append(patches);
+    }
+    candidate.append(section('Combined verification'));
+    if (!integration.verification?.length)
+      candidate.append(
+        el('p', 'event-detail', 'Waiting for the integrated candidate.'),
+      );
+    for (const check of integration.verification ?? []) {
+      const row = el('div', 'verification-check');
+      const command = el(
+        'span',
+        'verification-command',
+        [check.program, ...check.args].join(' '),
+      );
+      row.append(
+        command,
+        badge(
+          check.code === 0 ? 'PASS' : check.code == null ? 'PENDING' : 'FAILED',
+        ),
+      );
+      if (check.logPath) row.append(el('p', 'artifact-path', check.logPath));
+      candidate.append(row);
+    }
+    if (integration.receiptPath)
+      candidate.append(retainedArtifacts([integration.receiptPath]));
+    panel.append(candidate);
+  }
+  const review = implementation.review;
+  const reviewPanel = el('section', 'implementation-review');
+  const reviewHeading = section(
+    'Independent review',
+    'Temari reviews the result against the goal',
+  );
+  if (review?.result?.status) reviewHeading.append(badge(review.result.status));
+  reviewPanel.append(reviewHeading);
+  if (review?.assignment)
+    reviewPanel.append(
+      el(
+        'p',
+        'event-detail',
+        `${review.assignment.id} · ${review.assignment.goal ?? review.assignment.brief?.context ?? 'Review the verified integration candidate.'}`,
+      ),
+    );
+  if (review?.revision)
+    reviewPanel.append(
+      el('p', 'artifact-path', `Reviewed commit ${review.revision}`),
+    );
+  if (review?.result?.summary)
+    reviewPanel.append(el('pre', '', plainLog(review.result.summary)));
+  else
+    reviewPanel.append(
+      el(
+        'p',
+        'event-detail',
+        'Review findings will be retained after combined verification.',
+      ),
+    );
+  if (review?.result?.evidencePaths?.length)
+    reviewPanel.append(retainedArtifacts(review.result.evidencePaths));
+  if (
+    implementation.state === 'COMPLETE' &&
+    !implementation.integrityIssue &&
+    integration?.status === 'PASS' &&
+    integration.integratedCommit &&
+    review?.result?.status === 'PASS' &&
+    review.revision === integration.integratedCommit
+  )
+    reviewPanel.append(
+      el(
+        'p',
+        'review-required',
+        'The candidate is ready for Temari to assess the findings, verification, and original goal. This task still needs review.',
+      ),
+    );
+  panel.append(reviewPanel);
+  return panel;
+}
 function renderControls(task, control) {
   const panel = el('section', 'task-controls');
   panel.append(
     section(
       'Work on this task',
-      control.swarm
-        ? 'Read-only agent swarm'
-        : (control.recipe ?? 'Needs planning'),
+      control.implementation
+        ? (control.planTitle ?? 'Parallel implementation')
+        : control.swarm
+          ? 'Read-only agent swarm'
+          : (control.recipe ?? 'Needs planning'),
     ),
   );
   if (control.message) {
@@ -653,6 +921,7 @@ function renderControls(task, control) {
         `Prepared revision ${control.verifiedRevision.slice(0, 12)}`,
       ),
     );
+  if (control.implementation) panel.append(renderImplementation(task, control));
   if (control.swarm) {
     const limits = control.limits;
     panel.append(
@@ -678,72 +947,7 @@ function renderControls(task, control) {
           'Supervisor ownership needs recovery. Ask Temari to reconcile retained process identity and artifacts before restarting work.',
         ),
       );
-    const outcomes = el('div', 'swarm-outcomes');
-    for (const { assignment, task: child, events } of swarm.workers) {
-      const row = el('details', 'log-capture');
-      const key = `${task.taskId}/${assignment.id}`;
-      row.open = state.expanded.has(key);
-      row.addEventListener('toggle', () => {
-        if (row.isConnected)
-          row.open ? state.expanded.add(key) : state.expanded.delete(key);
-      });
-      const summary = el('summary');
-      summary.append(
-        el(
-          'span',
-          '',
-          `${assignment.id} · ${assignment.role} · attempt ${child.attempt} `,
-        ),
-        badge(child.status),
-      );
-      row.append(summary);
-      row.append(el('p', 'event-detail', assignment.brief.context));
-      if (child.result?.summary)
-        row.append(el('pre', '', child.result.summary));
-      if (child.error) row.append(el('p', 'blocker', child.error));
-      if (
-        events.some((event) => event.type === 'task-cancellation-requested') &&
-        ![
-          'CANCELLED',
-          'SUCCEEDED',
-          'FAILED',
-          'ISSUES',
-          'BLOCKED',
-          'DROPPED',
-        ].includes(child.status)
-      )
-        row.append(
-          el(
-            'p',
-            'event-detail',
-            'Stop requested. Waiting for the worker process to exit.',
-          ),
-        );
-      const history = el('ul', 'worker-history');
-      for (const event of events.filter(
-        (item) => item.type !== 'task-lease-renewed',
-      ))
-        history.append(
-          el(
-            'li',
-            '',
-            `${new Date(event.at).toLocaleTimeString()} · ${event.type.replace(/^task-/, '').replaceAll('-', ' ')}`,
-          ),
-        );
-      row.append(history);
-      const paths = child.result?.evidencePaths ?? [];
-      if (paths.length) {
-        const artifacts = el('details', 'worker-artifacts');
-        artifacts.append(
-          el('summary', '', `Retained logs and artifacts (${paths.length})`),
-        );
-        for (const path of paths)
-          artifacts.append(el('p', 'artifact-path', path));
-        row.append(artifacts);
-      }
-      outcomes.append(row);
-    }
-    panel.append(outcomes);
+    panel.append(renderWorkerOutcomes(task, swarm.workers));
   }
   const actions = el('div', 'control-actions');
   const labels = {
@@ -754,12 +958,16 @@ function renderControls(task, control) {
     verify: 'Verify evidence',
     'swarm-start': 'Start agents',
     'swarm-cancel': 'Cancel agents',
+    'implementation-start': 'Start implementers',
+    'implementation-cancel': 'Cancel implementation',
   };
   for (const [action, label] of Object.entries(labels)) {
     if (!control.actions.includes(action)) continue;
     const button = el(
       'button',
-      ['start', 'swarm-start'].includes(action) ? 'primary' : 'quiet',
+      ['start', 'swarm-start', 'implementation-start'].includes(action)
+        ? 'primary'
+        : 'quiet',
       label,
     );
     button.disabled = state.mutating;
@@ -780,7 +988,7 @@ function renderControls(task, control) {
     drafts.baseVersion = task.version;
   }
   state.drafts.set(task.taskId, drafts);
-  if (control.actions.includes('accept')) {
+  if (!control.implementation && control.actions.includes('accept')) {
     const review = el('div', 'acceptance');
     review.append(el('h4', '', 'Review the result'));
     review.append(
@@ -884,26 +1092,80 @@ function renderControls(task, control) {
   }
   return panel;
 }
+const implementationOptionPrefix = '__implementation__:';
+function selectedImplementationPlan() {
+  const selection = byId('goal-recipe').value;
+  if (!selection.startsWith(implementationOptionPrefix)) return null;
+  return (
+    state.dashboard.config.implementation?.plans.find(
+      (plan) => plan.id === selection.slice(implementationOptionPrefix.length),
+    ) ?? null
+  );
+}
+function renderImplementationPreview(plan) {
+  const preview = byId('implementation-preview');
+  preview.replaceChildren();
+  preview.hidden = !plan;
+  if (!plan) return;
+  const config = state.dashboard.config.implementation;
+  preview.append(section('Configured implementation plan', plan.title));
+  if (plan.description) preview.append(el('p', '', plan.description));
+  preview.append(
+    el(
+      'p',
+      'event-detail',
+      `${plan.assignments.length} implementers · at most ${config.maxConcurrency} running at once · ${Math.round(config.timeoutMs / 1000)}s per attempt.`,
+    ),
+  );
+  for (const assignment of plan.assignments) {
+    const card = el('div', 'plan-assignment');
+    card.append(
+      el('h4', '', `${assignment.id} · implementer`),
+      el('p', '', assignment.goal),
+      ownershipList(assignment.owns),
+    );
+    preview.append(card);
+  }
+  const verification = el('div', 'plan-assignment');
+  verification.append(el('h4', '', 'Combined verification'));
+  for (const check of plan.verification)
+    verification.append(
+      el('p', 'artifact-path', [check.program, ...check.args].join(' ')),
+    );
+  preview.append(verification);
+  const reviewer = el('div', 'plan-assignment');
+  reviewer.append(
+    el('h4', '', `${plan.reviewer.id} · independent reviewer`),
+    el('p', '', plan.reviewer.goal),
+  );
+  preview.append(reviewer);
+}
 function selectGoalRecipe() {
   const swarm = byId('goal-recipe').value === '__swarm__';
+  const implementation = selectedImplementationPlan();
   const recipe = state.dashboard.config.recipes.find(
     (item) => item.id === byId('goal-recipe').value,
   );
-  byId('goal-title').value = recipe?.title ?? '';
+  byId('goal-title').value = recipe?.title ?? implementation?.title ?? '';
   byId('goal-text').value = recipe?.goal ?? '';
   byId('goal-title').readOnly = Boolean(recipe);
   byId('goal-text').readOnly = Boolean(recipe);
   byId('swarm-options').hidden = !swarm;
-  byId('save-goal').textContent = swarm
-    ? 'Prepare agents'
-    : recipe
-      ? 'Prepare verification'
-      : 'Save goal';
-  byId('goal-help').textContent = swarm
-    ? 'Prepare 2–4 agents against a pinned, clean workspace. Review the task, then start the investigation.'
-    : recipe
-      ? 'This runs the configured checks against a pinned, clean workspace. Review the prepared task, then start it.'
-      : 'Your goal will be saved with a continuation brief. Temari prepares the execution plan before work starts.';
+  renderImplementationPreview(implementation);
+  byId('save-goal').textContent = implementation
+    ? 'Prepare implementation'
+    : swarm
+      ? 'Prepare agents'
+      : recipe
+        ? 'Prepare verification'
+        : 'Save goal';
+  byId('goal-help').textContent = implementation
+    ? 'Describe the overall goal for this configured plan. Each implementer works in an isolated workspace with the ownership shown above. Their patches are integrated, verified, and independently reviewed before Temari assesses the candidate.'
+    : swarm
+      ? 'Prepare 2–4 agents against a pinned, clean workspace. Review the task, then start the investigation.'
+      : recipe
+        ? 'This runs the configured checks against a pinned, clean workspace. Review the prepared task, then start it.'
+        : 'Your goal will be saved with a continuation brief. Temari prepares the execution plan before work starts.';
 }
 function selectConcurrency() {
   const bound = Math.min(
@@ -943,6 +1205,15 @@ byId('new-goal').addEventListener('click', () => {
     }
     selectConcurrency();
   }
+  for (const plan of state.dashboard.config.implementation?.plans ?? []) {
+    const option = el(
+      'option',
+      '',
+      `Implement with parallel agents · ${plan.title}`,
+    );
+    option.value = `${implementationOptionPrefix}${plan.id}`;
+    select.append(option);
+  }
   for (const recipe of state.dashboard.config.recipes) {
     const option = el('option', '', recipe.title);
     option.value = recipe.id;
@@ -964,22 +1235,30 @@ byId('goal-form').addEventListener('submit', async (event) => {
   byId('save-goal').disabled = true;
   try {
     const recipeId = byId('goal-recipe').value;
+    const implementation = selectedImplementationPlan();
     const task = await post('/api/tasks', {
       requestId: state.goalRequestId,
-      ...(recipeId === '__swarm__'
+      ...(implementation
         ? {
-            mode: 'swarm',
+            mode: 'implementation',
+            planId: implementation.id,
             title: byId('goal-title').value.trim(),
             goal: byId('goal-text').value.trim(),
-            workerCount: Number(byId('swarm-workers').value),
-            maxConcurrency: Number(byId('swarm-concurrency').value),
           }
-        : recipeId
-          ? { recipeId }
-          : {
+        : recipeId === '__swarm__'
+          ? {
+              mode: 'swarm',
               title: byId('goal-title').value.trim(),
               goal: byId('goal-text').value.trim(),
-            }),
+              workerCount: Number(byId('swarm-workers').value),
+              maxConcurrency: Number(byId('swarm-concurrency').value),
+            }
+          : recipeId
+            ? { recipeId }
+            : {
+                title: byId('goal-title').value.trim(),
+                goal: byId('goal-text').value.trim(),
+              }),
     });
     state.selected = task.taskId;
     const url = new URL(location.href);
