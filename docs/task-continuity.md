@@ -163,6 +163,23 @@ The host's candidate-profile receipt remains a context reference pending trusted
 closeout. It does not become `DONE` through this tracking integration. Ordinary
 Archon task execution still uses the run binding and evidence rules below.
 
+### Track work through the packaged entry
+
+The public `temari.mjs` and `poteto-mode.mjs` engineering `start` and `resume`
+commands accept the same separately pinned tracking flags. The
+[bundled tracking guide](../packages/workflow-runtime/public/skills/temari/references/task-tracking.md)
+contains the exact schemas and recovery procedure. Lightweight runs use version 1.
+Full feature runs use version 2 to bind the original project and trusted public
+request/manifest; the canonical host separately verifies the workers' integration
+checkout. Feature preparation saves a handoff before workers launch, so its
+failures remain discoverable even when no stage checkpoint exists.
+
+The task must already be selected. Task discovery remains available through the
+local task CLI and dashboard; the packaged entry does not scan or intercept chats.
+Rebuild the public bundle to acquire this interface. Existing installed caches do
+not change when source files change. QA, worker-only and closeout commands keep
+their own contracts and refuse tracking flags.
+
 ### Layout and everyday flow
 
 - **Left inbox:** search, open/all/done filters, task title, next action, run count,

@@ -84,9 +84,14 @@ function phaseKey(sidecar, phase) {
         sidecar.expected.runId,
         sidecar.expected.revision,
         sidecar.expected.runDirectory,
-        sidecar.expected.candidateRoot,
+        sidecar.schemaVersion === 2
+          ? sidecar.expected.sourceCandidateRoot
+          : sidecar.expected.candidateRoot,
         sidecar.idempotencyKey,
         phase,
+        ...(sidecar.schemaVersion === 2
+          ? [sidecar.expected.requestSha256, sidecar.expected.manifestSha256]
+          : []),
       ]),
     )
     .digest('hex')}`;
@@ -140,7 +145,10 @@ function validateSidecar(value, runtime) {
     ],
     ['create'],
   );
-  assert.equal(value.schemaVersion, 1, 'Unsupported task tracking schema.');
+  assert(
+    value.schemaVersion === 1 || value.schemaVersion === 2,
+    'Unsupported task tracking schema.',
+  );
   absolute(value.taskRoot);
   runtime.assertTaskId(value.taskId);
   text(value.actor, 'actor', 512);
@@ -152,16 +160,34 @@ function validateSidecar(value, runtime) {
       value.expectedVersion <= Number.MAX_SAFE_INTEGER - 3,
     'Invalid task tracking expected version.',
   );
-  exactFields(value.expected, [
-    'runId',
-    'revision',
-    'runDirectory',
-    'candidateRoot',
-  ]);
+  exactFields(
+    value.expected,
+    value.schemaVersion === 2
+      ? [
+          'runId',
+          'revision',
+          'runDirectory',
+          'sourceCandidateRoot',
+          'requestSha256',
+          'manifestSha256',
+        ]
+      : ['runId', 'revision', 'runDirectory', 'candidateRoot'],
+  );
   runtime.assertTaskId(value.expected.runId);
   text(value.expected.revision, 'revision', 512);
   absolute(value.expected.runDirectory);
-  absolute(value.expected.candidateRoot);
+  if (value.schemaVersion === 2) {
+    absolute(value.expected.sourceCandidateRoot);
+    for (const digest of [
+      value.expected.requestSha256,
+      value.expected.manifestSha256,
+    ])
+      assert.match(
+        digest ?? '',
+        /^[a-f0-9]{64}$/,
+        'Task tracking requires pinned public request and manifest digests.',
+      );
+  } else absolute(value.expected.candidateRoot);
   if (value.create !== undefined) {
     exactFields(value.create, ['title', 'goal', 'workspaceRoot']);
     text(value.create.title, 'title', 256);
@@ -219,18 +245,28 @@ export async function prepareTaskTracking({
   paths,
   sidecarPath,
   expectedSha256,
+  artifactRoot,
+  featureContext,
+  requiredSchemaVersion,
 }) {
-  const bindingPath = join(input.runDirectory, 'task-binding.json');
-  const retained = (await exists(bindingPath))
-    ? await readBoundedJson(bindingPath, BINDING_BYTES)
+  const hostBindingPath = join(input.runDirectory, 'task-binding.json');
+  const featureBindingPath = featureContext
+    ? join(featureContext.evidenceRoot, `${input.runId}-task-binding.json`)
     : null;
+  const retainedHost = (await exists(hostBindingPath))
+    ? await readBoundedJson(hostBindingPath, BINDING_BYTES)
+    : null;
+  const retainedFeature =
+    featureBindingPath && (await exists(featureBindingPath))
+      ? await readBoundedJson(featureBindingPath, BINDING_BYTES)
+      : null;
   if (sidecarPath === undefined) {
     assert(
       expectedSha256 === undefined,
       'Task tracking requires both sidecar and expected digest.',
     );
     assert(
-      retained === null,
+      retainedHost === null && retainedFeature === null,
       'This host run is task-tracked; resume requires its explicit task tracking sidecar and digest.',
     );
     return null;
@@ -247,20 +283,57 @@ export async function prepareTaskTracking({
   );
   const sidecar = JSON.parse(utf8.decode(bytes));
   validateSidecar(sidecar, runtime);
+  if (requiredSchemaVersion !== undefined)
+    assert.equal(
+      sidecar.schemaVersion,
+      requiredSchemaVersion,
+      'Task tracking schema differs from the selected public route.',
+    );
+  const feature = sidecar.schemaVersion === 2;
+  assert(
+    !feature || featureContext,
+    'Task tracking schema 2 requires verified public feature context.',
+  );
+  const workspaceRoot = feature
+    ? featureContext.sourceCandidateRoot
+    : input.candidate.root;
+  const bindingPath = feature ? featureBindingPath : hostBindingPath;
+  const retained = feature ? retainedFeature : retainedHost;
+  assert(
+    feature ? retainedHost === null : retainedFeature === null,
+    'Host run task binding cannot switch between execution and public source tracking.',
+  );
   assert.deepEqual(
     sidecar.expected,
     {
       runId: input.runId,
       revision: input.revision,
       runDirectory: input.runDirectory,
-      candidateRoot: input.candidate.root,
+      ...(feature
+        ? {
+            sourceCandidateRoot: featureContext.sourceCandidateRoot,
+            requestSha256: featureContext.hostBinding.requestSha256,
+            manifestSha256: featureContext.hostBinding.manifestSha256,
+          }
+        : { candidateRoot: input.candidate.root }),
     },
     'Task tracking expected host identity mismatch.',
   );
   const root = await taskRoot(sidecar.taskRoot);
-  isolated(root, [input.candidate.root, runtimeRoot, input.runDirectory]);
+  isolated(root, [
+    input.candidate.root,
+    runtimeRoot,
+    input.runDirectory,
+    ...(artifactRoot ? [artifactRoot] : []),
+    ...(feature
+      ? [featureContext.sourceCandidateRoot, featureContext.evidenceRoot]
+      : []),
+    ...(feature && featureContext.artifactRoot
+      ? [featureContext.artifactRoot]
+      : []),
+  ]);
   const binding = {
-    schemaVersion: 1,
+    schemaVersion: sidecar.schemaVersion,
     taskRoot: root,
     taskId: sidecar.taskId,
     ...sidecar.expected,
@@ -282,6 +355,18 @@ export async function prepareTaskTracking({
       location: join(paths.stores[1], `${input.runId}.checkpoint.json`),
     },
     { kind: 'host-evidence', location: paths.stores[2] },
+    ...(feature
+      ? [
+          {
+            kind: 'feature-source-workspace',
+            location: featureContext.sourceCandidateRoot,
+          },
+          {
+            kind: 'feature-worker-evidence',
+            location: featureContext.evidenceRoot,
+          },
+        ]
+      : []),
   ];
   for (const ref of contextRefs) absolute(ref.location);
   const enter = {
@@ -313,7 +398,7 @@ export async function prepareTaskTracking({
       );
       assert.equal(
         await directory(task.workspaceRoot),
-        input.candidate.root,
+        workspaceRoot,
         'Tracked task workspace differs from the canonical candidate scope.',
       );
     } else {
@@ -330,7 +415,7 @@ export async function prepareTaskTracking({
     if (sidecar.create)
       assert.equal(
         await directory(sidecar.create.workspaceRoot),
-        input.candidate.root,
+        workspaceRoot,
         'Task creation workspace differs from the canonical candidate scope.',
       );
     const prior = priorEvent(task, enter, {

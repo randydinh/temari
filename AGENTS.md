@@ -39,6 +39,10 @@ in [host session tracking](docs/migrations/host-session.md#track-the-host-journe
 to retain progress automatically. Keep tracking metadata outside the invocation
 descriptor. A candidate-profile host receipt is a pending-closeout context link;
 never pass it through the simpler task-run verifier or infer `DONE` from host PASS.
+For public engineering start/resume in a rebuilt bundle, follow the
+[installed tracking contract](packages/workflow-runtime/public/skills/temari/references/task-tracking.md).
+Feature tracking pins the original project and public request/manifest before
+workers run; execution still uses the independently verified integration checkout.
 
 ## Local Codex parallel batches
 

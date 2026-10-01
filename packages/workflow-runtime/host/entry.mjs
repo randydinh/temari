@@ -656,6 +656,18 @@ async function main(session) {
     paths,
     sidecarPath: extra[1],
     expectedSha256: extra[3],
+    ...(featureProof
+      ? {
+          featureContext: {
+            artifactRoot: await directory(dirname(runtimeRoot)),
+            sourceCandidateRoot: await directory(
+              input.featureHost.sourceCandidate.root,
+            ),
+            evidenceRoot: await directory(input.featureHost.evidenceRoot),
+            hostBinding: input.featureHost.hostBinding,
+          },
+        }
+      : {}),
   });
   // Pin selected bookkeeping before even the initial resumable checkpoint.
   // Task progress itself still waits for runtime admission at the first handler.

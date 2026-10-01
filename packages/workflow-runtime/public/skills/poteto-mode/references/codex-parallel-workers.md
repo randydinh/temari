@@ -1,5 +1,11 @@
 # Local Codex parallel workers
 
+For a full feature request launched through `temari.mjs` or `poteto-mode.mjs`,
+use [task tracking](../../temari/references/task-tracking.md) when a durable task
+has been selected. Its version-2 sidecar keeps the original project as the task
+scope and records preparation before workers launch. Standalone worker commands
+do not accept tracking flags.
+
 The bundled `bin/codex-parallel.mjs` runs independent local Codex CLI workers. Resolve that file from the installed plugin root and invoke it with Node and an absolute JSON request path:
 
 ```sh

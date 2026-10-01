@@ -922,61 +922,64 @@ process.stdin.on('end', () => {
   }
 });
 
-test('full feature start binds local host proof to six persisted stages', async (t) => {
-  if (process.platform === 'win32')
-    return t.skip('The fake host tools are POSIX executable scripts.');
-  const root = await mkdtemp(join(tmpdir(), 'temari-feature-start-'));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const artifact = join(root, 'artifact');
-  await cp(output, artifact, { recursive: true });
-  const candidate = join(root, 'candidate');
-  execFileSync('git', ['init', '-q', candidate]);
-  execFileSync('git', ['config', 'user.name', 'Test'], { cwd: candidate });
-  execFileSync('git', ['config', 'user.email', 'test@localhost'], {
-    cwd: candidate,
-  });
-  await writeFile(join(candidate, 'README.md'), 'base\n');
-  execFileSync('git', ['add', 'README.md'], { cwd: candidate });
-  execFileSync('git', ['commit', '-qm', 'base'], { cwd: candidate });
-  execFileSync('git', [
-    '-C',
-    candidate,
-    'remote',
-    'add',
-    'origin',
-    'git@github.com:test/repo.git',
-  ]);
-  const baseCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
-    cwd: candidate,
-    encoding: 'utf8',
-  }).trim();
-  const evidenceRoot = join(root, 'worker-evidence');
-  await mkdir(evidenceRoot);
-  const integrationPath = join(
-    evidenceRoot,
-    'feature-start-workers',
-    'build',
-    'feature-start-workers-build',
-    'integration',
-  );
-  const fakeGh = join(root, 'gh');
-  await writeFile(
-    fakeGh,
-    `#!/usr/bin/env node
+for (const trackingMode of ['untracked', 'tracked', 'worker-failure']) {
+  test(`full feature start binds local host proof to six persisted stages (${trackingMode})`, async (t) => {
+    if (process.platform === 'win32')
+      return t.skip('The fake host tools are POSIX executable scripts.');
+    const root = await mkdtemp(join(tmpdir(), 'temari-feature-start-'));
+    t.after(() => rm(root, { recursive: true, force: true }));
+    const artifact = join(root, 'artifact');
+    await cp(output, artifact, { recursive: true });
+    const candidate = join(root, 'candidate');
+    execFileSync('git', ['init', '-q', candidate]);
+    execFileSync('git', ['config', 'user.name', 'Test'], { cwd: candidate });
+    execFileSync('git', ['config', 'user.email', 'test@localhost'], {
+      cwd: candidate,
+    });
+    await writeFile(join(candidate, 'README.md'), 'base\n');
+    execFileSync('git', ['add', 'README.md'], { cwd: candidate });
+    execFileSync('git', ['commit', '-qm', 'base'], { cwd: candidate });
+    execFileSync('git', [
+      '-C',
+      candidate,
+      'remote',
+      'add',
+      'origin',
+      'git@github.com:test/repo.git',
+    ]);
+    const baseCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: candidate,
+      encoding: 'utf8',
+    }).trim();
+    const evidenceRoot = join(root, 'worker-evidence');
+    await mkdir(evidenceRoot);
+    const integrationPath = join(
+      evidenceRoot,
+      'feature-start-workers',
+      'build',
+      'feature-start-workers-build',
+      'integration',
+    );
+    const fakeGh = join(root, 'gh');
+    await writeFile(
+      fakeGh,
+      `#!/usr/bin/env node
 const {execFileSync} = require('node:child_process');
+require('node:fs').appendFileSync(process.env.FAKE_FORGE_LOG, 'forge\\n');
 const args = process.argv.slice(2).join(' ');
 if (args === 'api user --jq .login') console.log('test-user');
 else if (args === 'api repos/test/repo') console.log(JSON.stringify({full_name:'test/repo',html_url:'https://github.com/test/repo',permissions:{push:true}}));
 else if (args === 'api repos/test/repo/pulls/7') console.log(JSON.stringify({html_url:'https://github.com/test/repo/pull/7',base:{repo:{full_name:'test/repo'}},head:{sha:execFileSync('git',['-C',process.env.FAKE_INTEGRATION_PATH,'rev-parse','HEAD'],{encoding:'utf8'}).trim()},state:'open'}));
 else process.exit(3);
 `,
-  );
-  await chmod(fakeGh, 0o755);
-  const fakeCodex = join(root, 'codex');
-  await writeFile(
-    fakeCodex,
-    `#!/usr/bin/env node
+    );
+    await chmod(fakeGh, 0o755);
+    const fakeCodex = join(root, 'codex');
+    await writeFile(
+      fakeCodex,
+      `#!/usr/bin/env node
 const fs = require('node:fs');
+fs.appendFileSync(process.env.FAKE_WORKER_LOG, 'worker\\n');
 const args = process.argv.slice(2);
 const final = args[args.indexOf('--output-last-message') + 1];
 const sandbox = args[args.indexOf('--sandbox') + 1];
@@ -985,257 +988,409 @@ process.stdin.on('data', chunk => prompt += chunk);
 process.stdin.on('end', () => {
   const id = prompt.match(/Goal: ([A-Za-z]+)/)?.[1] ?? 'unknown';
   if (sandbox === 'workspace-write') fs.writeFileSync(id + '.txt', id + '\\n');
-  fs.writeFileSync(final, JSON.stringify({status:'PASS',summary:id}));
+  fs.writeFileSync(final, JSON.stringify({status:process.env.FAKE_WORKER_FAIL === 'yes' ? 'ISSUES' : 'PASS',summary:id}));
 });
 `,
-  );
-  await chmod(fakeCodex, 0o755);
-  const brief = (id) => ({
-    goal: id,
-    context: 'feature lifecycle test',
-    scope: id,
-    acceptanceCriteria: ['produce result'],
-    verificationCommand: null,
-    reportFormat: 'json',
-    forbiddenActions: ['stay in scope'],
-  });
-  const runDirectory = join(root, 'run');
-  const featureRequest = {
-    ...request('temari'),
-    invocation: {
-      runId: 'feature-start',
-      revision: 'selected-feature',
-      candidate: { scopeId: 'feature-candidate', root: candidate },
-      runDirectory,
-    },
-    featureWorkers: {
-      evidenceRoot,
-      baseCommit,
-      timeoutMs: 5000,
-      architect: {
-        id: 'architect',
-        role: 'investigator',
-        required: true,
-        brief: brief('design'),
+    );
+    await chmod(fakeCodex, 0o755);
+    const brief = (id) => ({
+      goal: id,
+      context: 'feature lifecycle test',
+      scope: id,
+      acceptanceCriteria: ['produce result'],
+      verificationCommand: null,
+      reportFormat: 'json',
+      forbiddenActions: ['stay in scope'],
+    });
+    const runDirectory = join(root, 'run');
+    const featureRequest = {
+      ...request('temari'),
+      invocation: {
+        runId: 'feature-start',
+        revision: 'selected-feature',
+        candidate: { scopeId: 'feature-candidate', root: candidate },
+        runDirectory,
       },
-      builder: {
-        id: 'builder',
-        role: 'implementer',
-        required: true,
-        brief: brief('delta'),
-      },
-      owns: [{ kind: 'file', path: 'delta.txt' }],
-      verify: [
-        {
-          program: process.execPath,
-          args: [
-            '-e',
-            "if(!require('fs').existsSync('delta.txt'))process.exit(5)",
-          ],
+      featureWorkers: {
+        evidenceRoot,
+        baseCommit,
+        timeoutMs: 5000,
+        architect: {
+          id: 'architect',
+          role: 'investigator',
+          required: true,
+          brief: brief('design'),
         },
-      ],
-      reviewer: {
-        id: 'reviewer',
-        role: 'reviewer',
-        required: true,
-        brief: brief('review'),
+        builder: {
+          id: 'builder',
+          role: 'implementer',
+          required: true,
+          brief: brief('delta'),
+        },
+        owns: [{ kind: 'file', path: 'delta.txt' }],
+        verify: [
+          {
+            program: process.execPath,
+            args: [
+              '-e',
+              "if(!require('fs').existsSync('delta.txt'))process.exit(5)",
+            ],
+          },
+        ],
+        reviewer: {
+          id: 'reviewer',
+          role: 'reviewer',
+          required: true,
+          brief: brief('review'),
+        },
       },
-    },
-  };
-  const requestBytes = Buffer.from(JSON.stringify(featureRequest));
-  const requestPath = join(root, 'request.json');
-  await writeFile(requestPath, requestBytes);
-  const launch = (mode) => {
-    const child = spawn(
-      process.execPath,
+    };
+    const requestBytes = Buffer.from(JSON.stringify(featureRequest));
+    const requestPath = join(root, 'request.json');
+    await writeFile(requestPath, requestBytes);
+    const fixture = {
+      root,
+      artifact,
+      candidate,
+      runDirectory,
+      request: featureRequest,
+    };
+    let tracking =
+      trackingMode === 'untracked'
+        ? null
+        : await installedTracking(fixture, {
+            schemaVersion: 2,
+            expected: {
+              runId: featureRequest.invocation.runId,
+              revision: featureRequest.invocation.revision,
+              runDirectory: join(await realpath(root), 'run'),
+              sourceCandidateRoot: await realpath(candidate),
+              requestSha256: digest(requestBytes),
+              manifestSha256: manifestSha256(manifest),
+            },
+          });
+    const launch = (mode, extra = tracking?.args ?? []) => {
+      const child = spawn(
+        process.execPath,
+        [
+          join(artifact, 'bin/temari.mjs'),
+          mode,
+          '--request',
+          requestPath,
+          '--expected-request-sha256',
+          digest(requestBytes),
+          '--expected-manifest-sha256',
+          manifestSha256(manifest),
+          ...extra,
+        ],
+        {
+          cwd: root,
+          env: {
+            ...process.env,
+            PATH: `${root}:${process.env.PATH}`,
+            FAKE_INTEGRATION_PATH: integrationPath,
+            FAKE_FORGE_LOG: join(root, 'forge-calls.log'),
+            FAKE_WORKER_LOG: join(root, 'worker-calls.log'),
+            FAKE_WORKER_FAIL: trackingMode === 'worker-failure' ? 'yes' : 'no',
+            NODE_OPTIONS: '',
+            NODE_PATH: '',
+          },
+          stdio: ['pipe', 'pipe', 'pipe'],
+        },
+      );
+      let buffer = '';
+      let stderr = '';
+      const messages = [];
+      let waiter;
+      child.stderr.setEncoding('utf8').on('data', (part) => (stderr += part));
+      child.stdout.setEncoding('utf8').on('data', (part) => {
+        buffer += part;
+        let end;
+        while ((end = buffer.indexOf('\n')) >= 0) {
+          const message = JSON.parse(buffer.slice(0, end));
+          buffer = buffer.slice(end + 1);
+          if (waiter) {
+            clearTimeout(waiter.timer);
+            waiter.resolve(message);
+            waiter = undefined;
+          } else messages.push(message);
+        }
+      });
+      const done = new Promise((resolve, reject) => {
+        child.once('error', reject);
+        child.once('close', (code) => resolve(code));
+      });
+      t.after(async () => {
+        if (child.exitCode === null) child.kill('SIGKILL');
+        await done;
+      });
+      return {
+        child,
+        done,
+        stderr: () => stderr,
+        next: async () => {
+          if (messages.length) return messages.shift();
+          return new Promise((resolve, reject) => {
+            waiter = {
+              resolve,
+              reject,
+              timer: setTimeout(
+                () => reject(new Error(`Feature stage timeout: ${stderr}`)),
+                15000,
+              ),
+            };
+          });
+        },
+      };
+    };
+    if (tracking) {
+      for (const variant of [
+        'wrong-digest',
+        'wrong-request',
+        'wrong-source',
+        'evidence-overlap',
+      ]) {
+        let invalid = tracking;
+        if (variant === 'wrong-digest')
+          invalid = { args: [...tracking.args.slice(0, 3), '0'.repeat(64)] };
+        else {
+          const expected = { ...tracking.payload.expected };
+          if (variant === 'wrong-request')
+            expected.requestSha256 = '0'.repeat(64);
+          if (variant === 'wrong-source')
+            expected.sourceCandidateRoot = await realpath(evidenceRoot);
+          invalid = await installedTracking(
+            fixture,
+            {
+              ...tracking.payload,
+              expected,
+              ...(variant === 'evidence-overlap'
+                ? { taskRoot: join(await realpath(evidenceRoot), 'tasks') }
+                : {}),
+            },
+            variant,
+          );
+        }
+        const rejected = launch('start', invalid.args);
+        assert.notEqual(await rejected.done, 0, variant);
+        await assert.rejects(lstat(join(root, 'forge-calls.log')), {
+          code: 'ENOENT',
+        });
+        await assert.rejects(lstat(join(root, 'worker-calls.log')), {
+          code: 'ENOENT',
+        });
+        assert.deepEqual(await readdir(evidenceRoot), []);
+        await assert.rejects(lstat(tracking.payload.taskRoot), {
+          code: 'ENOENT',
+        });
+      }
+    }
+    let session = launch('start');
+    if (trackingMode === 'worker-failure') {
+      assert.notEqual(await session.done, 0);
+      const failed = await installedTask(fixture, tracking);
+      assert.equal(failed.task.version, 3);
+      assert.match(failed.task.handoff.summary, /interrupted/i);
+      assert.equal((await failed.pickup()).selected.status, 'BLOCKED');
+      const canonicalEvidenceRoot = await realpath(evidenceRoot);
+      assert(
+        failed.task.handoff.contextRefs.some((ref) =>
+          ref.location.startsWith(canonicalEvidenceRoot),
+        ),
+      );
+      await assert.rejects(lstat(runDirectory), { code: 'ENOENT' });
+      const workersBefore = await readFile(join(root, 'worker-calls.log'));
+      const forgeBefore = await readFile(join(root, 'forge-calls.log'));
+      const omitted = launch('start', []);
+      assert.notEqual(await omitted.done, 0);
+      assert.match(omitted.stderr(), /task-tracked/);
+      assert.deepEqual(
+        await readFile(join(root, 'worker-calls.log')),
+        workersBefore,
+      );
+      assert.deepEqual(
+        await readFile(join(root, 'forge-calls.log')),
+        forgeBefore,
+      );
+      return;
+    }
+    let resumed = false;
+    const seen = [];
+    while (true) {
+      const message = await session.next();
+      if (message.type === 'complete') {
+        assert.equal(message.status, 'PASS', session.stderr());
+        break;
+      }
+      if (message.type !== 'stage') continue;
+      if (message.stage === 'plan' && !resumed) {
+        session.child.kill('SIGKILL');
+        await session.done;
+        if (tracking) {
+          const retained = await installedTask(fixture, tracking);
+          assert.equal(retained.task.workspaceRoot, await realpath(candidate));
+          assert.notEqual(
+            retained.task.workspaceRoot,
+            await realpath(integrationPath),
+          );
+          const omitted = launch('resume', []);
+          assert.notEqual(await omitted.done, 0);
+          assert.match(omitted.stderr(), /task-tracked/);
+          const switched = await installedTracking(
+            fixture,
+            {
+              ...tracking.payload,
+              taskId: 'switched-goal',
+            },
+            'switched-feature',
+          );
+          assert.notEqual(await launch('resume', switched.args).done, 0);
+          tracking = await installedTracking(
+            fixture,
+            {
+              ...tracking.payload,
+              expectedVersion: retained.task.version,
+              create: undefined,
+              idempotencyKey: 'installed-feature-resume',
+              session: {
+                host: 'codex',
+                sessionId: 'installed-feature-chat-two',
+              },
+            },
+            'resume-feature',
+          );
+        }
+        session = launch('resume');
+        resumed = true;
+        continue;
+      }
+      seen.push(message.stage);
+      const sourceRequired = ['investigate', 'plan', 'deliver'].includes(
+        message.stage,
+      );
+      await writeFile(
+        join(message.workspace, 'observation.txt'),
+        `stage ${message.stage}\n`,
+      );
+      if (sourceRequired)
+        await writeFile(
+          join(message.workspace, 'source.txt'),
+          message.stage === 'deliver'
+            ? JSON.stringify({
+                pullRequestUrl: 'https://github.com/test/repo/pull/7',
+              })
+            : `documented ${message.stage}\n`,
+        );
+      await writeFile(
+        join(message.workspace, 'host-result.json'),
+        JSON.stringify({
+          schemaVersion: 1,
+          sessionId: message.sessionId,
+          requestId: message.requestId,
+          stage: message.stage,
+          status: 'PASS',
+          summary: `feature ${message.stage} complete`,
+          evidence: [
+            {
+              name: 'observation',
+              kind: 'verification',
+              path: 'observation.txt',
+            },
+            ...(sourceRequired
+              ? [{ name: 'source', kind: 'other', path: 'source.txt' }]
+              : []),
+          ],
+        }),
+      );
+      session.child.stdin.write(
+        JSON.stringify({
+          type: 'result',
+          sessionId: message.sessionId,
+          requestId: message.requestId,
+          stage: message.stage,
+        }) + '\n',
+      );
+    }
+    assert.equal(await session.done, 0, session.stderr());
+    assert(resumed, 'Feature lifecycle did not resume.');
+    assert.equal(
+      (await readFile(join(root, 'worker-calls.log'), 'utf8'))
+        .trim()
+        .split('\n').length,
+      3,
+    );
+    if (tracking) {
+      const completed = await installedTask(fixture, tracking);
+      assert.equal(completed.task.sessions.length, 2);
+      assert.equal(
+        completed.task.events.filter(
+          (event) => event.change.type === 'task-entered',
+        ).length,
+        2,
+      );
+      assert.equal(completed.task.workspaceRoot, await realpath(candidate));
+      assert.deepEqual(completed.task.runs, []);
+      assert.equal(completed.task.acceptance, null);
+      assert.match(completed.task.handoff.summary, /PASS/);
+      assert.equal((await completed.pickup()).selected.status, 'OPEN');
+    }
+    assert.deepEqual(seen, [
+      'investigate',
+      'plan',
+      'build',
+      'review',
+      'verify',
+      'deliver',
+    ]);
+    assert.equal(
+      execFileSync('git', ['-C', candidate, 'rev-parse', 'HEAD'], {
+        encoding: 'utf8',
+      }).trim(),
+      baseCommit,
+    );
+    const descriptor = JSON.parse(
+      await readFile(join(runDirectory, 'config/input.json'), 'utf8'),
+    );
+    assert.deepEqual(descriptor.plan.requiredCapabilities, [
+      'subagents',
+      'forge',
+    ]);
+    assert.equal(descriptor.candidate.root, await realpath(integrationPath));
+    const artifactRequire = createRequire(
+      pathToFileURL(join(artifact, 'runtime/consumer.mjs')),
+    );
+    const runtime = await import(
+      pathToFileURL(artifactRequire.resolve('@temari/runtime')).href
+    );
+    const current = await runtime.observeCandidate(descriptor.candidate);
+    const currentBytes = Buffer.from(JSON.stringify(current));
+    const currentPath = join(root, 'current.json');
+    await writeFile(currentPath, currentBytes);
+    const closeout = await childResult(
       [
-        join(artifact, 'bin/temari.mjs'),
-        mode,
+        join(artifact, 'bin/closeout.mjs'),
+        'verify',
         '--request',
         requestPath,
         '--expected-request-sha256',
         digest(requestBytes),
         '--expected-manifest-sha256',
         manifestSha256(manifest),
+        '--expected-current',
+        currentPath,
+        '--expected-current-sha256',
+        digest(currentBytes),
       ],
+      0,
       {
-        cwd: root,
-        env: {
-          ...process.env,
-          PATH: `${root}:${process.env.PATH}`,
-          FAKE_INTEGRATION_PATH: integrationPath,
-          NODE_OPTIONS: '',
-          NODE_PATH: '',
-        },
-        stdio: ['pipe', 'pipe', 'pipe'],
+        PATH: `${root}:${process.env.PATH}`,
+        FAKE_INTEGRATION_PATH: integrationPath,
+        FAKE_FORGE_LOG: join(root, 'forge-calls.log'),
       },
     );
-    let buffer = '';
-    let stderr = '';
-    const messages = [];
-    let waiter;
-    child.stderr.setEncoding('utf8').on('data', (part) => (stderr += part));
-    child.stdout.setEncoding('utf8').on('data', (part) => {
-      buffer += part;
-      let end;
-      while ((end = buffer.indexOf('\n')) >= 0) {
-        const message = JSON.parse(buffer.slice(0, end));
-        buffer = buffer.slice(end + 1);
-        if (waiter) {
-          clearTimeout(waiter.timer);
-          waiter.resolve(message);
-          waiter = undefined;
-        } else messages.push(message);
-      }
-    });
-    const done = new Promise((resolve, reject) => {
-      child.once('error', reject);
-      child.once('close', (code) => resolve(code));
-    });
-    t.after(async () => {
-      if (child.exitCode === null) child.kill('SIGKILL');
-      await done;
-    });
-    return {
-      child,
-      done,
-      stderr: () => stderr,
-      next: async () => {
-        if (messages.length) return messages.shift();
-        return new Promise((resolve, reject) => {
-          waiter = {
-            resolve,
-            reject,
-            timer: setTimeout(
-              () => reject(new Error(`Feature stage timeout: ${stderr}`)),
-              15000,
-            ),
-          };
-        });
-      },
-    };
-  };
-  let session = launch('start');
-  let resumed = false;
-  const seen = [];
-  while (true) {
-    const message = await session.next();
-    if (message.type === 'complete') {
-      assert.equal(message.status, 'PASS', session.stderr());
-      break;
-    }
-    if (message.type !== 'stage') continue;
-    if (message.stage === 'plan' && !resumed) {
-      session.child.kill('SIGKILL');
-      await session.done;
-      session = launch('resume');
-      resumed = true;
-      continue;
-    }
-    seen.push(message.stage);
-    const sourceRequired = ['investigate', 'plan', 'deliver'].includes(
-      message.stage,
-    );
-    await writeFile(
-      join(message.workspace, 'observation.txt'),
-      `stage ${message.stage}\n`,
-    );
-    if (sourceRequired)
-      await writeFile(
-        join(message.workspace, 'source.txt'),
-        message.stage === 'deliver'
-          ? JSON.stringify({
-              pullRequestUrl: 'https://github.com/test/repo/pull/7',
-            })
-          : `documented ${message.stage}\n`,
-      );
-    await writeFile(
-      join(message.workspace, 'host-result.json'),
-      JSON.stringify({
-        schemaVersion: 1,
-        sessionId: message.sessionId,
-        requestId: message.requestId,
-        stage: message.stage,
-        status: 'PASS',
-        summary: `feature ${message.stage} complete`,
-        evidence: [
-          {
-            name: 'observation',
-            kind: 'verification',
-            path: 'observation.txt',
-          },
-          ...(sourceRequired
-            ? [{ name: 'source', kind: 'other', path: 'source.txt' }]
-            : []),
-        ],
-      }),
-    );
-    session.child.stdin.write(
-      JSON.stringify({
-        type: 'result',
-        sessionId: message.sessionId,
-        requestId: message.requestId,
-        stage: message.stage,
-      }) + '\n',
-    );
-  }
-  assert.equal(await session.done, 0, session.stderr());
-  assert(resumed, 'Feature lifecycle did not resume.');
-  assert.deepEqual(seen, [
-    'investigate',
-    'plan',
-    'build',
-    'review',
-    'verify',
-    'deliver',
-  ]);
-  assert.equal(
-    execFileSync('git', ['-C', candidate, 'rev-parse', 'HEAD'], {
-      encoding: 'utf8',
-    }).trim(),
-    baseCommit,
-  );
-  const descriptor = JSON.parse(
-    await readFile(join(runDirectory, 'config/input.json'), 'utf8'),
-  );
-  assert.deepEqual(descriptor.plan.requiredCapabilities, [
-    'subagents',
-    'forge',
-  ]);
-  assert.equal(descriptor.candidate.root, await realpath(integrationPath));
-  const artifactRequire = createRequire(
-    pathToFileURL(join(artifact, 'runtime/consumer.mjs')),
-  );
-  const runtime = await import(
-    pathToFileURL(artifactRequire.resolve('@temari/runtime')).href
-  );
-  const current = await runtime.observeCandidate(descriptor.candidate);
-  const currentBytes = Buffer.from(JSON.stringify(current));
-  const currentPath = join(root, 'current.json');
-  await writeFile(currentPath, currentBytes);
-  const closeout = await childResult(
-    [
-      join(artifact, 'bin/closeout.mjs'),
-      'verify',
-      '--request',
-      requestPath,
-      '--expected-request-sha256',
-      digest(requestBytes),
-      '--expected-manifest-sha256',
-      manifestSha256(manifest),
-      '--expected-current',
-      currentPath,
-      '--expected-current-sha256',
-      digest(currentBytes),
-    ],
-    0,
-    {
-      PATH: `${root}:${process.env.PATH}`,
-      FAKE_INTEGRATION_PATH: integrationPath,
-    },
-  );
-  assert.equal(JSON.parse(closeout.stdout).status, 'candidate-verified');
-});
+    assert.equal(JSON.parse(closeout.stdout).status, 'candidate-verified');
+  });
+}
 
 test('both engineering skills reach the complete versioned QA writer inside the artifact', async () => {
   for (const entry of ['temari', 'poteto-mode']) {
@@ -1766,6 +1921,7 @@ async function installedFixture(t, entry = 'temari') {
     mode = 'start',
     digest = createHash('sha256').update(requestBytes).digest('hex'),
     loader,
+    extra = [],
   ) => {
     const args = [
       ...(loader ? ['--experimental-loader', pathToFileURL(loader).href] : []),
@@ -1777,6 +1933,7 @@ async function installedFixture(t, entry = 'temari') {
       digest,
       '--expected-manifest-sha256',
       manifestSha256(manifest),
+      ...extra,
     ];
     const child = spawn(process.execPath, args, {
       cwd: root,
@@ -1862,6 +2019,246 @@ async function installedFixture(t, entry = 'temari') {
 }
 
 const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
+
+async function installedTracking(f, changes = {}, name = 'tracking') {
+  const root = await realpath(f.root);
+  const candidateRoot = await realpath(f.candidate);
+  const payload = {
+    schemaVersion: 1,
+    taskRoot: join(root, 'tasks'),
+    taskId: 'installed-goal',
+    actor: 'temari-coordinator',
+    session: { host: 'codex', sessionId: 'installed-chat-one' },
+    expectedVersion: 0,
+    idempotencyKey: 'installed-start',
+    create: {
+      title: 'Continue work through the installed entry',
+      goal: 'Retain one goal across process loss and fresh chats.',
+      workspaceRoot: candidateRoot,
+    },
+    expected: {
+      runId: f.request.invocation.runId,
+      revision: f.request.invocation.revision,
+      runDirectory: join(root, 'run'),
+      candidateRoot,
+    },
+    ...changes,
+  };
+  if (Object.hasOwn(changes, 'create') && changes.create === undefined)
+    delete payload.create;
+  const path = join(root, `${name}.json`);
+  const bytes = JSON.stringify(payload);
+  await writeFile(path, bytes);
+  return {
+    payload,
+    path,
+    args: [
+      '--task-tracking',
+      path,
+      '--expected-task-tracking-sha256',
+      digest(bytes),
+    ],
+  };
+}
+
+async function installedTask(f, tracking) {
+  const require = createRequire(
+    pathToFileURL(join(f.artifact, 'runtime/consumer.mjs')),
+  );
+  const runtime = await import(
+    pathToFileURL(require.resolve('@temari/runtime')).href
+  );
+  const store = await runtime.FileTaskStore.openExisting(
+    tracking.payload.taskRoot,
+  );
+  return {
+    runtime,
+    store,
+    task: await store.load(tracking.payload.taskId),
+    pickup: () =>
+      new runtime.TaskRuntime({ store }).pickup({
+        taskId: tracking.payload.taskId,
+      }),
+  };
+}
+
+for (const entry of ['temari', 'poteto-mode']) {
+  test(`installed ${entry} retains task context through interruption and a fresh-chat resume`, async (t) => {
+    const f = await installedFixture(t, entry);
+    const tracking = await installedTracking(f);
+    const first = f.launch('start', undefined, undefined, tracking.args);
+    const stages = [];
+    while (true) {
+      const message = await first.next();
+      if (message.type === 'checkpoint' && message.stage === 'build') break;
+      if (message.type !== 'stage') continue;
+      stages.push(message.stage);
+      await answerStage(f, first, message);
+    }
+    first.child.stdin.end();
+    assert.notEqual((await first.done).code, 0);
+    const descriptor = await readFile(
+      join(f.runDirectory, 'config/input.json'),
+    );
+    const interrupted = await installedTask(f, tracking);
+    assert.equal(interrupted.task.version, 2);
+    assert.match(interrupted.task.handoff.summary, /Starting or resuming/);
+    assert(
+      interrupted.task.handoff.contextRefs.some(
+        (ref) => ref.kind === 'host-checkpoint',
+      ),
+    );
+    assert.equal((await interrupted.pickup()).selected.status, 'OPEN');
+    const omitted = await f.launch('resume').done;
+    assert.notEqual(omitted.code, 0);
+    assert.match(omitted.stderr, /task-tracked/);
+    const switched = await installedTracking(
+      f,
+      { taskId: 'another-goal' },
+      'switched',
+    );
+    assert.notEqual(
+      (await f.launch('resume', undefined, undefined, switched.args).done).code,
+      0,
+    );
+    const resumedTracking = await installedTracking(
+      f,
+      {
+        expectedVersion: interrupted.task.version,
+        create: undefined,
+        idempotencyKey: 'installed-resume',
+        session: { host: 'codex', sessionId: 'installed-chat-two' },
+      },
+      'resume-tracking',
+    );
+    const resumed = f.launch(
+      'resume',
+      undefined,
+      undefined,
+      resumedTracking.args,
+    );
+    while (true) {
+      const message = await resumed.next();
+      if (message.type === 'complete') {
+        assert.equal(message.status, 'PASS');
+        break;
+      }
+      if (message.type !== 'stage') continue;
+      stages.push(message.stage);
+      await answerStage(f, resumed, message);
+    }
+    const result = await resumed.done;
+    assert.equal(result.code, 0, result.stderr);
+    assert.deepEqual(stages, [
+      'investigate',
+      'plan',
+      'build',
+      'review',
+      'verify',
+      'deliver',
+    ]);
+    assert.deepEqual(
+      await readFile(join(f.runDirectory, 'config/input.json')),
+      descriptor,
+    );
+    const completed = await installedTask(f, tracking);
+    assert.equal(completed.task.version, 5);
+    assert.equal(completed.task.sessions.length, 2);
+    assert.deepEqual(completed.task.runs, []);
+    assert.equal(completed.task.acceptance, null);
+    assert.match(completed.task.handoff.summary, /PASS/);
+    assert.equal((await completed.pickup()).selected.status, 'OPEN');
+    assert(
+      completed.task.handoff.contextRefs.some(
+        (ref) => ref.kind === 'host-receipt-pending-closeout',
+      ),
+    );
+    const terminal = await f.launch(
+      'resume',
+      undefined,
+      undefined,
+      resumedTracking.args,
+    ).done;
+    assert.notEqual(terminal.code, 0);
+    assert.deepEqual((await installedTask(f, tracking)).task, completed.task);
+  });
+}
+
+test('installed tracking rejects invalid selection and malformed flag pairs before stage work', async (t) => {
+  for (const variant of [
+    'missing-digest',
+    'wrong-digest',
+    'duplicate',
+    'unknown',
+    'wrong-run',
+    'bundle-overlap',
+    'stale-version',
+  ]) {
+    await t.test(variant, async (t) => {
+      const f = await installedFixture(t);
+      const tracking = await installedTracking(f);
+      let args = tracking.args;
+      if (variant === 'missing-digest') args = args.slice(0, 2);
+      if (variant === 'wrong-digest')
+        args = [...args.slice(0, 3), '0'.repeat(64)];
+      if (variant === 'duplicate') args = [...args, ...args];
+      if (variant === 'unknown') args = [...args, '--unexpected', 'value'];
+      if (variant === 'wrong-run')
+        args = (
+          await installedTracking(f, {
+            expected: { ...tracking.payload.expected, runId: 'unselected-run' },
+          })
+        ).args;
+      if (variant === 'bundle-overlap')
+        args = (
+          await installedTracking(f, {
+            taskRoot: join(await realpath(f.artifact), 'new-task-store'),
+          })
+        ).args;
+      if (variant === 'stale-version')
+        args = (
+          await installedTracking(f, { expectedVersion: 7, create: undefined })
+        ).args;
+      const result = await f.launch('start', undefined, undefined, args).done;
+      assert.notEqual(result.code, 0);
+      assert(!result.messages.some((message) => message.type === 'stage'));
+      assert.equal(
+        await readFile(join(f.candidate, 'product.txt'), 'utf8'),
+        'pear\napple\n',
+      );
+      await assert.rejects(lstat(tracking.payload.taskRoot), {
+        code: 'ENOENT',
+      });
+      await assert.rejects(
+        lstat(
+          join(f.runDirectory, 'receipts/installed-lightweight.receipt.json'),
+        ),
+        { code: 'ENOENT' },
+      );
+    });
+  }
+});
+
+test('task tracking is refused on QA, worker-only and admission commands', async (t) => {
+  for (const command of ['qa', 'run-workers', 'admit']) {
+    await t.test(command, async (t) => {
+      const f = await installedFixture(t);
+      const tracking = await installedTracking(f);
+      const result = await f.launch(
+        command,
+        undefined,
+        undefined,
+        tracking.args,
+      ).done;
+      assert.notEqual(result.code, 0);
+      assert.match(result.stderr, /tracking|digests|Usage/i);
+      await assert.rejects(lstat(f.runDirectory), { code: 'ENOENT' });
+      await assert.rejects(lstat(tracking.payload.taskRoot), {
+        code: 'ENOENT',
+      });
+    });
+  }
+});
 
 function canonicalReceipt(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalReceipt).join(',')}]`;

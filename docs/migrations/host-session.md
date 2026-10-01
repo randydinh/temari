@@ -113,8 +113,9 @@ untracked or move to another task, including after a crash before stage dispatch
 A fresh chat uses that same task with its current version and a new idempotency
 key.
 
-Normal completion or interruption records a handoff automatically. A hard process
-kill preserves the task binding, any saved handoff and runtime checkpoints for
+Normal completion or a caught execution failure records a handoff automatically.
+A hard process kill or abrupt transport loss preserves the task binding, any saved
+handoff and runtime checkpoints for
 recovery. A crash during the initial binding write leaves no partial final binding;
 the original host recovery rules still apply if no initial checkpoint was saved.
 If another chat changes the task during execution, the final handoff refuses to
@@ -126,9 +127,12 @@ nonresumable.
 These host receipts use `candidate-stage-evidence-v1`. Their locations are
 **context references pending trusted closeout**, not ordinary `TaskRun` evidence
 bindings. A host `PASS` does not mark the task `DONE` or satisfy feature delivery.
-Use the existing trusted candidate closeout route. This source integration does
-not intercept every chat, update the installed plugin, or change the public
-entry's existing request and manifest checks.
+Use the existing trusted candidate closeout route. The
+[packaged entry tracking contract](../../packages/workflow-runtime/public/skills/temari/references/task-tracking.md)
+extends this bookkeeping to admitted public engineering starts and resumes in a
+rebuilt bundle. Its feature schema preserves the original task workspace while
+the host verifies the integration checkout. Existing installed bundles need a
+rebuild; tracking does not intercept every chat.
 
 ## Private dialogue
 

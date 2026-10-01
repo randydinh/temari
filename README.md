@@ -30,6 +30,8 @@ tree — [docs/overlays.md](docs/overlays.md).
   When pickup returns choices, select the intended goal explicitly.
   For source host execution, the [tracked host entry](docs/migrations/host-session.md#track-the-host-journey-as-a-durable-task)
   saves recovery and outcome handoffs automatically around the existing stage dialogue.
+  Rebuilt public bundles support [installed entry tracking](packages/workflow-runtime/public/skills/temari/references/task-tracking.md)
+  for lightweight and feature engineering, including worker preparation failures.
 - **Route a request:** [Temari coordinator and worker contracts](docs/system-roles-and-responsibilities.md#decision-and-control-owners),
   [one workflow](docs/workflow.md), and the packaged
   [Temari](packages/workflow-runtime/assets/v4.1/skills/temari/SKILL.md) and

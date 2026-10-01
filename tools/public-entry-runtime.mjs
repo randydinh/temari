@@ -86,6 +86,10 @@ const publicFiles = [
     'skills/temari/SKILL.md',
   ],
   [
+    'packages/workflow-runtime/public/skills/temari/references/task-tracking.md',
+    'skills/temari/references/task-tracking.md',
+  ],
+  [
     'packages/workflow-runtime/public/skills/poteto-mode/SKILL.md',
     'skills/poteto-mode/SKILL.md',
   ],
