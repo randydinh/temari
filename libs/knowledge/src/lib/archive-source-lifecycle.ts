@@ -1,8 +1,8 @@
 /** An operator-triggered handoff between two complete captures of one source. */
 import assert from 'node:assert/strict';
 import { lstat } from 'node:fs/promises';
-import { isAbsolute, join } from 'node:path';
-import { canonical, digest, hash } from './codec.js';
+import { basename, dirname, isAbsolute, join } from 'node:path';
+import { canonical, digest, hash, object, text } from './codec.js';
 import {
   captureArchive,
   loadArchivePublication,
@@ -31,6 +31,12 @@ export interface ArchiveSourceRecaptureInput {
   readonly beforeGraphId?: string;
 }
 
+export interface ArchiveSourceResumeInput {
+  readonly beforePublicationPath: string;
+  readonly resultPath: string;
+  readonly beforeGraphId?: string;
+}
+
 type DiffCounts = ArchiveGenerationDiffReceipt['counts'];
 type ImpactCounts = ArchiveGraphImpactReceipt['counts'];
 
@@ -56,6 +62,25 @@ export interface ArchiveSourceRecaptureReceipt {
   };
   readonly currentOriginal: 'not-checked';
   readonly graphMutation: 'none';
+}
+
+export interface ArchiveSourceResumeReceipt extends Omit<
+  ArchiveSourceRecaptureReceipt,
+  'kind'
+> {
+  readonly kind: 'temari-archive-source-resume';
+  /** The persisted capture does not prove the failed caller's original v1. */
+  readonly beforeSelection: 'operator-selected-on-resume';
+  readonly captureAttemptSha256: string;
+  readonly captureResultSha256: string;
+  readonly captureBindingSha256: string;
+}
+
+export interface ArchiveSourceResumeOutcome {
+  readonly status: 'handoff';
+  readonly capture: ArchiveIntakeOutcome;
+  readonly receiptPath: string;
+  readonly receipt: ArchiveSourceResumeReceipt;
 }
 
 export type ArchiveSourceRecaptureOutcome =
@@ -118,6 +143,33 @@ async function exactReceipt(path: string, receipt: unknown): Promise<string> {
   return hash(bytes);
 }
 
+async function exactArtifact(path: string): Promise<{
+  value: unknown;
+  sha256: string;
+}> {
+  const { value, bytes } = await readJsonWithBytes(path);
+  assert.equal(
+    bytes.toString('utf8'),
+    canonical(value),
+    'Persisted artifact is not canonical',
+  );
+  return { value, sha256: hash(bytes) };
+}
+
+function observedMicros(value: unknown): bigint {
+  const timestamp = text(value);
+  const parts =
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.(\d{1,6}))?(?:Z|[+-]\d{2}:\d{2})$/.exec(
+      timestamp,
+    );
+  assert(parts, 'Unsupported archive observation timestamp');
+  const millis = Date.parse(timestamp);
+  assert(Number.isSafeInteger(millis), 'Invalid archive observation timestamp');
+  const fractionMicros = Number((parts[1] ?? '').padEnd(6, '0'));
+  // Date keeps milliseconds; restore the remaining Registrar microseconds.
+  return BigInt(millis) * 1000n + BigInt(fractionMicros % 1000);
+}
+
 async function unusedBinding(path: string): Promise<void> {
   try {
     await lstat(path);
@@ -128,27 +180,21 @@ async function unusedBinding(path: string): Promise<void> {
   assert.fail('Fresh archive request key required');
 }
 
-/**
- * Capture v2, then produce a pinned diff and optional read-only graph review.
- * This sequence is not atomic: a later refusal leaves the capture artifacts.
- * The request key identifies one logical idempotent capture. A prior binding
- * refuses sequential reuse, but concurrent calls with the same fresh key may
- * converge on that capture; this API makes no per-invocation freshness claim.
- */
-export async function recaptureArchiveSource(
-  input: ArchiveSourceRecaptureInput,
-): Promise<ArchiveSourceRecaptureOutcome> {
-  assert.deepEqual(
-    Object.keys(input).sort(),
-    (input.beforeGraphId === undefined
-      ? ['after', 'beforePublicationPath']
-      : ['after', 'beforeGraphId', 'beforePublicationPath']
-    ).sort(),
-  );
-  if (input.beforeGraphId !== undefined) digest(input.beforeGraphId);
-  const after = JSON.parse(canonical(input.after)) as ArchiveIntakeOptions;
+async function validateSelection(
+  beforePublicationPath: string,
+  after: ArchiveIntakeOptions,
+  beforeGraphId: string | undefined,
+  requireUnusedBinding: boolean,
+): Promise<{
+  before: ArchivePublication;
+  beforePin: ArchiveGenerationDiffPin;
+  transport: Awaited<ReturnType<typeof archiveTransport>>;
+  captureRequestKey: string;
+  binding: string;
+  observedAt: string;
+}> {
   const { publication: before, pin: beforePin } = await exactPublication(
-    input.beforePublicationPath,
+    beforePublicationPath,
   );
   assert.equal(
     before.preservation,
@@ -181,9 +227,10 @@ export async function recaptureArchiveSource(
     'Fresh archive request key required',
   );
   const binding = hash(captureRequestKey);
-  await unusedBinding(
-    join(after.task.directory, `archive-binding-${binding}.json`),
-  );
+  if (requireUnusedBinding)
+    await unusedBinding(
+      join(after.task.directory, `archive-binding-${binding}.json`),
+    );
   const transport = await archiveTransport(after.transport);
   assert.equal(
     canonical(transport.config),
@@ -228,17 +275,17 @@ export async function recaptureArchiveSource(
   assert.equal(priorInspect['preservation'], 'complete-admitted');
   assert.equal(canonical(priorInspect['counts']), canonical(before.counts));
   assert.equal(
-    (await exactPublication(input.beforePublicationPath)).pin.publicationSha256,
+    (await exactPublication(beforePublicationPath)).pin.publicationSha256,
     beforePin.publicationSha256,
     'Prior publication changed before capture',
   );
-  if (input.beforeGraphId !== undefined) {
+  if (beforeGraphId !== undefined) {
     const reader = await createArchiveGraphReader({
-      publications: [input.beforePublicationPath],
+      publications: [beforePublicationPath],
       readScope: 'source-root',
     });
     const graph = await reader.read({
-      graphId: input.beforeGraphId,
+      graphId: beforeGraphId,
       scope: [before.source],
       limit: 1,
       maxBytes: transport.config.maxStdoutBytes,
@@ -266,9 +313,47 @@ export async function recaptureArchiveSource(
       'Prior graph is not pinned to the complete before generation',
     );
   }
-  await unusedBinding(
-    join(after.task.directory, `archive-binding-${binding}.json`),
+  if (requireUnusedBinding)
+    await unusedBinding(
+      join(after.task.directory, `archive-binding-${binding}.json`),
+    );
+
+  return {
+    before,
+    beforePin,
+    transport,
+    captureRequestKey,
+    binding,
+    observedAt: text(priorInspect['observed_at']),
+  };
+}
+
+/**
+ * Capture v2, then produce a pinned diff and optional read-only graph review.
+ * This sequence is not atomic: a later refusal leaves the capture artifacts.
+ * The request key identifies one logical idempotent capture. A prior binding
+ * refuses sequential reuse, but concurrent calls with the same fresh key may
+ * converge on that capture; this API makes no per-invocation freshness claim.
+ */
+export async function recaptureArchiveSource(
+  input: ArchiveSourceRecaptureInput,
+): Promise<ArchiveSourceRecaptureOutcome> {
+  assert.deepEqual(
+    Object.keys(input).sort(),
+    (input.beforeGraphId === undefined
+      ? ['after', 'beforePublicationPath']
+      : ['after', 'beforeGraphId', 'beforePublicationPath']
+    ).sort(),
   );
+  if (input.beforeGraphId !== undefined) digest(input.beforeGraphId);
+  const after = JSON.parse(canonical(input.after)) as ArchiveIntakeOptions;
+  const { before, beforePin, transport, captureRequestKey } =
+    await validateSelection(
+      input.beforePublicationPath,
+      after,
+      input.beforeGraphId,
+      true,
+    );
 
   const capture = await captureArchive(after);
   if (capture.status === 'blocked')
@@ -277,6 +362,274 @@ export async function recaptureArchiveSource(
     return { status: 'blocked', capture, reason: 'incomplete-preservation' };
   assert(capture.publicationPath);
 
+  return finishHandoff({
+    beforePublicationPath: input.beforePublicationPath,
+    beforeGraphId: input.beforeGraphId,
+    before,
+    beforePin,
+    after,
+    transport,
+    captureRequestKey,
+    capture,
+  });
+}
+
+/**
+ * Operator-selected v1 handoff from an already complete persisted v2 result.
+ * The capture artifacts do not record the v1 selected by a failed caller.
+ * This path never calls Registrar capture or creates another attempt.
+ */
+export async function resumeArchiveSourceHandoff(
+  input: ArchiveSourceResumeInput,
+): Promise<ArchiveSourceResumeOutcome> {
+  assert.deepEqual(
+    Object.keys(input).sort(),
+    (input.beforeGraphId === undefined
+      ? ['beforePublicationPath', 'resultPath']
+      : ['beforeGraphId', 'beforePublicationPath', 'resultPath']
+    ).sort(),
+  );
+  if (input.beforeGraphId !== undefined) digest(input.beforeGraphId);
+  assert(isAbsolute(input.resultPath), 'Absolute capture result path required');
+  const resultId =
+    /^archive-result-([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.json$/.exec(
+      basename(input.resultPath),
+    );
+  assert(resultId, 'Canonical capture result name required');
+  const attemptPath = join(
+    dirname(input.resultPath),
+    `archive-attempt-${resultId[1]}.json`,
+  );
+  const resultArtifact = await exactArtifact(input.resultPath);
+  const result = object(resultArtifact.value);
+  assert.deepEqual(
+    Object.keys(result).sort(),
+    [
+      'status',
+      'publicationPath',
+      'preservation',
+      'gaps',
+      'attemptPath',
+      'resultPath',
+    ].sort(),
+    'Unexpected capture result shape',
+  );
+  assert.equal(
+    result['status'],
+    'published',
+    'Complete published capture result required',
+  );
+  assert.equal(
+    result['preservation'],
+    'complete-admitted',
+    'Complete v2 preservation required',
+  );
+  assert.equal(
+    result['resultPath'],
+    input.resultPath,
+    'Capture result path mismatch',
+  );
+  assert.equal(
+    result['attemptPath'],
+    attemptPath,
+    'Capture attempt path mismatch',
+  );
+  const attemptArtifact = await exactArtifact(attemptPath);
+  const attempt = object(attemptArtifact.value);
+  assert.deepEqual(
+    Object.keys(attempt).sort(),
+    ['schema', 'kind', 'options', 'state'].sort(),
+    'Unexpected capture attempt shape',
+  );
+  assert.equal(attempt['schema'], 1);
+  assert.equal(attempt['kind'], 'temari-archive-attempt');
+  assert.equal(attempt['state'], 'started');
+  const after = object(attempt['options']) as unknown as ArchiveIntakeOptions;
+  const permitted = [
+    'task',
+    'source',
+    'readScope',
+    'transport',
+    'requestKey',
+    ...(after.ocrMode === undefined ? [] : ['ocrMode']),
+    ...(after.limits === undefined ? [] : ['limits']),
+  ];
+  assert.deepEqual(
+    Object.keys(after).sort(),
+    permitted.sort(),
+    'Unexpected attempt options',
+  );
+  assert.equal(
+    after.task.directory,
+    dirname(input.resultPath),
+    'Capture task directory mismatch',
+  );
+  const selected = await validateSelection(
+    input.beforePublicationPath,
+    after,
+    input.beforeGraphId,
+    false,
+  );
+  const {
+    before,
+    beforePin,
+    transport,
+    captureRequestKey,
+    binding,
+    observedAt,
+  } = selected;
+  const publicationPath = join(
+    after.task.directory,
+    `archive-publication-${binding}.json`,
+  );
+  assert.equal(
+    result['publicationPath'],
+    publicationPath,
+    'Capture publication path mismatch',
+  );
+  const { publication: publishedAfter, pin: afterPin } =
+    await exactPublication(publicationPath);
+  assert.equal(
+    publishedAfter.rebind,
+    undefined,
+    'Original capture publication required',
+  );
+  assert.equal(publishedAfter.preservation, 'complete-admitted');
+  assert.equal(publishedAfter.captureRequestKey, captureRequestKey);
+  assert.equal(
+    canonical(publishedAfter.gaps),
+    canonical(result['gaps']),
+    'Capture result gaps changed',
+  );
+  assert.equal(canonical(publishedAfter.task), canonical(after.task));
+  assert.equal(canonical(publishedAfter.source), canonical(after.source));
+  assert.equal(
+    canonical(publishedAfter.transport),
+    canonical(transport.config),
+  );
+  assert.equal(publishedAfter.registration, before.registration);
+  assert.notEqual(afterPin.generation, beforePin.generation);
+
+  const limits = {
+    entries: 1000,
+    file_bytes: 8 * 1024 * 1024,
+    total_bytes: 64 * 1024 * 1024,
+    text_bytes: 8 * 1024 * 1024,
+    ...after.limits,
+  };
+  assert.deepEqual(
+    Object.keys(limits).sort(),
+    ['entries', 'file_bytes', 'total_bytes', 'text_bytes'].sort(),
+    'Invalid capture limits',
+  );
+  assert(after.ocrMode === undefined || after.ocrMode === 'macos-vision');
+  const expectedBinding = {
+    schema: 1,
+    task: after.task,
+    source: after.source,
+    readScope: after.readScope,
+    limits,
+    captureRequestKey,
+    transport: transport.config,
+    implementation: transport.implementation,
+    protocolSha256: transport.protocolSha256,
+    registration: before.registration,
+    ...(after.ocrMode ? { ocrMode: after.ocrMode } : {}),
+  };
+  const bindingArtifact = await exactArtifact(
+    join(after.task.directory, `archive-binding-${binding}.json`),
+  );
+  assert.equal(
+    canonical(bindingArtifact.value),
+    canonical(expectedBinding),
+    'Persisted capture binding settings changed',
+  );
+
+  const afterInspect = await transport.invoke('inspect', [
+    after.source.id,
+    afterPin.generation,
+    '--manifest-sha256',
+    afterPin.manifestSha256,
+    '--offset',
+    '0',
+    '--limit',
+    '1',
+    '--max-bytes',
+    String(transport.config.maxStdoutBytes),
+  ]);
+  snapshot(afterInspect, publishedAfter);
+  assert.equal(afterInspect['status'], 'complete');
+  assert.equal(afterInspect['request_key'], captureRequestKey);
+  assert.equal(
+    afterInspect['request_fingerprint'],
+    publishedAfter.captureFingerprint,
+  );
+  assert.equal(afterInspect['preservation'], 'complete-admitted');
+  assert.equal(
+    canonical(afterInspect['counts']),
+    canonical(publishedAfter.counts),
+  );
+  assert(
+    observedMicros(observedAt) < observedMicros(afterInspect['observed_at']),
+    'Operator-selected v1 does not predate persisted v2 capture',
+  );
+
+  const capture = result as unknown as ArchiveIntakeOutcome;
+  return finishHandoff({
+    beforePublicationPath: input.beforePublicationPath,
+    beforeGraphId: input.beforeGraphId,
+    before,
+    beforePin,
+    after,
+    transport,
+    captureRequestKey,
+    capture,
+    resumePins: {
+      captureAttemptSha256: attemptArtifact.sha256,
+      captureResultSha256: resultArtifact.sha256,
+      captureBindingSha256: bindingArtifact.sha256,
+    },
+  });
+}
+
+interface HandoffParams {
+  beforePublicationPath: string;
+  beforeGraphId?: string;
+  before: ArchivePublication;
+  beforePin: ArchiveGenerationDiffPin;
+  after: ArchiveIntakeOptions;
+  transport: Awaited<ReturnType<typeof archiveTransport>>;
+  captureRequestKey: string;
+  capture: ArchiveIntakeOutcome;
+}
+type ResumePins = Pick<
+  ArchiveSourceResumeReceipt,
+  'captureAttemptSha256' | 'captureResultSha256' | 'captureBindingSha256'
+>;
+async function finishHandoff(
+  params: HandoffParams & { resumePins: ResumePins },
+): Promise<ArchiveSourceResumeOutcome>;
+async function finishHandoff(
+  params: HandoffParams & { resumePins?: undefined },
+): Promise<Extract<ArchiveSourceRecaptureOutcome, { status: 'handoff' }>>;
+async function finishHandoff(
+  params: HandoffParams & { resumePins?: ResumePins },
+): Promise<
+  | ArchiveSourceResumeOutcome
+  | Extract<ArchiveSourceRecaptureOutcome, { status: 'handoff' }>
+> {
+  const {
+    beforePublicationPath,
+    beforeGraphId,
+    before,
+    beforePin,
+    after,
+    transport,
+    captureRequestKey,
+    capture,
+    resumePins,
+  } = params;
+  assert(capture.status === 'published' && capture.publicationPath);
   let stage: ArchiveRecaptureHandoffError['stage'] = 'after-validation';
   try {
     const { publication: publishedAfter, pin: afterPin } =
@@ -298,7 +651,7 @@ export async function recaptureArchiveSource(
 
     stage = 'diff';
     const diff = await diffArchiveGenerations({
-      beforePublicationPath: input.beforePublicationPath,
+      beforePublicationPath: beforePublicationPath,
       afterPublicationPath: capture.publicationPath,
     });
     const diffReceiptSha256 = await exactReceipt(
@@ -309,12 +662,12 @@ export async function recaptureArchiveSource(
     assert.deepEqual(diff.receipt.after, afterPin);
     let graphImpact: ArchiveSourceRecaptureReceipt['graphImpact'] = null;
     let impactReceipt: ArchiveGraphImpactReceipt | null = null;
-    if (input.beforeGraphId !== undefined) {
+    if (beforeGraphId !== undefined) {
       stage = 'graph-impact';
       const impact = await planArchiveGraphImpact({
-        beforePublicationPath: input.beforePublicationPath,
+        beforePublicationPath: beforePublicationPath,
         afterPublicationPath: capture.publicationPath,
-        beforeGraphId: input.beforeGraphId,
+        beforeGraphId: beforeGraphId,
       });
       const receiptSha256 = await exactReceipt(
         impact.receiptPath,
@@ -324,7 +677,7 @@ export async function recaptureArchiveSource(
       assert.deepEqual(impact.receipt.after, afterPin);
       assert.equal(impact.receipt.diffReceiptSha256, diffReceiptSha256);
       graphImpact = {
-        beforeGraphId: input.beforeGraphId,
+        beforeGraphId: beforeGraphId,
         receiptPath: impact.receiptPath,
         receiptSha256,
         counts: impact.receipt.counts,
@@ -333,8 +686,7 @@ export async function recaptureArchiveSource(
     }
     stage = 'handoff';
     assert.equal(
-      (await exactPublication(input.beforePublicationPath)).pin
-        .publicationSha256,
+      (await exactPublication(beforePublicationPath)).pin.publicationSha256,
       beforePin.publicationSha256,
       'Prior publication changed during recapture',
     );
@@ -358,6 +710,30 @@ export async function recaptureArchiveSource(
         graphImpact.receiptSha256,
         'Graph impact receipt changed during recapture',
       );
+    if (resumePins) {
+      assert.equal(
+        (await exactArtifact(capture.attemptPath)).sha256,
+        resumePins.captureAttemptSha256,
+        'Capture attempt changed during handoff',
+      );
+      assert.equal(
+        (await exactArtifact(capture.resultPath)).sha256,
+        resumePins.captureResultSha256,
+        'Capture result changed during handoff',
+      );
+      assert.equal(
+        (
+          await exactArtifact(
+            join(
+              after.task.directory,
+              `archive-binding-${hash(captureRequestKey)}.json`,
+            ),
+          )
+        ).sha256,
+        resumePins.captureBindingSha256,
+        'Capture binding changed during handoff',
+      );
+    }
     const receipt: ArchiveSourceRecaptureReceipt = {
       schema: 1,
       kind: 'temari-archive-source-recapture',
@@ -376,16 +752,37 @@ export async function recaptureArchiveSource(
       currentOriginal: 'not-checked',
       graphMutation: 'none',
     };
+    const publishedReceipt:
+      ArchiveSourceRecaptureReceipt | ArchiveSourceResumeReceipt = resumePins
+      ? {
+          ...receipt,
+          kind: 'temari-archive-source-resume',
+          beforeSelection: 'operator-selected-on-resume',
+          ...resumePins,
+        }
+      : receipt;
     assert(
-      Buffer.byteLength(canonical(receipt)) <= 65536,
+      Buffer.byteLength(canonical(publishedReceipt)) <= 65536,
       'Recapture receipt exceeds bound',
     );
     const receiptPath = join(
       after.task.directory,
-      `archive-source-recapture-${hash(canonical(receipt))}.json`,
+      `${resumePins ? 'archive-source-resume' : 'archive-source-recapture'}-${hash(canonical(publishedReceipt))}.json`,
     );
-    await publishJson(receiptPath, receipt, 65536);
-    return { status: 'handoff', capture, receiptPath, receipt };
+    await publishJson(receiptPath, publishedReceipt, 65536);
+    if (resumePins)
+      return {
+        status: 'handoff',
+        capture,
+        receiptPath,
+        receipt: publishedReceipt as ArchiveSourceResumeReceipt,
+      };
+    return {
+      status: 'handoff',
+      capture,
+      receiptPath,
+      receipt: publishedReceipt as ArchiveSourceRecaptureReceipt,
+    };
   } catch (error) {
     throw new ArchiveRecaptureHandoffError(stage, capture, error);
   }

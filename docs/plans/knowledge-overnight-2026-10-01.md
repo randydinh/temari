@@ -273,3 +273,48 @@ publication and binding artifacts and revoked admission refuse. The old graph
 still refuses under v2. An independent in-flight reviewer found no blocker
 after the deferral fixtures were added. Keep pending canonical package/check
 and exact-head review. No active v2 graph or semantic correctness is claimed.
+
+## 04:15 PDT repin delivery and recovery investigation
+
+PR #134 merged at `02b4313ff4cd37615bcc71882e1b7186faf3d971`
+after independent exact-head review of clean commit
+`c58cc971e821cc506b388fc1bed9bca2f0158235`. Canonical package/check
+reported `dirty: false`, a stock-Node import passed, and GitHub reported no
+branch checks. The isolated worktree now starts a new branch from merged
+main. The next investigation is an operator-triggered handoff resume after a
+complete v2 capture succeeded but diff, graph-impact or durable handoff
+failed. The original recapture API refuses reusing that request key, and a
+runtime lease must not blindly repeat the capture. Any recovery API must
+verify the persisted attempt/result/publication, current admission, and
+v1/v2 pins without capturing again. It cannot claim automatic scheduling,
+safe backup/restore, continuous freshness or graph mutation.
+
+The recovery unit finishes only if an operator can select a complete,
+persisted v2 capture result and an explicit complete v1 publication, validate
+their attempt/result/publication/binding pair and current registration, then
+publish the same bounded diff and optional impact handoff without another
+capture. An actual Registrar CLI case must keep the generation and attempt
+counts unchanged across resume and deterministic repeat. Tampered or mismatched
+attempt/result, incomplete capture, changed admission, or invalid v1 graph
+must refuse. The receipt must identify that v1 was selected on resume: the
+capture attempt alone does not prove which v1 the failed call intended.
+Missing persisted results, automatic retries, leases, live freshness and
+production restore remain separate gaps. Focused Nx verification, independent
+review, clean package and reviewable PR remain delivery gates.
+
+## 04:30 PDT recovery checkpoint
+
+The no-capture resume candidate passed 70/70 actual-CLI knowledge integration
+tests, 43/43 unit tests, typecheck and post-final focused 7/7. It binds a
+complete persisted attempt/result/publication to the original settings and
+current admission, then reuses the diff and optional graph-impact finalizer.
+Two resumes produce identical receipt bytes without another Registrar
+generation or capture attempt. The tests refuse altered or mismatched
+artifacts, incomplete capture, bad graph, reversed observation order, missing
+result and revoked registration. Independent review caught and repaired a
+schema compatibility issue: the shipped recapture receipt remains unchanged;
+resume now has a distinct kind/path and an operator-selected v1 marker. It
+also caught millisecond timestamp precision loss; the candidate now compares
+microsecond observations. Keep pending clean package and exact-head review.
+This does not prove a prior failed caller's v1 intent or support automatic
+leases/retries.
