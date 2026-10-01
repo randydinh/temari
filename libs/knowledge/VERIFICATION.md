@@ -173,3 +173,22 @@ and Temari publishes only hash, size, path and gap metadata. The snapshot is a
 non-atomic observation at one time; later source edits do not rewrite it.
 This does not establish continuous freshness, automatic recapture, graph
 refresh, or searchable PDF text on this macOS host.
+
+## Synthetic sealed retrieval cohorts, 2026-10-01
+
+An actual Registrar CLI fixture now pins five development and five distinct
+holdout gold paths outside the registered source root, then runs exact and BM25
+at the same top-two budget. All ten gold paths were indexed and all shortlists
+were verified. Each cohort scored exact 3/5 and BM25 5/5, with no per-case
+regression or unverified shortlist; the existing local gate returned
+`promotion-eligible`. The fixture includes rare identifiers, two partial
+paraphrase probes, duplicate-document crowding and contrary drafts. Injected
+key and fetch counters stayed at zero, so this evaluation made no hosted call.
+
+The final test-only edit passed its focused actual-CLI Nx integration run (1/1)
+and `knowledge:typecheck`. A full integration run before the final scenario
+assertions passed 64/64; the final focused run verifies those assertions. The
+cohorts were authored with the synthetic fixture, so the result validates gate
+mechanics and a specific lexical comparison, not untouched real-task holdout
+quality or a default-ranker change. No-answer, image-only and searchable-PDF
+coverage remain open.
