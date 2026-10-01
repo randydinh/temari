@@ -438,6 +438,7 @@ test('ACTUAL CLI: graph one-hop trial recovers a lexical miss from a pinned rela
       { path: 'seed.txt', bytes: Buffer.from('Signal signal signal relay.\n') },
       { path: 'decoy.txt', bytes: Buffer.from('Signal signal unrelated.\n') },
       { path: 'target.txt', bytes: Buffer.from('Charger location record.\n') },
+      { path: 'inferred.txt', bytes: Buffer.from('Unverified relation target.\n') },
     ],
   });
   const task = {
@@ -491,7 +492,7 @@ test('ACTUAL CLI: graph one-hop trial recovers a lexical miss from a pinned rela
     return JSON.parse(output.stdout);
   };
   const anchors = [];
-  for (const path of ['seed.txt', 'target.txt']) {
+  for (const path of ['seed.txt', 'target.txt', 'inferred.txt']) {
     const read = await cli([
       'read',
       f.source.id,
@@ -544,15 +545,34 @@ test('ACTUAL CLI: graph one-hop trial recovers a lexical miss from a pinned rela
         provenance: 'extracted',
         anchors: [anchors[1]],
       },
+      {
+        id: '4'.repeat(32),
+        kind: 'mention',
+        label: 'unverified target',
+        provenance: 'extracted',
+        anchors: [anchors[2]],
+      },
     ],
     assertions: [
       {
         id: '3'.repeat(32),
         kind: 'relationship',
         subject: '1'.repeat(32),
-        predicate: 'relates-to',
+        predicate: 'contains',
         object: '2'.repeat(32),
         support: [anchors[0], anchors[1]],
+        contrary: [],
+        provenance: 'extracted',
+        lifecycle: 'active',
+        supersedes: [],
+      },
+      {
+        id: '0'.repeat(32),
+        kind: 'relationship',
+        subject: '1'.repeat(32),
+        predicate: 'relates-to',
+        object: '4'.repeat(32),
+        support: [anchors[0], anchors[2]],
         contrary: [],
         provenance: 'inferred',
         lifecycle: 'active',
@@ -597,6 +617,7 @@ test('ACTUAL CLI: graph one-hop trial recovers a lexical miss from a pinned rela
     result.graph?.added.map((item) => item.path),
     ['target.txt'],
   );
+  assert.equal(result.graph?.added[0]?.provenance, 'extracted');
   assert.equal(result.graph?.verifiedEvidenceCount, 1);
   assert.equal(result.graph?.targetReadAttempts, 1);
   assert((result.graph?.projectionNodeCount ?? 0) > 0);

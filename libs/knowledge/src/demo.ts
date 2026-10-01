@@ -50,6 +50,14 @@ import {
   publishArchiveDocumentLinks,
   type ArchiveDocumentLinksPlan,
 } from './lib/archive-document-links.js';
+import {
+  recordArchiveQueryFeedback,
+  type ArchiveQueryFeedbackInput,
+} from './lib/archive-query-feedback.js';
+import {
+  publishReviewedArchiveGraphChange,
+  type ArchiveReviewedGraphChange,
+} from './lib/archive-graph-reviewed-change.js';
 
 const help = `Knowledge demo (explicit local files; no model or semantic approval):
   pnpm nx run knowledge:demo -- capture --input /absolute/intake.json
@@ -65,6 +73,8 @@ const help = `Knowledge demo (explicit local files; no model or semantic approva
   pnpm nx run knowledge:demo -- graph-gate --input /absolute/sealed-graph-questions.json --sha256 QUESTION_SET_SHA256 --handoff-sha256 HANDOFF_SHA256
   pnpm nx run knowledge:demo -- structure-publish --input /absolute/structure-plan.json
   pnpm nx run knowledge:demo -- document-links-publish --input /absolute/links-plan.json
+  pnpm nx run knowledge:demo -- query-feedback --input /absolute/feedback.json
+  pnpm nx run knowledge:demo -- graph-reviewed-change --input /absolute/review.json
   pnpm nx run knowledge:demo -- --help
   pnpm nx run knowledge:demo -- prepare --manifest /absolute/selected-documents.json --python /absolute/python --registrar-source /absolute/registrar-repo
   pnpm nx run knowledge:demo -- collect --input /absolute/input.json [--resume /absolute/knowledge-HASH.json] [--assessment /absolute/assessment.json]
@@ -172,6 +182,24 @@ async function main(): Promise<void> {
     ) as ArchiveDocumentLinksPlan;
     process.stdout.write(
       JSON.stringify(await publishArchiveDocumentLinks(input), null, 2) + '\n',
+    );
+    return;
+  }
+  if (command === 'query-feedback') {
+    const input = JSON.parse(
+      await readFile(arg('--input'), 'utf8'),
+    ) as ArchiveQueryFeedbackInput;
+    process.stdout.write(
+      JSON.stringify(await recordArchiveQueryFeedback(input), null, 2) + '\n',
+    );
+    return;
+  }
+  if (command === 'graph-reviewed-change') {
+    const input = JSON.parse(
+      await readFile(arg('--input'), 'utf8'),
+    ) as ArchiveReviewedGraphChange;
+    process.stdout.write(
+      JSON.stringify(await publishReviewedArchiveGraphChange(input), null, 2) + '\n',
     );
     return;
   }

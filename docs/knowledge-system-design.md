@@ -65,9 +65,16 @@ retries and an uncertain-hosted-call block make explicit ticks resumable. The
 live three-source intake succeeded; its narrowed search returned a verified
 excerpt and Jev judgment with explicit gaps, correctly ending `ISSUES`.
 This is an operator-run workflow, not unattended agent scheduling or a
-complete-task quality claim. Reviewed graph additions, feedback regression
-cases, held-out ranking promotion, PDF boundary support and plugin lifecycle
-remain open.
+complete-task quality claim.
+
+The next [feedback and graph review pilot](evidence/knowledge-system/feedback-graph-review-2026-10-01.md)
+adds operator-attributed, revision-pinned query feedback as a private regression
+candidate and an explicit child graph publication for one verified archived
+Markdown link and/or selected retractions. The graph trial now excludes
+inferred and call-name-candidate edges from expansion. These controls support
+continual correction, but no autonomous relationship authoring, authenticated
+reviewer identity or measured default-ranking improvement is claimed. Held-out
+ranking promotion, PDF boundary support and plugin lifecycle remain open.
 
 ## Delivery decision: complete the knowledge journey before plugin packaging
 

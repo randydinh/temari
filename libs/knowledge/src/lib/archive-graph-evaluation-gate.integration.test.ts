@@ -80,9 +80,9 @@ test('ACTUAL CLI: sealed graph gate records an improvement and displacement with
     parent: null, nodes,
     assertions: [[0, 1], [2, 3]].map(([a, b], i) => ({
       id: String(i + 5).repeat(32), kind: 'relationship',
-      subject: nodes[a].id, predicate: 'relates-to', object: nodes[b].id,
+      subject: nodes[a].id, predicate: 'contains', object: nodes[b].id,
       support: [anchors[a], anchors[b]], contrary: [],
-      provenance: 'inferred', lifecycle: 'active', supersedes: [],
+      provenance: 'extracted', lifecycle: 'active', supersedes: [],
     })),
   };
   const graphPath = join(f.base, 'graph-gate-batch.json');

@@ -152,6 +152,71 @@ generation; Temari saves an immutable task receipt with the reason. The parent
 and its original evidence remain readable. Search feedback or a Jev judgment
 may prompt review but cannot trigger retraction automatically.
 
+### Query feedback and reviewed graph changes
+
+`query-feedback` accepts a private operational `archive-query-*` report, the
+original query text, an operator attribution and reason, and explicitly
+selected `relevant` and `missed` document pins (`sourceId`, source-relative
+`path`, `sha256`). Relevant pins must match the ranked shortlist; missed pins
+must be outside it. The command verifies the query hash, exact report and
+handoff bytes, current source admission and archived reads before saving a
+content-addressed feedback receipt. Its private `candidate` is a labeled
+search case with `hostedTextApproved: false`. This makes a regression question
+available for a separately sealed evaluation; it publishes no graph edge and
+does not change default ranking.
+
+```json
+{
+  "reportPath": "/absolute/private-task/archive-query-HASH.json",
+  "query": "the exact original query",
+  "reviewerRef": "operator:local-review",
+  "reason": "Verified the selected documents against the task",
+  "relevant": [{ "sourceId": "SOURCE", "path": "a.md", "sha256": "ORIGINAL_SHA256" }],
+  "missed": []
+}
+```
+
+```sh
+pnpm nx run knowledge:demo -- query-feedback --input /absolute/private-feedback.json
+```
+
+`graph-reviewed-change` publishes one child generation from an exact parent
+graph and selected archive publications. The operator can retract specified
+assertion IDs, add one Markdown `links-to` assertion, or do both. For an
+addition, supply the retained source and target paths, an explicit allowed
+path set, and the Unicode code-point offset of `[` in the source link.
+Temari rebuilds the link and both anchors from the archived representation,
+checks current admission and the parent's RevisionSet, verifies the child,
+and saves a receipt with exact publication byte pins. The parent stays
+readable. A review attribution string is recorded; it is not authenticated
+identity. Query feedback and Jev output cannot create an assertion.
+
+```json
+{
+  "publications": ["/absolute/private-task/archive-publication-BINDING.json"],
+  "parentGraphId": "PARENT_GRAPH_SHA256",
+  "reviewerRef": "operator:local-review",
+  "reason": "Checked the retained Markdown link and target",
+  "retractAssertionIds": [],
+  "addLink": {
+    "publicationPath": "/absolute/private-task/archive-publication-BINDING.json",
+    "sourcePath": "a.md",
+    "targetPath": "b.md",
+    "codePointOffset": 42,
+    "allowedPaths": ["a.md", "b.md"]
+  }
+}
+```
+
+```sh
+pnpm nx run knowledge:demo -- graph-reviewed-change --input /absolute/private-graph-review.json
+```
+
+This reviewed link path supports one same-source Markdown link at a time.
+Unsupported destinations, code, raw HTML, images, unadmitted targets and
+ambiguous source text remain omissions. A fresh source capture needs a new
+review against its new RevisionSet; old graph generations remain historical.
+
 ## Search and score
 
 On macOS, Jev looks up the TypeSafe key in the current user's Keychain item
@@ -296,10 +361,11 @@ case automatically trials the graph recorded in its intake handoff when
 `graphId` is omitted. The report keeps
 `ranked` and `expectedRecallAtK` as the lexical baseline and adds `graph.ranked`,
 `graph.expectedRecallAtK`, relationship provenance and explicit gaps. The trial
-uses the first lexical hit with an active, archived graph relationship as its
-seed and verifies at most `topK - 1` one-hop
+uses the first lexical hit with an active, extracted `contains`, `depends-on`
+or `links-to` relationship as its seed and verifies at most `topK - 1` one-hop
 related documents through the same archived provider. Its ordering is an
 experimental policy, not a default ranker or evidence of semantic correctness.
+Inferred, ambiguous and call-name-candidate edges cannot expand results.
 No graph quotations or source excerpts enter the report; a private checkpoint
 retains verified graph evidence. A missing/stale graph leaves lexical results
 available and records a gap.

@@ -23,7 +23,7 @@ export interface RankedArchiveDocument {
 export interface ArchiveGraphTrial {
   readonly graphId: string;
   readonly status: 'complete' | 'gap';
-  readonly policy: 'one-lexical-seed-one-hop-related-first-v1';
+  readonly policy: 'one-lexical-seed-one-hop-related-first-v2';
   readonly ranked: readonly RankedArchiveDocument[];
   readonly expectedRecallAtK: number;
   readonly added: readonly (RankedArchiveDocument & {
@@ -41,7 +41,13 @@ export interface ArchiveGraphTrial {
   readonly timingMs: number;
 }
 
-const policy = 'one-lexical-seed-one-hop-related-first-v1' as const;
+const policy = 'one-lexical-seed-one-hop-related-first-v2' as const;
+const traversablePredicates = new Set(['contains', 'depends-on', 'links-to']);
+const traversable = (record: ArchiveGraphRecord): boolean =>
+  record.kind === 'relationship' &&
+  record.lifecycle === 'active' &&
+  record.provenance === 'extracted' &&
+  traversablePredicates.has(record.predicate ?? '');
 const key = (sourceId: string, path: string): string =>
   canonical([sourceId, path]);
 const identity = (item: RankedArchiveDocument): string =>
@@ -126,11 +132,7 @@ export async function evaluateArchiveGraphTrial(input: {
   projectionNodeCount = records.size;
   const connected = new Set(
     [...records.values()]
-      .filter(
-        (record) =>
-          (record.kind === 'relationship' || record.kind === 'identity-link') &&
-          record.lifecycle === 'active',
-      )
+      .filter(traversable)
       .flatMap((record) => [record.subject, record.object]),
   );
   const nodesFor = (candidate: RankedArchiveDocument): Set<string> =>
@@ -160,8 +162,7 @@ export async function evaluateArchiveGraphTrial(input: {
     a.id.localeCompare(b.id),
   )) {
     if (
-      (relation.kind !== 'relationship' && relation.kind !== 'identity-link') ||
-      relation.lifecycle !== 'active'
+      !traversable(relation)
     )
       continue;
     const opposite = seedNodes.has(relation.subject!)
