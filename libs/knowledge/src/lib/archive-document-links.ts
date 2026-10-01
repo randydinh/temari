@@ -109,6 +109,15 @@ async function archivedText(provider: KnowledgeProvider, publication: Publicatio
 /** Mask comments, frontmatter and code without changing UTF-16 indices. */
 function visibleMarkdown(body: string): string {
   const blank = (part: string) => part.replace(/[^\r\n]/g, ' ');
+  const multilineHtml = new Set([
+    'article', 'aside', 'blockquote', 'body', 'caption', 'center', 'dd',
+    'details', 'dialog', 'div', 'dl', 'dt', 'fieldset', 'figcaption',
+    'figure', 'footer', 'form', 'frameset', 'h1', 'h2', 'h3', 'h4', 'h5',
+    'h6', 'head', 'header', 'html', 'iframe', 'li', 'main', 'nav',
+    'noframes', 'ol', 'pre', 'script', 'section', 'style', 'summary',
+    'table', 'tbody', 'td', 'textarea', 'tfoot', 'th', 'thead', 'title',
+    'tr', 'ul',
+  ]);
   const exactBacktickClose = (line: string, run: string, from: number): number => {
     let at = line.indexOf(run, from);
     while (at >= 0) {
@@ -135,6 +144,7 @@ function visibleMarkdown(body: string): string {
   let frontmatter = /^---\s*\r?\n/.test(body);
   let comment = false;
   let inlineRun: string | null = null;
+  let htmlBlock: string | null = null;
   return lines.map((line, index) => {
     if (frontmatter) {
       if (index > 0 && /^\s*(?:---|\.\.\.)\s*$/.test(line.trimEnd())) frontmatter = false;
@@ -151,7 +161,26 @@ function visibleMarkdown(body: string): string {
       inlineRun = null;
       return blank(line);
     }
-    if (/^(?: {4}|\t)/.test(line)) return blank(line);
+    if (htmlBlock) {
+      if (new RegExp(`</${htmlBlock}\\s*>`, 'i').test(line)) htmlBlock = null;
+      return blank(line);
+    }
+    // Markdown block containers can precede code indentation. Preserve the
+    // original line so every later offset remains an exact retained-text offset.
+    let afterContainers = line;
+    for (let depth = 0; depth < 16; depth++) {
+      const prefix = /^ {0,3}(?:>[ \t]?|(?:[-+*]|\d{1,9}[.)])[ \t]+)/.exec(afterContainers);
+      if (!prefix) break;
+      afterContainers = afterContainers.slice(prefix[0].length);
+    }
+    if (/^(?: {4}|\t)/.test(afterContainers)) return blank(line);
+    const blockStart = /^ {0,3}<([A-Za-z][A-Za-z0-9-]*)(?:\s[^>]*)?>/.exec(afterContainers);
+    if (blockStart && multilineHtml.has(blockStart[1].toLowerCase()) &&
+      !/\/\s*>$/.test(blockStart[0]) &&
+      !new RegExp(`</${blockStart[1]}\\s*>`, 'i').test(afterContainers)) {
+      htmlBlock = blockStart[1];
+      return blank(line);
+    }
     // HTML can reinterpret Markdown syntax; this adapter leaves such lines out.
     if (/<\/?[A-Za-z][^>\n]*>/.test(line)) return blank(line);
     let output = '';
@@ -242,6 +271,72 @@ function span(basis: Anchor, body: string, start: number, quote: string): Anchor
   return { ...basis, text_start: textStart,
     text_end: textStart + Array.from(quote).length,
     quote, quote_sha256: hash(quote) };
+}
+
+/** Re-extract one operator-selected link from retained text, never from supplied evidence. */
+export async function extractReviewedArchiveDocumentLink(input: {
+  readonly publicationPath: string;
+  readonly sourcePath: string;
+  readonly targetPath: string;
+  readonly codePointOffset: number;
+  readonly allowedPaths: readonly string[];
+}) {
+  assert(isAbsolute(input.publicationPath), 'Absolute publication path required');
+  const sourcePath = relativePath(input.sourcePath);
+  const targetPath = relativePath(input.targetPath);
+  assert(markdown(sourcePath) && markdown(targetPath) && sourcePath !== targetPath,
+    'Distinct Markdown endpoints required');
+  assert(Array.isArray(input.allowedPaths) && input.allowedPaths.length >= 2 &&
+    input.allowedPaths.length <= 200, 'Explicit endpoint allowlist required');
+  const allowed = input.allowedPaths.map(relativePath);
+  assert.equal(new Set(allowed).size, allowed.length, 'Duplicate allowed path');
+  assert(allowed.includes(sourcePath) && allowed.includes(targetPath),
+    'Link endpoint outside allowed paths');
+  integer(input.codePointOffset, 0, 65536);
+  const publication = await loadArchivePublication(input.publicationPath);
+  const transport = await archiveTransport(publication.transport);
+  assert.equal(transport.implementation, publication.implementation);
+  assert.equal(transport.protocolSha256, publication.protocolSha256);
+  const admission = async () => assert.equal(
+    await registrationFor(transport, publication.source), publication.registration,
+    'Source registration changed');
+  await admission();
+  const provider = await createArchiveRegistrar({
+    publications: [input.publicationPath], readScope: 'source-root',
+  });
+  const source = await archivedText(provider, publication, sourcePath);
+  const target = await archivedText(provider, publication, targetPath);
+  assert(source && target, 'Both retained Markdown endpoints must have complete text');
+  const candidate = links(source.body).find((item) =>
+    Array.from(source.body.slice(0, item.start)).length === input.codePointOffset);
+  assert(candidate && !candidate.image && !candidate.escaped &&
+    Array.from(candidate.quote).length <= 512 &&
+    destination(sourcePath, candidate.destination) === targetPath,
+  'Offset must identify an exact visible inline Markdown link to the allowed target');
+  const nodeId = (path: string, item: ArchivedText) =>
+    hash(canonical([publication.source.id, publication.generation, path,
+      item.anchor.original_sha256, item.anchor.representation_sha256])).slice(0, 32);
+  const cite = span(source.anchor, source.body, candidate.start, candidate.quote);
+  const sourceId = nodeId(sourcePath, source), targetId = nodeId(targetPath, target);
+  const node = (id: string, path: string, item: ArchivedText) => ({
+    id, kind: 'mention' as const,
+    label: path.length <= 512 ? path : posix.basename(path).slice(0, 512),
+    provenance: 'extracted' as const, anchors: [item.anchor],
+  });
+  const assertion = {
+    id: hash(canonical([sourceId, 'links-to', targetId, cite.text_start,
+      cite.quote_sha256])).slice(0, 32),
+    kind: 'relationship' as const, subject: sourceId, predicate: 'links-to',
+    object: targetId, support: [cite, target.anchor], contrary: [],
+    provenance: 'extracted' as const, lifecycle: 'active' as const,
+    supersedes: [],
+  };
+  await admission();
+  assert.equal(canonical(await loadArchivePublication(input.publicationPath)),
+    canonical(publication), 'Publication changed during link extraction');
+  return { source: publication.source, nodes: [
+    node(sourceId, sourcePath, source), node(targetId, targetPath, target),
+  ], assertion };
 }
 
 export async function publishArchiveDocumentLinks(plan: ArchiveDocumentLinksPlan) {

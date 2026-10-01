@@ -1388,7 +1388,9 @@ test('actual Graft and Nx structure imports publish only archived, current sourc
     ],
   });
   assert.equal(automatic.report.cases[0].expectedRecallAtK, 0);
-  assert.equal(automatic.report.cases[0].graph?.expectedRecallAtK, 1);
+  // A Graft call-name candidate remains inspectable but cannot expand search.
+  assert.equal(automatic.report.cases[0].graph?.expectedRecallAtK, 0);
+  assert.deepEqual(automatic.report.cases[0].graph?.added, []);
   await writeFile(
     join(f.base, 'sources/src/Target.swift'),
     'class Target { changed }\n',
