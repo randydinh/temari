@@ -318,3 +318,58 @@ also caught millisecond timestamp precision loss; the candidate now compares
 microsecond observations. Keep pending clean package and exact-head review.
 This does not prove a prior failed caller's v1 intent or support automatic
 leases/retries.
+
+## 04:33 PDT recovery delivery and graph-publish feasibility
+
+PR #135 merged at `1460c2297566d026ca4448363684caa46ba6b026`
+after independent exact-head review of clean commit
+`f7c5059ea653565cae62610768c209a495643849`. Canonical package/check
+reported `dirty: false`, the stock-Node export passed and GitHub reported no
+branch checks. The isolated worktree now starts a new branch from merged main.
+The next read-only feasibility question is whether a human-reviewed fresh v2
+graph root can use the verified repin proposal without treating historical
+v1 IDs as active. A candidate must honor Registrar's RevisionSet/lineage
+rules, rebuild full v2 anchors from retained text, make old-to-new mapping
+explicit, and require operator selection. If those cannot be proven in a
+bounded actual-CLI test before handoff, leave graph publication for later.
+
+## 04:35 PDT fresh v2 graph root selection
+
+The read-only feasibility review found that Registrar can publish a fresh v2
+root with `parent: null` and new record IDs; a v1 child cannot safely change
+its RevisionSet or old anchors. The next bounded unit requires an operator's
+explicit eligible-record selection, reviewer reference and reason. Revalidate
+the impact, proposal, publications, old graph and current admission; reread
+selected v2 spans to recover exact quotes and verify every proposed coordinate
+and hash; reject deferred, changed, historical and superseding records and
+relationships missing selected endpoints. Publish a deterministic fresh root
+through the actual Registrar CLI, read it under the exact v2 RevisionSet, and
+keep a metadata-only old-to-new mapping receipt. The v1 graph must remain
+readable. Repeat must be deterministic after a post-publish receipt failure;
+tampered pins and revoked admission must refuse. The receipt must state that
+reviewer attribution is unauthenticated, original currentness is untested,
+and selecting unchanged evidence does not itself prove semantic correctness.
+The quote-bearing publish draft is a bounded, mode-0600 persisted input in the
+task directory for deterministic replay. Generated receipt fields carry only
+metadata; the operator-supplied reviewer reference and reason are free text.
+No automatic relationship promotion is claimed. Full focused Nx checks,
+independent review and a reviewable PR are delivery gates.
+
+## 04:50 PDT fresh-root checkpoint
+
+The candidate published a fresh v2 root through the actual Registrar CLI from
+an explicit eligible subset and read it under the exact v2 RevisionSet. The
+fixture retained the v1 graph, excluded changed, dependent, retracted and
+superseding records, refused missing endpoints and invalid selections, checked
+contrary evidence, verified deterministic repeat, and recovered from a
+post-publish receipt collision without a second graph. Tampered publication
+and revoked admission refused. A separate read-only reviewer found no
+remaining code blocker after adding the explicit semantic-correctness caveat
+and documenting the private persisted draft. Final full Nx knowledge
+integration passed 71/71, unit tests 43/43 and typecheck passed. Keep the
+candidate pending clean canonical package/check, commit and exact-head PR
+review. The test has no dedicated malformed-v2-quote injection; the proposal
+recomputation and Registrar publish validate retained anchors, but the
+specific negative branch remains unexercised here. Graph fact semantics,
+reviewer authentication, currentness and automatic relationship refresh are
+still open.
