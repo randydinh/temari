@@ -1416,3 +1416,186 @@ test('actual Graft and Nx structure imports publish only archived, current sourc
     /No structure edges/,
   );
 });
+
+test('Python Graft calls require exact AST definitions and an own-body unshadowed Name call', async () => {
+  const registrarSource = process.env['TEMARI_REGISTRAR_SOURCE'] ?? '';
+  const python = process.env['TEMARI_REGISTRAR_PYTHON'] ?? '';
+  assert(registrarSource && python);
+  const source = [
+    'def target():',
+    '    return 1',
+    '',
+    'def caller():',
+    '    message = "é"; target()',
+    '',
+    'def string_only():',
+    '    message = "target()"',
+    '',
+    'def attr_only():',
+    '    module.target()',
+    '',
+    'def nested_only():',
+    '    def inner():',
+    '        target()',
+    '',
+    'def shadowed():',
+    '    target = lambda: None',
+    '    target()',
+    '',
+    '@target()',
+    'def decorated():',
+    '    pass',
+    '',
+    'def defaults(x=target()):',
+    '    pass',
+    '',
+    'def outer():',
+    '    target = lambda: None',
+    '    def inner():',
+    '        target()',
+    '',
+    'def caller_nested_target():',
+    '    nested_target()',
+    '',
+    'def holder():',
+    '    def nested_target():',
+    '        pass',
+    '',
+    'class Carrier:',
+    '    def method_target(self):',
+    '        pass',
+    '',
+    'def caller_method_target():',
+    '    method_target()',
+    '',
+    'def rebound():',
+    '    return 1',
+    'rebound = lambda: None',
+    'def caller_rebound():',
+    '    rebound()',
+    '',
+  ].join('\n');
+  const f = await prepareRegistrar({
+    registrarSource,
+    python,
+    documents: [{ path: 'seed.txt', bytes: Buffer.from('Synthetic fixture.\n') }],
+  });
+  await mkdir(join(f.base, 'sources', 'src'), { recursive: true });
+  await writeFile(join(f.base, 'sources', 'src', 'calls.py'), source);
+  await writeFile(join(f.base, 'sources', 'src', 'other.py'),
+    'def target():\n    return 2\n');
+  const patternSource = 'def target():\n    return 1\n\ndef pattern_shadow(value):\n    match value:\n        case {"target": target}:\n            target()\n';
+  await writeFile(join(f.base, 'sources', 'src', 'patterns.py'), patternSource);
+  const capture = await captureArchive({
+    task: { id: 'python-graft-test', directory: join(f.base, 'task'), authorityRef: 'synthetic-authority' },
+    source: f.source,
+    readScope: 'source-root',
+    transport: { python, registrarSource, workspace: join(f.base, 'state') },
+    requestKey: 'v1',
+  });
+  assert(capture.publicationPath);
+  const lines = source.split('\n');
+  const definition = (name: string, start: number, end: number, bodyHash?: string) => ({
+    id: `src/calls.py#${name}`,
+    path: 'src/calls.py',
+    name,
+    kind: 'function',
+    span: `L${start}-L${end}`,
+    body_hash: bodyHash ?? hash(lines.slice(start - 1, end).join('\n')),
+  });
+  const nodes = [
+    definition('target', 1, 2),
+    definition('caller', 4, 5),
+    definition('string_only', 7, 8),
+    definition('attr_only', 10, 11),
+    definition('nested_only', 13, 15),
+    definition('shadowed', 17, 19),
+    definition('decorated', 22, 23),
+    definition('defaults', 25, 26),
+    definition('inner', 30, 31),
+    definition('caller_nested_target', 33, 34),
+    definition('nested_target', 37, 38),
+    {
+      ...definition('method_target', 41, 42),
+      kind: 'method',
+    },
+    definition('caller_method_target', 44, 45),
+    definition('rebound', 47, 48),
+    definition('caller_rebound', 50, 51),
+    {
+      id: 'src/patterns.py#target', path: 'src/patterns.py', name: 'target',
+      kind: 'function', span: 'L1-L2', body_hash: hash('def target():\n    return 1'),
+    },
+    {
+      id: 'src/patterns.py#pattern_shadow', path: 'src/patterns.py',
+      name: 'pattern_shadow', kind: 'function', span: 'L4-L7',
+      body_hash: hash('def pattern_shadow(value):\n    match value:\n        case {"target": target}:\n            target()'),
+    },
+    {
+      id: 'src/other.py#target',
+      path: 'src/other.py',
+      name: 'target',
+      kind: 'function',
+      span: 'L1-L2',
+      body_hash: hash('def target():\n    return 2'),
+    },
+    {
+      ...definition('caller', 4, 5, hash('different body')),
+      id: 'src/calls.py#stale',
+    },
+  ];
+  const edges = [
+    'caller', 'string_only', 'attr_only', 'nested_only', 'shadowed',
+    'decorated', 'defaults', 'stale', 'inner',
+  ].map((name) => ({
+    source: `src/calls.py#${name}`,
+    target: 'src/calls.py#target',
+    relation: 'calls',
+    confidence: 'inferred',
+  }));
+  edges.push({
+    source: 'src/calls.py#caller',
+    target: 'external.module',
+    relation: 'imports',
+    confidence: 'inferred',
+  });
+  edges.push({
+    source: 'src/calls.py#caller',
+    target: 'src/other.py#target',
+    relation: 'calls',
+    confidence: 'inferred',
+  });
+  edges.push({
+    source: 'src/patterns.py#pattern_shadow',
+    target: 'src/patterns.py#target',
+    relation: 'calls',
+    confidence: 'inferred',
+  });
+  for (const [caller, target] of [
+    ['caller_nested_target', 'nested_target'],
+    ['caller_method_target', 'method_target'],
+    ['caller_rebound', 'rebound'],
+  ]) edges.push({
+    source: `src/calls.py#${caller}`,
+    target: `src/calls.py#${target}`,
+    relation: 'calls',
+    confidence: 'inferred',
+  });
+  const artifactPath = join(f.base, 'python-wiring.json');
+  await writeFile(artifactPath, JSON.stringify({ meta: { version: 1 }, nodes, edges }));
+  const result = await publishArchiveStructure({
+    publicationPath: capture.publicationPath,
+    artifactPath,
+    kind: 'graft',
+    paths: ['src/calls.py', 'src/other.py', 'src/patterns.py'],
+    maxEdges: 20,
+  });
+  assert.equal(result.relationshipCount, 1);
+  assert.equal(result.skipped['unverified-relation'], 13);
+  assert.equal(result.skipped['import-target-without-node'], 1);
+  const draft = JSON.parse(await readFile(result.draftPath, 'utf8'));
+  assert.equal(draft.assertions[0].predicate, 'call-name-candidate');
+  assert.equal(draft.assertions[0].support[0].quote, 'target');
+  assert.equal(draft.assertions[0].support[0].text_start,
+    Array.from(source.slice(0, source.indexOf('target()', source.indexOf('message = "é"')))).length);
+});

@@ -76,10 +76,22 @@ this host when the archive worker cannot establish its hard memory boundary.
 `graft` accepts a Graft `.graph/wiring.json` generated from the selected
 non-Nx checkout. Provide only paths admitted in the source root. Temari checks
 each structural endpoint against the retained archive text and the current
-source file hash. Graft call candidates require matching AST span hashes and
-a Swift call spelling outside comments. Files containing any Swift string
-delimiter, unmasked slash/hash syntax or non-ASCII code are omitted until a Swift expression
-parser handles interpolation and regex literals; accepted
+source file hash. Python Graft `calls` edges require matching Graft span hashes,
+exact Python AST definition name/kind/span, and one `ast.Name` call token in
+the source definition's own body. Both endpoints must be in the same pinned
+file; a matching name in another file is omitted until import/module mapping
+can verify it. Temari parses the bounded retained Python text in a short-lived
+isolated subprocess using the configured transport Python. It excludes nested
+definitions, decorators/defaults, attribute calls, local and enclosing
+shadowing (including match captures), nested or class-method target
+definitions, and module rebinding/import aliases. The AST is cached per file
+for one publication attempt. Imports whose target is only a module name have
+no Graft node ID and are omitted as `import-target-without-node`; a future
+adapter must map module names to pinned file nodes before asserting imports.
+Swift candidates require a call spelling outside comments. Files containing
+any Swift string delimiter, unmasked slash/hash syntax or non-ASCII code are
+omitted until a Swift expression parser handles interpolation and regex
+literals; accepted
 candidates publish as
 `call-name-candidate` because callee resolution is not proven. `contains` is
 limited to whole-file Graft fingerprints and fingerprinted child spans. Nx
