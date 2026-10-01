@@ -63,10 +63,10 @@ class SourceRegistry:
         from knowledge_agent.source_archive import migrate
         with self._db() as db:
             version = db.execute('PRAGMA user_version').fetchone()[0]
-            graph_ready = db.execute(
-                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='graph_retractions'"
+            audit_ready = db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='archive_audits'"
             ).fetchone()
-            if version == 4 and graph_ready and not self._sharing_migration_needed(db):
+            if version == 5 and audit_ready and not self._sharing_migration_needed(db):
                 return
         with self._writer(), self._db() as db:
             migrate(db)
@@ -333,6 +333,14 @@ class SourceRegistry:
     def audit_current_source(self, *args, **kwargs):
         from knowledge_agent.source_archive import audit_current_source
         return audit_current_source(self, *args, **kwargs)
+
+    def audit_start(self, *args, **kwargs):
+        from knowledge_agent.source_archive import audit_start
+        return audit_start(self, *args, **kwargs)
+
+    def audit_page(self, *args, **kwargs):
+        from knowledge_agent.source_archive import audit_page
+        return audit_page(self, *args, **kwargs)
 
     def read_snapshot(self, *args, **kwargs):
         from knowledge_agent.source_archive import read_snapshot

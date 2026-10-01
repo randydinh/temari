@@ -108,6 +108,14 @@ has an observation time; it does not turn the earlier generation diff or graph
 impact plan into a continuous freshness guarantee. The audit does not invoke
 Jev or publish a new graph.
 
+Larger currentness results use a single source scan followed by immutable
+pages from a bounded, content-addressed local audit snapshot. This avoids
+rereading all source bytes for each page and keeps one observation time across
+the receipt. Registrar limits snapshot size and retains at most eight per
+source; each page rechecks current admission and archive pins. A source edit
+after the scan does not rewrite that historical observation. A fresh audit is
+needed to describe the later source state.
+
 ## Delivery decisions
 
 ### Installed capability decision — 2026-10-01

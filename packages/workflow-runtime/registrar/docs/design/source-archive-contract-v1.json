@@ -10,6 +10,12 @@
       "$ref": "#/$defs/currentness"
     },
     {
+      "$ref": "#/$defs/currentnessStart"
+    },
+    {
+      "$ref": "#/$defs/currentnessPage"
+    },
+    {
       "$ref": "#/$defs/read"
     },
     {
@@ -35,6 +41,47 @@
     }
   ],
   "$defs": {
+    "currentnessStart": {
+      "type": "object",
+      "properties": {
+        "schema": { "const": 1 },
+        "kind": { "const": "archive-currentness-audit-start" },
+        "status": { "enum": ["complete", "partial"] },
+        "source_id": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "generation": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+        "manifest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "audit_id": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "total": { "type": "integer", "minimum": 0, "maximum": 2000 },
+        "counts": { "type": "object" },
+        "observed_at": { "type": "string" },
+        "consistency": { "const": "declared-selection-not-atomic" },
+        "evidence": { "const": "point-in-time-local-observation" }
+      },
+      "required": ["schema", "kind", "status", "source_id", "generation", "manifest_sha256", "audit_id", "total", "counts", "observed_at", "consistency", "evidence"],
+      "additionalProperties": true
+    },
+    "currentnessPage": {
+      "type": "object",
+      "properties": {
+        "schema": { "const": 1 },
+        "kind": { "const": "archive-currentness-audit-page" },
+        "status": { "enum": ["complete", "partial"] },
+        "source_id": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "generation": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+        "manifest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "audit_id": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "total": { "type": "integer", "minimum": 0, "maximum": 2000 },
+        "counts": { "type": "object" },
+        "observed_at": { "type": "string" },
+        "consistency": { "const": "declared-selection-not-atomic" },
+        "evidence": { "const": "point-in-time-local-observation" },
+        "offset": { "type": "integer", "minimum": 0, "maximum": 2000 },
+        "rows": { "type": "array", "maxItems": 200 },
+        "next_cursor": { "type": ["string", "null"] }
+      },
+      "required": ["schema", "kind", "status", "source_id", "generation", "manifest_sha256", "audit_id", "total", "counts", "observed_at", "consistency", "evidence", "offset", "rows", "next_cursor"],
+      "additionalProperties": true
+    },
     "currentness": {
       "type": "object",
       "properties": {

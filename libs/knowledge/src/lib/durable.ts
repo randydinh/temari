@@ -13,14 +13,24 @@ import { dirname, isAbsolute, join } from 'node:path';
 import { canonical } from './codec.js';
 
 /** Exclusive publication, synced before and after the no-overwrite link. */
-export async function publishJson(path: string, value: unknown): Promise<void> {
+export async function publishJson(
+  path: string,
+  value: unknown,
+  maxBytes = 1_048_576,
+): Promise<void> {
   const directory = dirname(path),
     body = canonical(value);
+  assert(
+    Number.isSafeInteger(maxBytes) &&
+      maxBytes >= 1 &&
+      maxBytes <= 8 * 1_048_576,
+    'Invalid artifact byte bound',
+  );
   assert(
     isAbsolute(path) && (await realpath(directory)) === directory,
     'Canonical existing artifact directory required',
   );
-  assert(Buffer.byteLength(body) <= 1_048_576, 'Intake artifact exceeds bound');
+  assert(Buffer.byteLength(body) <= maxBytes, 'Intake artifact exceeds bound');
   const temporary = join(directory, `.archive-${randomUUID()}.tmp`);
   const file = await open(temporary, 'wx', 0o600);
   try {
@@ -40,7 +50,7 @@ export async function publishJson(path: string, value: unknown): Promise<void> {
         'Unsafe artifact collision',
       );
       assert(
-        existing.size <= 1_048_576,
+        existing.size <= maxBytes,
         'Existing intake artifact exceeds bound',
       );
       assert.equal(
@@ -66,23 +76,33 @@ export async function readJson(path: string): Promise<unknown> {
 /** Read exact artifact bytes from one regular file descriptor with a hard byte cap. */
 export async function readJsonWithBytes(
   path: string,
+  maxBytes = 1_048_576,
 ): Promise<{ readonly value: unknown; readonly bytes: Buffer }> {
+  assert(
+    Number.isSafeInteger(maxBytes) &&
+      maxBytes >= 1 &&
+      maxBytes <= 8 * 1_048_576,
+    'Invalid artifact byte bound',
+  );
   assert(
     isAbsolute(path) && (await realpath(path)) === path,
     'Canonical artifact required',
   );
-  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  const file = await open(
+    path,
+    constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+  );
   try {
     const stat = await file.stat();
-    assert(stat.isFile() && stat.size <= 1_048_576, 'Artifact exceeds bound');
+    assert(stat.isFile() && stat.size <= maxBytes, 'Artifact exceeds bound');
     const chunks: Buffer[] = [];
     let size = 0;
     for (;;) {
-      const next = Buffer.allocUnsafe(Math.min(65536, 1_048_577 - size));
+      const next = Buffer.allocUnsafe(Math.min(65536, maxBytes + 1 - size));
       const { bytesRead } = await file.read(next, 0, next.length, null);
       if (bytesRead === 0) break;
       size += bytesRead;
-      assert(size <= 1_048_576, 'Artifact exceeds bound');
+      assert(size <= maxBytes, 'Artifact exceeds bound');
       chunks.push(next.subarray(0, bytesRead));
     }
     const bytes = Buffer.concat(chunks, size);
