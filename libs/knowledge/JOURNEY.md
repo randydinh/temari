@@ -168,24 +168,32 @@ prove the live source is still current.
 ## Audit one local source at a point in time
 
 To compare a complete archived generation with the currently admitted local
-root, run a separate read-only audit:
+root, run a separate local audit. The paged route handles results larger than
+the one-shot 1 MiB response cap:
 
 ```ts
-import { auditArchiveCurrentness } from '@temari/knowledge';
+import { auditArchiveCurrentnessPaged } from '@temari/knowledge';
 
-const { receiptPath, receipt } = await auditArchiveCurrentness({
+const { receiptPath, receipt } = await auditArchiveCurrentnessPaged({
   publicationPath: '/absolute/private-task/archive-publication-HASH.json',
 });
 ```
 
-The Registrar rereads admitted regular files with the capture's file, total
-and entry limits. The metadata-only receipt separates added, removed, changed,
+The Registrar scans admitted regular files once with the capture's file, total
+and entry limits, then stores a content-addressed metadata-only audit snapshot
+in its local workspace. Temari reads bounded pages of that same observation
+and publishes a metadata-only receipt. The result separates added, removed, changed,
 unchanged and `unavailable` paths. Oversized, unreadable, symlink and other
 nonregular files are unknown or refused; they never count as unchanged.
 Tampered archive pins and revoked or changed source registration refuse the
-audit. `observedAt` and `declared-selection-not-atomic` describe one bounded
+audit. Each page rechecks current source admission and the pinned archive; an
+evicted snapshot or bad cursor refuses. Registrar keeps at most eight audit
+snapshots per source. The original `auditArchiveCurrentness` one-shot API remains
+available for smaller results. `observedAt` and `declared-selection-not-atomic` describe one bounded
 observation, not continuous freshness or an atomic filesystem snapshot. The
-audit does not recapture the source, update a graph or use Jev. Historical
+audit does not recapture the source, update a graph or use Jev. It writes an
+audit snapshot in Registrar state and a receipt in the task directory;
+historical pages retain the observation even if source bytes change later. Historical
 archive reads still use their original generation.
 
 ## Pinned Markdown links

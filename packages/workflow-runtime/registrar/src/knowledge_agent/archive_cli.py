@@ -20,12 +20,20 @@ def main(argv=None):
     generations.add_argument('source_id')
     inspect = commands.add_parser('inspect')
     audit = commands.add_parser('audit-current')
+    audit_start = commands.add_parser('audit-start')
+    audit_page = commands.add_parser('audit-page')
     read = commands.add_parser('read')
     recover = commands.add_parser('recover')
-    for command in (inspect, read, recover, audit):
+    for command in (inspect, read, recover, audit, audit_start, audit_page):
         command.add_argument('source_id')
         command.add_argument('generation')
     audit.add_argument('--manifest-sha256', required=True)
+    audit_start.add_argument('--manifest-sha256', required=True)
+    audit_page.add_argument('audit_id')
+    audit_page.add_argument('--manifest-sha256', required=True)
+    audit_page.add_argument('--cursor')
+    audit_page.add_argument('--limit', type=int, default=20)
+    audit_page.add_argument('--max-bytes', type=int, default=16000)
     for command in (read, recover):
         command.add_argument('path')
     recover.add_argument('destination', type=Path)
@@ -93,7 +101,7 @@ def main(argv=None):
         if command == 'import':
             args['bundle_path'] = args.pop('bundle')
         method = dict(capture='capture_source', generations='source_generations', inspect='source_generation',
-            **{'audit-current':'audit_current_source'},
+            **{'audit-current':'audit_current_source', 'audit-start':'audit_start', 'audit-page':'audit_page'},
             read='read_snapshot', discover='discover_snapshot', recover='recover_original',
             export='export_archive', **{'import':'import_archive',
             'graph-publish':'publish_graph', 'graph-read':'read_graph',

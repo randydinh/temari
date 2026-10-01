@@ -7,6 +7,7 @@ or current engine fingerprints are necessary to use a published representation.
 from __future__ import annotations
 
 import base64
+import binascii
 from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 import errno
@@ -27,6 +28,8 @@ import uuid
 from knowledge_agent.knowledge import _path
 
 MAX_RESPONSE = 1024 * 1024
+MAX_AUDIT_SNAPSHOT = 8 * MAX_RESPONSE
+MAX_AUDIT_SNAPSHOTS_PER_SOURCE = 8
 MAX_BUNDLE = 192 * 1024 * 1024
 BM25_RANKER = 'sqlite-fts5-bm25-v1'
 BM25_TOKENIZER = 'unicode61 remove_diacritics 0'
@@ -50,6 +53,8 @@ DDL = [
     'CREATE TABLE IF NOT EXISTS graph_generations(id TEXT PRIMARY KEY, data BLOB NOT NULL)',
     'CREATE TABLE IF NOT EXISTS archive_blobs(sha256 TEXT PRIMARY KEY, data BLOB NOT NULL)',
     'CREATE TABLE IF NOT EXISTS archive_generations(id TEXT PRIMARY KEY, source_id TEXT NOT NULL, request_key TEXT NOT NULL, fingerprint TEXT NOT NULL, manifest_sha256 TEXT NOT NULL, manifest BLOB NOT NULL, UNIQUE(source_id,request_key))',
+    'CREATE TABLE IF NOT EXISTS archive_audits(id TEXT PRIMARY KEY, source_id TEXT NOT NULL, generation TEXT NOT NULL, manifest_sha256 TEXT NOT NULL, data BLOB NOT NULL)',
+    'CREATE INDEX IF NOT EXISTS archive_audits_source ON archive_audits(source_id)',
 ]
 
 
@@ -68,16 +73,18 @@ def _ddl(db, statement):
 def migrate(db):
     # Caller holds writer lock; re-read version after lock acquisition.
     version = db.execute('PRAGMA user_version').fetchone()[0]
-    if version not in (0, 1, 2, 3, 4):
+    if version not in (0, 1, 2, 3, 4, 5):
         raise ValueError('unsupported registry schema')
-    if version == 4 and db.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='graph_retractions'").fetchone():
+    if version == 5 and db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='archive_audits'").fetchone():
         return
+    graph_retractions_existed = bool(db.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='graph_retractions'").fetchone())
     db.execute('BEGIN IMMEDIATE')
     try:
         for statement in DDL:
             _ddl(db, statement)
-        if version == 4:
+        if version == 4 and not graph_retractions_existed:
             # A phase-2 schema-4 workspace can already contain retractions. The
             # backfill and table creation commit together before publication.
             for graph_id, raw in db.execute('SELECT id,data FROM graph_generations'):
@@ -91,7 +98,7 @@ def migrate(db):
                         _id(assertion['id'])
                         db.execute('INSERT OR IGNORE INTO graph_retractions VALUES (?)',
                                    (assertion['id'],))
-        db.execute('PRAGMA user_version=4')
+        db.execute('PRAGMA user_version=5')
         db.execute('COMMIT')
     except BaseException:
         db.execute('ROLLBACK')
@@ -576,7 +583,7 @@ def _audit_file(root, path, limit, file_limit):
     return ('read', digest(raw), len(raw), None)
 
 
-def audit_current_source(registry, source_id, generation, *, manifest_sha256, max_bytes=MAX_RESPONSE):
+def _scan_current_source(registry, source_id, generation, manifest_sha256):
     """Compare one complete archived generation with a bounded local observation.
 
     This does not produce an atomic filesystem snapshot or alter archived state.
@@ -585,7 +592,6 @@ def audit_current_source(registry, source_id, generation, *, manifest_sha256, ma
     if not isinstance(source_id, str) or not 1 <= len(source_id) <= 80:
         raise ValueError('invalid archive source identity')
     _hash_id(manifest_sha256)
-    _integer(max_bytes, 1024, MAX_RESPONSE, 'response bytes')
     with registry._db() as db:
         source = registry._source(db, source_id)
         manifest = _load(registry, db, source_id, generation)
@@ -657,7 +663,147 @@ def audit_current_source(registry, source_id, generation, *, manifest_sha256, ma
                        evidence='point-in-time-local-observation',
                        added=added, removed=removed, changed=changed,
                        unchanged=unchanged, unavailable=unavailable)
-        return bounded(receipt, max_bytes)
+        return receipt
+
+
+def audit_current_source(registry, source_id, generation, *, manifest_sha256, max_bytes=MAX_RESPONSE):
+    """Return the original one-shot bounded currentness contract."""
+    _integer(max_bytes, 1024, MAX_RESPONSE, 'response bytes')
+    return bounded(_scan_current_source(registry, source_id, generation, manifest_sha256), max_bytes)
+
+
+def _audit_summary(snapshot, audit_id, kind):
+    return dict(schema=1, kind=kind, source_id=snapshot['source_id'],
+                generation=snapshot['generation'], manifest_sha256=snapshot['manifest_sha256'],
+                audit_id=audit_id, status=snapshot['status'], total=len(snapshot['rows']),
+                counts=snapshot['counts'], observed_at=snapshot['observed_at'],
+                consistency=snapshot['consistency'], evidence=snapshot['evidence'])
+
+
+def audit_start(registry, source_id, generation, *, manifest_sha256):
+    """Scan once, then publish a bounded immutable metadata-only observation."""
+    receipt = _scan_current_source(registry, source_id, generation, manifest_sha256)
+    categories = ('added', 'removed', 'changed', 'unchanged', 'unavailable')
+    rows = sorted((dict(kind=kind, **entry) for kind in categories for entry in receipt[kind]),
+                  key=lambda row: row['path'])
+    counts = {kind: len(receipt[kind]) for kind in categories}
+    snapshot = dict(schema=1, kind='archive-currentness-audit-snapshot',
+                    source_id=source_id, generation=generation,
+                    manifest_sha256=manifest_sha256, status=receipt['status'],
+                    observed_at=receipt['observed_at'], consistency=receipt['consistency'],
+                    evidence=receipt['evidence'], counts=counts, rows=rows)
+    raw = canonical(snapshot)
+    if len(raw) > MAX_AUDIT_SNAPSHOT:
+        raise ValueError('currentness audit snapshot exceeds byte budget')
+    audit_id = digest(raw)
+    with registry._writer(), registry._db() as db:
+        manifest = _load(registry, db, source_id, generation)
+        if digest(canonical(manifest)) != manifest_sha256:
+            raise ValueError('archive manifest pin mismatch')
+        db.execute('BEGIN IMMEDIATE')
+        try:
+            old = db.execute('SELECT source_id,generation,manifest_sha256,data FROM archive_audits WHERE id=?',
+                             (audit_id,)).fetchone()
+            if old is not None and old != (source_id, generation, manifest_sha256, raw):
+                raise ValueError('currentness audit identity collision')
+            # Replayed identical observations remain among the newest eight.
+            # Delete/reinsert is atomic and retains the exact content-addressed bytes.
+            if old is not None:
+                db.execute('DELETE FROM archive_audits WHERE id=?', (audit_id,))
+            db.execute('INSERT INTO archive_audits VALUES (?,?,?,?,?)',
+                       (audit_id, source_id, generation, manifest_sha256, raw))
+            evicted = db.execute(
+                'SELECT id FROM archive_audits WHERE source_id=? ORDER BY rowid DESC LIMIT -1 OFFSET ?',
+                (source_id, MAX_AUDIT_SNAPSHOTS_PER_SOURCE)).fetchall()
+            db.executemany('DELETE FROM archive_audits WHERE id=?', evicted)
+            db.execute('COMMIT')
+        except BaseException:
+            db.execute('ROLLBACK')
+            raise
+    return bounded(_audit_summary(snapshot, audit_id, 'archive-currentness-audit-start'))
+
+
+def _audit_cursor(audit_id, offset):
+    binding = dict(audit_id=audit_id, offset=offset)
+    return base64.urlsafe_b64encode(canonical(dict(**binding, checksum=digest(canonical(binding))))).decode()
+
+
+def _audit_resume(cursor, audit_id):
+    try:
+        if not isinstance(cursor, str) or len(cursor) > 2048:
+            raise ValueError('invalid currentness audit cursor')
+        raw = base64.b64decode(cursor, altchars=b'-_', validate=True)
+        value = json.loads(raw)
+        if (canonical(value) != raw or set(value) != {'audit_id', 'offset', 'checksum'}
+                or value['audit_id'] != audit_id):
+            raise ValueError('currentness audit cursor binding changed')
+        offset = _integer(value['offset'], 0, 10**9, 'currentness audit cursor offset')
+        if value['checksum'] != digest(canonical(dict(audit_id=audit_id, offset=offset))):
+            raise ValueError('currentness audit cursor integrity mismatch')
+        return offset
+    except (TypeError, KeyError, UnicodeError, json.JSONDecodeError, binascii.Error) as exc:
+        raise ValueError('invalid currentness audit cursor') from exc
+
+
+def audit_page(registry, source_id, generation, audit_id, *, manifest_sha256,
+               cursor=None, limit=20, max_bytes=16000):
+    """Read a stored point-in-time audit without reobserving source bytes."""
+    _id(generation); _hash_id(audit_id); _hash_id(manifest_sha256)
+    _integer(limit, 1, 200, 'currentness audit page limit')
+    _integer(max_bytes, 1024, MAX_RESPONSE, 'response bytes')
+    offset = 0 if cursor is None else _audit_resume(cursor, audit_id)
+    with registry._db() as db:
+        manifest = _load(registry, db, source_id, generation)
+        if digest(canonical(manifest)) != manifest_sha256:
+            raise ValueError('archive manifest pin mismatch')
+        stored = db.execute('SELECT source_id,generation,manifest_sha256,data FROM archive_audits WHERE id=?',
+                            (audit_id,)).fetchone()
+        if stored is None:
+            raise ValueError('currentness audit snapshot unavailable or expired')
+        raw = bytes(stored[3])
+        if len(raw) > MAX_AUDIT_SNAPSHOT or digest(raw) != audit_id:
+            raise ValueError('currentness audit snapshot integrity mismatch')
+        try:
+            snapshot = json.loads(raw)
+            if canonical(snapshot) != raw or not isinstance(snapshot, dict):
+                raise ValueError('currentness audit snapshot is not canonical')
+            if (stored[:3] != (source_id, generation, manifest_sha256)
+                    or snapshot.get('schema') != 1
+                    or snapshot.get('kind') != 'archive-currentness-audit-snapshot'
+                    or (snapshot.get('source_id'), snapshot.get('generation'),
+                        snapshot.get('manifest_sha256')) != stored[:3]
+                    or snapshot.get('consistency') != 'declared-selection-not-atomic'
+                    or snapshot.get('evidence') != 'point-in-time-local-observation'):
+                raise ValueError('currentness audit snapshot binding mismatch')
+            _timestamp(snapshot['observed_at'])
+            rows = snapshot['rows']
+            categories = ('added', 'removed', 'changed', 'unchanged', 'unavailable')
+            if (not isinstance(rows, list) or len(rows) > 2*DEFAULT_LIMITS['entries']
+                    or any(not isinstance(row, dict) or row.get('kind') not in categories
+                           or not isinstance(row.get('path'), str) for row in rows)
+                    or [row['path'] for row in rows] != sorted({row['path'] for row in rows})
+                    or snapshot.get('counts') != {kind: sum(row['kind'] == kind for row in rows)
+                                                  for kind in categories}
+                    or snapshot.get('status') != ('partial' if snapshot['counts']['unavailable'] else 'complete')):
+                raise ValueError('invalid currentness audit snapshot rows')
+        except (KeyError, TypeError, UnicodeError, json.JSONDecodeError) as exc:
+            raise ValueError('invalid stored currentness audit snapshot') from exc
+        if offset >= len(rows) and (offset != 0 or rows):
+            raise ValueError('currentness audit cursor offset beyond snapshot')
+        end = min(len(rows), offset + limit)
+        summary = _audit_summary(snapshot, audit_id, 'archive-currentness-audit-page')
+        while True:
+            result = dict(summary, offset=offset, rows=rows[offset:end],
+                          next_cursor=_audit_cursor(audit_id, end) if end < len(rows) else None)
+            if len(canonical(result)) <= max_bytes:
+                break
+            if end == offset:
+                raise ValueError('currentness audit page cannot fit one row')
+            end -= 1
+        if end == offset and offset < len(rows):
+            raise ValueError('currentness audit page cannot fit one row')
+        _recheck(registry, db, source_id, manifest)
+        return bounded(result, max_bytes)
 
 
 def _cursor(binding, offset):

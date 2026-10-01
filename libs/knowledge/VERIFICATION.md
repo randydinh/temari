@@ -154,3 +154,22 @@ The audit is a bounded, non-atomic observation of the local root. A file that
 cannot be verified is `unavailable`, so a partial result cannot certify the
 whole source as unchanged. The result does not schedule recapture, repin a
 graph, establish continuous freshness, or resolve the macOS PDF text gap.
+
+## Bounded currentness snapshot paging, 2026-10-01
+
+The next isolated increment passed `knowledge:typecheck`, 43 unit tests, 59
+actual-Registrar integration tests, four focused Registrar snapshot tests, and
+15 canonical runtime tests. The actual CLI journey verifies one immutable audit
+across source edits, a bad cursor and revoked registration, Python Unicode
+code-point path order, and multiple pages with a pinned 16,000-byte transport
+cap. A dense 994-path Python fixture exceeds the former 1 MiB one-shot limit
+but returns every row through bounded pages; a 2,000-path union and schema-4
+to schema-5 migration are also covered. Independent read-only review found no
+remaining blocking issue after byte-cap, ordering, cursor and contract repairs.
+
+The Registrar stores at most eight content-addressed snapshots per source,
+each bounded to 8 MiB. Pages recheck current source admission and archive pin,
+and Temari publishes only hash, size, path and gap metadata. The snapshot is a
+non-atomic observation at one time; later source edits do not rewrite it.
+This does not establish continuous freshness, automatic recapture, graph
+refresh, or searchable PDF text on this macOS host.

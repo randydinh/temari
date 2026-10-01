@@ -88,6 +88,8 @@ export async function archiveTransport(options: ArchiveTransportOptions) {
     operation:
       | 'capture'
       | 'audit-current'
+      | 'audit-start'
+      | 'audit-page'
       | 'inspect'
       | 'read'
       | 'discover'
@@ -143,7 +145,8 @@ export async function archiveTransport(options: ArchiveTransportOptions) {
             cwd: config.registrarSource,
             timeout: timeoutMs,
             killSignal: 'SIGKILL',
-            maxBuffer: Math.min(maxStdoutBytes, responseBytes + 4096),
+            // The CLI emits one newline after its bounded JSON response.
+            maxBuffer: Math.min(maxStdoutBytes + 1, responseBytes + 4096),
             encoding: 'buffer',
             env: {
               PATH: '/usr/bin:/bin',

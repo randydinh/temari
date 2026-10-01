@@ -81,3 +81,32 @@ scope or pinning issue, then verified the race test. The audit's single-response
 result. The scan is non-atomic and cannot assert continuous freshness. Commit,
 clean packaged export and exact-head PR review are still required. The macOS
 searchable-PDF boundary and broader production gates remain open.
+
+## 02:26 PDT bounded currentness paging experiment
+
+The currentness audit is one bounded response. A valid dense source can exceed
+1 MiB even though each record fits comfortably in a page. The next unit will
+scan once, persist a bounded, content-addressed local audit snapshot under an
+explicit Registrar schema migration, and page that immutable observation with
+current admission and archive-pin rechecks. Its finish predicate is complete
+row recovery with no duplicate or omission at the response cap, rejection of
+tampered/expired cursors and revoked registration, a source edit after the scan
+that does not silently rewrite the historical snapshot, no source text in the
+snapshot, and a bounded retention policy. A focused scale fixture and actual
+CLI journey must pass with typecheck and independent review. This remains a
+point-in-time, non-atomic audit; it does not establish continuous freshness.
+
+## 02:47 PDT paging checkpoint
+
+The paged audit increment passes the focused 994-path and 2,000-path Registrar
+fixtures, knowledge typecheck, 43 unit tests, 59 actual-CLI integration tests,
+and 15 canonical runtime tests. The actual-CLI tests cover Unicode path order,
+immutable historical pages, invalid cursor and revoked registration, and a
+16,000-byte pinned transport that forces multiple pages. Independent review
+found no remaining blocking issue after repairs to the path order, 2,000-row
+schema bound, transport newline allowance, and per-publication response cap.
+The first full integration run exposed an optional-parameter callback regression;
+an explicit wrapper repaired it, and two later full runs passed. The decision
+is to keep this read-only, metadata-only increment pending clean package and
+exact-head PR review. It does not close the macOS PDF extraction or broader
+production losslessness gates.

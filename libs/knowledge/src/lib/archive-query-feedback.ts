@@ -188,7 +188,7 @@ export async function recordArchiveQueryFeedback(
     assert(!ranked.has(identity(item)), 'Missed document was already ranked');
 
   const publicationArtifacts = await Promise.all(
-    handoff.publications.map(readJsonWithBytes),
+    handoff.publications.map((path) => readJsonWithBytes(path)),
   );
   const publications = await Promise.all(
     handoff.publications.map(loadArchivePublication),
