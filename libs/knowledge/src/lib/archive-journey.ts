@@ -228,7 +228,7 @@ export async function runArchiveIntake(
   };
 }
 
-async function loadHandoff(path: string): Promise<ArchiveIntakeHandoff> {
+export async function loadArchiveHandoff(path: string): Promise<ArchiveIntakeHandoff> {
   assert(isAbsolute(path));
   const value = object(await readJson(path)) as unknown as ArchiveIntakeHandoff;
   assert.equal(value.schema, 1);
@@ -310,7 +310,7 @@ export async function evaluateArchiveSearch(
       selected.cases.length >= 1 &&
       selected.cases.length <= 32,
   );
-  const handoff = await loadHandoff(selected.handoffPath);
+  const handoff = await loadArchiveHandoff(selected.handoffPath);
   assert(
     new Set(selected.cases.map((item) => item.id)).size ===
       selected.cases.length,

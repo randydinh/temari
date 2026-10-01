@@ -183,6 +183,70 @@ retains verified graph evidence. A missing/stale graph leaves lexical results
 available and records a gap.
 
 This loop measures local archive, exact/BM25 ranking and bounded evidence reads.
+
+## Sealed retrieval gate
+
+Keep the question set in the private task workspace. Define `development` before
+changing retrieval code and a separate `holdout` before inspecting challenger
+results. Record the holdout's SHA-256 in a dated, append-only decision log or
+commit before tuning; the runner verifies the supplied hash but cannot prove
+when an operator first sealed it. Each question names its registered source scope and one or more
+source-relative gold paths. Gold documents must be disjoint across every
+question in both cohorts, so rewording one question about the same document
+cannot inflate the independent sample. The gate refuses a changed question-set
+SHA-256, repeated questions, reused gold documents, or a changed handoff. The following shape
+omits real source IDs and paths:
+
+```json
+{
+  "schema": 1,
+  "handoffPath": "/absolute/private-task/archive-handoff-HASH.json",
+  "topK": 3,
+  "cohorts": {
+    "development": [{
+      "id": "question-1", "query": "bounded search terms",
+      "sourceIds": ["REGISTERED_SOURCE_ID"],
+      "expected": [{"sourceId": "REGISTERED_SOURCE_ID", "path": "relative/file.md"}]
+    }],
+    "holdout": [{
+      "id": "question-2", "query": "separate search terms",
+      "sourceIds": ["REGISTERED_SOURCE_ID"],
+      "expected": [{"sourceId": "REGISTERED_SOURCE_ID", "path": "relative/other.md"}]
+    }]
+  }
+}
+```
+
+```sh
+shasum -a 256 /absolute/sealed-questions.json
+pnpm nx run knowledge:demo -- journey-gate --input /absolute/sealed-questions.json --sha256 FULL_SHA256
+```
+
+The runner reads the exact pinned intake handoff, inspects every archived gold
+path, and runs exact and BM25 for each question at the same `topK` and first-excerpt
+budgets. It explicitly opts every case out of Jev; no key lookup or hosted call is
+needed. Private search reports retain paths and evidence checkpoints in the task
+directory. The gate receipt contains question IDs, coverage reason counts, scores,
+verification status, timing, report paths and hashes, without source text or gold
+paths. A preserved PDF without a text representation counts as a coverage gap,
+not a ranker miss. Gold paths absent from the capture are also coverage gaps.
+Each fully indexable comparison requires a verified first discovery page that
+contains the complete top K. Further lower-ranked pages need not be fetched;
+a failed or undersized first page aborts without a passing receipt.
+
+`promotion-eligible` requires at least five independent questions in **each**
+cohort, all gold paths indexed, verified returned shortlists, at least one extra
+gold hit for BM25 in each cohort and no case-level regression. This is a local
+review gate, not automatic promotion or proof of answer quality. `coverage-blocked`
+and `insufficient-sample` take precedence; otherwise a failed comparison is
+`rejected`. The receipt still shows diagnostic recall on the fully indexable
+cases. Add new case cohorts before tuning to them; a reused holdout becomes
+development evidence and needs replacement for a later promotion decision.
+An extraction gap such as `empty-document` or `pdf-memory-boundary-unavailable`
+blocks promotion even when BM25 improves the remaining indexed documents. If
+the runner itself fails, no passing receipt is published; inspect the private
+task reports and rerun only after the cause is resolved.
+
 Graft and Nx artifact generation remain operator-owned. Native Graphify
 non-code extraction, image interpretation, a scheduled pair of autonomous
 agents and semantic answer quality remain separate
