@@ -14,6 +14,16 @@ export interface TaskViewOptions {
   readonly runtime: TaskViewReader;
   readonly archonBaseUrl: string;
   readonly controller?: TaskViewController;
+  readonly knowledge?: {
+    inspect(): Promise<unknown>;
+    select(nodeId: string): Promise<unknown>;
+    expand(nodeId: string): Promise<unknown>;
+  };
+  readonly schedules?: {
+    describe(): Promise<unknown>;
+    create(input: unknown): Promise<unknown>;
+    update(id: string, input: unknown): Promise<unknown>;
+  };
 }
 
 /** The service owns admission, idempotency, runtime control, and acceptance. */
@@ -163,6 +173,10 @@ const assets = new Map([
   ['/', ['task-view.html', 'text/html; charset=utf-8']],
   ['/task-view.js', ['task-view.js', 'text/javascript; charset=utf-8']],
   ['/task-view.css', ['task-view.css', 'text/css; charset=utf-8']],
+  [
+    '/dashboard-pages.js',
+    ['dashboard-pages.js', 'text/javascript; charset=utf-8'],
+  ],
 ] as const);
 
 /** Local task projection with optional mutations delegated to the controller. */
@@ -204,6 +218,10 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
         /^\/api\/tasks\/([A-Za-z0-9][A-Za-z0-9._-]{0,127})\/actions$/.exec(
           url.pathname,
         );
+      const scheduleMatch =
+        /^\/api\/schedules\/([A-Za-z0-9][A-Za-z0-9._-]{0,127})\/actions$/.exec(
+          url.pathname,
+        );
       if (
         request.method !== 'GET' &&
         request.method !== 'HEAD' &&
@@ -222,7 +240,13 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
           });
           return;
         }
-        if (url.search || (url.pathname !== '/api/tasks' && !actionMatch)) {
+        if (
+          url.search ||
+          (url.pathname !== '/api/tasks' &&
+            !actionMatch &&
+            url.pathname !== '/api/schedules' &&
+            !scheduleMatch)
+        ) {
           send(404, { error: 'Not found.' });
           return;
         }
@@ -237,9 +261,18 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
           );
         validateMutation(request, csrfToken);
         const input = await readJsonBody(request);
-        const result = actionMatch
-          ? await options.controller!.action(actionMatch[1]!, input)
-          : await options.controller!.create(input);
+        if (
+          (url.pathname === '/api/schedules' || scheduleMatch) &&
+          !options.schedules
+        )
+          throw new RequestError(400, 'Scheduling is not configured.');
+        const result = scheduleMatch
+          ? await options.schedules!.update(scheduleMatch[1]!, input)
+          : url.pathname === '/api/schedules'
+            ? await options.schedules!.create(input)
+            : actionMatch
+              ? await options.controller!.action(actionMatch[1]!, input)
+              : await options.controller!.create(input);
         send(200, result);
         return;
       }
@@ -251,7 +284,67 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
             ? await options.controller.describe()
             : null,
           archonBaseUrl,
+          knowledgeAvailable: Boolean(options.knowledge),
+          schedulingAvailable: Boolean(options.schedules),
         });
+        return;
+      }
+      if (url.pathname === '/api/schedules') {
+        if (url.search)
+          throw new RequestError(400, 'Unexpected schedule query.');
+        send(
+          200,
+          options.schedules
+            ? await options.schedules.describe()
+            : { configured: false, schedules: [], targets: [] },
+        );
+        return;
+      }
+      if (
+        url.pathname === '/api/knowledge' ||
+        url.pathname === '/api/knowledge/expand' ||
+        url.pathname === '/api/knowledge/node'
+      ) {
+        const params = [...url.searchParams.keys()];
+        if (
+          url.pathname === '/api/knowledge'
+            ? params.length > 0
+            : params.length !== 1 ||
+              params[0] !== 'node' ||
+              url.searchParams.getAll('node').length !== 1
+        )
+          throw new RequestError(400, 'Select one configured node identity.');
+        const node = url.searchParams.get('node');
+        if (
+          url.pathname !== '/api/knowledge' &&
+          (!node || node.length > 256 || node.includes('\0'))
+        )
+          throw new RequestError(400, 'Invalid knowledge node identity.');
+        if (!options.knowledge) {
+          send(200, {
+            schema: 1,
+            state: 'not-configured',
+            nodes: [],
+            edges: [],
+            gaps: [
+              {
+                reason:
+                  'Configure pinned Registrar publications to view their map.',
+              },
+            ],
+            historical: true,
+            currentOriginal: 'not-checked',
+          });
+          return;
+        }
+        send(
+          200,
+          url.pathname === '/api/knowledge'
+            ? await options.knowledge.inspect()
+            : url.pathname === '/api/knowledge/expand'
+              ? await options.knowledge.expand(node!)
+              : await options.knowledge.select(node!),
+        );
         return;
       }
       if (actionMatch && options.controller) {
@@ -306,7 +399,9 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
         error instanceof RequestError
           ? error.status
           : options.controller &&
-              (controllerStatus === 400 || controllerStatus === 409)
+              (controllerStatus === 400 ||
+                controllerStatus === 404 ||
+                controllerStatus === 409)
             ? controllerStatus
             : 500;
       if (request.method !== 'GET' && request.method !== 'HEAD') {

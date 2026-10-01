@@ -46,6 +46,15 @@ const statusNames = {
 };
 function displayedStatus(task) {
   const control = state.dashboard?.config?.controls?.[task.taskId];
+  if (control?.planning && !control.implementation) {
+    if (['STARTING', 'RUNNING'].includes(control.planning.state))
+      return 'RUNNING';
+    if (
+      ['BLOCKED', 'RECOVERY_REQUIRED'].includes(control.planning.state) ||
+      control.planning.integrityIssue
+    )
+      return 'BLOCKED';
+  }
   const execution = control?.implementation ?? control?.swarm;
   if (!execution) return task.status;
   if (
@@ -371,7 +380,7 @@ function renderDetail() {
     );
     detail.append(handoff);
   }
-  if (!control?.swarm && !control?.implementation)
+  if (!control?.swarm && !control?.implementation && !control?.planning)
     detail.append(
       section(
         'Workflow',
@@ -391,7 +400,8 @@ function renderDetail() {
     );
     stageGrid.append(card);
   }
-  if (!control?.swarm && !control?.implementation) detail.append(stageGrid);
+  if (!control?.swarm && !control?.implementation && !control?.planning)
+    detail.append(stageGrid);
   detail.append(section('Runs', 'One goal, retained history'));
   if (control?.progress?.length) {
     const progress = el('div', 'native-progress');
@@ -899,7 +909,9 @@ function renderControls(task, control) {
         ? (control.planTitle ?? 'Parallel implementation')
         : control.swarm
           ? 'Read-only agent swarm'
-          : (control.recipe ?? 'Needs planning'),
+          : control.planning
+            ? 'Temari goal planning'
+            : (control.recipe ?? 'Needs planning'),
     ),
   );
   if (control.message) {
@@ -921,6 +933,7 @@ function renderControls(task, control) {
         `Prepared revision ${control.verifiedRevision.slice(0, 12)}`,
       ),
     );
+  if (control.planning) panel.append(renderGoalPlanning(control));
   if (control.implementation) panel.append(renderImplementation(task, control));
   if (control.swarm) {
     const limits = control.limits;
@@ -958,6 +971,8 @@ function renderControls(task, control) {
     verify: 'Verify evidence',
     'swarm-start': 'Start agents',
     'swarm-cancel': 'Cancel agents',
+    'planner-start': 'Start planner',
+    'prepare-plan': 'Prepare this plan',
     'implementation-start': 'Start implementers',
     'implementation-cancel': 'Cancel implementation',
   };
@@ -971,7 +986,15 @@ function renderControls(task, control) {
       label,
     );
     button.disabled = state.mutating;
-    button.addEventListener('click', () => perform(task, action));
+    button.addEventListener('click', () =>
+      perform(
+        task,
+        action,
+        action === 'prepare-plan'
+          ? { proposalSha256: control.planning.proposalSha256 }
+          : {},
+      ),
+    );
     actions.append(button);
   }
   panel.append(actions);
@@ -1092,6 +1115,80 @@ function renderControls(task, control) {
   }
   return panel;
 }
+function renderGoalPlanning(control) {
+  const draft = control.planning;
+  const panel = el('section', 'planning-result');
+  panel.append(
+    section('Goal plan', draft.policyId),
+    badge(draft.state, draft.state === 'READY' ? 'Proposal ready' : undefined),
+  );
+  if (draft.integrityIssue)
+    panel.append(el('p', 'blocker', draft.integrityIssue));
+  if (!control.policyCurrent)
+    panel.append(
+      el(
+        'p',
+        'blocker',
+        'Configured policy changed. Prepare a new goal against the current policy.',
+      ),
+    );
+  if (draft.proposal) {
+    panel.append(
+      el('h3', '', draft.proposal.title),
+      el('p', '', draft.proposal.summary),
+    );
+    const policy = state.dashboard.config.planning?.policies.find(
+      (item) => item.id === draft.policyId,
+    );
+    for (const assignment of draft.proposal.assignments) {
+      const row = el('div', 'plan-assignment');
+      row.append(el('h4', '', assignment.slotId), el('p', '', assignment.goal));
+      const slot = policy?.slots.find((item) => item.id === assignment.slotId);
+      if (slot) row.append(ownershipList(slot.owns));
+      const criteria = el('ul');
+      for (const item of [
+        ...new Set([
+          ...(slot?.mandatoryCriteria ?? []),
+          ...assignment.acceptanceCriteria,
+        ]),
+      ])
+        criteria.append(el('li', '', item));
+      row.append(criteria);
+      panel.append(row);
+    }
+    panel.append(
+      el(
+        'p',
+        'event-detail',
+        'Independent implementers → integrate patches → configured checks → independent review. Dependent coding waves are not admitted by this policy.',
+      ),
+    );
+    panel.append(el('p', 'artifact-path', `Proposal ${draft.proposalSha256}`));
+  }
+  const evidence = el('details');
+  evidence.append(el('summary', '', 'Planner evidence'));
+  for (const ref of draft.evidenceRefs)
+    evidence.append(el('p', 'artifact-path', `${ref.path} · ${ref.sha256}`));
+  if (!draft.evidenceRefs.length)
+    evidence.append(
+      el(
+        'p',
+        'event-detail',
+        'Evidence is retained when the bounded planner call ends.',
+      ),
+    );
+  panel.append(evidence);
+  return panel;
+}
+const planningOptionPrefix = '__planning__:';
+function selectedPlanningPolicy() {
+  const value = byId('goal-recipe').value;
+  return value.startsWith(planningOptionPrefix)
+    ? state.dashboard.config.planning?.policies.find(
+        (item) => item.id === value.slice(planningOptionPrefix.length),
+      )
+    : null;
+}
 const implementationOptionPrefix = '__implementation__:';
 function selectedImplementationPlan() {
   const selection = byId('goal-recipe').value;
@@ -1143,6 +1240,7 @@ function renderImplementationPreview(plan) {
 function selectGoalRecipe() {
   const swarm = byId('goal-recipe').value === '__swarm__';
   const implementation = selectedImplementationPlan();
+  const planning = selectedPlanningPolicy();
   const recipe = state.dashboard.config.recipes.find(
     (item) => item.id === byId('goal-recipe').value,
   );
@@ -1151,21 +1249,39 @@ function selectGoalRecipe() {
   byId('goal-title').readOnly = Boolean(recipe);
   byId('goal-text').readOnly = Boolean(recipe);
   byId('swarm-options').hidden = !swarm;
-  renderImplementationPreview(implementation);
-  byId('save-goal').textContent = implementation
-    ? 'Prepare implementation'
-    : swarm
-      ? 'Prepare agents'
-      : recipe
-        ? 'Prepare verification'
-        : 'Save goal';
-  byId('goal-help').textContent = implementation
-    ? 'Describe the overall goal for this configured plan. Each implementer works in an isolated workspace with the ownership shown above. Their patches are integrated, verified, and independently reviewed before Temari assesses the candidate.'
-    : swarm
-      ? 'Prepare 2–4 agents against a pinned, clean workspace. Review the task, then start the investigation.'
-      : recipe
-        ? 'This runs the configured checks against a pinned, clean workspace. Review the prepared task, then start it.'
-        : 'Your goal will be saved with a continuation brief. Temari prepares the execution plan before work starts.';
+  renderImplementationPreview(
+    planning
+      ? {
+          ...planning,
+          assignments: planning.slots.map((slot) => ({
+            id: slot.id,
+            goal: slot.description,
+            owns: slot.owns,
+          })),
+        }
+      : implementation,
+  );
+  if (planning)
+    byId('implementation-preview').firstChild.textContent =
+      'Planning policy · ' + planning.title;
+  byId('save-goal').textContent = planning
+    ? 'Plan my goal'
+    : implementation
+      ? 'Prepare implementation'
+      : swarm
+        ? 'Prepare agents'
+        : recipe
+          ? 'Prepare verification'
+          : 'Save goal';
+  byId('goal-help').textContent = planning
+    ? 'Temari reads the pinned clean workspace and proposes bounded assignments within this policy. Review the validated proposal, then prepare and start its parallel implementation.'
+    : implementation
+      ? 'Describe the overall goal for this configured plan. Each implementer works in an isolated workspace with the ownership shown above. Their patches are integrated, verified, and independently reviewed before Temari assesses the candidate.'
+      : swarm
+        ? 'Prepare 2–4 agents against a pinned, clean workspace. Review the task, then start the investigation.'
+        : recipe
+          ? 'This runs the configured checks against a pinned, clean workspace. Review the prepared task, then start it.'
+          : 'Your goal will be saved with a continuation brief. Temari prepares the execution plan before work starts.';
 }
 function selectConcurrency() {
   const bound = Math.min(
@@ -1205,6 +1321,11 @@ byId('new-goal').addEventListener('click', () => {
     }
     selectConcurrency();
   }
+  for (const policy of state.dashboard.config.planning?.policies ?? []) {
+    const option = el('option', '', `Let Temari plan · ${policy.title}`);
+    option.value = `${planningOptionPrefix}${policy.id}`;
+    select.append(option);
+  }
   for (const plan of state.dashboard.config.implementation?.plans ?? []) {
     const option = el(
       'option',
@@ -1219,6 +1340,8 @@ byId('new-goal').addEventListener('click', () => {
     option.value = recipe.id;
     select.append(option);
   }
+  if (state.dashboard.config.planning?.policies.length)
+    select.value = `${planningOptionPrefix}${state.dashboard.config.planning.policies[0].id}`;
   byId('goal-workspace').textContent = state.dashboard.config.workspaceRoot;
   byId('goal-error').hidden = true;
   selectGoalRecipe();
@@ -1236,29 +1359,37 @@ byId('goal-form').addEventListener('submit', async (event) => {
   try {
     const recipeId = byId('goal-recipe').value;
     const implementation = selectedImplementationPlan();
+    const planning = selectedPlanningPolicy();
     const task = await post('/api/tasks', {
       requestId: state.goalRequestId,
-      ...(implementation
+      ...(planning
         ? {
-            mode: 'implementation',
-            planId: implementation.id,
+            mode: 'planning',
+            policyId: planning.id,
             title: byId('goal-title').value.trim(),
             goal: byId('goal-text').value.trim(),
           }
-        : recipeId === '__swarm__'
+        : implementation
           ? {
-              mode: 'swarm',
+              mode: 'implementation',
+              planId: implementation.id,
               title: byId('goal-title').value.trim(),
               goal: byId('goal-text').value.trim(),
-              workerCount: Number(byId('swarm-workers').value),
-              maxConcurrency: Number(byId('swarm-concurrency').value),
             }
-          : recipeId
-            ? { recipeId }
-            : {
+          : recipeId === '__swarm__'
+            ? {
+                mode: 'swarm',
                 title: byId('goal-title').value.trim(),
                 goal: byId('goal-text').value.trim(),
-              }),
+                workerCount: Number(byId('swarm-workers').value),
+                maxConcurrency: Number(byId('swarm-concurrency').value),
+              }
+            : recipeId
+              ? { recipeId }
+              : {
+                  title: byId('goal-title').value.trim(),
+                  goal: byId('goal-text').value.trim(),
+                }),
     });
     state.selected = task.taskId;
     const url = new URL(location.href);

@@ -120,6 +120,8 @@ test('read-only task view serves retained task data and rejects mutation and for
     csrfToken: null,
     config: null,
     archonBaseUrl: 'http://127.0.0.1:3091',
+    knowledgeAvailable: false,
+    schedulingAvailable: false,
   });
   assert.equal((await fetch(`${base}/api/tasks/one`)).status, 200);
   assert.equal((await fetch(`${base}/api/tasks/missing`)).status, 404);
@@ -518,4 +520,76 @@ test('dashboard restart invalidates the prior server token', async (t) => {
   });
   assert.equal(current.status, 200);
   assert.equal(changes, 1);
+});
+
+test('schedule mutations retain local-origin protection and knowledge selections admit only one server node ID', async (t) => {
+  const calls: string[] = [];
+  const server = await startTaskViewServer({
+    runtime: emptyReader,
+    controller: {
+      describe: () => ({}),
+      create: async () => ({}),
+      action: async () => ({}),
+    },
+    archonBaseUrl: 'http://127.0.0.1:3091',
+    port: 0,
+    schedules: {
+      describe: async () => ({ schedules: [], targets: [] }),
+      create: async (input) => {
+        calls.push('create');
+        return input;
+      },
+      update: async (id, input) => {
+        calls.push(id);
+        return input;
+      },
+    },
+    knowledge: {
+      inspect: async () => ({ nodes: [] }),
+      select: async (id) => {
+        calls.push(id);
+        return { node: { id } };
+      },
+      expand: async (id) => ({ nodes: [{ id }] }),
+    },
+  });
+  t.after(() => closeServer(server));
+  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  const dashboard = await (await fetch(`${base}/api/dashboard`)).json();
+  assert.equal(
+    (
+      await fetch(`${base}/api/schedules`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{}',
+      })
+    ).status,
+    403,
+  );
+  const response = await fetch(`${base}/api/schedules`, {
+    method: 'POST',
+    headers: {
+      origin: base,
+      'content-type': 'application/json',
+      'x-temari-token': dashboard.csrfToken,
+    },
+    body: JSON.stringify({ requestId: 'one' }),
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual(calls, ['create']);
+  assert.equal(
+    (await fetch(`${base}/api/knowledge/node?node=known&path=/etc/passwd`))
+      .status,
+    400,
+  );
+  assert.equal(
+    (await fetch(`${base}/api/knowledge/node?node=known&node=other`)).status,
+    400,
+  );
+  assert.equal(
+    (await fetch(`${base}/api/knowledge/node?node=known`)).status,
+    200,
+  );
+  assert.deepEqual(calls, ['create', 'known']);
+  assert.equal((await fetch(`${base}/dashboard-pages.js`)).status, 200);
 });

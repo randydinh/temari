@@ -6,13 +6,20 @@
     <title>Temari · Tasks</title>
     <link rel="stylesheet" href="/task-view.css" />
     <script src="/task-view.js" defer></script>
+    <script src="/dashboard-pages.js" defer></script>
   </head>
   <body>
     <header class="topbar">
       <a class="brand" href="/" aria-label="Temari tasks"
         ><span class="brand-mark">T</span> Temari</a
       >
-      <span class="workspace-label">Workspace / Tasks</span>
+      <nav class="page-nav" aria-label="Workspace views">
+        <button data-view="tasks" aria-pressed="true">Tasks</button>
+        <button data-view="schedules" aria-pressed="false">Schedules</button>
+        <button data-view="knowledge" aria-pressed="false">
+          Knowledge map
+        </button>
+      </nav>
       <div class="top-actions">
         <span id="connection" role="status">Loading…</span
         ><button id="refresh" class="quiet">Refresh</button
@@ -21,7 +28,7 @@
         >
       </div>
     </header>
-    <main class="workspace">
+    <main class="workspace" id="tasks-page">
       <aside class="inbox" aria-label="Task inbox">
         <div class="inbox-heading">
           <span class="eyebrow">YOUR WORK</span>
@@ -56,6 +63,77 @@
         </div>
       </section>
     </main>
+    <section
+      id="schedules-page"
+      class="secondary-page"
+      aria-label="Schedules"
+      hidden
+    >
+      <div class="page-heading">
+        <div>
+          <span class="eyebrow">RUN ON A SCHEDULE</span>
+          <h1>Schedules</h1>
+          <p>Recurring checks with a retained history for every occurrence.</p>
+        </div>
+        <button id="new-schedule" class="primary" disabled>New schedule</button>
+      </div>
+      <p id="schedule-clock" class="event-detail" role="status"></p>
+      <div id="schedule-list" aria-live="polite"></div>
+    </section>
+    <section
+      id="knowledge-page"
+      class="secondary-page"
+      aria-label="Knowledge map"
+      hidden
+    >
+      <div class="page-heading">
+        <div>
+          <span class="eyebrow">CONTENT REGISTRAR</span>
+          <h1>Knowledge map</h1>
+          <p>
+            Follow sources, publications, paths and their recorded
+            relationships.
+          </p>
+        </div>
+        <button id="refresh-map" class="quiet">Refresh map</button>
+      </div>
+      <p id="knowledge-status" class="event-detail" role="status"></p>
+      <div class="map-tools">
+        <label
+          >Find a node<input
+            id="map-search"
+            type="search"
+            placeholder="Source, document or path…" /></label
+        ><label
+          >Show<select id="map-kind">
+            <option value="">All node types</option>
+          </select></label
+        >
+      </div>
+      <div class="knowledge-layout">
+        <div class="map-content">
+          <div
+            id="knowledge-map"
+            class="knowledge-map"
+            aria-label="Source relationships"
+          ></div>
+          <div
+            id="knowledge-nodes"
+            class="knowledge-nodes"
+            aria-label="Map nodes"
+          ></div>
+        </div>
+        <aside
+          id="knowledge-detail"
+          class="knowledge-detail"
+          aria-label="Selected node"
+        >
+          <h2>Select a node</h2>
+          <p>Inspect its provenance and connected records.</p>
+        </aside>
+      </div>
+      <section id="knowledge-gaps" aria-label="Map coverage gaps"></section>
+    </section>
     <div id="error" class="error-banner" role="alert" hidden></div>
     <dialog id="goal-dialog" aria-labelledby="goal-dialog-title">
       <form id="goal-form">
@@ -105,6 +183,43 @@
         </p>
         <p id="goal-error" class="blocker" role="alert" hidden></p>
         <button id="save-goal" class="primary" type="submit">Save goal</button>
+      </form>
+    </dialog>
+    <dialog id="schedule-dialog" aria-labelledby="schedule-dialog-title">
+      <form id="schedule-form">
+        <div class="section-heading">
+          <h2 id="schedule-dialog-title">Schedule a check</h2>
+          <button id="close-schedule" type="button" class="quiet">Close</button>
+        </div>
+        <label
+          >Configured check<select id="schedule-target" required></select
+        ></label>
+        <label
+          >Cadence<select id="schedule-cadence">
+            <option value="once">Once</option>
+            <option value="interval">Recurring</option>
+          </select></label
+        >
+        <label
+          >First run<input id="schedule-at" type="datetime-local" required
+        /></label>
+        <label id="schedule-interval-label" hidden
+          >Every (minutes)<input
+            id="schedule-interval"
+            type="number"
+            min="1"
+            max="525600"
+            value="60"
+        /></label>
+        <p class="event-detail">
+          Schedules dispatch while this dashboard server is running. Missed
+          intervals coalesce into one check; an active or uncertain run prevents
+          overlap. Pausing stops future runs.
+        </p>
+        <p id="schedule-error" class="blocker" role="alert" hidden></p>
+        <button id="save-schedule" class="primary" type="submit">
+          Create schedule
+        </button>
       </form>
     </dialog>
   </body>

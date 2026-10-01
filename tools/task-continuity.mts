@@ -1,6 +1,6 @@
 import { readFile, stat } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
-import { isAbsolute, resolve } from 'node:path';
+import { isAbsolute, resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs, promisify } from 'node:util';
 import {
@@ -10,6 +10,7 @@ import {
 import {
   FileTaskStore,
   TaskRuntime,
+  taskDigest,
   type HarnessSelection,
 } from '../libs/runtime/src/index.js';
 import { platformInfo } from '../packages/initializer/src/lib/platform.js';
@@ -18,6 +19,16 @@ import {
   DashboardController,
   loadDashboardConfig,
 } from './dashboard-controller.mjs';
+import { FileScheduleStore } from '../libs/runtime/src/lib/schedule-store.js';
+import {
+  createDashboardScheduler,
+  type DashboardSchedulerTick,
+} from './dashboard-scheduler.mjs';
+import {
+  inspectKnowledgeMap,
+  selectKnowledgeMapNode,
+  expandKnowledgeMap,
+} from './dashboard-knowledge.mjs';
 
 export const taskHelp = `Temari tasks — keep a goal and its evidence across runs
 
@@ -245,17 +256,88 @@ export async function runTaskCommand(
           },
         })
       : undefined;
+    const scheduler =
+      controller && dashboardConfig?.scheduling
+        ? createDashboardScheduler({
+            store: await FileScheduleStore.create(
+              join(dashboardConfig.preparationRoot, 'schedules'),
+              dashboardConfig.workspaceRoot,
+            ),
+            dispatcher: {
+              describeTargets: async () =>
+                dashboardConfig.recipes.map((recipe) => ({
+                  id: recipe.id,
+                  title: recipe.title,
+                  goal: recipe.goal,
+                  pin: taskDigest(recipe),
+                })),
+              create: (input) => controller.create(input),
+              inspect: (taskId, startRequestId) =>
+                controller.inspectScheduledTask(taskId, startRequestId),
+              start: (taskId, input) =>
+                controller.action(taskId, { action: 'start', ...input }),
+            },
+          })
+        : undefined;
+    let lastTick: DashboardSchedulerTick | null = null;
+    let clockIssue: string | null = null;
+    const tick = async () => {
+      try {
+        lastTick = await scheduler!.tick();
+        clockIssue = null;
+      } catch (error) {
+        clockIssue = error instanceof Error ? error.message : String(error);
+      }
+    };
+    if (scheduler) await tick();
+    let clock: ReturnType<typeof setInterval> | null = null;
     const server = await startTaskViewServer({
       runtime,
       ...(controller ? { controller } : {}),
+      ...(scheduler
+        ? {
+            schedules: {
+              describe: async () => ({
+                ...((await scheduler.describe()) as Record<string, unknown>),
+                configured: true,
+                lastTickAt: lastTick?.at ?? null,
+                issues: lastTick?.issues ?? [],
+                issue: clockIssue,
+                tickMs: dashboardConfig!.scheduling!.tickMs,
+              }),
+              create: (input: unknown) => scheduler.create(input),
+              update: (id: string, input: unknown) =>
+                scheduler.update(id, input),
+            },
+          }
+        : {}),
+      ...(dashboardConfig?.knowledge
+        ? {
+            knowledge: {
+              inspect: () => inspectKnowledgeMap(dashboardConfig.knowledge!),
+              select: (nodeId: string) =>
+                selectKnowledgeMapNode(dashboardConfig.knowledge!, nodeId),
+              expand: (nodeId: string) =>
+                expandKnowledgeMap(dashboardConfig.knowledge!, nodeId),
+            },
+          }
+        : {}),
       archonBaseUrl: values['archon-url'] ?? 'http://127.0.0.1:3091',
       port: values.port ? Number(values.port) : 3092,
     });
+    if (scheduler)
+      clock = setInterval(() => {
+        void tick();
+      }, dashboardConfig!.scheduling!.tickMs);
     for (const signal of ['SIGINT', 'SIGTERM'] as const)
       process.once(signal, () => {
+        if (clock) clearInterval(clock);
         server.closeAllConnections();
         server.close();
       });
+    server.once('close', () => {
+      if (clock) clearInterval(clock);
+    });
     const port = (server.address() as { port: number }).port;
     return {
       url: `http://127.0.0.1:${port}`,

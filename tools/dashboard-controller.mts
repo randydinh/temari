@@ -48,6 +48,21 @@ import {
   type CommandSpec,
 } from './run-codex-write-workers.mjs';
 import { parseCodexWorkersRequest } from './run-codex-workers.mjs';
+import {
+  parsePlannerPolicy,
+  prepareGoalPlan,
+  startGoalPlan,
+  inspectGoalPlan,
+  materializeGoalPlan,
+  type PlannerPolicy,
+  type GoalPlanHandle,
+  type GoalPlanSnapshot,
+} from './dashboard-planner.mjs';
+import {
+  parseDashboardKnowledgeOptions,
+  type DashboardKnowledgeOptions,
+} from './dashboard-knowledge.mjs';
+import type { ScheduledTaskInspection } from './dashboard-scheduler.mjs';
 
 const runFile = promisify(execFile);
 const sha = (value: string | Uint8Array) =>
@@ -96,6 +111,13 @@ export interface DashboardConfig {
     timeoutMs: number;
     plans: DashboardImplementationPlan[];
   };
+  planning?: {
+    executable: string;
+    timeoutMs: number;
+    policies: PlannerPolicy[];
+  };
+  scheduling?: { tickMs: number };
+  knowledge?: DashboardKnowledgeOptions;
 }
 type Candidate = { head: string; fingerprint: string };
 interface Preparation {
@@ -127,6 +149,19 @@ interface ImplementationPreparation {
   planSha256: string;
   goal: string;
   handle: DashboardImplementationHandle;
+  planning?: {
+    handle: GoalPlanHandle;
+    policySha256: string;
+    proposalSha256: string;
+  };
+}
+interface PlanningPreparation {
+  schema: 1;
+  taskId: string;
+  handle: GoalPlanHandle;
+}
+function planningAdmissionId(snapshot: GoalPlanSnapshot): string {
+  return `goal-${taskDigest([snapshot.taskId, snapshot.requestId, snapshot.proposalSha256, snapshot.policySha256, snapshot.candidate]).slice(0, 48)}`;
 }
 export interface DashboardControllerOptions {
   config: DashboardConfig;
@@ -325,10 +360,8 @@ async function validateImplementationConfig(
     'Invalid coding time bound.',
   );
   assert(
-    Array.isArray(config.plans) &&
-      config.plans.length >= 1 &&
-      config.plans.length <= 20,
-    'Configure one to twenty implementation plans.',
+    Array.isArray(config.plans) && config.plans.length <= 20,
+    'Configure at most twenty implementation plans.',
   );
   const seen = new Set<string>();
   for (const raw of config.plans) {
@@ -441,7 +474,7 @@ export async function validateDashboardConfig(
   fields(
     config,
     ['schema', 'workspaceRoot', 'preparationRoot', 'recipes'],
-    ['swarm', 'implementation'],
+    ['swarm', 'implementation', 'planning', 'scheduling', 'knowledge'],
   );
   assert.equal(config.schema, 1);
   for (const key of ['workspaceRoot', 'preparationRoot']) {
@@ -467,6 +500,48 @@ export async function validateDashboardConfig(
       workspaceRoot,
       preparationRoot,
     );
+  if (config.planning !== undefined) {
+    assert(
+      config.implementation,
+      'Goal planning requires configured implementation limits.',
+    );
+    const planning = object(config.planning);
+    fields(planning, ['executable', 'timeoutMs', 'policies']);
+    assert(
+      isAbsolute(planning.executable) &&
+        (await lstat(planning.executable)).isFile(),
+      'Planning requires an installed Codex executable.',
+    );
+    assert(
+      Number.isSafeInteger(planning.timeoutMs) &&
+        planning.timeoutMs >= 1000 &&
+        planning.timeoutMs <= 300000,
+      'Invalid planning time bound.',
+    );
+    assert(
+      Array.isArray(planning.policies) &&
+        planning.policies.length >= 1 &&
+        planning.policies.length <= 20,
+      'Configure one to twenty planning policies.',
+    );
+    planning.policies = planning.policies.map(parsePlannerPolicy);
+    assert.equal(
+      new Set(planning.policies.map((item: PlannerPolicy) => item.id)).size,
+      planning.policies.length,
+      'Duplicate planning policy.',
+    );
+  }
+  if (config.scheduling !== undefined) {
+    fields(object(config.scheduling), ['tickMs']);
+    assert(
+      Number.isSafeInteger(config.scheduling.tickMs) &&
+        config.scheduling.tickMs >= 1000 &&
+        config.scheduling.tickMs <= 60000,
+      'Schedule ticks must be bounded from 1 to 60 seconds.',
+    );
+  }
+  if (config.knowledge !== undefined)
+    config.knowledge = parseDashboardKnowledgeOptions(config.knowledge);
   if (config.swarm !== undefined) {
     const swarm = object(config.swarm);
     fields(swarm, ['executable', 'maxConcurrency', 'maxWorkers', 'timeoutMs']);
@@ -716,14 +791,21 @@ export class DashboardController implements TaskViewController {
           'workerCount',
           'maxConcurrency',
           'planId',
+          'policyId',
         ],
       );
       id(request.requestId);
       assert(
         request.mode === undefined ||
           request.mode === 'swarm' ||
-          request.mode === 'implementation',
+          request.mode === 'implementation' ||
+          request.mode === 'planning',
         'Unknown goal mode.',
+      );
+      if (request.mode === 'planning') return this.createPlanning(request);
+      assert(
+        request.policyId === undefined,
+        'Planning policies require the planning route.',
       );
       if (request.mode === 'swarm') return this.createSwarm(request);
       if (request.mode === 'implementation')
@@ -993,6 +1075,143 @@ export class DashboardController implements TaskViewController {
     return this.options.runtime.snapshot(taskId);
   }
 
+  private async planningPreparation(
+    task: TaskSnapshot,
+  ): Promise<PlanningPreparation | null> {
+    const refs = task.events.flatMap((event) =>
+      event.change.type === 'handoff-recorded'
+        ? event.change.handoff.contextRefs.filter(
+            (ref) => ref.kind === 'dashboard-goal-plan',
+          )
+        : [],
+    );
+    if (!refs.length) return null;
+    const ref = refs[0]!;
+    const path = join(
+      this.options.config.preparationRoot,
+      task.taskId,
+      'planning.json',
+    );
+    assert.equal(
+      ref.location,
+      path,
+      'Planner reference lies outside its task preparation.',
+    );
+    assert.equal(
+      await realpath(path),
+      path,
+      'Planner reference resolution changed.',
+    );
+    const content = await bytes(path);
+    assert.equal(sha(content), ref.sha256, 'Planner reference changed.');
+    const prepared = JSON.parse(content.toString()) as PlanningPreparation;
+    assert.equal(prepared.schema, 1);
+    assert.equal(prepared.taskId, task.taskId);
+    assert.equal(
+      prepared.handle.requestPath,
+      join(dirname(path), 'planning', 'request.json'),
+    );
+    const snapshot = await inspectGoalPlan(prepared.handle);
+    assert.equal(snapshot.taskId, task.taskId);
+    assert.equal(
+      snapshot.goalSha256,
+      taskDigest(task.goal),
+      'Task goal changed since planning.',
+    );
+    return prepared;
+  }
+
+  private async createPlanning(
+    request: Record<string, any>,
+  ): Promise<TaskSnapshot> {
+    fields(request, ['requestId', 'mode', 'policyId', 'title', 'goal']);
+    id(request.policyId);
+    text(request.title, 256);
+    text(request.goal, 8192);
+    const config = this.options.config.planning;
+    assert(config, 'Goal planning is not configured.');
+    const policy = config.policies.find(
+      (entry) => entry.id === request.policyId,
+    );
+    assert(policy, 'Unknown planning policy.');
+    const taskId = `task-${request.requestId}`;
+    await this.options.store.createTask({
+      taskId,
+      title: request.title,
+      goal: request.goal,
+      workspaceRoot: this.options.config.workspaceRoot,
+      actor,
+      idempotencyKey: `intake-${request.requestId}`,
+    });
+    let task = await this.task(taskId);
+    const prior = await this.planningPreparation(task);
+    if (prior) {
+      const snapshot = await inspectGoalPlan(prior.handle);
+      assert.equal(
+        snapshot.policySha256,
+        taskDigest(policy),
+        'Configured planning policy changed.',
+      );
+      // Exact retry may start a prepared draft, but never relaunch an uncertain call.
+      if (snapshot.canStart) await startGoalPlan(prior.handle);
+      return this.options.runtime.snapshot(taskId);
+    }
+    const directory = join(this.options.config.preparationRoot, taskId);
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+    assert.equal(
+      await realpath(directory),
+      directory,
+      'Planning storage resolution changed.',
+    );
+    const candidate = await cleanCandidate(task.workspaceRoot);
+    const handle = await prepareGoalPlan({
+      root: join(directory, 'planning'),
+      taskId,
+      requestId: request.requestId,
+      goal: request.goal,
+      workspaceRoot: task.workspaceRoot,
+      candidate,
+      policy,
+      executable: config.executable,
+      timeoutMs: config.timeoutMs,
+    });
+    const path = join(directory, 'planning.json');
+    await publish(
+      path,
+      JSON.stringify({
+        schema: 1,
+        taskId,
+        handle,
+      } satisfies PlanningPreparation),
+    );
+    await this.options.store.handoffTask({
+      taskId,
+      actor,
+      expectedVersion: task.version,
+      idempotencyKey: `planning-${request.requestId}`,
+      handoff: {
+        summary:
+          'Temari goal planning requested against a clean pinned candidate.',
+        decisions: [
+          `Host policy ${policy.id} bounds ownership, checks and independent review.`,
+          'Planning is a read-only model call; proposal readiness is not execution or completion.',
+        ],
+        nextAction:
+          'Review the validated proposal and prepare its parallel implementation.',
+        blocker: null,
+        contextRefs: [
+          {
+            kind: 'dashboard-goal-plan',
+            location: path,
+            sha256: sha(await bytes(path)),
+          },
+        ],
+      },
+    });
+    await startGoalPlan(handle);
+    return this.options.runtime.snapshot(taskId);
+  }
+
   private async createImplementation(
     request: Record<string, any>,
   ): Promise<TaskSnapshot> {
@@ -1014,7 +1233,22 @@ export class DashboardController implements TaskViewController {
       actor,
       idempotencyKey: `intake-${request.requestId}`,
     });
-    const task = await this.task(taskId);
+    return this.prepareImplementation(
+      request,
+      selected,
+      await this.task(taskId),
+    );
+  }
+
+  private async prepareImplementation(
+    request: Record<string, any>,
+    selected: DashboardImplementationPlan,
+    task: TaskSnapshot,
+    planning?: ImplementationPreparation['planning'],
+  ): Promise<TaskSnapshot> {
+    const config = this.options.config.implementation!;
+    const taskId = task.taskId;
+    const runId = `run-${request.requestId}`;
     const planSha256 = taskDigest({
       selected,
       executable: config.executable,
@@ -1099,6 +1333,7 @@ export class DashboardController implements TaskViewController {
         planSha256,
         goal: request.goal,
         handle,
+        ...(planning ? { planning } : {}),
       };
       await publish(path, JSON.stringify(prepared));
     }
@@ -1126,7 +1361,7 @@ export class DashboardController implements TaskViewController {
     await this.options.store.bindRun({
       taskId,
       actor,
-      expectedVersion: 1,
+      expectedVersion: task.version,
       idempotencyKey: `prepare-${request.requestId}`,
       run: {
         runId,
@@ -1321,7 +1556,7 @@ export class DashboardController implements TaskViewController {
       fields(
         request,
         ['action', 'requestId', 'expectedVersion'],
-        ['reason', 'nextAction', 'blocker'],
+        ['reason', 'nextAction', 'blocker', 'proposalSha256'],
       );
       id(request.requestId);
       assert(
@@ -1330,6 +1565,16 @@ export class DashboardController implements TaskViewController {
         'Expected task version is required.',
       );
       let task = await this.task(taskId);
+      const goalPreparation =
+        request.action === 'prepare-plan'
+          ? await this.planningPreparation(task)
+          : null;
+      const goalSnapshot = goalPreparation
+        ? await inspectGoalPlan(goalPreparation.handle)
+        : null;
+      const admissionId = goalSnapshot
+        ? planningAdmissionId(goalSnapshot)
+        : null;
       const command = {
         taskId,
         actor,
@@ -1337,7 +1582,9 @@ export class DashboardController implements TaskViewController {
         idempotencyKey: `ui-${request.requestId}`,
       };
       const prior = task.events.find(
-        (event) => event.idempotencyKey === command.idempotencyKey,
+        (event) =>
+          event.idempotencyKey === command.idempotencyKey ||
+          (admissionId && event.idempotencyKey === `prepare-${admissionId}`),
       );
       if (!prior)
         assert.equal(
@@ -1380,8 +1627,80 @@ export class DashboardController implements TaskViewController {
       fields(
         request,
         ['action', 'requestId', 'expectedVersion'],
-        request.action === 'accept' ? ['reason'] : [],
+        request.action === 'accept'
+          ? ['reason']
+          : request.action === 'prepare-plan'
+            ? ['proposalSha256']
+            : [],
       );
+      if (
+        request.action === 'planner-start' ||
+        request.action === 'prepare-plan'
+      ) {
+        const prepared = await this.planningPreparation(task);
+        assert(prepared, 'This task has no retained goal planner.');
+        const snapshot = await inspectGoalPlan(prepared.handle);
+        const policy = this.options.config.planning?.policies.find(
+          (entry) => entry.id === snapshot.policyId,
+        );
+        assert(
+          policy && taskDigest(policy) === snapshot.policySha256,
+          'Configured planning policy changed; prepare a new goal.',
+        );
+        assert.equal(
+          snapshot.goalSha256,
+          taskDigest(task.goal),
+          'Task goal changed since planning.',
+        );
+        if (request.action === 'planner-start') {
+          assert(
+            snapshot.canStart,
+            'Planner call is already started or needs recovery.',
+          );
+          assert.deepEqual(
+            await cleanCandidate(task.workspaceRoot),
+            snapshot.candidate,
+            'Workspace changed since planning.',
+          );
+          await startGoalPlan(prepared.handle);
+          return this.options.runtime.snapshot(taskId);
+        }
+        assert.equal(
+          request.proposalSha256,
+          snapshot.proposalSha256,
+          'Selected proposal changed; refresh before preparing it.',
+        );
+        const stableId = planningAdmissionId(snapshot);
+        if (task.runs.some((entry) => entry.runId === `run-${stableId}`))
+          return task;
+        assert(
+          !task.currentRunId,
+          'A proposal implementation is already prepared on this task.',
+        );
+        const material = await materializeGoalPlan(
+          policy,
+          snapshot,
+          await cleanCandidate(task.workspaceRoot),
+        );
+        return this.prepareImplementation(
+          { requestId: stableId, title: task.title, goal: task.goal },
+          {
+            id: `goal-${policy.id}`,
+            title: snapshot.proposal!.title,
+            description: snapshot.proposal!.summary,
+            assignments: structuredClone([...material.assignments]),
+            prepare: structuredClone([...material.prepare]),
+            verify: structuredClone([...material.verify]),
+            reviewer: structuredClone(material.reviewer),
+          },
+          task,
+          {
+            handle: prepared.handle,
+            policySha256: material.policySha256,
+            proposalSha256: material.proposalSha256,
+          },
+        );
+      }
       const implementation = await this.implementationPreparation(task);
       if (implementation) {
         const before = await inspectDashboardImplementation(
@@ -1402,6 +1721,35 @@ export class DashboardController implements TaskViewController {
             implementation.candidate,
             'Workspace changed since preparation; prepare a new implementation.',
           );
+          if (implementation.planning) {
+            const snapshot = await inspectGoalPlan(
+              implementation.planning.handle,
+            );
+            const policy = this.options.config.planning?.policies.find(
+              (entry) => entry.id === snapshot.policyId,
+            );
+            assert(policy, 'Prepared goal policy is unavailable.');
+            assert.equal(
+              snapshot.goalSha256,
+              taskDigest(task.goal),
+              'Task goal changed since planning.',
+            );
+            const material = await materializeGoalPlan(
+              policy,
+              snapshot,
+              implementation.candidate,
+            );
+            assert.equal(
+              material.policySha256,
+              implementation.planning.policySha256,
+              'Prepared policy changed.',
+            );
+            assert.equal(
+              material.proposalSha256,
+              implementation.planning.proposalSha256,
+              'Prepared proposal changed.',
+            );
+          }
         } else assert(before.canCancel, 'Implementation is already terminal.');
         await this.options.store.handoffTask({
           ...command,
@@ -1571,6 +1919,87 @@ export class DashboardController implements TaskViewController {
     });
   }
 
+  /** Refresh only the exact scheduled execution; leave evidence acceptance to review. */
+  async inspectScheduledTask(
+    taskId: string,
+    startRequestId?: string,
+  ): Promise<ScheduledTaskInspection> {
+    let task = await this.task(taskId);
+    let run = task.runs.find((entry) => entry.runId === task.currentRunId);
+    assert(run, 'Scheduled task has no prepared run.');
+    let issue: string | null = null;
+    if (
+      run.nativeRef &&
+      !run.operations.some((entry) => entry.state !== 'CONFIRMED') &&
+      (!run.nativeSnapshot ||
+        ['RUNNING', 'QUEUED', 'UNKNOWN'].includes(run.nativeSnapshot.status))
+    ) {
+      try {
+        task = await this.action(taskId, {
+          action: 'observe',
+          requestId: `scheduled-observe-${task.version}`,
+          expectedVersion: task.version,
+        });
+        run = task.runs.find((entry) => entry.runId === task.currentRunId)!;
+      } catch (error) {
+        issue = (error as Error).message;
+        // Observation may be durable even when subsequent evidence projection fails.
+        task = await this.task(taskId);
+        run = task.runs.find((entry) => entry.runId === task.currentRunId)!;
+      }
+    }
+    const exact = startRequestId
+      ? run.operations.find(
+          (entry) => entry.commandId === `ui-${startRequestId}`,
+        )
+      : null;
+    const intent = exact
+      ? exact.state === 'CONFIRMED'
+        ? ('confirmed' as const)
+        : ('pending' as const)
+      : ('absent' as const);
+    const unresolved = run.operations.some(
+      (entry) => entry.state !== 'CONFIRMED',
+    );
+    let state: ScheduledTaskInspection['state'] = 'uncertain';
+    let startAllowed = false;
+    if (!unresolved) {
+      if (run.nativeRef) {
+        if (
+          ['SUCCEEDED', 'FAILED', 'CANCELLED'].includes(
+            run.nativeSnapshot?.status ?? '',
+          )
+        )
+          state = 'terminal';
+        else if (
+          !issue &&
+          ['RUNNING', 'QUEUED'].includes(run.nativeSnapshot?.status ?? '')
+        )
+          state = 'active';
+      } else if (!run.operations.length) {
+        state = 'prepared';
+        try {
+          const prepared = await this.preparation(task);
+          startAllowed = Boolean(
+            prepared &&
+            taskDigest(await cleanCandidate(task.workspaceRoot)) ===
+              taskDigest(prepared.candidate),
+          );
+        } catch (error) {
+          issue = (error as Error).message;
+        }
+      }
+    }
+    return {
+      taskId,
+      version: task.version,
+      state,
+      startAllowed,
+      intent,
+      issue,
+    };
+  }
+
   async describe(): Promise<unknown> {
     const tasks = await this.options.runtime.listSnapshots();
     const controls: Record<string, unknown> = {};
@@ -1578,6 +2007,19 @@ export class DashboardController implements TaskViewController {
       (item) => item.workspaceRoot === this.options.config.workspaceRoot,
     )) {
       try {
+        const planned = await this.planningPreparation(task);
+        const planning = planned ? await inspectGoalPlan(planned.handle) : null;
+        const planningPolicy = planning
+          ? this.options.config.planning?.policies.find(
+              (entry) => entry.id === planning.policyId,
+            )
+          : null;
+        const policyCurrent =
+          !planning ||
+          Boolean(
+            planningPolicy &&
+            taskDigest(planningPolicy) === planning.policySha256,
+          );
         const implementation = await this.implementationPreparation(task);
         if (implementation) {
           const snapshot = await inspectDashboardImplementation(
@@ -1593,7 +2035,8 @@ export class DashboardController implements TaskViewController {
           if (
             snapshot.state === 'PREPARED' &&
             candidateCurrent &&
-            !snapshot.integrityIssue
+            !snapshot.integrityIssue &&
+            policyCurrent
           )
             actions.push('implementation-start');
           if (snapshot.canCancel) actions.push('implementation-cancel');
@@ -1601,6 +2044,7 @@ export class DashboardController implements TaskViewController {
           controls[task.taskId] = {
             actions,
             implementation: snapshot,
+            ...(planning ? { planning, policyCurrent } : {}),
             planTitle: implementation.planTitle,
             limits: {
               maxConcurrency: manifest.request.maxConcurrency,
@@ -1611,6 +2055,34 @@ export class DashboardController implements TaskViewController {
             progress: [],
             verifiedRevision: implementation.candidate.head,
             message: snapshot.statusNote,
+          };
+          continue;
+        }
+        if (planning) {
+          let candidateCurrent = false;
+          try {
+            candidateCurrent =
+              taskDigest(await cleanCandidate(task.workspaceRoot)) ===
+              taskDigest(planning.candidate);
+          } catch {}
+          const actions = ['update'];
+          if (candidateCurrent && policyCurrent && !planning.integrityIssue) {
+            if (planning.canStart) actions.push('planner-start');
+            if (planning.canPrepare && !task.currentRunId)
+              actions.push('prepare-plan');
+          }
+          controls[task.taskId] = {
+            actions,
+            planning,
+            policyCurrent,
+            candidateCurrent,
+            progress: [],
+            verifiedRevision: planning.candidate.head,
+            message: !policyCurrent
+              ? 'Planning policy changed; create a new goal.'
+              : !candidateCurrent
+                ? 'Workspace changed since planning; create a new goal for the current candidate.'
+                : planning.statusNote,
           };
           continue;
         }
@@ -1824,6 +2296,33 @@ export class DashboardController implements TaskViewController {
               reviewer: {
                 id: item.reviewer.id,
                 goal: item.reviewer.brief.goal,
+              },
+            })),
+          }
+        : null,
+      planning: this.options.config.planning
+        ? {
+            timeoutMs: this.options.config.planning.timeoutMs,
+            policies: this.options.config.planning.policies.map((entry) => ({
+              id: entry.id,
+              title: entry.title,
+              description: entry.description,
+              slots: entry.slots.map(
+                ({ id, title, description, owns, mandatoryCriteria }) => ({
+                  id,
+                  title,
+                  description,
+                  owns,
+                  mandatoryCriteria,
+                }),
+              ),
+              verification: entry.verify.map(({ program, args }) => ({
+                program,
+                args,
+              })),
+              reviewer: {
+                id: entry.reviewer.id,
+                goal: entry.reviewer.brief.goal,
               },
             })),
           }

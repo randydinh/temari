@@ -6,12 +6,12 @@ for the person configuring the workspace and reviewing its results. The
 
 ## Choose the right journey
 
-| Type of work                         | User flow                                                                                                                                      | Result                                                                                          |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| **New goal for Temari**              | Enter a title and goal → **Save goal** → **Continue in a chat**.                                                                               | A durable goal awaiting a plan. Saving it does not start an agent.                              |
-| **Configured verification recipe**   | Select a recipe → **Prepare verification** → **Start verification** → check execution → **Verify evidence** → **Accept result** with a reason. | A verified result for that recipe's fixed goal; eligible local serial work can become **Done**. |
-| **Investigate with parallel agents** | Enter the investigation goal → choose agents and concurrent workers → **Prepare agents** → **Start agents**.                                   | Independent source-backed findings retained on one task for Temari to review.                   |
-| **Configured implementation plan** | Select a coding plan → enter the goal → review scopes/checks → **Prepare implementation** → **Start implementers**. | An external integration checkout and commit, verification results, and independent reviewer findings for coordinator review. |
+| Type of work                         | User flow                                                                                                                                      | Result                                                                                                                       |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **New goal for Temari**              | Enter a title and goal → **Save goal** → **Continue in a chat**.                                                                               | A durable goal awaiting a plan. Saving it does not start an agent.                                                           |
+| **Configured verification recipe**   | Select a recipe → **Prepare verification** → **Start verification** → check execution → **Verify evidence** → **Accept result** with a reason. | A verified result for that recipe's fixed goal; eligible local serial work can become **Done**.                              |
+| **Investigate with parallel agents** | Enter the investigation goal → choose agents and concurrent workers → **Prepare agents** → **Start agents**.                                   | Independent source-backed findings retained on one task for Temari to review.                                                |
+| **Configured implementation plan**   | Select a coding plan → enter the goal → review scopes/checks → **Prepare implementation** → **Start implementers**.                            | An external integration checkout and commit, verification results, and independent reviewer findings for coordinator review. |
 
 The investigation route is read-only. Asking it to implement a feature produces
 investigation findings, not an implemented feature. A passing investigation
@@ -24,6 +24,10 @@ that exact commit to a separate read-only reviewer. It also ends at **Needs
 review**. The source checkout stays unchanged; applying or publishing the result
 requires a separate workflow. Start with the
 [small coding-plan example](dashboard-implementation-design.md#configure-a-small-coding-plan).
+
+Goal planning, once/recurring scheduling and the separate Registrar map are
+covered in [the autonomy guide](dashboard-autonomy.md), including configuration,
+recovery, ownership and honest evidence limits.
 
 ## Before you begin
 
@@ -235,16 +239,16 @@ Stopping or restarting the dashboard does not cancel detached native runs or the
 investigation/implementation supervisor. Restart with the same task/preparation roots and configuration.
 Use the explicit cancel action when you intend to stop execution.
 
-| Symptom                             | Next action                                                                                                                                                                 |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Workspace changed since preparation | Preserve the existing result. Select a clean candidate and prepare a new task for that revision.                                                                            |
-| Stale version or token error        | Refresh the task/page and inspect current state before issuing another action.                                                                                              |
-| Native dispatch outcome uncertain   | Follow [exact-run reconciliation](task-continuity.md#native-controls); never launch a replacement merely because the response was lost.                                     |
-| Agent supervisor missing or stale   | Preserve its launch/identity records and child artifacts. Ask Temari to reconcile ownership; do not remove markers or start a duplicate supervisor.                         |
-| Agent transport failed              | Inspect the retained attempt evidence. Investigation allows at most two mechanical attempts per child; implementation allows one. Start does not reopen a terminal receipt. |
+| Symptom                                   | Next action                                                                                                                                                                      |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Workspace changed since preparation       | Preserve the existing result. Select a clean candidate and prepare a new task for that revision.                                                                                 |
+| Stale version or token error              | Refresh the task/page and inspect current state before issuing another action.                                                                                                   |
+| Native dispatch outcome uncertain         | Follow [exact-run reconciliation](task-continuity.md#native-controls); never launch a replacement merely because the response was lost.                                          |
+| Agent supervisor missing or stale         | Preserve its launch/identity records and child artifacts. Ask Temari to reconcile ownership; do not remove markers or start a duplicate supervisor.                              |
+| Agent transport failed                    | Inspect the retained attempt evidence. Investigation allows at most two mechanical attempts per child; implementation allows one. Start does not reopen a terminal receipt.      |
 | Integration or independent review blocked | Inspect the retained patches, verification logs and reviewer findings. Keep the original attempt; Temari must prepare a new plan/attempt rather than editing its pinned request. |
-| Findings need review                | Give Temari the continuation brief and retained findings. Coordinator review determines the next plan; there is no parallel canonical acceptance shortcut.                  |
-| Evidence changed or cannot be read  | Preserve the artifacts and investigate the reported mismatch. Do not overwrite evidence to regain a passing status.                                                         |
+| Findings need review                      | Give Temari the continuation brief and retained findings. Coordinator review determines the next plan; there is no parallel canonical acceptance shortcut.                       |
+| Evidence changed or cannot be read        | Preserve the artifacts and investigate the reported mismatch. Do not overwrite evidence to regain a passing status.                                                              |
 
 Back up the task root and the preparation root together, plus the owning Archon
 data/artifacts. The task ledger references those records rather than copying them.
@@ -255,29 +259,29 @@ The JSON schema is enforced by
 [`validateDashboardConfig`](../tools/dashboard-controller.mts). Unknown fields
 are rejected.
 
-| Field                        | Accepted value                                                                                                                                |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `schema`                     | `1`                                                                                                                                           |
-| `workspaceRoot`              | Existing absolute directory; execution requires a clean Git root.                                                                             |
-| `preparationRoot`            | Existing absolute directory disjoint from the workspace.                                                                                      |
-| `recipes`                    | Required array, 0–20 recipes. Each has unique `id`, `title`, `goal`, and `stages`.                                                            |
-| `stages`                     | Exactly `investigate`, `plan`, `build`, `review`, `verify`, `deliver`. Each has `executable`, `args`, `timeoutMs`, `summary`.                 |
-| Recipe `executable` / `args` | Existing absolute executable path and an array of argument strings. Commands run with the selected workspace as cwd, without a shell wrapper. |
-| Recipe `timeoutMs`           | Integer 1–60,000 per stage. Combined stdout/stderr is bounded to 64 KiB per stage by the canonical bridge.                                    |
-| `swarm`                      | Optional object with exactly `executable`, `maxConcurrency`, `maxWorkers`, `timeoutMs`.                                                       |
-| Swarm `executable`           | Absolute path to the installed Codex executable.                                                                                              |
-| Swarm `maxWorkers`           | Integer 2–4.                                                                                                                                  |
-| Swarm `maxConcurrency`       | Integer 1–`maxWorkers`; browser selection cannot exceed this bound.                                                                           |
-| Swarm `timeoutMs`            | Integer 1,000–1,800,000 per worker attempt.                                                                                                   |
-| `implementation` | Optional object with exactly `executable`, `maxConcurrency`, `timeoutMs`, `plans`. |
-| Implementation `executable` | Existing absolute path to the authenticated Codex CLI executable. |
-| Implementation `maxConcurrency` / `timeoutMs` | Concurrency 1–4, capped by plan implementer count; worker timeout 1,000–1,800,000 ms. |
-| Implementation `plans` | 1–20 uniquely identified plans; each has `id`, `title`, `description`, `assignments`, `prepare`, `verify`, `reviewer`. |
-| Plan `assignments` | 2–4 required implementers, each `{worker, owns}` with disjoint typed `{kind: "file" \| "directory", path}` scopes relative to the repository. |
-| Assignment `brief` | `goal`, `context`, `scope`, nonempty `acceptanceCriteria`, `verificationCommand: null`, `reportFormat: "json"`, and nonempty `forbiddenActions`. |
-| Plan `reviewer` | Required reviewer assignment with a distinct ID and the same brief shape; it has no write scopes. |
-| Plan `prepare` / `verify` | Explicit arrays of at most 10 commands each; `prepare: []` is allowed, `verify` must be nonempty. |
-| Implementation command | Exactly `{program, args, timeoutMs}`. `program` is an existing absolute executable; `args` is a string array; timeout is 1–1,800,000 ms. |
+| Field                                         | Accepted value                                                                                                                                   |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `schema`                                      | `1`                                                                                                                                              |
+| `workspaceRoot`                               | Existing absolute directory; execution requires a clean Git root.                                                                                |
+| `preparationRoot`                             | Existing absolute directory disjoint from the workspace.                                                                                         |
+| `recipes`                                     | Required array, 0–20 recipes. Each has unique `id`, `title`, `goal`, and `stages`.                                                               |
+| `stages`                                      | Exactly `investigate`, `plan`, `build`, `review`, `verify`, `deliver`. Each has `executable`, `args`, `timeoutMs`, `summary`.                    |
+| Recipe `executable` / `args`                  | Existing absolute executable path and an array of argument strings. Commands run with the selected workspace as cwd, without a shell wrapper.    |
+| Recipe `timeoutMs`                            | Integer 1–60,000 per stage. Combined stdout/stderr is bounded to 64 KiB per stage by the canonical bridge.                                       |
+| `swarm`                                       | Optional object with exactly `executable`, `maxConcurrency`, `maxWorkers`, `timeoutMs`.                                                          |
+| Swarm `executable`                            | Absolute path to the installed Codex executable.                                                                                                 |
+| Swarm `maxWorkers`                            | Integer 2–4.                                                                                                                                     |
+| Swarm `maxConcurrency`                        | Integer 1–`maxWorkers`; browser selection cannot exceed this bound.                                                                              |
+| Swarm `timeoutMs`                             | Integer 1,000–1,800,000 per worker attempt.                                                                                                      |
+| `implementation`                              | Optional object with exactly `executable`, `maxConcurrency`, `timeoutMs`, `plans`.                                                               |
+| Implementation `executable`                   | Existing absolute path to the authenticated Codex CLI executable.                                                                                |
+| Implementation `maxConcurrency` / `timeoutMs` | Concurrency 1–4, capped by plan implementer count; worker timeout 1,000–1,800,000 ms.                                                            |
+| Implementation `plans`                        | 1–20 uniquely identified plans; each has `id`, `title`, `description`, `assignments`, `prepare`, `verify`, `reviewer`.                           |
+| Plan `assignments`                            | 2–4 required implementers, each `{worker, owns}` with disjoint typed `{kind: "file" \| "directory", path}` scopes relative to the repository.    |
+| Assignment `brief`                            | `goal`, `context`, `scope`, nonempty `acceptanceCriteria`, `verificationCommand: null`, `reportFormat: "json"`, and nonempty `forbiddenActions`. |
+| Plan `reviewer`                               | Required reviewer assignment with a distinct ID and the same brief shape; it has no write scopes.                                                |
+| Plan `prepare` / `verify`                     | Explicit arrays of at most 10 commands each; `prepare: []` is allowed, `verify` must be nonempty.                                                |
+| Implementation command                        | Exactly `{program, args, timeoutMs}`. `program` is an existing absolute executable; `args` is a string array; timeout is 1–1,800,000 ms.         |
 
 Combined swarm stdout/stderr is bounded to 1 MiB per worker attempt. The runtime allows at most two
 mechanical attempts per child; these are implementation limits, not additional
@@ -299,10 +303,12 @@ existing preparations retain their original identities and are not rewritten.
 
 The dashboard uses the existing runtime for execution ownership, durable child
 state and acceptance. Configured investigation and implementation agents use local
-Codex; Archon owns configured native verification workflows. Automatic task
-decomposition, scheduling, unattended service management, Registrar maps, provider
-budget telemetry, automatic source application and semantic feature closeout
-remain outside this increment.
+Codex; Archon owns configured native verification workflows. [Bounded goal
+planning, runtime schedules and the pinned Registrar map](dashboard-autonomy.md)
+are now available through separate configured journeys. Arbitrary dependent coding
+waves, unattended OS service management, provider budget telemetry, automatic
+source application and automatic semantic feature closeout remain outside this
+implementation.
 
 The [dashboard verification record](../evaluations/task-continuity/dashboard-controls-2026-09-30.md)
 retains actual macOS browser, native workflow and two-agent model evidence, with

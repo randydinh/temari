@@ -1,0 +1,43 @@
+
+> nx run runtime:knowledge-map-test
+
+> node --import @swc-node/register/esm-register --test --test-concurrency=1 tools/dashboard-knowledge.test.mts
+
+(node:1971) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1973) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:1973) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[32m✔ not configured is honest and performs no implicit discovery [90m(0.732167ms)[39m[39m
+[32m✔ configuration refuses scope widening, client query knobs, unpinned publications and excessive bounds [90m(1.221916ms)[39m[39m
+[32m✔ missing pinned publication yields an explicit gap and never guesses a replacement [90m(2.956083ms)[39m[39m
+(node:1973) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+▶ ACTUAL Registrar: pinned archive catalog and graph projection preserve navigation evidence and deny unsafe changes
+  [32m✔ actual document/path/source/publication and anchored graph assertions are shown without raw text [90m(0.852625ms)[39m[39m
+  [32m✔ selection and one-hop expansion resolve server IDs and retain exact click detail identity [90m(1682.092875ms)[39m[39m
+  [32m✔ node, edge, byte and page bounds disclose omissions [90m(475.995334ms)[39m[39m
+  [32m✔ catalog gap expansion reads only its next pinned metadata page through a server ID [90m(1576.797292ms)[39m[39m
+  [32m✔ missing originals and a newer capture never replace the selected historical generation [90m(2362.359625ms)[39m[39m
+  [32m✔ corrupt publication pin refuses the source before projection [90m(1.066542ms)[39m[39m
+  [32m✔ disabled source revokes overview and previously selected details [90m(328.061125ms)[39m[39m
+  [32m✔ corrupt retained manifest yields gaps rather than live-source fallback [90m(315.983375ms)[39m[39m
+[32m✔ ACTUAL Registrar: pinned archive catalog and graph projection preserve navigation evidence and deny unsafe changes [90m(9497.11975ms)[39m[39m
+[34mℹ tests 12[39m
+[34mℹ suites 0[39m
+[34mℹ pass 12[39m
+[34mℹ fail 0[39m
+[34mℹ cancelled 0[39m
+[34mℹ skipped 0[39m
+[34mℹ todo 0[39m
+[34mℹ duration_ms 9747.113167[39m
+
+
+
+ NX   Successfully ran target knowledge-map-test for project runtime
+
+
+  Run duration:      9.9s
+  Cache:             0/1 hit (0%)
+  Critical path:     9.8s (1 task)
+  Recoverable time:  <1ms

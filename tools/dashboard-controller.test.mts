@@ -65,7 +65,7 @@ function implementationPlan(): DashboardImplementationPlan {
   };
 }
 
-async function fixture(t: TestContext, coding = false) {
+async function fixture(t: TestContext, coding = false, planning = false) {
   const root = await realpath(
     await mkdtemp(join(tmpdir(), 'temari-dashboard-controller-')),
   );
@@ -97,6 +97,21 @@ async function fixture(t: TestContext, coding = false) {
   const finalizerPath = join(root, 'finalizer.ts');
   await writeFile(bridgePath, 'bridge fixture');
   await writeFile(finalizerPath, 'finalizer fixture');
+  const plannerExecutable = join(root, 'planner-fixture');
+  if (planning)
+    await writeFile(
+      plannerExecutable,
+      `#!${process.execPath}
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+process.stdin.resume();
+process.stdin.on('end', () => {
+ fs.writeFileSync(args[args.indexOf('--output-last-message') + 1], JSON.stringify({schema:1,title:'Two requested parts',summary:'Independent changes within configured scopes.',assignments:['first','second'].map(slotId=>({slotId,goal:'Implement '+slotId,acceptanceCriteria:['Requested behavior is present.'],dependsOn:[]})),blockers:[]}));
+ console.log(JSON.stringify({event:'fixture-plan'}));
+});
+`,
+      { mode: 0o700 },
+    );
   const config = await validateDashboardConfig({
     schema: 1,
     workspaceRoot,
@@ -126,6 +141,31 @@ async function fixture(t: TestContext, coding = false) {
             maxConcurrency: 2,
             timeoutMs: 3000,
             plans: [implementationPlan()],
+          },
+        }
+      : {}),
+    ...(planning
+      ? {
+          planning: {
+            executable: plannerExecutable,
+            timeoutMs: 3000,
+            policies: [
+              {
+                id: 'bounded-parts',
+                title: 'Two parts',
+                description: 'Configured disjoint parts.',
+                slots: ['first', 'second'].map((id) => ({
+                  id,
+                  title: id,
+                  description: `Implement ${id}.`,
+                  owns: [{ kind: 'file', path: `${id}.txt` }],
+                  mandatoryCriteria: [`Mandatory ${id} criterion.`],
+                })),
+                prepare: [],
+                verify: implementationPlan().verify,
+                reviewer: implementationPlan().reviewer,
+              },
+            ],
           },
         }
       : {}),
@@ -699,4 +739,188 @@ test('coding plan and candidate changes refuse new execution while retaining can
     expectedVersion: updated.version,
   });
   assert.equal(cancelled.status, 'CANCELLED');
+});
+
+async function readyGoalPlan(
+  f: Awaited<ReturnType<typeof fixture>>,
+  taskId: string,
+) {
+  const deadline = Date.now() + 10000;
+  do {
+    const control = ((await f.controller.describe()) as any).controls[taskId];
+    if (control.planning?.state === 'READY') return control;
+    if (['BLOCKED', 'RECOVERY_REQUIRED'].includes(control.planning?.state))
+      throw new Error(JSON.stringify(control));
+    await new Promise((resolve) => setTimeout(resolve, 30));
+  } while (Date.now() < deadline);
+  throw new Error('Goal planner did not become ready.');
+}
+
+test('natural goal retains a validated plan and prepares parallel execution on the same task with exact replay', async (t) => {
+  const f = await fixture(t, true, true);
+  const request = {
+    requestId: 'natural-goal',
+    mode: 'planning',
+    policyId: 'bounded-parts',
+    title: 'Requested change',
+    goal: 'Implement first and second independent parts.',
+  };
+  const task = await f.controller.create(request);
+  assert.equal(task.currentRunId, null);
+  const control = await readyGoalPlan(f, task.taskId);
+  assert(control.actions.includes('prepare-plan'));
+  assert.equal(control.planning.goalSha256, taskDigest(task.goal));
+  const input = {
+    action: 'prepare-plan',
+    requestId: 'admit-natural-goal',
+    expectedVersion: task.version,
+    proposalSha256: control.planning.proposalSha256,
+  };
+  const prepared = await f.controller.action(task.taskId, input);
+  assert.equal(prepared.taskId, task.taskId);
+  assert.equal(prepared.runs.length, 1);
+  assert.equal(prepared.runs[0]!.childRefs!.length, 2);
+  assert.notEqual(prepared.status, 'DONE');
+  assert.deepEqual(await f.controller.action(task.taskId, input), prepared);
+  assert.equal((await f.runtime.listSnapshots()).length, 1);
+  const finalControl = ((await f.controller.describe()) as any).controls[
+    task.taskId
+  ];
+  assert.equal(finalControl.planning.state, 'READY');
+  assert.equal(finalControl.implementation.state, 'PREPARED');
+  assert(finalControl.actions.includes('implementation-start'));
+  assert.deepEqual(
+    await f.controller.action(task.taskId, {
+      ...input,
+      requestId: 'another-admission',
+    }),
+    prepared,
+  );
+});
+
+test('goal plan admission rejects changed policy, candidate and proposal identity', async (t) => {
+  const f = await fixture(t, true, true);
+  const task = await f.controller.create({
+    requestId: 'bound-goal',
+    mode: 'planning',
+    policyId: 'bounded-parts',
+    title: 'Bound goal',
+    goal: 'Implement both parts.',
+  });
+  const control = await readyGoalPlan(f, task.taskId);
+  const input = {
+    action: 'prepare-plan',
+    requestId: 'admit-bound-goal',
+    expectedVersion: task.version,
+    proposalSha256: control.planning.proposalSha256,
+  };
+  await assert.rejects(
+    f.controller.action(task.taskId, {
+      ...input,
+      proposalSha256: '0'.repeat(64),
+    }),
+    /proposal changed/i,
+  );
+  (f.config.planning!.policies[0]!.slots[0]! as any).mandatoryCriteria = [
+    'Changed policy',
+  ] as any;
+  await assert.rejects(
+    f.controller.action(task.taskId, input),
+    /policy changed/i,
+  );
+  (f.config.planning!.policies[0]!.slots[0]! as any).mandatoryCriteria = [
+    'Mandatory first criterion.',
+  ] as any;
+  await writeFile(join(f.workspaceRoot, 'changed.txt'), 'changed');
+  await assert.rejects(f.controller.action(task.taskId, input), /uncommitted/);
+  assert.equal((await f.runtime.snapshot(task.taskId)).runs.length, 0);
+});
+
+test('scheduled inspection confirms only exact start intent and execution termination without accepting evidence', async (t) => {
+  const f = await fixture(t);
+  const task = await f.controller.create({
+    requestId: 'scheduled-check',
+    recipeId: 'checks',
+  });
+  const before = await f.controller.inspectScheduledTask(
+    task.taskId,
+    'exact-schedule-start',
+  );
+  assert.equal(before.state, 'prepared');
+  assert.equal(before.intent, 'absent');
+  assert.equal(before.startAllowed, true);
+  await f.controller.action(task.taskId, {
+    action: 'start',
+    requestId: 'exact-schedule-start',
+    expectedVersion: task.version,
+  });
+  const active = await f.controller.inspectScheduledTask(
+    task.taskId,
+    'exact-schedule-start',
+  );
+  assert.equal(active.state, 'active');
+  assert.equal(active.intent, 'confirmed');
+  assert.equal(
+    (await f.controller.inspectScheduledTask(task.taskId, 'another-start'))
+      .intent,
+    'absent',
+  );
+  f.setStatus('SUCCEEDED');
+  const ended = await f.controller.inspectScheduledTask(
+    task.taskId,
+    'exact-schedule-start',
+  );
+  assert.equal(ended.state, 'terminal');
+  assert.equal(ended.intent, 'confirmed');
+  assert.notEqual((await f.runtime.snapshot(task.taskId)).status, 'DONE');
+});
+
+test('goal admission recovers a published preparation after bind crash with a fresh browser request ID', async (t) => {
+  const f = await fixture(t, true, true);
+  const task = await f.controller.create({
+    requestId: 'admission-crash',
+    mode: 'planning',
+    policyId: 'bounded-parts',
+    title: 'Recover planning',
+    goal: 'Implement both requested parts.',
+  });
+  const control = await readyGoalPlan(f, task.taskId);
+  const bind = f.store.bindRun.bind(f.store);
+  let failOnce = true;
+  f.store.bindRun = async (input) => {
+    if (failOnce) {
+      failOnce = false;
+      throw new Error('Simulated crash before run binding');
+    }
+    return bind(input);
+  };
+  const input = {
+    action: 'prepare-plan',
+    requestId: 'browser-before-crash',
+    expectedVersion: task.version,
+    proposalSha256: control.planning.proposalSha256,
+  };
+  await assert.rejects(
+    f.controller.action(task.taskId, input),
+    /Simulated crash/,
+  );
+  const retained = JSON.parse(
+    await readFile(
+      join(f.preparationRoot, task.taskId, 'implementation.json'),
+      'utf8',
+    ),
+  );
+  const recovered = await f.controller.action(task.taskId, {
+    ...input,
+    requestId: 'browser-after-restart',
+  });
+  assert.equal(recovered.runs.length, 1);
+  assert.equal(
+    recovered.currentRunId,
+    retained.handle.runId ??
+      JSON.parse(await readFile(retained.handle.requestPath, 'utf8')).request
+        .runId,
+  );
+  assert.equal(recovered.runs[0]!.childRefs!.length, 2);
+  assert.notEqual(recovered.status, 'DONE');
 });

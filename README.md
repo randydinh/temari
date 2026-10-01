@@ -13,11 +13,14 @@ and [component guide](docs/platform-components.md) for the full design. Use the
 implementation and retained evidence.
 
 **Start with the [local dashboard guide](docs/task-dashboard.md)** to save goals,
-launch investigation agents, run a configured parallel coding plan in isolated
-clones, or execute verification checks. It covers setup, the UI flow,
+plan bounded parallel implementation from a natural goal, launch investigation
+agents, run coding agents in isolated clones, or execute verification checks. It covers setup, the UI flow,
 cancellation, retained results, and recovery. The
 [implementation design and example](docs/dashboard-implementation-design.md)
 explain ownership scopes, integration, independent review, and verification gates.
+The [planning, scheduling and knowledge-map guide](docs/dashboard-autonomy.md)
+covers retained goal proposals, durable recurring checks, pinned Registrar maps
+and their recovery boundaries.
 The [task continuity guide](docs/task-continuity.md) covers agent pickup, chat links,
 handoffs, evidence, and exact-run Archon controls. Successful agent findings need
 coordinator review; only eligible canonical evidence plus explicit acceptance can
@@ -34,8 +37,9 @@ tree — [docs/overlays.md](docs/overlays.md).
 ## Agent starting points
 
 - **Operate the dashboard:** [setup and supported journeys](docs/task-dashboard.md).
-  Choose a saved goal, verification recipe, investigation swarm, or host-configured
-  implementation plan. Coding produces an external integration candidate for
+  Choose a saved goal, verification recipe, investigation swarm, configured
+  implementation plan, or validated natural-goal proposal. Use Schedules for
+  fixed recurring checks and Knowledge map for pinned Registrar paths/anchors. Coding produces an external integration candidate for
   coordinator review; it does not apply changes to the source checkout or publish them.
 - **Pick up unfinished work:** [task continuity and recovery](docs/task-continuity.md).
   Use workspace-scoped `pickup` before creating work, explicitly `enter` the matching

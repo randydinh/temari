@@ -12,8 +12,10 @@ and its continuation work. For browser setup and daily operation, start with the
 [dashboard guide](task-dashboard.md). `serve` is read-only by default;
 `--control-config` enables goal intake, configured verification, bounded
 investigation agents, and configured implementation plans. This guide covers the
-underlying CLI and agent handoffs. Automatic capture of every chat, automatic task
-decomposition, schedules, and the Registrar graph view remain follow-up work.
+underlying CLI and agent handoffs. [Bounded goal planning, runtime schedules and
+the pinned Registrar map](dashboard-autonomy.md) extend these journeys. Automatic
+capture of every chat, arbitrary dependent coding waves and unattended OS service
+management remain follow-up work.
 
 ## Supported dashboard journeys
 
