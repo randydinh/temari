@@ -456,9 +456,11 @@ function renderDetail() {
       el(
         'div',
         'evidence-note',
-        snap?.evidence?.verified
-          ? 'Retained stage evidence verified. Task completion also requires Temari acceptance.'
-          : `Evidence incomplete${snap?.evidence?.issues?.length ? ` · ${snap.evidence.issues.join(' ')}` : '.'}`,
+        run.runId === task.currentRunId && control?.swarm
+          ? 'Investigation findings are retained per agent. Temari reviews them before deciding the next step.'
+          : snap?.evidence?.verified
+            ? 'Retained stage evidence verified. Task completion also requires Temari acceptance.'
+            : `Evidence incomplete${snap?.evidence?.issues?.length ? ` · ${snap.evidence.issues.join(' ')}` : '.'}`,
       ),
     );
     for (const operation of run.operations.filter(
@@ -630,7 +632,16 @@ function renderControls(task, control) {
         : (control.recipe ?? 'Needs planning'),
     ),
   );
-  if (control.message) panel.append(el('p', 'event-detail', control.message));
+  if (control.message) {
+    const message = control.swarm?.integrityIssue
+      ? control.message
+      : control.swarm?.state === 'PREPARED'
+        ? 'Ready to start. Each agent will investigate a complementary perspective.'
+        : control.swarm?.state === 'RUNNING'
+          ? 'Agents are working. You can leave this page and return to their retained results.'
+          : control.message;
+    panel.append(el('p', 'event-detail', message));
+  }
   if (control.issue) panel.append(el('p', 'blocker', control.issue));
   if (control.verifiedRevision)
     panel.append(
@@ -718,8 +729,16 @@ function renderControls(task, control) {
           ),
         );
       row.append(history);
-      for (const path of child.result?.evidencePaths ?? [])
-        row.append(el('p', 'artifact-path', path));
+      const paths = child.result?.evidencePaths ?? [];
+      if (paths.length) {
+        const artifacts = el('details', 'worker-artifacts');
+        artifacts.append(
+          el('summary', '', `Retained logs and artifacts (${paths.length})`),
+        );
+        for (const path of paths)
+          artifacts.append(el('p', 'artifact-path', path));
+        row.append(artifacts);
+      }
       outcomes.append(row);
     }
     panel.append(outcomes);
