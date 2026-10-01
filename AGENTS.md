@@ -25,8 +25,12 @@
 ## Task continuity
 
 Read [docs/task-continuity.md](docs/task-continuity.md) when starting or resuming
-tracked work. List the configured local task store, reuse a matching logical task,
-and retain a next action or blocker before handing off. Use a new run binding for
+tracked work. Use workspace-scoped `pickup` against the configured local task
+store. Resolve ambiguous choices explicitly; never select the newest task merely
+because it is first. `enter` links the selected logical task to the actual host
+conversation; one chat can coordinate multiple tasks. Save a structured `handoff`
+with progress, decisions, next action, blocker, and context references before
+leaving. These are local context, not execution permission or evidence. Use a new run binding for
 a new candidate; preserve prior run history. A missing/corrupt store is a visible
 recovery issue. Native success alone does not satisfy Temari closeout, and the
 local inbox's acceptance command does not verify full feature/forge obligations.

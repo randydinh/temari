@@ -28,6 +28,44 @@ export interface TaskCommand {
   readonly expectedVersion: number;
 }
 
+/** Opaque host/session identity; a session may be linked to many goals. */
+export interface TaskSessionIdentity {
+  readonly host: string;
+  readonly sessionId: string;
+}
+export interface TaskSessionRef extends TaskSessionIdentity {
+  readonly enteredAt: string;
+  readonly lastEnteredAt: string;
+}
+export interface TaskContextRef {
+  readonly kind: string;
+  readonly location: string;
+  readonly sha256?: string;
+}
+export interface TaskHandoffInput {
+  readonly summary: string;
+  readonly decisions: readonly string[];
+  readonly nextAction: string;
+  readonly blocker: string | null;
+  readonly contextRefs: readonly TaskContextRef[];
+}
+/** Context for a later session. This never establishes execution completion. */
+export interface TaskHandoff extends TaskHandoffInput {
+  readonly actor: string;
+  readonly at: string;
+  readonly taskVersion: number;
+  readonly runId: string | null;
+}
+export interface TaskCreationInput {
+  readonly title: string;
+  readonly goal: string;
+  readonly workspaceRoot: string;
+}
+export type EnterTaskRequest = TaskCommand & {
+  readonly session: TaskSessionIdentity;
+  readonly create?: TaskCreationInput;
+};
+
 /** A link to source authority, never a copied assertion of source validity. */
 export interface TaskSourceRef {
   readonly sourceId: string;
@@ -89,9 +127,17 @@ export interface TaskRecord {
   readonly currentRunId: string | null;
   readonly runs: readonly TaskRun[];
   readonly acceptance: TaskAcceptance | null;
+  readonly sessions: readonly TaskSessionRef[];
+  readonly handoff: TaskHandoff | null;
   readonly events: readonly TaskEvent[];
 }
 export type TaskChange =
+  | {
+      readonly type: 'task-entered';
+      readonly session: TaskSessionIdentity;
+      readonly create?: TaskCreationInput;
+    }
+  | { readonly type: 'handoff-recorded'; readonly handoff: TaskHandoffInput }
   | {
       readonly type: 'task-created';
       readonly title: string;
@@ -230,6 +276,37 @@ function date(value: unknown): void {
     typeof value === 'string' && Number.isFinite(Date.parse(value)),
     'Invalid task timestamp.',
   );
+}
+export function assertTaskSessionIdentity(value: TaskSessionIdentity): void {
+  keys(value, ['host', 'sessionId']);
+  text(value.host, 'session host', 128);
+  text(value.sessionId, 'session ID');
+  assert(
+    !/[\u0000-\u001f\u007f]/.test(value.host + value.sessionId),
+    'Session identity must not contain control characters.',
+  );
+}
+function handoffInput(value: TaskHandoffInput): void {
+  keys(value, ['summary', 'decisions', 'nextAction', 'blocker', 'contextRefs']);
+  text(value.summary, 'handoff summary', 4096);
+  text(value.nextAction, 'handoff next action', 4096);
+  if (value.blocker !== null) text(value.blocker, 'handoff blocker', 4096);
+  assert(
+    Array.isArray(value.decisions) && value.decisions.length <= 16,
+    'Handoff decisions exceed the 16-item limit.',
+  );
+  for (const decision of value.decisions)
+    text(decision, 'handoff decision', 1024);
+  assert(
+    Array.isArray(value.contextRefs) && value.contextRefs.length <= 16,
+    'Handoff context references exceed the 16-item limit.',
+  );
+  for (const ref of value.contextRefs) {
+    keys(ref, ['kind', 'location', 'sha256']);
+    text(ref.kind, 'context reference kind', 64);
+    text(ref.location, 'context reference location', 4096);
+    if (ref.sha256 !== undefined) digest(ref.sha256);
+  }
 }
 function plan(value: ExecutionPlan): void {
   keys(value, [
@@ -405,6 +482,28 @@ function amendRun(task: TaskRecord, run: TaskRun): TaskRecord {
     runs: task.runs.map((item) => (item.runId === run.runId ? run : item)),
   };
 }
+function createdTask(event: TaskEvent, input: TaskCreationInput): TaskRecord {
+  keys(input, ['title', 'goal', 'workspaceRoot']);
+  text(input.title, 'title', 256);
+  text(input.goal, 'goal', 16384);
+  path(input.workspaceRoot);
+  return {
+    schema: 1,
+    taskId: event.taskId,
+    version: 1,
+    ...input,
+    nextAction: null,
+    blocker: null,
+    createdAt: event.at,
+    updatedAt: event.at,
+    currentRunId: null,
+    runs: [],
+    acceptance: null,
+    sessions: [],
+    handoff: null,
+    events: [event],
+  };
+}
 
 /** Replay is the sole projection; there is no mutable status alongside the log. */
 function apply(task: TaskRecord | undefined, event: TaskEvent): TaskRecord {
@@ -413,24 +512,50 @@ function apply(task: TaskRecord | undefined, event: TaskEvent): TaskRecord {
   if (change.type === 'task-created') {
     assert(!task, 'Task already exists.');
     keys(change, ['type', 'title', 'goal', 'workspaceRoot']);
-    text(change.title, 'title', 256);
-    text(change.goal, 'goal', 16384);
-    path(change.workspaceRoot);
-    return {
-      schema: 1,
-      taskId: event.taskId,
-      version: 1,
+    return createdTask(event, {
       title: change.title,
       goal: change.goal,
       workspaceRoot: change.workspaceRoot,
-      nextAction: null,
-      blocker: null,
-      createdAt: event.at,
-      updatedAt: event.at,
-      currentRunId: null,
-      runs: [],
-      acceptance: null,
-      events: [event],
+    });
+  }
+  if (change.type === 'task-entered') {
+    keys(change, ['type', 'session', 'create']);
+    assertTaskSessionIdentity(change.session);
+    if (task)
+      assert(
+        change.create === undefined,
+        'Existing task entry cannot create or replace task metadata.',
+      );
+    else assert(change.create, 'New task entry requires creation metadata.');
+    const current = task
+      ? {
+          ...task,
+          version: event.taskVersion,
+          updatedAt: event.at,
+          events: [...task.events, event],
+        }
+      : createdTask(event, change.create!);
+    const existing = current.sessions.find(
+      (session) =>
+        session.host === change.session.host &&
+        session.sessionId === change.session.sessionId,
+    );
+    assert(
+      existing || current.sessions.length < 256,
+      'Task session reference limit exceeded.',
+    );
+    return {
+      ...current,
+      sessions: existing
+        ? current.sessions.map((session) =>
+            session === existing
+              ? { ...session, lastEnteredAt: event.at }
+              : session,
+          )
+        : [
+            ...current.sessions,
+            { ...change.session, enteredAt: event.at, lastEnteredAt: event.at },
+          ],
     };
   }
   assert(task, 'Task does not exist.');
@@ -440,6 +565,22 @@ function apply(task: TaskRecord | undefined, event: TaskEvent): TaskRecord {
     updatedAt: event.at,
     events: [...task.events, event],
   };
+  if (change.type === 'handoff-recorded') {
+    keys(change, ['type', 'handoff']);
+    handoffInput(change.handoff);
+    return {
+      ...next,
+      nextAction: change.handoff.nextAction,
+      blocker: change.handoff.blocker,
+      handoff: {
+        ...change.handoff,
+        actor: event.actor,
+        at: event.at,
+        taskVersion: event.taskVersion,
+        runId: task.currentRunId,
+      },
+    };
+  }
   if (change.type === 'metadata-updated') {
     keys(change, ['type', 'title', 'nextAction', 'blocker']);
     if (change.title !== undefined) text(change.title, 'title', 256);
@@ -832,6 +973,25 @@ export class FileTaskStore {
           workspaceRoot: request.workspaceRoot,
         },
       )
+    ).task;
+  }
+  async enterTask(request: EnterTaskRequest): Promise<TaskRecord> {
+    return (
+      await this.append(request, {
+        type: 'task-entered',
+        session: request.session,
+        ...(request.create === undefined ? {} : { create: request.create }),
+      })
+    ).task;
+  }
+  async handoffTask(
+    request: TaskCommand & { readonly handoff: TaskHandoffInput },
+  ): Promise<TaskRecord> {
+    return (
+      await this.append(request, {
+        type: 'handoff-recorded',
+        handoff: request.handoff,
+      })
     ).task;
   }
   async load(taskId: string): Promise<TaskRecord | null> {

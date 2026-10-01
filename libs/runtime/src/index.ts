@@ -22,3 +22,4 @@ export * from './lib/archon-receipt-parity.js';
 export * from './lib/v4-1-route-replay.js';
 export * from './lib/task-store.js';
 export * from './lib/task-runtime.js';
+export * from './lib/task-pickup.js';

@@ -1,8 +1,15 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import {
+  mkdtemp,
+  mkdir,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
+import { homedir, tmpdir } from 'node:os';
+import { delimiter, dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import test from 'node:test';
 import {
@@ -22,6 +29,36 @@ import type { TaskSnapshot } from '../libs/runtime/src/index.js';
 
 const runFile = promisify(execFile);
 const nativeOptions = { timeout: 120_000, skip: process.platform === 'win32' };
+
+async function nativeFixturePath(): Promise<string> {
+  const inheritedPath = process.env.PATH ?? '';
+  const candidates = [
+    ...inheritedPath
+      .split(delimiter)
+      .filter(Boolean)
+      .map((directory) => join(directory, 'bun')),
+    join(homedir(), '.bun', 'bin', 'bun'),
+    '/opt/homebrew/bin/bun',
+    '/usr/local/bin/bun',
+  ];
+  for (const candidate of new Set(candidates)) {
+    try {
+      const executable = await realpath(candidate);
+      const { stdout } = await runFile(executable, ['--version']);
+      if (!/^\d+\.\d+\.\d+/.test(stdout.trim())) continue;
+      return [
+        dirname(process.execPath),
+        dirname(executable),
+        inheritedPath,
+      ].join(delimiter);
+    } catch {
+      // Desktop Node launchers can omit a locally installed Bun from PATH.
+    }
+  }
+  throw new Error(
+    'Native task evidence fixture requires Bun on PATH or in a standard installation location.',
+  );
+}
 
 test(
   'native Archon evidence joins a logical task and survives a fresh session',
@@ -84,7 +121,7 @@ test(
         LOG_LEVEL: 'error',
         DO_NOT_TRACK: '1',
         CLAUDE_BIN_PATH: '/usr/bin/false',
-        PATH: `${dirname(process.execPath)}:${process.env.PATH}`,
+        PATH: await nativeFixturePath(),
       },
     });
     const selected: ExecutionHarness = {

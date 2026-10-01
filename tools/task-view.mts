@@ -4,6 +4,9 @@ import { readFile } from 'node:fs/promises';
 export interface TaskViewReader {
   listSnapshots(): Promise<readonly { readonly taskId: string }[]>;
   snapshot(taskId: string): Promise<unknown>;
+  pickup(request: {
+    readonly taskId: string;
+  }): Promise<{ readonly status: string; readonly selected: unknown }>;
 }
 
 export interface TaskViewOptions {
@@ -78,6 +81,15 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
           tasks: await options.runtime.listSnapshots(),
           archonBaseUrl,
         });
+        return;
+      }
+      const pickup =
+        /^\/api\/tasks\/([A-Za-z0-9][A-Za-z0-9._-]{0,127})\/pickup$/.exec(
+          url.pathname,
+        );
+      if (pickup) {
+        const result = await options.runtime.pickup({ taskId: pickup[1]! });
+        send(result.status === 'empty' ? 404 : 200, result);
         return;
       }
       const match = /^\/api\/tasks\/([A-Za-z0-9][A-Za-z0-9._-]{0,127})$/.exec(

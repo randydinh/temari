@@ -383,3 +383,240 @@ test('rejects unsafe IDs, unbounded metadata, invalid plans and corrupt ledgers 
   await writeFile(ledgerPath, '{truncated');
   await assert.rejects(f.store.list(), SyntaxError);
 });
+
+test('entry atomically creates one task and links its session with replay-safe context', async (t) => {
+  const f = await fixture(t);
+  const legacy = await FileTaskStore.openExisting(f.root).then((store) =>
+    store.load('goal-1'),
+  );
+  assert.deepEqual(legacy?.sessions, []);
+  assert.equal(legacy?.handoff, null);
+  const entry = {
+    taskId: 'entered-goal',
+    actor: 'temari',
+    idempotencyKey: 'first-entry',
+    expectedVersion: 0,
+    session: { host: 'codex', sessionId: 'session-1' },
+    create: {
+      title: 'Continue my work',
+      goal: 'Retain a bounded handoff.',
+      workspaceRoot: f.root,
+    },
+  };
+  await assert.rejects(
+    f.store.enterTask({ ...entry, session: { host: 'codex', sessionId: '' } }),
+    /session ID/,
+  );
+  assert.equal(await f.store.load(entry.taskId), null);
+  const entered = await f.store.enterTask(entry);
+  assert.equal(entered.version, 1);
+  assert.equal(entered.events.length, 1);
+  assert.equal(entered.events[0]?.change.type, 'task-entered');
+  assert.deepEqual(entered.sessions, [
+    {
+      ...entry.session,
+      enteredAt: entered.createdAt,
+      lastEnteredAt: entered.createdAt,
+    },
+  ]);
+  const handoff = {
+    summary: 'The first inspection is complete.',
+    decisions: ['Keep Archon as executor.'],
+    nextAction: 'Verify the candidate.',
+    blocker: null,
+    contextRefs: [
+      { kind: 'document', location: '/docs/plan.md', sha256: 'a'.repeat(64) },
+    ],
+  };
+  const retained = await f.store.handoffTask({
+    taskId: entry.taskId,
+    actor: 'reviewer',
+    idempotencyKey: 'handoff',
+    expectedVersion: entered.version,
+    handoff,
+  });
+  assert.equal(retained.handoff?.actor, 'reviewer');
+  assert.equal(retained.handoff?.taskVersion, 2);
+  assert.equal(retained.handoff?.runId, null);
+  assert.equal(retained.nextAction, handoff.nextAction);
+  const fresh = await FileTaskStore.openExisting(f.root);
+  assert.deepEqual(await fresh.load(entry.taskId), retained);
+  assert.deepEqual(await fresh.enterTask(entry), retained);
+  assert.equal((await fresh.load(entry.taskId))?.events.length, 2);
+});
+
+test('sessions and tasks retain many-to-many identity links without changing goals', async (t) => {
+  const f = await fixture(t);
+  const session = { host: 'codex', sessionId: 'same-chat' };
+  const first = await f.store.enterTask({
+    taskId: 'goal-1',
+    actor: 'temari',
+    idempotencyKey: 'enter',
+    expectedVersion: f.task.version,
+    session,
+  });
+  const second = await f.store.enterTask({
+    taskId: 'goal-2',
+    actor: 'temari',
+    idempotencyKey: 'enter',
+    expectedVersion: 0,
+    session,
+    create: {
+      title: 'Second goal',
+      goal: 'Another request in the same chat.',
+      workspaceRoot: f.root,
+    },
+  });
+  const otherSession = { host: 'archon', sessionId: 'other-chat' };
+  const linked = await f.store.enterTask({
+    taskId: 'goal-1',
+    actor: 'temari',
+    idempotencyKey: 'another-session',
+    expectedVersion: first.version,
+    session: otherSession,
+  });
+  const reentered = await f.store.enterTask({
+    taskId: 'goal-1',
+    actor: 'temari',
+    idempotencyKey: 'return-to-session',
+    expectedVersion: linked.version,
+    session,
+  });
+  assert.equal(reentered.sessions.length, 2);
+  assert.equal(second.sessions.length, 1);
+  assert.equal(reentered.sessions[0]?.enteredAt, first.sessions[0]?.enteredAt);
+  assert.equal(
+    reentered.sessions[0]?.lastEnteredAt,
+    reentered.events.at(-1)?.at,
+  );
+  assert.equal(reentered.goal, f.task.goal);
+  assert.equal(reentered.title, f.task.title);
+  await assert.rejects(
+    f.store.enterTask({
+      taskId: 'goal-1',
+      actor: 'temari',
+      idempotencyKey: 'replace-goal',
+      expectedVersion: reentered.version,
+      session,
+      create: {
+        title: 'Changed',
+        goal: 'Silently replace intent',
+        workspaceRoot: f.root,
+      },
+    }),
+    /cannot create or replace/,
+  );
+});
+
+test('concurrent entry and handoff reject stale updates while preserving idempotency', async (t) => {
+  const f = await fixture(t);
+  const other = await FileTaskStore.openExisting(f.root);
+  const command = {
+    taskId: 'goal-1',
+    actor: 'temari',
+    expectedVersion: f.task.version,
+  };
+  const enter = {
+    ...command,
+    idempotencyKey: 'entry',
+    session: { host: 'codex', sessionId: 'session' },
+  };
+  const handoff = {
+    ...command,
+    idempotencyKey: 'handoff',
+    handoff: {
+      summary: 'Need source evidence.',
+      decisions: [],
+      nextAction: 'Inspect source.',
+      blocker: 'Missing evidence',
+      contextRefs: [],
+    },
+  };
+  const results = await Promise.allSettled([
+    f.store.enterTask(enter),
+    other.handoffTask(handoff),
+  ]);
+  assert.equal(
+    results.filter((result) => result.status === 'fulfilled').length,
+    1,
+  );
+  const rejected = results.find((result) => result.status === 'rejected');
+  assert(rejected?.status === 'rejected');
+  assert.match(String(rejected.reason), /version conflict/);
+  let current = (await f.store.load('goal-1'))!;
+  if (current.sessions.length === 0)
+    current = await f.store.enterTask({
+      ...enter,
+      expectedVersion: current.version,
+    });
+  else
+    current = await f.store.handoffTask({
+      ...handoff,
+      expectedVersion: current.version,
+    });
+  assert.equal(current.sessions.length, 1);
+  assert.equal(current.handoff?.summary, handoff.handoff.summary);
+  assert.equal(current.version, 3);
+  assert.deepEqual(await other.enterTask(enter), current);
+  assert.deepEqual(await other.handoffTask(handoff), current);
+  await assert.rejects(
+    other.enterTask({
+      ...enter,
+      session: { ...enter.session, sessionId: 'different' },
+    }),
+    /Idempotency payload conflict/,
+  );
+  await assert.rejects(
+    other.handoffTask({ ...handoff, actor: 'different' }),
+    /Idempotency actor conflict/,
+  );
+  await assert.rejects(
+    other.handoffTask({
+      ...handoff,
+      handoff: { ...handoff.handoff, summary: 'Changed' },
+    }),
+    /Idempotency payload conflict/,
+  );
+});
+
+test('handoff bounds reject malformed context without changing acceptance or execution', async (t) => {
+  const f = await fixture(t);
+  const bound = await f.store.bindRun(f.bind);
+  const request = {
+    taskId: 'goal-1',
+    actor: 'temari',
+    expectedVersion: bound.version,
+    idempotencyKey: 'handoff',
+    handoff: {
+      summary: 'Ready for another session.',
+      decisions: [],
+      nextAction: 'Continue.',
+      blocker: null,
+      contextRefs: [],
+    },
+  };
+  await assert.rejects(
+    f.store.handoffTask({
+      ...request,
+      handoff: { ...request.handoff, decisions: Array(17).fill('decision') },
+    }),
+    /16-item limit/,
+  );
+  await assert.rejects(
+    f.store.handoffTask({
+      ...request,
+      handoff: {
+        ...request.handoff,
+        contextRefs: [
+          { kind: 'document', location: 'reference', sha256: 'not-a-hash' },
+        ],
+      },
+    }),
+    /digest/,
+  );
+  const saved = await f.store.handoffTask(request);
+  assert.equal(saved.handoff?.runId, f.bind.run.runId);
+  assert.equal(saved.acceptance, bound.acceptance);
+  assert.deepEqual(saved.runs, bound.runs);
+  assert.equal(saved.events.at(-1)?.change.type, 'handoff-recorded');
+});

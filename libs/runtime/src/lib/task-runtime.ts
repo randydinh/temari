@@ -32,6 +32,13 @@ import {
   type TaskRecord,
   type TaskRun,
 } from './task-store.js';
+import {
+  projectTaskPickupBrief,
+  projectTaskPickupChoice,
+  selectTaskPickupCandidates,
+  type TaskPickupRequest,
+  type TaskPickupResult,
+} from './task-pickup.js';
 
 export type TaskStatus =
   'OPEN' | 'RUNNING' | 'BLOCKED' | 'NEEDS_REVIEW' | 'DONE' | 'CANCELLED';
@@ -108,6 +115,12 @@ export class TaskRuntime {
     const runSnapshots = await Promise.all(
       task.runs.map((run) => this.inspectRun(run)),
     );
+    return this.projectSnapshot(task, runSnapshots);
+  }
+  private projectSnapshot(
+    task: TaskRecord,
+    runSnapshots: readonly TaskRunSnapshot[],
+  ): TaskSnapshot {
     const run = task.runs.find((r) => r.runId === task.currentRunId);
     const observed = runSnapshots.find((r) => r.runId === task.currentRunId);
     const evidence = observed?.evidence ?? missingEvidence;
@@ -215,6 +228,36 @@ export class TaskRuntime {
   async listSnapshots(): Promise<readonly TaskSnapshot[]> {
     const tasks = await this.store.list();
     return Promise.all(tasks.map((t) => this.snapshot(t.taskId)));
+  }
+  async pickup(request: TaskPickupRequest): Promise<TaskPickupResult> {
+    const { candidates, limit } = await selectTaskPickupCandidates(
+      await this.store.list(),
+      request,
+    );
+    const choices = candidates.slice(0, limit).map(projectTaskPickupChoice);
+    if (candidates.length !== 1)
+      return {
+        schema: 1,
+        status: candidates.length === 0 ? 'empty' : 'choices',
+        choices,
+        hasMore: candidates.length > limit,
+        selected: null,
+      };
+    const task = candidates[0]!;
+    const run = task.runs.find((item) => item.runId === task.currentRunId);
+    // A pickup validates only the selected current run. Full history remains
+    // available through the explicit task snapshot and retained event ledger.
+    const refreshed = this.projectSnapshot(
+      task,
+      run ? [await this.inspectRun(run)] : [],
+    );
+    return {
+      schema: 1,
+      status: 'selected',
+      choices,
+      hasMore: false,
+      selected: projectTaskPickupBrief(refreshed),
+    };
   }
 
   async dispatch(

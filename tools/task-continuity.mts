@@ -23,6 +23,9 @@ under tasks, so a fresh session can find the same work.
 
 Commands:
   create      Create a logical task from --input JSON
+  enter       Explicitly create/attach a task to a host conversation
+  pickup      Read a bounded continuation brief or return task choices
+  handoff     Save progress and the next action from --input JSON
   update      Record nextAction/blocker metadata from --input JSON
   bind        Attach an immutable plan and run binding from --input JSON
   link-evidence Attach receipt/evidence locations once the executor publishes them
@@ -39,6 +42,12 @@ Commands:
 
 Mutation commands require --input ABSOLUTE_JSON with taskId, actor and
 idempotencyKey. All except create also require expectedVersion from show.
+enter requires expectedVersion (0 for new), session:{host,sessionId}, and
+create:{title,goal,workspaceRoot} only when creating a task.
+pickup takes --task ID or --workspace ABSOLUTE_PATH, optionally paired
+--host HOST --session ID and --limit 1..50 (default 20). It never resumes execution.
+handoff carries handoff:{summary,decisions,nextAction,blocker,contextRefs}.
+Context references are {kind,location,sha256?}; they do not verify source content.
 Run commands require runId. create also requires title, goal, workspaceRoot.
 bind carries run:{runId,revision,plan,receiptRoot?,evidenceRoot?,...}.
 link-evidence carries runId, receiptRoot and evidenceRoot; those locations become
@@ -85,6 +94,10 @@ export async function runTaskCommand(
       root: { type: 'string' },
       input: { type: 'string' },
       task: { type: 'string' },
+      workspace: { type: 'string' },
+      host: { type: 'string' },
+      session: { type: 'string' },
+      limit: { type: 'string' },
       'archon-home': { type: 'string' },
       'archon-cache': { type: 'string' },
       'workflow-source': { type: 'string' },
@@ -97,6 +110,9 @@ export async function runTaskCommand(
   const [command] = positionals;
   const supported = [
     'create',
+    'enter',
+    'pickup',
+    'handoff',
     'update',
     'bind',
     'link-evidence',
@@ -120,7 +136,7 @@ export async function runTaskCommand(
     '--root',
   );
   const store =
-    command === 'create'
+    command === 'create' || command === 'enter'
       ? await FileTaskStore.create(root)
       : await FileTaskStore.openExisting(root);
   let selection: HarnessSelection | undefined;
@@ -160,6 +176,20 @@ export async function runTaskCommand(
     store,
     ...(selection ? { selection } : {}),
   });
+  if (command === 'pickup') {
+    if ((values.host === undefined) !== (values.session === undefined))
+      throw new Error('pickup requires --host and --session together.');
+    return runtime.pickup({
+      ...(values.task ? { taskId: values.task } : {}),
+      ...(values.workspace
+        ? { workspaceRoot: absolute(values.workspace, '--workspace') }
+        : {}),
+      ...(values.host !== undefined
+        ? { session: { host: values.host, sessionId: values.session! } }
+        : {}),
+      ...(values.limit !== undefined ? { limit: Number(values.limit) } : {}),
+    });
+  }
   if (command === 'list') return runtime.listSnapshots();
   if (command === 'show') {
     if (!values.task) throw new Error('show requires --task ID.');
@@ -183,6 +213,14 @@ export async function runTaskCommand(
   // Runtime validators own payload shape and durable invariants; the CLI adds
   // neither status shortcuts nor implicit actor/version/idempotency values.
   switch (command) {
+    case 'enter':
+      return store.enterTask(
+        input as unknown as Parameters<FileTaskStore['enterTask']>[0],
+      );
+    case 'handoff':
+      return store.handoffTask(
+        input as unknown as Parameters<FileTaskStore['handoffTask']>[0],
+      );
     case 'create':
       return store.createTask(
         input as unknown as Parameters<FileTaskStore['createTask']>[0],

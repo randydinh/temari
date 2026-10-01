@@ -10,15 +10,36 @@ The browser is a read-only inbox; the agent uses the task CLI or runtime API to
 record work. Automatic capture of every chat, a conversational web frontend,
 schedules, and the Registrar graph view remain follow-up work.
 
+## Current continuation: host pickup and handoff
+
+Main through `8e3ddc4` was integrated on 2026-09-30. Its knowledge and privacy
+decisions are assessed in the [compatibility review](../evaluations/task-continuity/main-compatibility-2026-09-30.md).
+The host entry increment connects conversations to durable tasks without
+changing the native executor or knowledge authority.
+
+The journey is to discover retained tasks in the selected workspace,
+explicitly attach the current host conversation to a task, and save a bounded
+handoff with its next action. One conversation may coordinate multiple goals;
+one goal may span multiple conversations. Ambiguous pickup returns choices.
+A pickup brief is context for the agent, not execution permission or completion
+evidence. The browser exposes the same brief read-only.
+
+The API preserves old ledgers and uses the same version/idempotency checks for
+entry and handoff. Pickup scopes task discovery before reading selected evidence.
+It returns choices when several tasks match, even with a choice limit of one.
+It does not execute a workflow, query Registrar, read credentials, or call a model.
+This is source-workspace integration. The
+knowledge journey remains ahead of plugin packaging, as decided on main.
+
 ## Start or pick up a task
 
 Run commands from a checkout with `pnpm install` completed. A fresh session should
-list retained work before creating a task. Reuse a matching task; give a replan a
+discover retained work before creating a task. Reuse a matching task; give a replan a
 new run ID under that task.
 
 ```sh
-pnpm exec nx run runtime:tasks -- list
-pnpm exec nx run runtime:tasks -- show --task YOUR_TASK_ID
+pnpm exec nx run runtime:tasks -- pickup --workspace /absolute/path/to/temari
+pnpm exec nx run runtime:tasks -- pickup --task YOUR_TASK_ID
 ```
 
 Storage defaults to `TEMARI_TASK_ROOT`, or `tasks` under the platform's Temari
@@ -54,12 +75,86 @@ seconds while visible. A refresh failure leaves the prior view visible with an
 error. The browser refresh reads persisted observations; it does not poll Archon
 or start work.
 
+### Connect the current chat and leave a handoff
+
+Use the real host and conversation identity supplied by the host. This reference
+does not read the conversation or give the task control over it. Save an entry
+command as `/absolute/enter-task.json`:
+
+```json
+{
+  "taskId": "dashboard-buildout",
+  "actor": "temari-coordinator",
+  "idempotencyKey": "enter-dashboard-chat-1",
+  "expectedVersion": 1,
+  "session": { "host": "codex", "sessionId": "ACTUAL_CHAT_ID" }
+}
+```
+
+```sh
+pnpm exec nx run runtime:tasks -- enter --input /absolute/enter-task.json
+pnpm exec nx run runtime:tasks -- pickup --workspace /absolute/path/to/temari --host codex --session ACTUAL_CHAT_ID
+```
+
+For a new task, `enter` can create and link it in a single write: use
+`expectedVersion: 0` and add `create: {title, goal, workspaceRoot}`. For an existing
+task, omit `create` and use the version returned by pickup. The conversation
+reference is many-to-many: entering a second goal does not detach the first.
+
+Pickup returns `selected`, `choices`, or `empty`. It requires an exact `--task`
+or an absolute `--workspace`; a paired `--host` and `--session` narrows either
+scope. Workspace matching resolves filesystem aliases. All supplied filters must
+match. Multiple matches always return choices; `--limit` controls only how many
+are shown (1–50, default 20), with `hasMore` indicating omissions. Choice statuses
+are stored hints, including `ACCEPTED_UNVERIFIED`; selected-task evidence is
+rechecked before a brief can report `DONE`. Use `show` for complete retained
+history and `list` for the full inbox.
+
+Before leaving, save `/absolute/handoff-task.json` using the latest version:
+
+```json
+{
+  "taskId": "dashboard-buildout",
+  "actor": "temari-coordinator",
+  "idempotencyKey": "handoff-candidate-review",
+  "expectedVersion": 2,
+  "handoff": {
+    "summary": "The candidate implements task pickup and retains prior run history.",
+    "decisions": ["Archon remains the replaceable native execution harness."],
+    "nextAction": "Review the candidate and its retained verification results.",
+    "blocker": null,
+    "contextRefs": [
+      { "kind": "design", "location": "/absolute/path/to/design.md" }
+    ]
+  }
+}
+```
+
+```sh
+pnpm exec nx run runtime:tasks -- handoff --input /absolute/handoff-task.json
+```
+
+The handoff updates the next action and blocker atomically. Its author, timestamp,
+task version, and current run identity remain in history. Context references can
+include an optional `sha256`; the task store does not open or verify them.
+Handoff prose cannot accept a result or clear a pending native operation.
+
+The brief includes the current run identity, refreshed evidence, latest handoff,
+and 12 recent event summaries. It omits full dispatch inputs, native logs, and old
+run details. Output is bounded to 128 KiB with explicit truncation and history
+counts; use the full task/run views when more detail is needed. The browser's
+**Continue in a chat** panel prepares the same brief. **Copy current brief**
+rechecks it before copying; if clipboard access is unavailable, the text is
+selected for manual copying. This is an explicit handoff, not automatic chat
+interception or packaged host integration.
+
 ### Layout and everyday flow
 
 - **Left inbox:** search, open/all/done filters, task title, next action, run count,
   and time of the latest retained event. Cancelled tasks stay in the open filter
   so the unfinished goal remains discoverable.
 - **Task details:** goal, next action and blocker, followed by six workflow stages.
+- **Continuation:** a brief for the next chat, plus the last handoff and decisions.
 - **Runs:** immutable run/revision identity, native or receipt status, evidence
   completeness, unresolved controls, and a link to the original Archon run.
 - **Evidence and delegation:** retained child outcomes and source/publication

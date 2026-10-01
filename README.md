@@ -12,8 +12,8 @@ and [component guide](docs/platform-components.md) for the full design. Use the
 [verification matrix](docs/verification-matrix.md) to trace claims to
 implementation and retained evidence.
 
-The [task continuity guide](docs/task-continuity.md) covers the first local inbox:
-durable goals, run history, evidence, next actions, and exact-run Archon controls.
+The [task continuity guide](docs/task-continuity.md) covers the local inbox:
+durable goals, chat links, continuation briefs, handoffs, evidence, and exact-run Archon controls.
 Start there to pick up unfinished work. The [boundary assessment](docs/system-roles-and-responsibilities.md#how-granular-are-the-boundaries-today)
 distinguishes documented roles from implemented enforcement.
 
@@ -25,8 +25,9 @@ tree — [docs/overlays.md](docs/overlays.md).
 ## Agent starting points
 
 - **Pick up unfinished work:** [task continuity and recovery](docs/task-continuity.md).
-  List the local task store before creating a new task, reuse the matching goal,
-  and retain its next action before ending a session.
+  Use workspace-scoped `pickup` before creating work, explicitly `enter` the matching
+  task with the current host conversation, and save a `handoff` before ending a session.
+  When pickup returns choices, select the intended goal explicitly.
 - **Route a request:** [Temari coordinator and worker contracts](docs/system-roles-and-responsibilities.md#decision-and-control-owners),
   [one workflow](docs/workflow.md), and the packaged
   [Temari](packages/workflow-runtime/assets/v4.1/skills/temari/SKILL.md) and

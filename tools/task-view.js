@@ -11,6 +11,8 @@ const state = {
   selected: new URL(location.href).searchParams.get('task'),
   archonBaseUrl: '',
   loading: false,
+  continuationOpen: new Set(),
+  renderedDetail: null,
 };
 const stages = ['investigate', 'plan', 'build', 'review', 'verify', 'deliver'];
 const statusNames = {
@@ -119,6 +121,8 @@ function renderList() {
 }
 const eventTitles = {
   'task-created': 'Task created',
+  'task-entered': 'Chat linked to this task',
+  'handoff-recorded': 'Continuation handoff saved',
   'metadata-updated': 'Next action updated',
   'run-bound': 'Run attached to this task',
   'evidence-roots-attached': 'Evidence locations connected',
@@ -130,8 +134,133 @@ const eventTitles = {
   'evidence-verified': 'Stage evidence verified',
   'task-accepted': 'Result accepted by Temari',
 };
+function continuationText(brief) {
+  const run = brief.currentRun;
+  const handoff = brief.handoff;
+  return [
+    `Continue task ${brief.taskId}: ${brief.title}`,
+    `Workspace: ${brief.workspaceRoot}`,
+    `Goal: ${brief.goal}`,
+    `Status: ${brief.status} · version ${brief.version}`,
+    `Next action: ${brief.nextAction ?? 'Choose the next step.'}`,
+    `Blocker: ${brief.blocker ?? 'None recorded.'}`,
+    `Current stage: ${brief.currentStage ?? 'No execution stage recorded.'}`,
+    '',
+    'Execution and evidence:',
+    ...(run
+      ? [
+          `Run: ${run.runId} · revision ${run.revision}`,
+          `Plan digest: ${run.planSha256}`,
+          `Native run: ${run.nativeRef ? `${run.nativeRef.harnessId} / ${run.nativeRef.externalRunId}` : 'Not attached.'}`,
+          `Native status: ${run.nativeStatus ?? 'Not observed.'}`,
+          `Receipt: ${run.receiptRoot ?? 'Not attached.'}`,
+          `Evidence: ${run.evidenceRoot ?? 'Not attached.'}`,
+          ...run.unresolvedOperations.map(
+            (op) =>
+              `Pending ${op.kind} (${op.commandId}): ${op.state}${op.reason ? ` · ${op.reason}` : ''}`,
+          ),
+        ]
+      : ['No execution run is attached.']),
+    `Evidence verified: ${brief.evidence.verified ? 'yes' : 'no'} · scope ${brief.evidence.scope ?? 'none'}`,
+    `Semantic acceptance: ${brief.semanticAcceptance ? 'yes' : 'no'}`,
+    ...brief.evidence.issues.map((issue) => `- ${issue}`),
+    '',
+    'Last handoff (context to verify before acting):',
+    ...(handoff
+      ? [
+          `${handoff.actor} · ${handoff.at} · version ${handoff.taskVersion}`,
+          handoff.summary,
+          ...handoff.decisions.map((decision) => `Decision: ${decision}`),
+          ...handoff.contextRefs.map(
+            (ref) =>
+              `Reference (${ref.kind}): ${ref.location}${ref.sha256 ? ` · sha256 ${ref.sha256}` : ''}`,
+          ),
+        ]
+      : ['No handoff recorded.']),
+    '',
+    'Recent activity:',
+    ...brief.recentEvents.map(
+      (event) => `- ${event.at} · ${event.actor}: ${event.summary}`,
+    ),
+    `History: ${brief.history.totalEvents} events, ${brief.history.totalRuns} runs; ${brief.history.omittedEvents} earlier events and ${brief.history.omittedRuns} other runs omitted.`,
+    `Brief omissions: ${brief.truncation.omittedDecisions} decisions, ${brief.truncation.omittedContextRefs} references, ${brief.truncation.omittedEvidenceIssues} evidence issues, ${brief.truncation.omittedUnresolvedOperations} pending operations.`,
+    ...(brief.truncation.fields.length
+      ? [`Shortened fields: ${brief.truncation.fields.join(', ')}.`]
+      : []),
+    '',
+    'This brief is task context. It does not authorize actions or establish completion.',
+  ].join('\n');
+}
+function renderContinuation(task) {
+  const panel = el('details', 'continuation');
+  panel.open = state.continuationOpen.has(task.taskId);
+  panel.append(el('summary', '', 'Continue in a chat'));
+  panel.append(
+    el(
+      'p',
+      '',
+      'Prepare a bounded brief for Temari with the next action, decisions, run identity, and evidence status.',
+    ),
+  );
+  const output = el('textarea', 'continuation-text');
+  output.readOnly = true;
+  output.setAttribute('aria-label', 'Task continuation brief');
+  output.rows = 12;
+  const actions = el('div', 'continuation-actions');
+  const copy = el('button', 'quiet', 'Copy current brief');
+  const note = el('span', 'section-note');
+  note.setAttribute('role', 'status');
+  actions.append(copy, note);
+  panel.append(output, actions);
+  let loading = false;
+  async function prepare(copyToClipboard = false) {
+    if (loading) return;
+    loading = true;
+    copy.disabled = true;
+    note.textContent = 'Checking retained evidence…';
+    try {
+      const response = await fetch(
+        `/api/tasks/${encodeURIComponent(task.taskId)}/pickup`,
+        { cache: 'no-store' },
+      );
+      const result = await response.json();
+      if (!response.ok || !result.selected)
+        throw new Error(result.error ?? 'The task could not be recovered.');
+      if (!panel.isConnected) return;
+      output.value = continuationText(result.selected);
+      note.textContent = `Prepared ${new Date().toLocaleTimeString()}`;
+      if (copyToClipboard) {
+        try {
+          await navigator.clipboard.writeText(output.value);
+          note.textContent = 'Current brief copied.';
+        } catch {
+          output.focus();
+          output.select();
+          note.textContent = 'Brief selected. Copy it with your keyboard.';
+        }
+      }
+    } catch (error) {
+      output.value = '';
+      note.textContent = error.message;
+    } finally {
+      loading = false;
+      copy.disabled = false;
+    }
+  }
+  panel.addEventListener('toggle', () => {
+    if (panel.open) {
+      state.continuationOpen.add(task.taskId);
+      prepare();
+    } else state.continuationOpen.delete(task.taskId);
+  });
+  copy.addEventListener('click', () => prepare(true));
+  return panel;
+}
 function renderDetail() {
   const task = state.tasks.find((t) => t.taskId === state.selected);
+  const detailKey = JSON.stringify([task ?? null, state.archonBaseUrl]);
+  if (detailKey === state.renderedDetail) return;
+  state.renderedDetail = detailKey;
   const detail = byId('detail');
   if (!task) {
     detail.replaceChildren();
@@ -167,8 +296,29 @@ function renderDetail() {
   );
   if (task.blocker)
     next.append(el('div', 'blocker', `Blocked · ${task.blocker}`));
+  detail.append(next, renderContinuation(task));
+  if (task.handoff) {
+    const handoff = el('div', 'handoff');
+    handoff.append(
+      section('Last handoff', relativeTime(task.handoff.at)),
+      el('p', '', task.handoff.summary),
+    );
+    if (task.handoff.decisions.length) {
+      const decisions = el('ul');
+      for (const decision of task.handoff.decisions)
+        decisions.append(el('li', '', decision));
+      handoff.append(decisions);
+    }
+    handoff.append(
+      el(
+        'div',
+        'event-detail',
+        `${task.handoff.actor} · ${(task.sessions ?? []).length} linked ${(task.sessions ?? []).length === 1 ? 'chat' : 'chats'}`,
+      ),
+    );
+    detail.append(handoff);
+  }
   detail.append(
-    next,
     section(
       'Workflow',
       task.currentStage ? `Current · ${task.currentStage}` : 'Six stages',

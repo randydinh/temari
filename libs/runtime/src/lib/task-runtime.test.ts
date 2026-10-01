@@ -1,5 +1,13 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import test, { type TestContext } from 'node:test';
@@ -21,6 +29,7 @@ import {
 } from './runtime.js';
 import { FileEvidenceStore } from './evidence-store.js';
 import { FileChildTaskStore } from './child-task-store.js';
+import { projectTaskPickupBrief, TASK_PICKUP_LIMITS } from './task-pickup.js';
 
 async function fixture(t: TestContext, plan: ExecutionPlan = minimalPlan()) {
   const root = await mkdtemp(join(tmpdir(), 'temari-task-runtime-'));
@@ -729,4 +738,422 @@ test('child projections retain successful sibling and failed assignment', async 
     observed.runSnapshots.at(-1)?.children.map((c) => c.status),
     ['SUCCEEDED', 'FAILED'],
   );
+});
+
+test('pickup keeps two goals in the same session ambiguous even with limit one', async (t) => {
+  const f = await fixture(t);
+  const session = { host: 'codex', sessionId: 'one-chat-many-goals' };
+  await f.store.enterTask({ ...(await f.command('enter')), session });
+  await f.store.enterTask({
+    taskId: 'goal-2',
+    actor: 'temari',
+    idempotencyKey: 'enter',
+    expectedVersion: 0,
+    session,
+    create: {
+      title: 'Another goal',
+      goal: 'Handle this separately.',
+      workspaceRoot: f.root,
+    },
+  });
+  const original = FileWorkflowReceiptStore.openExisting;
+  let evidenceReads = 0;
+  FileWorkflowReceiptStore.openExisting = async () => {
+    evidenceReads++;
+    throw new Error('Choice discovery must not open evidence.');
+  };
+  t.after(() => {
+    FileWorkflowReceiptStore.openExisting = original;
+  });
+  const choices = await f.runtime.pickup({
+    workspaceRoot: f.root,
+    session,
+    limit: 1,
+  });
+  assert.equal(choices.status, 'choices');
+  assert.equal(choices.selected, null);
+  assert.equal(choices.choices.length, 1);
+  assert.equal(choices.hasMore, true);
+  assert.equal(evidenceReads, 0);
+  const all = await f.runtime.pickup({ workspaceRoot: f.root, session });
+  assert.equal(all.status, 'choices');
+  assert.equal(all.choices.length, 2);
+  assert.equal(all.hasMore, false);
+  await assert.rejects(
+    f.runtime.pickup({ session }),
+    /exact task ID or an absolute workspace/,
+  );
+});
+
+test('pickup uses exact canonical workspace scope and respects explicit-task filters', async (t) => {
+  const f = await fixture(t);
+  const nested = join(f.root, 'nested-workspace');
+  await mkdir(nested);
+  await f.store.enterTask({
+    taskId: 'nested-goal',
+    actor: 'temari',
+    idempotencyKey: 'enter',
+    expectedVersion: 0,
+    session: { host: 'codex', sessionId: 'nested-chat' },
+    create: {
+      title: 'Nested workspace',
+      goal: 'Do not treat parent paths as membership.',
+      workspaceRoot: nested,
+    },
+  });
+  const alias = join(f.root, 'alias');
+  await symlink(f.root, alias, 'dir');
+  const byCanonicalRoot = await f.runtime.pickup({
+    workspaceRoot: await realpath(f.root),
+  });
+  assert.equal(byCanonicalRoot.status, 'selected');
+  assert.equal(byCanonicalRoot.selected?.taskId, 'goal');
+  assert.equal(
+    (await f.runtime.pickup({ workspaceRoot: alias })).selected?.taskId,
+    'goal',
+  );
+  assert.equal(
+    (await f.runtime.pickup({ taskId: 'goal', workspaceRoot: nested })).status,
+    'empty',
+  );
+  assert.equal(
+    (
+      await f.runtime.pickup({
+        taskId: 'goal',
+        session: { host: 'codex', sessionId: 'nested-chat' },
+      })
+    ).status,
+    'empty',
+  );
+  assert.equal(
+    (
+      await f.runtime.pickup({
+        taskId: 'nested-goal',
+        workspaceRoot: nested,
+        session: { host: 'codex', sessionId: 'nested-chat' },
+      })
+    ).selected?.taskId,
+    'nested-goal',
+  );
+  await assert.rejects(
+    f.runtime.pickup({ workspaceRoot: '.' }),
+    /must be absolute/,
+  );
+  await assert.rejects(
+    f.runtime.pickup({ taskId: 'goal', limit: 0 }),
+    /Pickup limit/,
+  );
+});
+
+test('fresh-session pickup restores the handoff without executing provider actions', async (t) => {
+  const f = await fixture(t);
+  const session = { host: 'codex', sessionId: 'previous-chat' };
+  await f.store.enterTask({ ...(await f.command('enter')), session });
+  await f.store.handoffTask({
+    ...(await f.command('handoff')),
+    handoff: {
+      summary: 'The investigation is retained.',
+      decisions: ['Use the current execution harness.'],
+      nextAction: 'Inspect the candidate.',
+      blocker: 'Awaiting test evidence.',
+      contextRefs: [{ kind: 'document', location: 'docs/task-continuity.md' }],
+    },
+  });
+  const runtime = new TaskRuntime({
+    store: await FileTaskStore.openExisting(join(f.root, 'tasks')),
+  });
+  const result = await runtime.pickup({ taskId: 'goal' });
+  assert.equal(result.status, 'selected');
+  assert.equal(result.selected?.version, (await f.store.load('goal'))?.version);
+  assert.equal(result.selected?.handoff?.actor, 'temari');
+  assert.equal(result.selected?.handoff?.contextOnly, true);
+  assert.equal(result.selected?.handoff?.runId, 'run-1');
+  assert.equal(result.selected?.nextAction, 'Inspect the candidate.');
+  assert.equal(result.selected?.blocker, 'Awaiting test evidence.');
+  assert.equal(result.selected?.currentRun?.runId, 'run-1');
+  assert.equal(f.starts + f.resumes + f.cancels, 0);
+});
+
+test('positive handoff and prior acceptance cannot hide changed current evidence', async (t) => {
+  const f = await fixture(t);
+  await f.publish();
+  await f.runtime.accept({
+    ...(await f.command('accept')),
+    reason: 'Reviewed the local evidence.',
+  });
+  await f.store.handoffTask({
+    ...(await f.command('optimistic-handoff')),
+    handoff: {
+      summary: 'Everything passed and the work is complete.',
+      decisions: ['Close this goal.'],
+      nextAction: 'No work remains.',
+      blocker: null,
+      contextRefs: [],
+    },
+  });
+  const original = await f.runtime.pickup({ workspaceRoot: f.root });
+  assert.equal(original.status, 'selected');
+  assert.equal(original.choices[0]?.statusHint, 'ACCEPTED_UNVERIFIED');
+  assert.equal(original.selected?.status, 'DONE');
+  const artifact = (await readdir(join(f.root, 'evidence'))).find((name) =>
+    name.endsWith('.artifact'),
+  )!;
+  await writeFile(join(f.root, 'evidence', artifact), 'changed after handoff');
+  const refreshed = await f.runtime.pickup({ workspaceRoot: f.root });
+  assert.equal(refreshed.status, 'selected');
+  assert.equal(refreshed.selected?.status, 'BLOCKED');
+  assert.equal(refreshed.selected?.evidence.verified, false);
+  assert.equal(refreshed.selected?.semanticAcceptance, false);
+  assert.equal(
+    refreshed.selected?.handoff?.summary,
+    'Everything passed and the work is complete.',
+  );
+  assert.equal(refreshed.selected?.handoff?.contextOnly, true);
+});
+
+test('pickup retains cancelled goals and unresolved native intent without dispatching again', async (t) => {
+  const f = await fixture(t);
+  f.loseStart();
+  await assert.rejects(
+    f.runtime.dispatch({
+      ...(await f.command('dispatch')),
+      entrypoint: 'workflow.yml',
+      inputs: { prompt: 'PRIVATE_DISPATCH_INPUT' },
+    }),
+    /Connection lost/,
+  );
+  await f.store.handoffTask({
+    ...(await f.command('handoff')),
+    handoff: {
+      summary: 'Continue after the interrupted request.',
+      decisions: [],
+      nextAction: 'Check the exact native identity.',
+      blocker: null,
+      contextRefs: [],
+    },
+  });
+  const pending = await f.runtime.pickup({ taskId: 'goal' });
+  assert.equal(pending.selected?.status, 'BLOCKED');
+  assert.equal(
+    pending.selected?.currentRun?.unresolvedOperations[0]?.kind,
+    'dispatch',
+  );
+  assert.equal(f.starts, 1);
+  assert(!JSON.stringify(pending).includes('PRIVATE_DISPATCH_INPUT'));
+  assert(!JSON.stringify(pending).includes('native.log'));
+  await f.runtime.reconcileNative({
+    ...(await f.command('reconcile')),
+    reference: f.nativeRef,
+  });
+  await f.runtime.cancel(await f.command('cancel'));
+  const cancelled = await f.runtime.pickup({ workspaceRoot: f.root });
+  assert.equal(cancelled.status, 'selected');
+  assert.equal(cancelled.selected?.status, 'CANCELLED');
+  assert.equal(cancelled.choices[0]?.statusHint, 'CANCELLED');
+  assert.equal(f.cancels, 1);
+  assert.equal(f.starts, 1);
+});
+
+test('pickup inspects only the selected current run and skips unrelated artifact stores', async (t) => {
+  const f = await fixture(t);
+  await f.store.bindRun({
+    ...(await f.command('current')),
+    run: {
+      runId: 'run-current',
+      revision: 'rev-current',
+      plan: minimalPlan(),
+      receiptRoot: join(f.root, 'current-receipts'),
+      evidenceRoot: join(f.root, 'current-evidence'),
+    },
+  });
+  const nested = join(f.root, 'different-workspace');
+  await mkdir(nested);
+  const other = await f.store.createTask({
+    taskId: 'other-task',
+    actor: 'temari',
+    idempotencyKey: 'create',
+    title: 'Other project',
+    goal: 'Keep unrelated evidence out of this pickup.',
+    workspaceRoot: nested,
+  });
+  await f.store.bindRun({
+    taskId: 'other-task',
+    actor: 'temari',
+    expectedVersion: other.version,
+    idempotencyKey: 'bind',
+    run: {
+      runId: 'other-run',
+      revision: 'other-revision',
+      plan: minimalPlan(),
+      receiptRoot: join(f.root, 'unrelated-poison'),
+      evidenceRoot: join(f.root, 'unrelated-evidence'),
+    },
+  });
+  const opened: string[] = [];
+  const original = FileWorkflowReceiptStore.openExisting;
+  FileWorkflowReceiptStore.openExisting = async (root) => {
+    opened.push(root);
+    return original(root);
+  };
+  t.after(() => {
+    FileWorkflowReceiptStore.openExisting = original;
+  });
+  const result = await f.runtime.pickup({ workspaceRoot: f.root });
+  assert.equal(result.selected?.currentRun?.runId, 'run-current');
+  assert.deepEqual(opened, [join(f.root, 'current-receipts')]);
+  assert.equal(result.selected?.history.totalRuns, 2);
+  assert.equal(result.selected?.history.omittedRuns, 1);
+});
+
+test('pickup bounds handoff text and history while omitting full event and source payloads', async (t) => {
+  const f = await fixture(t);
+  let task = await f.store.enterTask({
+    taskId: 'bounded',
+    actor: 'temari',
+    idempotencyKey: 'enter',
+    expectedVersion: 0,
+    session: { host: 'codex', sessionId: 'bounded-session' },
+    create: {
+      title: 'Bounded pickup',
+      goal: '😀'.repeat(8000),
+      workspaceRoot: f.root,
+    },
+  });
+  task = await f.store.handoffTask({
+    taskId: task.taskId,
+    actor: 'temari',
+    idempotencyKey: 'handoff',
+    expectedVersion: task.version,
+    handoff: {
+      summary: '日'.repeat(4096),
+      decisions: Array(16).fill('日'.repeat(1024)),
+      nextAction: '日'.repeat(4096),
+      blocker: null,
+      contextRefs: Array.from({ length: 16 }, (_, index) => ({
+        kind: 'source',
+        location: `source-${index}/` + '日'.repeat(4000),
+      })),
+    },
+  });
+  for (let i = 0; i < 16; i++)
+    task = await f.store.updateTask({
+      taskId: task.taskId,
+      actor: 'temari',
+      idempotencyKey: `metadata-${i}`,
+      expectedVersion: task.version,
+      title: `Update ${i}`,
+    });
+  const result = await f.runtime.pickup({ taskId: task.taskId });
+  assert(result.selected);
+  assert(
+    Buffer.byteLength(JSON.stringify(result.selected), 'utf8') <=
+      TASK_PICKUP_LIMITS.briefBytes,
+  );
+  assert.equal(
+    result.selected.recentEvents.length,
+    TASK_PICKUP_LIMITS.recentEvents,
+  );
+  assert.equal(
+    result.selected.history.omittedEvents,
+    task.events.length - TASK_PICKUP_LIMITS.recentEvents,
+  );
+  assert.equal(result.selected.truncation.omittedDecisions, 8);
+  assert.equal(result.selected.truncation.omittedContextRefs, 8);
+  assert(result.selected.truncation.fields.includes('goal'));
+  assert(result.selected.truncation.fields.includes('handoff.summary'));
+  assert.equal('events' in result.selected, false);
+  assert.equal('runs' in result.selected, false);
+  assert.equal('change' in result.selected.recentEvents[0]!, false);
+});
+
+test('pickup preserves maximum-length paths and identities within its encoded byte ceiling', async (t) => {
+  const f = await fixture(t);
+  const original = await f.runtime.snapshot('goal');
+  for (const unit of ['\u0001', '日', '\ud800']) {
+    const location = '/' + unit.repeat(4095);
+    const runId = 'r'.repeat(128);
+    const run = {
+      ...original.runs[0]!,
+      runId,
+      revision: unit.repeat(512),
+      receiptRoot: location,
+      evidenceRoot: location,
+      nativeRef: {
+        schema: 1 as const,
+        harnessId: unit.repeat(512),
+        harnessVersion: unit.repeat(512),
+        runId,
+        revision: unit.repeat(512),
+        planSha256: 'a'.repeat(64),
+        externalRunId: 'n'.repeat(128),
+        workspaceRoot: location,
+        entrypoint: location,
+        startedAt: ' '.repeat(10000) + 'Wed, 30 Sep 2026 00:00:00 GMT',
+      },
+      operations: [
+        {
+          commandId: unit.repeat(512),
+          kind: 'cancel' as const,
+          state: 'UNCERTAIN' as const,
+          reason: unit.repeat(4096),
+        },
+      ],
+    };
+    const snapshot = {
+      ...original,
+      taskId: 't'.repeat(128),
+      title: unit.repeat(256),
+      goal: unit.repeat(16384),
+      workspaceRoot: location,
+      nextAction: unit.repeat(4096),
+      blocker: unit.repeat(4096),
+      currentRunId: runId,
+      runs: [run],
+      evidence: {
+        ...original.evidence,
+        issues: Array(16).fill(unit.repeat(4096)),
+      },
+      handoff: {
+        summary: unit.repeat(4096),
+        decisions: Array(16).fill(unit.repeat(1024)),
+        nextAction: unit.repeat(4096),
+        blocker: unit.repeat(4096),
+        contextRefs: Array.from({ length: 16 }, () => ({
+          kind: unit.repeat(64),
+          location,
+          sha256: 'a'.repeat(64),
+        })),
+        actor: unit.repeat(512),
+        at: original.createdAt,
+        taskVersion: 2,
+        runId,
+      },
+      events: Array.from({ length: 20 }, (_, index) => ({
+        ...original.events[0]!,
+        sequence: 49980 + index,
+        taskVersion: 49980 + index,
+        actor: unit.repeat(512),
+        change: { type: 'metadata-updated' as const },
+      })),
+    };
+    const brief = projectTaskPickupBrief(snapshot);
+    assert.equal(brief.workspaceRoot, location);
+    assert.equal(brief.currentRun?.receiptRoot, location);
+    assert.equal(brief.currentRun?.evidenceRoot, location);
+    assert.equal(brief.currentRun?.revision, run.revision);
+    assert.equal(
+      brief.currentRun?.nativeRef?.harnessId,
+      run.nativeRef.harnessId,
+    );
+    assert.equal(
+      brief.currentRun?.nativeRef?.startedAt,
+      '2026-09-30T00:00:00.000Z',
+    );
+    assert(
+      Buffer.byteLength(JSON.stringify(brief), 'utf8') <=
+        TASK_PICKUP_LIMITS.briefBytes,
+    );
+    assert(brief.truncation.fields.includes('goal'));
+    assert(brief.truncation.fields.includes('handoff.summary'));
+  }
 });

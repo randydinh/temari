@@ -13,6 +13,13 @@ test('read-only task view serves retained task data and rejects mutation and for
     runtime: {
       listSnapshots: async () => [task],
       snapshot: async (id) => (id === 'one' ? task : null),
+      pickup: async ({ taskId }) => ({
+        status: taskId === 'one' ? 'selected' : 'empty',
+        selected:
+          taskId === 'one'
+            ? { taskId, nextAction: 'Review retained evidence' }
+            : null,
+      }),
     },
     archonBaseUrl: 'http://127.0.0.1:3091',
     port: 0,
@@ -34,6 +41,15 @@ test('read-only task view serves retained task data and rejects mutation and for
   assert.equal(list.headers.get('cache-control'), 'no-store');
   assert.equal((await fetch(`${base}/api/tasks/one`)).status, 200);
   assert.equal((await fetch(`${base}/api/tasks/missing`)).status, 404);
+  assert.deepEqual(await (await fetch(`${base}/api/tasks/one/pickup`)).json(), {
+    status: 'selected',
+    selected: { taskId: 'one', nextAction: 'Review retained evidence' },
+  });
+  assert.equal((await fetch(`${base}/api/tasks/missing/pickup`)).status, 404);
+  assert.equal(
+    (await fetch(`${base}/api/tasks/one/pickup`, { method: 'POST' })).status,
+    405,
+  );
   assert.equal(
     (await fetch(`${base}/api/tasks`, { method: 'POST' })).status,
     405,
@@ -74,6 +90,9 @@ test('task read failures stay visible instead of looking like an empty inbox', a
         throw new Error('Task ledger digest mismatch.');
       },
       snapshot: async () => null,
+      pickup: async () => {
+        throw new Error('Task ledger digest mismatch.');
+      },
     },
     archonBaseUrl: 'http://localhost:3091',
     port: 0,
@@ -90,6 +109,13 @@ test('task read failures stay visible instead of looking like an empty inbox', a
   );
   assert.equal(response.status, 500);
   assert.deepEqual(await response.json(), {
+    error: 'Task ledger digest mismatch.',
+  });
+  const pickup = await fetch(
+    `http://127.0.0.1:${(server.address() as { port: number }).port}/api/tasks/one/pickup`,
+  );
+  assert.equal(pickup.status, 500);
+  assert.deepEqual(await pickup.json(), {
     error: 'Task ledger digest mismatch.',
   });
 });

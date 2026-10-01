@@ -341,6 +341,53 @@ h1 {
   color: #956528;
   margin-top: 10px;
 }
+.continuation {
+  margin: -10px 0 24px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 17px;
+  background: #fff;
+}
+.continuation summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.continuation p,
+.handoff p,
+.handoff li {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #607255;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.continuation-text {
+  width: 100%;
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: #fafbf9;
+  color: #425146;
+  font:
+    11px/1.6 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+.continuation-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 12px;
+}
+.handoff ul {
+  padding-left: 20px;
+}
 .section-heading {
   display: flex;
   align-items: center;
