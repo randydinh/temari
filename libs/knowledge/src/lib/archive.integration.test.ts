@@ -109,11 +109,18 @@ async function capturedForRebind() {
   const f = await fixture();
   const registrarSource = join(f.base, 'registrar-runtime');
   await mkdir(registrarSource);
-  await cp(join(f.config.registrarSource, 'src'), join(registrarSource, 'src'), {
-    recursive: true,
-  });
   await cp(
-    join(f.config.registrarSource, 'docs/design/source-archive-contract-v1.json'),
+    join(f.config.registrarSource, 'src'),
+    join(registrarSource, 'src'),
+    {
+      recursive: true,
+    },
+  );
+  await cp(
+    join(
+      f.config.registrarSource,
+      'docs/design/source-archive-contract-v1.json',
+    ),
     join(registrarSource, 'docs/design/source-archive-contract-v1.json'),
   );
   for (const name of ['pyproject.toml', 'uv.lock'])
@@ -423,7 +430,10 @@ test('ACTUAL ARCHIVE CLI: rebind upgrades a retained generation after runtime ch
     'READER_VERSION = 2\n',
   );
   await assert.rejects(
-    createArchiveRegistrar({ publications: [f.priorPath], readScope: 'source-root' }),
+    createArchiveRegistrar({
+      publications: [f.priorPath],
+      readScope: 'source-root',
+    }),
     /Publication implementation changed/,
   );
   const first = await rebindArchivePublication({
@@ -459,7 +469,10 @@ test('ACTUAL ARCHIVE CLI: rebind upgrades a retained generation after runtime ch
     'READER_VERSION = 3\n',
   );
   await assert.rejects(
-    createArchiveRegistrar({ publications: [first.publicationPath], readScope: 'source-root' }),
+    createArchiveRegistrar({
+      publications: [first.publicationPath],
+      readScope: 'source-root',
+    }),
     /Publication implementation changed/,
   );
   const third = await rebindArchivePublication({
@@ -468,17 +481,25 @@ test('ACTUAL ARCHIVE CLI: rebind upgrades a retained generation after runtime ch
   });
   assert.notEqual(third.publicationPath, first.publicationPath);
   assert.equal(
-    (await loadArchivePublication(third.publicationPath)).rebind?.priorPublicationPath,
+    (await loadArchivePublication(third.publicationPath)).rebind
+      ?.priorPublicationPath,
     first.publicationPath,
   );
-  assert((await createArchiveRegistrar({
-    publications: [third.publicationPath],
-    readScope: 'source-root',
-  })).identity);
+  assert(
+    (
+      await createArchiveRegistrar({
+        publications: [third.publicationPath],
+        readScope: 'source-root',
+      })
+    ).identity,
+  );
   const auditBytes = await readFile(first.auditPath);
   await rm(first.auditPath);
   await assert.rejects(
-    createArchiveRegistrar({ publications: [third.publicationPath], readScope: 'source-root' }),
+    createArchiveRegistrar({
+      publications: [third.publicationPath],
+      readScope: 'source-root',
+    }),
   );
   await writeFile(first.auditPath, auditBytes);
   const firstBytes = await readFile(first.publicationPath);
@@ -486,11 +507,17 @@ test('ACTUAL ARCHIVE CLI: rebind upgrades a retained generation after runtime ch
   altered.task.id = 'different-authority';
   await writeFile(first.publicationPath, canonical(altered));
   await assert.rejects(
-    rebindArchivePublication({ priorPublicationPath: first.publicationPath, transport: f.transport }),
+    rebindArchivePublication({
+      priorPublicationPath: first.publicationPath,
+      transport: f.transport,
+    }),
     /Rebound publication changed/,
   );
   await assert.rejects(
-    createArchiveRegistrar({ publications: [third.publicationPath], readScope: 'source-root' }),
+    createArchiveRegistrar({
+      publications: [third.publicationPath],
+      readScope: 'source-root',
+    }),
   );
   await writeFile(first.publicationPath, firstBytes);
   const generations = await cli(f, ['generations', f.source.id]);
@@ -506,13 +533,21 @@ test('ACTUAL ARCHIVE CLI: rebind refuses an unreadable seventeenth ancestry entr
       join(f.transport.registrarSource, 'src/knowledge_agent/rebind_marker.py'),
       `READER_VERSION = ${version}\n`,
     );
-    priorPublicationPath = (await rebindArchivePublication({
-      priorPublicationPath, transport: f.transport,
-    })).publicationPath;
+    priorPublicationPath = (
+      await rebindArchivePublication({
+        priorPublicationPath,
+        transport: f.transport,
+      })
+    ).publicationPath;
   }
-  assert((await createArchiveRegistrar({
-    publications: [priorPublicationPath], readScope: 'source-root',
-  })).identity);
+  assert(
+    (
+      await createArchiveRegistrar({
+        publications: [priorPublicationPath],
+        readScope: 'source-root',
+      })
+    ).identity,
+  );
   await writeFile(
     join(f.transport.registrarSource, 'src/knowledge_agent/rebind_marker.py'),
     'READER_VERSION = 17\n',
@@ -530,10 +565,15 @@ test('ACTUAL ARCHIVE CLI: rebind checks bounded prior bytes and every audit prov
     'READER_VERSION = 2\n',
   );
   const rebound = await rebindArchivePublication({
-    priorPublicationPath: f.priorPath, transport: f.transport,
+    priorPublicationPath: f.priorPath,
+    transport: f.transport,
   });
   const auditBytes = await readFile(rebound.auditPath);
-  for (const field of ['priorImplementation', 'priorProtocolSha256', 'currentOriginal']) {
+  for (const field of [
+    'priorImplementation',
+    'priorProtocolSha256',
+    'currentOriginal',
+  ]) {
     const audit = JSON.parse(auditBytes.toString());
     audit[field] = field === 'currentOriginal' ? 'checked' : '0'.repeat(64);
     await writeFile(rebound.auditPath, canonical(audit));
@@ -542,7 +582,9 @@ test('ACTUAL ARCHIVE CLI: rebind checks bounded prior bytes and every audit prov
   await writeFile(rebound.auditPath, auditBytes);
   const oversized = join(f.prior.task.directory, 'oversized-prior.json');
   await writeFile(oversized, 'x'.repeat(1_048_577));
-  const publication = JSON.parse(await readFile(rebound.publicationPath, 'utf8'));
+  const publication = JSON.parse(
+    await readFile(rebound.publicationPath, 'utf8'),
+  );
   publication.rebind.priorPublicationPath = oversized;
   const audit = JSON.parse(auditBytes.toString());
   audit.priorPublicationPath = oversized;
@@ -561,7 +603,7 @@ test('ACTUAL ARCHIVE CLI: rebind refuses changed or disabled registration and ta
     if (mode === 'manifest') {
       await python(
         f,
-        "import sqlite3,sys; db=sqlite3.connect(sys.argv[1]); db.execute(\"UPDATE archive_generations SET manifest=x'7b7d'\"); db.commit()",
+        'import sqlite3,sys; db=sqlite3.connect(sys.argv[1]); db.execute("UPDATE archive_generations SET manifest=x\'7b7d\'"); db.commit()',
         [join(f.base, 'state/registry.sqlite3')],
       );
     } else {
@@ -571,14 +613,17 @@ test('ACTUAL ARCHIVE CLI: rebind refuses changed or disabled registration and ta
         [join(f.base, 'state/registry.sqlite3'), mode, f.source.id],
       );
     }
-    await assert.rejects(rebindArchivePublication({
-      priorPublicationPath: f.priorPath,
-      transport: f.transport,
-    }));
+    await assert.rejects(
+      rebindArchivePublication({
+        priorPublicationPath: f.priorPath,
+        transport: f.transport,
+      }),
+    );
     const artifacts = await readdir(f.options.task.directory);
     assert(!artifacts.some((name) => name.startsWith('archive-rebind-')));
     assert.equal(
-      artifacts.filter((name) => name.startsWith('archive-publication-')).length,
+      artifacts.filter((name) => name.startsWith('archive-publication-'))
+        .length,
       1,
     );
   }
@@ -786,29 +831,72 @@ test('ACTUAL ARCHIVE CLI: actual DOCX, searchable/scanned PDF and image retain o
       (g) => g.detail === 'visual-evidence-unavailable',
     ),
   );
-  const pdf = await provider.read(readRequest(f, 'searchable.pdf'));
-  if (pdf.ok)
-    assert.match(pdf.value.evidence.excerpt, /ArchiveSignal searchable PDF/);
-  else {
-    const inspected = await cli(f, [
-      'inspect',
-      f.source.id,
-      p.generation,
-      '--limit',
-      '100',
-      '--max-bytes',
-      '100000',
-    ]);
+  const inspected = await cli(f, [
+    'inspect',
+    f.source.id,
+    p.generation,
+    '--limit',
+    '100',
+    '--max-bytes',
+    '100000',
+  ]);
+  const document = (path: string) => {
     const doc = inspected.documents.find(
-      (d: { path: string }) => d.path === 'searchable.pdf',
+      (d: { path: string }) => d.path === path,
     );
+    assert(doc, `Missing captured document ${path}`);
+    assert.equal(doc.original.sha256, hash(originals.get(path)!));
+    return doc;
+  };
+  const pdf = await provider.read(readRequest(f, 'searchable.pdf'));
+  const searchable = document('searchable.pdf');
+  if (process.platform === 'darwin') {
+    assert(!pdf.ok, JSON.stringify(pdf));
+    assert.equal(searchable.representation, null);
     assert(
-      doc.gaps.includes('pdf-memory-boundary-unavailable'),
-      JSON.stringify(doc),
+      searchable.gaps.includes('pdf-memory-boundary-unavailable'),
+      JSON.stringify(searchable),
     );
-    assert.equal(doc.original.sha256, hash(originals.get('searchable.pdf')!));
+  } else if (process.platform === 'linux') {
+    assert(pdf.ok, JSON.stringify(pdf));
+    assert.match(pdf.value.evidence.excerpt, /ArchiveSignal searchable PDF/);
+    assert.equal(
+      pdf.value.evidence.sha256,
+      hash(originals.get('searchable.pdf')!),
+    );
+    assert.equal(pdf.value.evidence.representation.method, 'pdf-text');
+    assert.equal(
+      pdf.value.evidence.archive?.representationSha256,
+      searchable.representation.sha256,
+    );
+    assert.equal(pdf.value.evidence.archive?.generation, p.generation);
+    assert.deepEqual(pdf.value.evidence.span, {
+      unit: 'unicode-codepoint',
+      start: 0,
+      end: Array.from(pdf.value.evidence.excerpt).length,
+    });
+  } else {
+    assert.fail(`PDF extraction boundary not evaluated on ${process.platform}`);
   }
-  assert(!(await provider.read(readRequest(f, 'pixel.png'))).ok);
+  const discovered = await provider.discover({
+    scope: [f.source],
+    query: 'searchable',
+    limit: 20,
+    maxBytes: 16000,
+    continuation: null,
+  });
+  assert(discovered.ok, JSON.stringify(discovered));
+  assert.deepEqual(
+    discovered.value.documents.map((d) => d.document.path),
+    process.platform === 'linux' ? ['searchable.pdf'] : [],
+  );
+  for (const path of ['scanned.pdf', 'pixel.png']) {
+    const doc = document(path);
+    assert.equal(doc.representation, null, JSON.stringify(doc));
+    const read = await provider.read(readRequest(f, path));
+    assert(!read.ok, JSON.stringify(read));
+    assert.equal(read.gap.kind, 'unsupported');
+  }
   assert(p.gaps.some((g) => g.detail === 'visual-evidence-unavailable'));
   const request = {
     scope: [f.source],

@@ -85,6 +85,13 @@ gap and prevents hosted use. Revocation can prevent the next attempt but cannot
 retract text in a request that is already in flight. A Registrar upgrade changes
 the implementation pin, requiring publication rebind and a fresh intake handoff.
 
+An explicit archived-generation diff compares two complete, pinned captures
+of the same registered source by retained original SHA-256. Its durable receipt
+lists affected paths without document bodies and preserves historical reads.
+It reports `currentOriginal: not-checked`; it neither observes later live
+changes nor rebuilds graph relationships. The macOS searchable-PDF extraction
+gap remains open until a hard worker memory boundary can be demonstrated.
+
 ## Delivery decisions
 
 ### Installed capability decision — 2026-10-01
