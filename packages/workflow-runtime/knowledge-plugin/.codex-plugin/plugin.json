@@ -1,0 +1,19 @@
+{
+  "name": "content-registrar-knowledge",
+  "version": "0.1.0",
+  "description": "Standalone source-backed Content Registrar knowledge workflow.",
+  "author": {
+    "name": "Randy Dinh"
+  },
+  "keywords": ["knowledge", "content-registrar", "search", "retrieval"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Content Registrar Knowledge",
+    "shortDescription": "Capture and retrieve source-backed knowledge.",
+    "longDescription": "Install the pinned Content Registrar and use Temari's two-agent intake and search workflow with local archives and explicit sharing controls.",
+    "developerName": "Randy Dinh",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": ["Use Content Registrar to search my registered sources."]
+  }
+}
