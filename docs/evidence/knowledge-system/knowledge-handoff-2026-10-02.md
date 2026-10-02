@@ -91,3 +91,22 @@ direct TypeSafe Keychain or registered-source/local-only policy.
 
 The present system has verified preservation and retrieval increments, but
 the production **lossless knowledge system** finish condition is not met.
+
+## 04:41 UTC DOCX package-media continuation
+
+GitHub reports [#154](https://github.com/randydinh/temari/pull/154) merged at
+`d02bdedf05ff595184dee5aaff2d4ee18b713159` after independent exact-head
+review of clean commit `0fe0b2e396939b8ff7adf43c572cc34dbc90bcfb`.
+The final-source actual-Registrar integration passed 88/88, Knowledge unit
+tests 43/43, typecheck and Nx sync passed. Canonical package/check reported
+that exact commit with `dirty:false`, and the stock Node Knowledge export
+loaded. GitHub listed no branch checks for #154. The local `gh pr merge`
+command returned an error while trying to switch to `main` because another
+worktree owns it; the remote PR state and merge commit confirm the merge.
+
+The [DOCX package-media inventory](docx-media-inventory-2026-10-02.md) checks
+one explicitly recovered original against its retained manifest entry and
+current source registration. It emits bounded `word/media/*` hashes and byte
+counts only. It does not determine whether document XML displays a member or
+what an image means. The fixture used `local-only`; this increment made no
+TypeSafe call. The broader five finish predicates above remain open.
