@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { readFile, writeFile } from 'node:fs/promises';
+import { chmod, lstat, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { promisify } from 'node:util';
@@ -8,14 +8,16 @@ import { actualFixture } from '../support/fixtures.js';
 import { captureArchive, loadArchivePublication } from './archive-intake.js';
 import { createArchiveGraphReader } from './archive-graph.js';
 import { planArchiveGraphImpact } from './archive-graph-impact.js';
-import { evaluateReviewedArchiveGraphRoot } from './archive-graph-handoff.js';
+import { evaluateReviewedArchiveGraphChild, evaluateReviewedArchiveGraphRoot } from './archive-graph-handoff.js';
 import { proposeArchiveGraphRepins } from './archive-graph-repin.js';
 import { publishReviewedArchiveGraphRoot } from './archive-graph-republish.js';
+import { publishReviewedArchiveGraphChange, type ArchiveReviewedGraphChangeReceipt } from './archive-graph-reviewed-change.js';
+import { publishJson } from './durable.js';
 import { canonical, hash } from './codec.js';
 
 const exec = promisify(execFile);
 
-test('ACTUAL ARCHIVE CLI: reviewed v2 root has an explicit pinned one-hop evaluation path', async () => {
+test('ACTUAL ARCHIVE CLI: reviewed v2 root and changed-link child have receipt-pinned evaluations', async () => {
   const f = await actualFixture();
   const workspace = join(f.base, 'state');
   const options = {
@@ -51,6 +53,8 @@ test('ACTUAL ARCHIVE CLI: reviewed v2 root has an explicit pinned one-hop evalua
     );
     return JSON.parse(stdout);
   };
+  await writeFile(join(f.base, 'sources/changed.md'), '# Before\nNo link yet.\n');
+  await writeFile(join(f.base, 'sources/new-target.md'), '# New target\nRetained evidence.\n');
   const before = await captureArchive(options);
   assert(before.publicationPath);
   const old = await loadArchivePublication(before.publicationPath);
@@ -113,6 +117,8 @@ test('ACTUAL ARCHIVE CLI: reviewed v2 root has an explicit pinned one-hop evalua
   const v1 = await cli(['graph-publish', graphDraftPath]);
   assert.equal(v1.status, 'complete');
   await writeFile(join(f.base, 'sources/plan.txt'), 'Changed plan in v2.');
+  const changedMarkdown = '# After 😀\n[New target](new-target.md)\n';
+  await writeFile(join(f.base, 'sources/changed.md'), changedMarkdown);
   const after = await captureArchive({ ...options, requestKey: 'after' });
   assert(after.publicationPath);
   const impact = await planArchiveGraphImpact({
@@ -195,6 +201,119 @@ test('ACTUAL ARCHIVE CLI: reviewed v2 root has an explicit pinned one-hop evalua
   await assert.rejects(evaluateReviewedArchiveGraphRoot(input));
   await writeFile(reviewed.receiptPath, savedReview);
 
+  const child = await publishReviewedArchiveGraphChange({
+    publications: [after.publicationPath], parentGraphId: reviewed.graphId,
+    reviewerRef: 'synthetic-operator', reason: 'Review the new archived Markdown link.',
+    retractAssertionIds: [reviewed.receipt.recordMapping.find((r) => r.beforeRecordId === id('4'))!.afterRecordId],
+    addLink: {
+      publicationPath: after.publicationPath, sourcePath: 'changed.md',
+      targetPath: 'new-target.md',
+      codePointOffset: Array.from(changedMarkdown.split('[')[0]).length,
+      allowedPaths: ['changed.md', 'new-target.md'],
+    },
+  });
+  const childInput = {
+    ...input, childReviewReceiptPath: child.receiptPath,
+    lexical: [{ sourceId: f.source.id, path: 'changed.md', sha256: hash(changedMarkdown) }],
+    expected: [{ sourceId: f.source.id, path: 'new-target.md' }],
+  };
+  const { childReviewReceiptPath: _, ...rootInput } = childInput;
+  const rootTrial = await evaluateReviewedArchiveGraphRoot(rootInput);
+  const childResult = await evaluateReviewedArchiveGraphChild(childInput);
+  assert.equal(rootTrial.trial.expectedRecallAtK, 0);
+  assert.equal(rootTrial.trial.status, 'complete');
+  assert.deepEqual(rootTrial.trial.added, []);
+  assert.equal(childResult.trial.expectedRecallAtK, 1);
+  assert.equal(childResult.trial.status, 'complete');
+  assert.equal(childResult.trial.verifiedEvidenceCount, 1);
+  assert.deepEqual(childResult.trial.added.map((r) => r.path), ['new-target.md']);
+  assert.equal(childResult.receipt.topK, rootTrial.receipt.topK);
+  assert.equal(childResult.receipt.lexicalSha256, rootTrial.receipt.lexicalSha256);
+  assert.equal(childResult.receipt.graphId, child.graphId);
+  assert.equal(childResult.receipt.rootGraphId, reviewed.graphId);
+  assert.equal(childResult.receipt.retractedAssertionCount, 1);
+  assert.equal(childResult.receipt.addedAssertionCount, 1);
+  assert.equal(childResult.receipt.bm25Lift, 'not-measured');
+  assert.equal(childResult.receipt.semanticCorrectness, 'not-verified');
+  assert.equal(childResult.receipt.reviewerAuthenticated, false);
+  assert.equal(childResult.receipt.operationalQueryChanged, false);
+  assert.equal((await lstat(child.draftPath)).mode & 0o077, 0);
+  const childSummary = await readFile(childResult.receiptPath, 'utf8');
+  for (const privateText of [input.query, changedMarkdown, '[New target](new-target.md)',
+    'Retained evidence.', 'Review the new archived Markdown link.']) {
+    assert(!childSummary.includes(privateText));
+  }
+  const childReview = JSON.parse(await readFile(child.receiptPath, 'utf8')) as ArchiveReviewedGraphChangeReceipt;
+  const alteredReceipt = async (change: Record<string, unknown>) => {
+    const receipt = { ...childReview, ...change };
+    const path = join(options.task.directory, `archive-graph-reviewed-change-${hash(canonical(receipt))}.json`);
+    await publishJson(path, receipt);
+    return { ...childInput, childReviewReceiptPath: path };
+  };
+  for (const change of [
+    { kind: 'arbitrary-child-review' },
+    { policy: 'unverified-link' },
+    { reviewerAuthenticated: true },
+    { parentGraphId: v1.graph_id },
+    { revisionSetId: '0'.repeat(64) },
+    { graphId: reviewed.graphId },
+    { publicationPins: [] },
+    { publicationPins: [...childReview.publicationPins, ...childReview.publicationPins] },
+    { publicationPins: [{ ...childReview.publicationPins[0], generation: old.generation }] },
+    { publicationPins: [{ ...childReview.publicationPins[0], sha256: '0'.repeat(64) }] },
+    { retractedAssertionIds: [] },
+    { addedAssertionId: null },
+  ]) await assert.rejects(evaluateReviewedArchiveGraphChild(await alteredReceipt(change)));
+  await assert.rejects(evaluateReviewedArchiveGraphChild({ ...childInput,
+    lexical: [{ ...childInput.lexical[0], sha256: '0'.repeat(64) }] }));
+  const originalChildReceipt = await readFile(child.receiptPath, 'utf8');
+  await writeFile(child.receiptPath, originalChildReceipt + ' ');
+  await assert.rejects(evaluateReviewedArchiveGraphChild(childInput));
+  await writeFile(child.receiptPath, originalChildReceipt);
+  const originalRootDraft = await readFile(reviewed.receipt.draftPath, 'utf8');
+  await writeFile(reviewed.receipt.draftPath, originalRootDraft + ' ');
+  await assert.rejects(evaluateReviewedArchiveGraphChild(childInput));
+  await writeFile(reviewed.receipt.draftPath, originalRootDraft);
+  const originalDraft = await readFile(child.draftPath, 'utf8');
+  await writeFile(child.draftPath, originalDraft + ' ');
+  await assert.rejects(evaluateReviewedArchiveGraphChild(childInput));
+  await writeFile(child.draftPath, originalDraft);
+  await chmod(child.draftPath, 0o644);
+  await assert.rejects(evaluateReviewedArchiveGraphChild(childInput), /private/);
+  await chmod(child.draftPath, 0o600);
+  await writeFile(reviewed.receiptPath, savedReview + ' ');
+  await assert.rejects(evaluateReviewedArchiveGraphChild(childInput));
+  await writeFile(reviewed.receiptPath, savedReview);
+
+  // Valid Registrar graphs and recomputed receipt/draft filenames are not enough:
+  // the entire delta must equal the declared retractions and re-extracted link.
+  const forgedDraft = JSON.parse(originalDraft);
+  forgedDraft.nodes.push({ ...forgedDraft.nodes[0], id: 'f'.repeat(32) });
+  forgedDraft.nodes.sort((a: { id: string }, b: { id: string }) => a.id.localeCompare(b.id));
+  const forgedPath = join(options.task.directory,
+    `archive-graph-reviewed-draft-${hash(canonical(forgedDraft))}.json`);
+  await publishJson(forgedPath, forgedDraft);
+  const forgedGraph = await cli(['graph-publish', forgedPath]);
+  assert.equal(forgedGraph.status, 'complete');
+  await assert.rejects(evaluateReviewedArchiveGraphChild(await alteredReceipt({
+    graphId: forgedGraph.graph_id, draftSha256: hash(canonical(forgedDraft)),
+  })), /Unexpected child node delta/);
+  const falseLinkDraft = JSON.parse(originalDraft);
+  const falseLink = falseLinkDraft.assertions.find((r: { id: string }) => r.id === child.addedAssertionId);
+  falseLink.predicate = 'depends-on';
+  falseLink.id = 'e'.repeat(32);
+  falseLinkDraft.assertions.sort((a: { id: string }, b: { id: string }) => a.id.localeCompare(b.id));
+  const falseLinkPath = join(options.task.directory,
+    `archive-graph-reviewed-draft-${hash(canonical(falseLinkDraft))}.json`);
+  await publishJson(falseLinkPath, falseLinkDraft);
+  const falseLinkGraph = await cli(['graph-publish', falseLinkPath]);
+  assert.equal(falseLinkGraph.status, 'complete');
+  assert.equal(falseLinkGraph.graph_id, hash(canonical(falseLinkDraft)));
+  await assert.rejects(evaluateReviewedArchiveGraphChild(await alteredReceipt({
+    graphId: falseLinkGraph.graph_id, draftSha256: hash(canonical(falseLinkDraft)),
+    addedAssertionId: falseLink.id,
+  })), /differs from archived Markdown link/);
+
   await exec(f.config.python, [
     '-B', '-c',
     "import sqlite3,sys,json; db=sqlite3.connect(sys.argv[1]); row=json.loads(db.execute('SELECT data FROM sources WHERE id=?',(sys.argv[2],)).fetchone()[0]); row['enabled']=False; db.execute('UPDATE sources SET data=? WHERE id=?',(json.dumps(row),sys.argv[2])); db.commit()",
@@ -202,4 +321,5 @@ test('ACTUAL ARCHIVE CLI: reviewed v2 root has an explicit pinned one-hop evalua
     f.source.id,
   ]);
   await assert.rejects(evaluateReviewedArchiveGraphRoot(input));
+  await assert.rejects(evaluateReviewedArchiveGraphChild(childInput));
 });
