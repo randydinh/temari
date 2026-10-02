@@ -550,3 +550,67 @@ before Registrar reopens them, validate the full package or source admission,
 or make separate imports atomic. The 8 MiB archive and 1 MiB per-OKF caps
 remain. No hosted Jev call or key read occurred. All five broader finish
 predicates above remain open.
+
+## Morning reconciliation and next gates
+
+The audited base was clean at `origin/main`
+`5a342487d9cb43145b91e839942de69fa4ac8a64` before this final
+reconciliation draft. A read-only GitHub and Git audit found all
+59 Knowledge PRs from #127–189 merged, excluding four unrelated PRs
+#139, #140, #142 and #150. Every reported merge result is an ancestor
+of that main. For #184–189, each reviewed head and GitHub merge result
+have the same tree. The latest package/check results and actual Registrar/Nx checks are
+summarized in the source-linked increment notes above; raw logs and
+receipts remain off-repository. PRs #184, #186 and #188 were scoped
+recovery improvements, not production backup.
+The handoff's 24 local Markdown file links resolve in this checkout.
+
+Before this final reconciliation, the append-only decision log had 238
+data rows, each with six fields.
+It directly names 37 of the 59 Knowledge PR URLs. The 22 absent from
+those historical rows are [#138](https://github.com/randydinh/temari/pull/138)
+and [#144](https://github.com/randydinh/temari/pull/144), plus the
+documentation handoffs
+[#148](https://github.com/randydinh/temari/pull/148),
+[#153](https://github.com/randydinh/temari/pull/153),
+[#155](https://github.com/randydinh/temari/pull/155),
+[#157](https://github.com/randydinh/temari/pull/157),
+[#159](https://github.com/randydinh/temari/pull/159),
+[#161](https://github.com/randydinh/temari/pull/161),
+[#163](https://github.com/randydinh/temari/pull/163),
+[#165](https://github.com/randydinh/temari/pull/165),
+[#167](https://github.com/randydinh/temari/pull/167),
+[#169](https://github.com/randydinh/temari/pull/169),
+[#171](https://github.com/randydinh/temari/pull/171),
+[#173](https://github.com/randydinh/temari/pull/173),
+[#175](https://github.com/randydinh/temari/pull/175),
+[#177](https://github.com/randydinh/temari/pull/177),
+[#179](https://github.com/randydinh/temari/pull/179),
+[#181](https://github.com/randydinh/temari/pull/181),
+[#183](https://github.com/randydinh/temari/pull/183),
+[#185](https://github.com/randydinh/temari/pull/185),
+[#187](https://github.com/randydinh/temari/pull/187) and
+[#189](https://github.com/randydinh/temari/pull/189).
+These merged PRs are reconciled here; the earlier log rows remain
+untouched. The original audit already called out #138 and #144.
+
+The five production finish predicates above remain open:
+representative human-validated answer and abstention quality;
+scanned/visual and mixed-format meaning; recurring automatic source and
+graph evolution with authenticated corrections; atomic recovery of data,
+policy, erasure and derived views with RPO/RTO; and real Windows plus
+default-plugin disconnect/uninstall/reinstall lifecycle tests. The
+opt-in bounded Linux guest captures searchable PDF text on this Mac,
+but does not prove image or scanned-page meaning. Synthetic BM25 timing
+and graph replay are not service-level or production recovery proof.
+The direct TypeSafe Jev route remains the only hosted model for this
+workflow, subject to current registered-source/local-only decisions;
+this final audit made no hosted call or key read.
+
+The next substantive units need broader bounded parser work, real
+answer labels, a recurring runtime/graph correction design, a
+transactional recovery design, or a Windows host. Read-only option
+comparison found no meaningful feature increment that could complete
+the full actual Registrar, Nx, independent review and PR cycle before
+the morning handoff. Finish this run with the audited state, leaving
+those gates explicit.
