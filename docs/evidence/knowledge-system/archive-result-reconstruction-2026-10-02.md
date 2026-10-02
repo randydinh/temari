@@ -1,0 +1,11 @@
+# Committed archive result reconstruction
+
+The operator recapture path could leave a complete Registrar generation and Temari publication but no Temari result file if that final write failed. The existing resume API needs the result, while starting a fresh recapture refuses the already used binding.
+
+`recoverArchiveSourceAttempt` accepts caller-pinned hashes for the original attempt, prior publication and committed publication. It verifies the saved attempt/options and binding, current source admission, the complete committed local publication and a Registrar inspect of its generation, manifest, request key, fingerprint, preservation and counts. When the original sibling result is genuinely missing, it publishes the original six-field result immutably and delegates to the existing diff/graph-impact resume. A complete existing result uses resume; blocked or malformed results refuse. The recovery path does not call Registrar capture, use Jev, or read a key.
+
+The actual Registrar integration fixture commits v2, removes only its Temari result, then verifies reconstruction, unchanged generation and attempt counts, the pinned diff, and read-only graph impact. It also covers blocked/malformed result, missing publication, forged publication gap bytes, changed attempt/prior selection and disabled registration. Independent review found and caused removal of an earlier mutating replay design; the revised candidate passed review.
+
+This covers result-write failure **after a complete local publication exists**. It cannot reconcile a Registrar commit lacking a Temari publication, prove that the caller's publication hash was independently authenticated, or make checks and writes atomic. Registrar inspect verifies generation/manifest/counts; gap and capability metadata remain caller-pinned local publication metadata, not independently rederived from the full Registrar manifest. Recurring freshness, automatic graph correction, recovery RPO/RTO, answer quality and Windows/plugin lifecycle remain open.
+
+Verification on the isolated checkout: focused actual Registrar 1/1, uncached Knowledge integration 101/101, Knowledge unit 43/43, Knowledge typecheck, `nx sync:check`, scoped Prettier and `git diff --check` passed. The PR and merge outcome will be recorded in the production decision trail after delivery.
