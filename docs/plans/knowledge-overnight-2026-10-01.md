@@ -673,3 +673,14 @@ diff checks passed. Independent read-only review found no must-fix after
 scanner overlap, escaped-start and declaration false positives were repaired.
 The receipt remains conservative declared syntax only. Clean exact-head
 package, commit review and PR delivery remain.
+
+### 06:33 UTC Markdown raw-HTML delivery
+
+Independent exact-head review accepted clean commit
+`6f581f2e9af16fde7aed3e50de0ae606c9aaa6d9`. Canonical package/check
+reported that head with `dirty:false`, and its stock Node export loaded.
+GitHub reports [#162](https://github.com/randydinh/temari/pull/162) merged at
+`814a4699060be04670a81dff8febea9b5fa285f3`; the reviewed and merged
+trees match. Keep this bounded syntax receipt. HTML rendering, visual meaning,
+PDF assets, continuous freshness, Windows and production losslessness remain
+open.
