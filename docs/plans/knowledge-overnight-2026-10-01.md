@@ -862,3 +862,49 @@ evidence, the appended audit rows preserve the six-field append-only trail,
 and no private path, query or report filename enters the added text. Keep the
 handoff as a documentation increment. The five production finish predicates
 remain open.
+
+## 2026-10-02 08:03 UTC BM25 scale baseline experiment
+
+PRs #168 and #169 are merged; this clean isolated branch starts from
+`681bfbfdd33e7794fe5dd3be34dfb5c03c569ef7`. A read-only architect
+compared a pinned actual-Registrar BM25 latency/scale baseline with an
+archived HTML image inventory. Registrar presently rebuilds an in-memory
+SQLite FTS5 corpus per BM25 discovery, while no selected-size latency curve
+exists. HTML inventory would require a separate bounded recovered-original
+parser and does not address the measured retrieval-efficiency question.
+Select the baseline before considering any index cache.
+
+Pass only if synthetic local-only sources with deterministic content at
+multiple document counts are captured through the actual Registrar; repeated
+bounded BM25 discoveries record host, Python/SQLite version, selected bytes,
+document count, index scope, median and p95 observed latency, and verify
+top citations against pinned archived text. Preserve a bounded refusal case
+and record every configuration needed to reproduce the run. Keep results
+observational: no absolute CI timing threshold, default-ranker change,
+persistent cache, hosted call, human answer-quality claim or production-scale
+SLO. Run a focused test and full Knowledge integration/typecheck through Nx,
+obtain independent review and clean exact-head package evidence before PR.
+If capture or measurement cost is unsuitable for a regular integration suite,
+isolate the scale runner so normal tests remain bounded.
+
+### 08:26 UTC BM25 scale checkpoint
+
+The opt-in runner captured cumulative 100, 500 and 1,000 synthetic documents
+through actual Registrar CLI sources explicitly set `local-only`; each scope
+performed one warmup and seven timed fresh-process BM25 discoveries. Final
+observed medians were 127.425, 674.979 and 1463.777 ms on this Mac; these
+include process startup and archive verification, and source count also grows
+with document count. All 24 top citations were independently read against
+exact source, generation, manifest, path, original and representation pins,
+Unicode spans and quote; each scope had a stable index digest, and a 33-term
+query refused under the 32-term bound. This is observational, not a latency
+SLO, quality gate or cache justification.
+
+The first independent review identified missing readback identity/span checks.
+The builder repaired the runner and reran focused and full measurements at
+the final script. Independent re-review passed with no must-fix. Prior
+candidate Nx Knowledge integration passed 96/96 actual Registrar cases, unit
+43/43, uncached typecheck and sync; the subsequent change was confined to
+the opt-in benchmark and evidence note. No hosted call or Keychain lookup
+was used. Clean commit, exact-head package/check and PR delivery remain.
+The five broader production finish predicates remain open.
