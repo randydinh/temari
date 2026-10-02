@@ -9,7 +9,7 @@ import { canonical, hash } from './codec.js';
 
 const exec = promisify(execFile);
 
-test('ACTUAL Registrar: paired archive and root OKF graph replay preserves exact pinned records in a fresh local-only workspace', async () => {
+test('ACTUAL Registrar: ordered root and retracted-child OKF replay preserves graph lineage in a fresh local-only workspace', async () => {
   const python = process.env['TEMARI_REGISTRAR_PYTHON'] ?? '';
   const registrarSource = process.env['TEMARI_REGISTRAR_SOURCE'] ?? '';
   assert(python && registrarSource, 'Pinned actual Registrar required');
@@ -32,7 +32,9 @@ test('ACTUAL Registrar: paired archive and root OKF graph replay preserves exact
     const restoredState = join(f.base, 'restored-state');
     const archiveTamperState = join(f.base, 'archive-tamper-state');
     const okfTamperState = join(f.base, 'okf-tamper-state');
+    const childTamperState = join(f.base, 'child-tamper-state');
     const disabledState = join(f.base, 'disabled-state');
+    const childDisabledState = join(f.base, 'child-disabled-state');
     const environment = {
       PATH: '/usr/bin:/bin',
       PYTHONPATH: join(registrarSource, 'src'),
@@ -102,12 +104,25 @@ test('ACTUAL Registrar: paired archive and root OKF graph replay preserves exact
         [
           '-B',
           '-c',
-          "import json,sqlite3,sys; db=sqlite3.connect(sys.argv[1]); print(json.dumps([db.execute('SELECT COUNT(*) FROM '+table).fetchone()[0] for table in ('archive_generations','revision_sets','graph_generations')]))",
+          "import json,sqlite3,sys; db=sqlite3.connect(sys.argv[1]); print(json.dumps([db.execute('SELECT COUNT(*) FROM '+table).fetchone()[0] for table in ('archive_generations','revision_sets','graph_generations','graph_record_identities','graph_retractions')]))",
           join(workspace, 'registry.sqlite3'),
         ],
         { env: environment, timeout: 60000 },
       );
       return JSON.parse(stdout) as number[];
+    }
+    async function graphLedger(workspace: string) {
+      const { stdout } = await exec(
+        python,
+        [
+          '-B',
+          '-c',
+          "import hashlib,json,sqlite3,sys; db=sqlite3.connect(sys.argv[1]); tables=('revision_sets','graph_generations','graph_record_identities','graph_retractions'); print(json.dumps({table:[(row[0],hashlib.sha256(row[1]).hexdigest()) if len(row)>1 else (row[0],) for row in db.execute('SELECT * FROM '+table+' ORDER BY id')] for table in tables}))",
+          join(workspace, 'registry.sqlite3'),
+        ],
+        { env: environment, timeout: 60000 },
+      );
+      return JSON.parse(stdout) as Record<string, unknown>;
     }
 
     const sharing = await command(sourceState, 'sources', [
@@ -120,17 +135,24 @@ test('ACTUAL Registrar: paired archive and root OKF graph replay preserves exact
     const initialSources = (await command(sourceState, 'sources', ['list']))
       .body['sources'];
     await Promise.all(
-      [restoredState, archiveTamperState, okfTamperState, disabledState].map(
-        backup,
-      ),
+      [
+        restoredState,
+        archiveTamperState,
+        okfTamperState,
+        childTamperState,
+        disabledState,
+        childDisabledState,
+      ].map(backup),
     );
     for (const workspace of [
       restoredState,
       archiveTamperState,
       okfTamperState,
+      childTamperState,
       disabledState,
+      childDisabledState,
     ]) {
-      assert.deepEqual(await counts(workspace), [0, 0, 0]);
+      assert.deepEqual(await counts(workspace), [0, 0, 0, 0, 0]);
       const listed = await command(workspace, 'sources', ['list']);
       assert.equal(
         canonical(listed.body['sources']),
@@ -201,7 +223,7 @@ test('ACTUAL Registrar: paired archive and root OKF graph replay preserves exact
           { source_id: f.source.id, generation, manifest_sha256: manifest },
         ],
       },
-      parent: null,
+      parent: null as string | null,
       nodes: [
         {
           id: ids.a,
@@ -277,6 +299,57 @@ test('ACTUAL Registrar: paired archive and root OKF graph replay preserves exact
     assert.equal(originalCheck.body['status'], 'verified');
     assert.equal(originalCheck.body['native_proof'], false);
 
+    const retired = await archive(sourceState, [
+      'graph-retract',
+      graphId,
+      ...graphScope,
+      '--assertion',
+      ids.link,
+    ]);
+    assert.equal(retired.code, 0);
+    assert.equal(retired.body['parent_graph_id'], graphId);
+    assert.deepEqual(retired.body['retracted_assertion_ids'], [ids.link]);
+    const childGraphId = String(retired.body['graph_id']);
+    assert.match(childGraphId, /^[a-f0-9]{64}$/);
+    assert.notEqual(childGraphId, graphId);
+    assert.equal(retired.body['revision_set_id'], revisionSetId);
+    const childGraph = structuredClone(graph);
+    childGraph.parent = graphId;
+    childGraph.assertions[0].lifecycle = 'retracted';
+    const originalChildRead = await archive(sourceState, [
+      'graph-read',
+      childGraphId,
+      ...graphScope,
+      '--limit',
+      '10',
+    ]);
+    assert.equal(originalChildRead.code, 0);
+    assert.equal(originalChildRead.body['revision_set_id'], revisionSetId);
+    assert.equal(
+      canonical(originalChildRead.body['records']),
+      canonical([...childGraph.nodes, ...childGraph.assertions]),
+    );
+    const originalChildProjection = await archive(sourceState, [
+      'graph-projection',
+      childGraphId,
+      ...graphScope,
+    ]);
+    assert.equal(originalChildProjection.code, 0);
+    const childProjectionPath = join(f.base, 'derived-child-projection.json');
+    await writeFile(
+      childProjectionPath,
+      canonical(originalChildProjection.body['projection']),
+    );
+    const originalChildCheck = await archive(sourceState, [
+      'graph-check',
+      childGraphId,
+      ...graphScope,
+      childProjectionPath,
+    ]);
+    assert.equal(originalChildCheck.body['status'], 'verified');
+    assert.equal(originalChildCheck.body['native_proof'], false);
+    assert.deepEqual(await counts(sourceState), [1, 1, 2, 3, 1]);
+
     const archivePackage = join(f.base, 'archive-package.json');
     const exportedArchive = await archive(sourceState, [
       'export',
@@ -319,6 +392,22 @@ test('ACTUAL Registrar: paired archive and root OKF graph replay preserves exact
     const okfPackage = join(f.base, 'root-graph.okf.json');
     await writeFile(okfPackage, canonical(exportedGraph.body));
     assert.notEqual(archivePackage, okfPackage);
+    const exportedChild = await archive(sourceState, [
+      'graph-export-okf',
+      childGraphId,
+      ...graphScope,
+    ]);
+    assert.equal(exportedChild.code, 0);
+    assert.equal(exportedChild.body['graph_id'], childGraphId);
+    assert.equal(exportedChild.body['revision_set_id'], revisionSetId);
+    assert.equal(canonical(exportedChild.body['graph']), canonical(childGraph));
+    assert.deepEqual(
+      Object.keys(exportedChild.body['files'] as object).sort(),
+      Object.keys(files).sort(),
+    );
+    const childOkfPackage = join(f.base, 'child-graph.okf.json');
+    await writeFile(childOkfPackage, canonical(exportedChild.body));
+    assert.notEqual(childOkfPackage, okfPackage);
 
     await refused(
       restoredState,
@@ -327,7 +416,7 @@ test('ACTUAL Registrar: paired archive and root OKF graph replay preserves exact
     );
     assert.deepEqual(
       await counts(restoredState),
-      [0, 0, 0],
+      [0, 0, 0, 0, 0],
       'Wrong-order graph import must not publish an invalid graph',
     );
     const importedArchive = await archive(restoredState, [
@@ -336,7 +425,17 @@ test('ACTUAL Registrar: paired archive and root OKF graph replay preserves exact
     ]);
     assert.equal(importedArchive.code, 0);
     assert.equal(importedArchive.body['imported_generations'], 1);
-    assert.deepEqual(await counts(restoredState), [1, 0, 0]);
+    assert.deepEqual(await counts(restoredState), [1, 0, 0, 0, 0]);
+    await refused(
+      restoredState,
+      ['graph-import-okf', childOkfPackage],
+      /unknown graph or RevisionSet/,
+    );
+    assert.deepEqual(
+      await counts(restoredState),
+      [1, 0, 0, 0, 0],
+      'Child before root must not publish a graph or retirement row',
+    );
     const importedGraph = await archive(restoredState, [
       'graph-import-okf',
       okfPackage,
@@ -344,7 +443,65 @@ test('ACTUAL Registrar: paired archive and root OKF graph replay preserves exact
     assert.equal(importedGraph.code, 0);
     assert.equal(importedGraph.body['graph_id'], graphId);
     assert.equal(importedGraph.body['revision_set_id'], revisionSetId);
-    assert.deepEqual(await counts(restoredState), [1, 1, 1]);
+    assert.deepEqual(await counts(restoredState), [1, 1, 1, 3, 0]);
+    const importedChild = await archive(restoredState, [
+      'graph-import-okf',
+      childOkfPackage,
+    ]);
+    assert.equal(importedChild.code, 0);
+    assert.equal(importedChild.body['graph_id'], childGraphId);
+    assert.equal(importedChild.body['revision_set_id'], revisionSetId);
+    assert.deepEqual(await counts(restoredState), [1, 1, 2, 3, 1]);
+    assert.equal(
+      canonical(await graphLedger(restoredState)),
+      canonical(await graphLedger(sourceState)),
+      'RevisionSet, both graph generations, record identities and retirement must match',
+    );
+    const restoredChildOkf = await archive(restoredState, [
+      'graph-export-okf',
+      childGraphId,
+      ...graphScope,
+    ]);
+    assert.equal(restoredChildOkf.code, 0);
+    assert.equal(
+      canonical(restoredChildOkf.body),
+      canonical(exportedChild.body),
+      'Child OKF must preserve exact parent pointer and lifecycle',
+    );
+    const replayedRoot = await archive(restoredState, [
+      'graph-import-okf',
+      okfPackage,
+    ]);
+    assert.equal(replayedRoot.code, 0);
+    assert.equal(replayedRoot.body['graph_id'], graphId);
+    assert.deepEqual(await counts(restoredState), [1, 1, 2, 3, 1]);
+    const ledgerAfterRootReplay = await graphLedger(restoredState);
+    assert.equal(
+      canonical(ledgerAfterRootReplay),
+      canonical(await graphLedger(sourceState)),
+      'Reimporting an immutable root may not erase a child retirement',
+    );
+    const resurrectionBatch = join(f.base, 'resurrection.json');
+    await writeFile(
+      resurrectionBatch,
+      canonical({
+        ...graph,
+        parent: graphId,
+        nodes: graph.nodes.map((node) =>
+          node.id === ids.a ? { ...node, label: 'new root child label' } : node,
+        ),
+      }),
+    );
+    await refused(
+      restoredState,
+      ['graph-publish', resurrectionBatch],
+      /retracted assertion ID cannot reactivate/,
+    );
+    assert.equal(
+      canonical(await graphLedger(restoredState)),
+      canonical(ledgerAfterRootReplay),
+      'Resurrection refusal must not publish any graph state',
+    );
     const inspected = await archive(restoredState, [
       'inspect',
       f.source.id,
@@ -412,6 +569,37 @@ test('ACTUAL Registrar: paired archive and root OKF graph replay preserves exact
     ]);
     assert.equal(restoredCheck.body['status'], 'verified');
     assert.equal(restoredCheck.body['native_proof'], false);
+    const restoredChildRead = await archive(restoredState, [
+      'graph-read',
+      childGraphId,
+      ...graphScope,
+      '--limit',
+      '10',
+    ]);
+    assert.equal(restoredChildRead.code, 0);
+    assert.equal(
+      canonical(restoredChildRead.body),
+      canonical(originalChildRead.body),
+      'Retracted child must remain an exact historical pinned graph',
+    );
+    const restoredChildProjection = await archive(restoredState, [
+      'graph-projection',
+      childGraphId,
+      ...graphScope,
+    ]);
+    assert.equal(restoredChildProjection.code, 0);
+    assert.equal(
+      canonical(restoredChildProjection.body),
+      canonical(originalChildProjection.body),
+    );
+    const restoredChildCheck = await archive(restoredState, [
+      'graph-check',
+      childGraphId,
+      ...graphScope,
+      childProjectionPath,
+    ]);
+    assert.equal(restoredChildCheck.body['status'], 'verified');
+    assert.equal(restoredChildCheck.body['native_proof'], false);
     for (const [path, bytes] of Object.entries(originals)) {
       const before = await archive(sourceState, readArgs(path));
       const after = await archive(restoredState, readArgs(path));
@@ -470,7 +658,7 @@ test('ACTUAL Registrar: paired archive and root OKF graph replay preserves exact
       ['import', badArchivePackage],
       /blob integrity mismatch/,
     );
-    assert.deepEqual(await counts(archiveTamperState), [0, 0, 0]);
+    assert.deepEqual(await counts(archiveTamperState), [0, 0, 0, 0, 0]);
 
     assert.equal(
       (await archive(okfTamperState, ['import', archivePackage])).body[
@@ -487,7 +675,30 @@ test('ACTUAL Registrar: paired archive and root OKF graph replay preserves exact
       ['graph-import-okf', badOkfPackage],
       /OKF profile mismatch/,
     );
-    assert.deepEqual(await counts(okfTamperState), [1, 0, 0]);
+    assert.deepEqual(await counts(okfTamperState), [1, 0, 0, 0, 0]);
+
+    assert.equal(
+      (await archive(childTamperState, ['import', archivePackage])).body[
+        'imported_generations'
+      ],
+      1,
+    );
+    assert.equal(
+      (await archive(childTamperState, ['graph-import-okf', okfPackage])).body[
+        'graph_id'
+      ],
+      graphId,
+    );
+    const tamperedChild = JSON.parse(await readFile(childOkfPackage, 'utf8'));
+    tamperedChild.files[`${ids.link}.md`] += '\nforged child';
+    const badChildPackage = join(f.base, 'tampered-child-graph.okf.json');
+    await writeFile(badChildPackage, canonical(tamperedChild));
+    await refused(
+      childTamperState,
+      ['graph-import-okf', badChildPackage],
+      /OKF profile mismatch/,
+    );
+    assert.deepEqual(await counts(childTamperState), [1, 1, 1, 3, 0]);
 
     assert.equal(
       (await archive(disabledState, ['import', archivePackage])).body[
@@ -505,7 +716,29 @@ test('ACTUAL Registrar: paired archive and root OKF graph replay preserves exact
       ['graph-import-okf', okfPackage],
       /source is disabled/,
     );
-    assert.deepEqual(await counts(disabledState), [1, 0, 0]);
+    assert.deepEqual(await counts(disabledState), [1, 0, 0, 0, 0]);
+    assert.equal(
+      (await archive(childDisabledState, ['import', archivePackage])).body[
+        'imported_generations'
+      ],
+      1,
+    );
+    assert.equal(
+      (await archive(childDisabledState, ['graph-import-okf', okfPackage]))
+        .body['graph_id'],
+      graphId,
+    );
+    const childDisabled = await command(childDisabledState, 'sources', [
+      'disable',
+      f.source.id,
+    ]);
+    assert.equal(childDisabled.body['enabled'], false);
+    await refused(
+      childDisabledState,
+      ['graph-import-okf', childOkfPackage],
+      /source is disabled/,
+    );
+    assert.deepEqual(await counts(childDisabledState), [1, 1, 1, 3, 0]);
     const restoredDisabled = await command(restoredState, 'sources', [
       'disable',
       f.source.id,

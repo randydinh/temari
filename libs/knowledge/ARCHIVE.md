@@ -286,11 +286,17 @@ read the exact graph ID and RevisionSet, and use `graph-check` on a derived
 projection. The OKF contains labels and anchor quotes, so protect it as source
 content. Keep both export packages outside the plugin and source roots.
 
-This exercise covers one root graph and one source only. The two exports are
-not atomic, and import does not provision registration or restore policy,
-erasure state, child graph lineage, retractions, or arbitrary derived views.
-It is not a production backup, disaster-recovery, RPO/RTO or semantic-graph
-correctness claim. Disabled registration still refuses graph access.
+The [ordered child replay fixture](../../docs/evidence/knowledge-system/graph-retraction-replay-2026-10-02.md)
+also exports a retracted child as a separate OKF package. After importing the
+archive and root, import the child to retain its parent pointer and retired
+assertion ID. Child-before-root and resurrection attempts refuse. Protect all
+three packages and import in that order.
+
+These exercises cover one source and at most one child. The exports are not
+atomic, and import does not provision registration or restore policy, erasure
+state, arbitrary graph history, or arbitrary derived views. They are not a
+production backup, disaster-recovery, RPO/RTO or semantic-graph correctness
+claim. Disabled registration still refuses graph access.
 
 ## Failures and trust boundary
 
