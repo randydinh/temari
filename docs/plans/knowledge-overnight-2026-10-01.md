@@ -1554,3 +1554,29 @@ evidence, confirmed four intended documentation/audit files and a strict
 six-field append, and found no private or raw source text in added bytes.
 The note keeps the trusted-prior, at-check and TOCTOU limits and all five
 finish predicates open. Publish after clean exact-head package/check.
+
+### 12:53 UTC morning audit hypothesis and selection
+
+Reconcile the append-only log against GitHub merged PRs, Git ancestry,
+reviewed trees for the latest changes and current artifacts. Preserve
+historical accounting gaps rather than rewriting rows. Read-only
+architect compared exact Registrar profile/atomic recovery, bounded PDF
+visual extraction and recurring graph/source evolution: each requires
+more than another narrow receipt and cannot credibly complete actual
+Registrar/Nx, independent review and PR before handoff. Stop new feature
+experiments, finish a source-linked morning audit and pause the heartbeat.
+Five broader production finish predicates remain open.
+
+### 12:57 UTC morning audit verification
+
+Keep the truthful source-linked handoff. GitHub reports all 59 in-scope
+Knowledge PRs #127–189 merged after excluding four unrelated PRs; all
+59 merge result commits are ancestors of audited main and reviewed/merged
+trees match for #184–189. The pre-reconciliation append-only log had
+238 six-field data rows and direct URLs for 37 of those PRs; 22 missing
+historical URL entries are explicitly listed in the handoff without
+rewriting old rows. All 24 local handoff links resolve. Independent
+read-only review found no remaining must-fix after correcting raw-log
+and clean-base wording. Keep all five production finish predicates open.
+Exact-head package/check and final audit PR remain before pausing the
+heartbeat.
