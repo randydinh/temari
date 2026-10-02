@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { lstat } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type {
@@ -32,6 +33,8 @@ export interface ArchiveIntakeOptions {
   readonly requestKey: string;
   /** Explicit on-device PNG OCR; omitted means Registrar's ordinary capture. */
   readonly ocrMode?: 'macos-vision';
+  /** Opt-in, local PDF worker profile. Registrar applies its own worker admission. */
+  readonly pdfWorkerProfilePath?: string;
   readonly limits?: {
     readonly entries?: number;
     readonly file_bytes?: number;
@@ -54,6 +57,8 @@ export interface ArchivePublication {
   readonly manifestSha256: string;
   readonly captureRequestKey: string;
   readonly captureFingerprint: string;
+  /** Raw profile bytes and its local path are never published. */
+  readonly pdfWorkerProfileSha256?: string;
   readonly preservation: 'complete-admitted' | 'incomplete';
   readonly counts: Record<string, number>;
   readonly capabilities: Record<string, unknown>;
@@ -138,6 +143,8 @@ export function validatePublication(
     'binding',
   ])
     digest(p[k]);
+  if (p['pdfWorkerProfileSha256'] !== undefined)
+    digest(p['pdfWorkerProfileSha256']);
   assert(/^temari-archive-v1:[a-f0-9]{64}$/.test(text(p['captureRequestKey'])));
   assert.equal(p['currentOriginal'], 'not-checked');
   assert(['complete-admitted', 'incomplete'].includes(text(p['preservation'])));
@@ -237,6 +244,11 @@ async function loadArchivePublicationChain(
         `Rebound ${key} changed`,
       );
     }
+    assert.equal(
+      value.pdfWorkerProfileSha256,
+      prior.pdfWorkerProfileSha256,
+      'Rebound PDF worker profile changed',
+    );
     for (const key of [
       'task',
       'source',
@@ -258,6 +270,11 @@ async function loadArchivePublicationChain(
         `Rebind audit ${key} changed`,
       );
     }
+    assert.equal(
+      audit['pdfWorkerProfileSha256'],
+      value.pdfWorkerProfileSha256,
+      'Rebind audit PDF worker profile changed',
+    );
     assert.equal(audit['priorImplementation'], prior.implementation);
     assert.equal(audit['priorProtocolSha256'], prior.protocolSha256);
     assert.equal(audit['currentOriginal'], 'not-checked');
@@ -288,6 +305,14 @@ async function loadArchivePublicationChain(
         canonical(binding[key]),
         canonical(fields[key]),
         `Original capture binding ${key} changed`,
+      );
+    if (value.pdfWorkerProfileSha256 === undefined)
+      assert.equal(binding['pdfWorkerProfile'], undefined);
+    else
+      assert.equal(
+        digest(object(binding['pdfWorkerProfile'])['sha256']),
+        value.pdfWorkerProfileSha256,
+        'Original PDF worker profile changed',
       );
   }
   return value;
@@ -435,6 +460,9 @@ export async function rebindArchivePublication(
     implementation: transport.implementation,
     protocolSha256: transport.protocolSha256,
     currentOriginal: 'not-checked',
+    ...(prior.pdfWorkerProfileSha256
+      ? { pdfWorkerProfileSha256: prior.pdfWorkerProfileSha256 }
+      : {}),
   };
   const publication: ArchivePublication = {
     ...prior,
@@ -482,6 +510,36 @@ export interface ArchiveIntakeOutcome {
   readonly attemptPath: string;
   readonly resultPath: string;
 }
+type PdfWorkerProfilePin = Readonly<{ path: string; sha256: string }>;
+
+/** Pin a small local JSON profile without following symlinks or retaining its bytes. */
+async function pinPdfWorkerProfile(path: string): Promise<PdfWorkerProfilePin> {
+  assert(
+    isAbsolute(path) && path.length <= 512 && !path.includes('\0'),
+    'Absolute bounded PDF worker profile path required',
+  );
+  const before = await lstat(path);
+  assert(before.isFile(), 'Regular PDF worker profile required');
+  assert.equal(
+    before.uid,
+    process.getuid?.(),
+    'PDF worker profile owner changed',
+  );
+  assert.equal(before.mode & 0o022, 0, 'Writable PDF worker profile refused');
+  const { value, bytes } = await readJsonWithBytes(path, 4096);
+  object(value);
+  const after = await lstat(path);
+  assert.equal(after.dev, before.dev, 'PDF worker profile changed');
+  assert.equal(after.ino, before.ino, 'PDF worker profile changed');
+  assert.equal(
+    after.mode,
+    before.mode,
+    'PDF worker profile permissions changed',
+  );
+  assert.equal(after.ctimeMs, before.ctimeMs, 'PDF worker profile changed');
+  assert.equal(after.size, bytes.length, 'PDF worker profile changed');
+  return { path, sha256: hash(bytes) };
+}
 /** Operator-only. Does not register, refresh, or copy any source bytes into Temari. */
 export async function captureArchive(
   options: ArchiveIntakeOptions,
@@ -494,6 +552,9 @@ export async function captureArchive(
   assert.equal(o.readScope, 'source-root');
   assert(/^[A-Za-z0-9_.:-]{1,128}$/.test(o.requestKey));
   assert(o.ocrMode === undefined || o.ocrMode === 'macos-vision');
+  const pdfWorkerProfile = o.pdfWorkerProfilePath
+    ? await pinPdfWorkerProfile(o.pdfWorkerProfilePath)
+    : undefined;
   const attempt = randomUUID(),
     attemptPath = join(o.task.directory, `archive-attempt-${attempt}.json`),
     resultPath = join(o.task.directory, `archive-result-${attempt}.json`);
@@ -507,7 +568,7 @@ export async function captureArchive(
   try {
     const transport = await archiveTransport(o.transport);
     const limits = {
-      entries: 1000,
+      entries: pdfWorkerProfile ? 32 : 1000,
       file_bytes: 8 * 1024 * 1024,
       total_bytes: 64 * 1024 * 1024,
       text_bytes: 8 * 1024 * 1024,
@@ -515,7 +576,7 @@ export async function captureArchive(
     };
     assert(Object.keys(limits).length === 4);
     for (const [key, max] of Object.entries({
-      entries: 1000,
+      entries: pdfWorkerProfile ? 32 : 1000,
       file_bytes: 8 * 1024 * 1024,
       total_bytes: 64 * 1024 * 1024,
       text_bytes: 8 * 1024 * 1024,
@@ -537,6 +598,7 @@ export async function captureArchive(
       protocolSha256: transport.protocolSha256,
       registration,
       ...(o.ocrMode ? { ocrMode: o.ocrMode } : {}),
+      ...(pdfWorkerProfile ? { pdfWorkerProfile } : {}),
     };
     await publishJson(
       join(o.task.directory, `archive-binding-${bindingId}.json`),
@@ -549,8 +611,28 @@ export async function captureArchive(
       '--limits',
       canonical(limits),
       ...(o.ocrMode ? ['--ocr-mode', o.ocrMode] : []),
+      ...(pdfWorkerProfile
+        ? [
+            '--pdf-worker-profile',
+            pdfWorkerProfile.path,
+            '--pdf-worker-profile-sha256',
+            pdfWorkerProfile.sha256,
+          ]
+        : []),
     ];
+    if (pdfWorkerProfile)
+      assert.deepEqual(
+        await pinPdfWorkerProfile(pdfWorkerProfile.path),
+        pdfWorkerProfile,
+        'PDF worker profile changed before capture',
+      );
     const r = await transport.invoke('capture', captureArgs);
+    if (pdfWorkerProfile)
+      assert.deepEqual(
+        await pinPdfWorkerProfile(pdfWorkerProfile.path),
+        pdfWorkerProfile,
+        'PDF worker profile changed during capture',
+      );
     assert.equal(r['status'], 'complete');
     assert.equal(r['source_id'], o.source.id);
     assert.equal(r['request_key'], captureRequestKey);
@@ -635,6 +717,9 @@ export async function captureArchive(
       ...pin,
       captureRequestKey,
       captureFingerprint: digest(r['request_fingerprint']),
+      ...(pdfWorkerProfile
+        ? { pdfWorkerProfileSha256: pdfWorkerProfile.sha256 }
+        : {}),
       preservation: r['preservation'] as ArchivePublication['preservation'],
       counts: object(r['counts']) as Record<string, number>,
       capabilities,

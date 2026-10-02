@@ -101,6 +101,27 @@ export async function archiveTransport(options: ArchiveTransportOptions) {
     args: string[],
     responseBytes = maxStdoutBytes,
   ): Promise<Record<string, unknown>> {
+    // The optional Lima profile admits at most 32 entries and 8 PDFs. Its
+    // capture deadline includes 40s/PDF, 10s/other entry, and 90s for setup.
+    // All other operations retain the ordinary 30-60s transport deadline.
+    const profileArg = args.indexOf('--pdf-worker-profile');
+    const pdfCapture = operation === 'capture' && profileArg !== -1;
+    let commandTimeoutMs = timeoutMs;
+    if (pdfCapture) {
+      assert(isAbsolute(text(args[profileArg + 1])));
+      const shaArg = args.indexOf('--pdf-worker-profile-sha256');
+      assert(shaArg !== -1, 'Bound PDF worker profile digest required');
+      assert(/^[a-f0-9]{64}$/.test(text(args[shaArg + 1])));
+      const limitsArg = args.indexOf('--limits');
+      assert(limitsArg !== -1, 'Bound capture limits required');
+      const entries = integer(
+        object(JSON.parse(text(args[limitsArg + 1])))['entries'],
+        1,
+        32,
+      );
+      commandTimeoutMs =
+        90_000 + 40_000 * Math.min(entries, 8) + 10_000 * entries;
+    }
     assert.equal(
       await implementationDigest(),
       implementation,
@@ -138,13 +159,15 @@ export async function archiveTransport(options: ArchiveTransportOptions) {
     ];
     const result = await new Promise<{ code: number; stdout: Buffer }>(
       (resolve, reject) => {
-        execFile(
+        let termTimer: NodeJS.Timeout | undefined;
+        let killTimer: NodeJS.Timeout | undefined;
+        const child = execFile(
           config.python,
           argv,
           {
             cwd: config.registrarSource,
-            timeout: timeoutMs,
-            killSignal: 'SIGKILL',
+            timeout: pdfCapture ? 0 : timeoutMs,
+            killSignal: pdfCapture ? 'SIGTERM' : 'SIGKILL',
             // The CLI emits one newline after its bounded JSON response.
             maxBuffer: Math.min(maxStdoutBytes + 1, responseBytes + 4096),
             encoding: 'buffer',
@@ -157,6 +180,8 @@ export async function archiveTransport(options: ArchiveTransportOptions) {
             },
           },
           (error, stdout) => {
+            if (termTimer) clearTimeout(termTimer);
+            if (killTimer) clearTimeout(killTimer);
             if (
               error &&
               (typeof error.code !== 'number' || ![0, 2].includes(error.code))
@@ -174,6 +199,13 @@ export async function archiveTransport(options: ArchiveTransportOptions) {
               });
           },
         );
+        if (pdfCapture) {
+          termTimer = setTimeout(() => child.kill('SIGTERM'), commandTimeoutMs);
+          killTimer = setTimeout(
+            () => child.kill('SIGKILL'),
+            commandTimeoutMs + 10_000,
+          );
+        }
       },
     );
     assert.equal(

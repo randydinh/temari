@@ -150,15 +150,18 @@ def _access(source, manifest=None):
     return config
 
 
-def _capture_policy():
+def _capture_policy(pdf_worker=None):
     from knowledge_agent import knowledge, macos_ocr, structure
-    return dict(POLICY, implementation_sha256=digest(canonical({
+    policy = dict(POLICY, implementation_sha256=digest(canonical({
         'knowledge': digest(Path(knowledge.__file__).read_bytes()),
         'structure': digest(Path(structure.__file__).read_bytes()),
         'worker': digest(Path(__file__).with_name('archive_worker.py').read_bytes()),
         'macos_ocr': digest(Path(macos_ocr.__file__).read_bytes()),
         'extractors': {key: knowledge._signature(value) for key, value in knowledge.DEFAULT_EXTRACTORS.items()},
     })))
+    if pdf_worker is not None:
+        policy['pdf_worker'] = pdf_worker.identity
+    return policy
 
 
 def _limits(limits):
@@ -296,17 +299,28 @@ def _receipt(manifest, replayed=False):
         evidence='archived-snapshot', current_original='not-checked'))
 
 
-def capture_source(registry, source_id, *, request_key, limits=None, ocr_mode='none'):
+def capture_source(registry, source_id, *, request_key, limits=None, ocr_mode='none',
+                   pdf_worker_profile=None, pdf_worker_profile_sha256=None):
     if not isinstance(request_key, str) or not re.fullmatch(r'[A-Za-z0-9_.:-]{1,128}', request_key):
         raise ValueError('request key requires 1–128 ASCII identity characters')
     if ocr_mode not in ('none', 'macos-vision'):
         raise ValueError('unsupported archive OCR mode')
+    if pdf_worker_profile_sha256 is not None and pdf_worker_profile is None:
+        raise ValueError('PDF profile digest requires a profile')
+    pdf_worker = None
+    if pdf_worker_profile is not None:
+        if ocr_mode != 'none':
+            raise ValueError('Lima PDF worker cannot be combined with OCR')
+        from knowledge_agent.pdf_lima_worker import LimaPdfWorker
+        pdf_worker = LimaPdfWorker.load(pdf_worker_profile, expected_sha256=pdf_worker_profile_sha256)
     limits = _limits(limits)
+    if pdf_worker is not None and limits['entries'] > 32:
+        raise ValueError('local PDF worker requires an entries limit of at most 32')
     with registry._writer(), registry._db() as db:
         source = registry._source(db, source_id)
         config = _access(source)
         binding = dict(configuration_sha256=digest(canonical(config)), limits=limits,
-                       policy=_capture_policy(), ocr_mode=ocr_mode)
+                       policy=_capture_policy(pdf_worker), ocr_mode=ocr_mode)
         fingerprint = digest(canonical(binding))
         old = db.execute('SELECT id,fingerprint FROM archive_generations WHERE source_id=? AND request_key=?',
                          (source_id, request_key)).fetchone()
@@ -318,6 +332,7 @@ def capture_source(registry, source_id, *, request_key, limits=None, ocr_mode='n
         generation = uuid.uuid4().hex
         membership = _enumerate(source, limits['entries'])
         documents, blobs, checks, total, text_total = [], {}, {}, 0, 0
+        pdf_attempts = 0
         for path, kind in membership:
             item = dict(path=path, observation=observed, status='excluded', reason=kind,
                         original=None, representation=None, gaps=[])
@@ -340,8 +355,14 @@ def capture_source(registry, source_id, *, request_key, limits=None, ocr_mode='n
                         remaining_text = DEFAULT_LIMITS['total_bytes'] - text_total
                         if remaining_text:
                             text_limit = min(limits['text_bytes'], remaining_text)
-                            extracted = (_extract(raw, path, text_limit, ocr_mode) if ocr_mode != 'none'
-                                         else _extract(raw, path, text_limit))
+                            if pdf_worker is not None and (raw.startswith(b'%PDF-') or Path(path).suffix.lower() == '.pdf'):
+                                pdf_attempts += 1
+                                extracted = (pdf_worker.extract(raw, path, text_limit) if pdf_attempts <= 8
+                                             else dict(status='limited', reason='pdf-worker-document-limit',
+                                                       gaps=['pdf-worker-document-limit']))
+                            else:
+                                extracted = (_extract(raw, path, text_limit, ocr_mode) if ocr_mode != 'none'
+                                             else _extract(raw, path, text_limit))
                         else:
                             extracted = dict(status='limited', reason='generation-text-byte-limit')
                         if extracted['status'] == 'captured':
@@ -432,6 +453,17 @@ def _validate_manifest(manifest, get_blob):
         raise ValueError('unsupported archive extraction policy')
     _required(manifest['policy'], 'name version timeout_seconds memory_bytes zip_members zip_expanded_bytes implementation_sha256', 'policy')
     _hash_id(manifest['policy']['implementation_sha256'])
+    if 'pdf_worker' in manifest['policy']:
+        worker = manifest['policy']['pdf_worker']
+        _required(worker, 'backend profile_sha256 limactl_sha256 guest_python_sha256 image_digest helper_sha256 '
+                  'bridge_sha256 worker_sha256 engine_sha256 cache_sha256 structure_sha256 pypdf_version', 'PDF worker')
+        if worker['backend'] != 'lima-cgroup-v2-v1' or worker['pypdf_version'] != '6.17.0':
+            raise ValueError('unsupported archive PDF worker')
+        for key in ('profile_sha256', 'limactl_sha256', 'guest_python_sha256', 'helper_sha256', 'bridge_sha256', 'worker_sha256',
+                    'engine_sha256', 'cache_sha256', 'structure_sha256'):
+            _hash_id(worker[key])
+        if not isinstance(worker['image_digest'], str) or not re.fullmatch('sha512:[0-9a-f]{128}', worker['image_digest']):
+            raise ValueError('invalid archive PDF image digest')
     for key in ('timeout_seconds', 'memory_bytes', 'zip_members', 'zip_expanded_bytes'):
         _integer(manifest['policy'][key], 1, POLICY[key], 'policy ' + key)
     _id(manifest['generation'])
