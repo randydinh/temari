@@ -14,10 +14,11 @@ export interface ArchiveRecoveryDependencyPlan {
 }
 
 export interface ArchiveRecoveryDependencyReceipt {
-  schema: 1;
+  schema: 2;
   kind: 'archive-recovery-dependency-plan';
   status: 'dependency-closed';
-  payloadIntegrity: 'not-validated';
+  payloadIntegrity: 'internal-hashes-verified';
+  profile: 'not-validated';
   admission: 'not-checked';
   atomicity: 'none';
   archive: {
@@ -62,6 +63,87 @@ function selection(value: unknown) {
 
 function selectionKey(item: ReturnType<typeof selection>): string {
   return `${item.sourceId}:${item.generation}:${item.manifestSha256}`;
+}
+
+function checkArchiveBlobs(archive: Record<string, unknown>): void {
+  const blobs = object(archive['blobs'], 'archive blobs');
+  const decodedBytes = new Map<string, number>();
+  for (const [key, encoded] of Object.entries(blobs)) {
+    hex(key, 64, 'archive blob hash');
+    if (
+      typeof encoded !== 'string' ||
+      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
+        encoded,
+      )
+    )
+      throw new Error('Invalid archive blob base64');
+    const raw = Buffer.from(encoded, 'base64');
+    if (raw.toString('base64') !== encoded)
+      throw new Error('Invalid archive blob base64');
+    if (hash(raw) !== key) throw new Error('Archive blob hash mismatch');
+    decodedBytes.set(key, raw.length);
+  }
+  const referenced = new Set<string>();
+  for (const envelopeValue of archive['generations'] as unknown[]) {
+    const manifest = object(
+      object(envelopeValue, 'archive envelope')['manifest'],
+      'archive manifest',
+    );
+    if (!Array.isArray(manifest['documents']))
+      throw new Error('Invalid archive document descriptors');
+    for (const value of manifest['documents']) {
+      const document = object(value, 'archive document');
+      if (
+        !Object.hasOwn(document, 'original') ||
+        !Object.hasOwn(document, 'representation')
+      )
+        throw new Error('Invalid archive document descriptors');
+      let originalSha: string | null = null;
+      for (const field of ['original', 'representation'] as const) {
+        if (document[field] === null) continue;
+        const descriptor = object(document[field], `archive ${field}`);
+        const sha = hex(descriptor['sha256'], 64, `archive ${field} hash`);
+        const length = descriptor['bytes'];
+        if (
+          typeof length !== 'number' ||
+          !Number.isSafeInteger(length) ||
+          length < 0
+        )
+          throw new Error('Invalid archive descriptor length');
+        const actualLength = decodedBytes.get(sha);
+        if (actualLength === undefined)
+          throw new Error('Archive descriptor blob missing');
+        if (actualLength !== length)
+          throw new Error('Archive descriptor length mismatch');
+        referenced.add(sha);
+        if (field === 'original') originalSha = sha;
+        else if (descriptor['original_sha256'] !== originalSha)
+          throw new Error('Archive representation original hash mismatch');
+      }
+    }
+  }
+  if (referenced.size !== decodedBytes.size)
+    throw new Error('Unreferenced archive blob');
+}
+
+function checkOkfFiles(envelope: Record<string, unknown>): void {
+  const files = object(envelope['files'], 'OKF files');
+  const fileHashes = object(envelope['file_sha256'], 'OKF file hashes');
+  const names = Object.keys(files);
+  if (
+    names.length !== Object.keys(fileHashes).length ||
+    names.some((name) => !Object.hasOwn(fileHashes, name))
+  )
+    throw new Error('OKF file hash keyset mismatch');
+  for (const name of names) {
+    const body = files[name];
+    const expected = hex(fileHashes[name], 64, 'OKF file hash');
+    if (
+      typeof body !== 'string' ||
+      hash(Buffer.from(body, 'utf8')) !== expected
+    )
+      throw new Error('OKF file hash mismatch');
+  }
 }
 
 async function packageJson(path: string, maxBytes: number) {
@@ -172,6 +254,7 @@ export async function planArchiveRecoveryDependencies(
     generationIds.size !== archiveSelections.length
   )
     throw new Error('Duplicate archive generation declaration');
+  checkArchiveBlobs(archive);
 
   const graphFiles = await Promise.all(
     request.graphPackagePaths.map((path) => packageJson(path, MAX_GRAPH_BYTES)),
@@ -197,6 +280,7 @@ export async function planArchiveRecoveryDependencies(
       revisionSet['selections'].length > 100
     )
       throw new Error('Unsupported graph package declaration');
+    checkOkfFiles(envelope);
     const selectors = revisionSet['selections'].map(selection);
     if (
       new Set(selectors.map((item) => item.sourceId)).size !==
@@ -261,10 +345,11 @@ export async function planArchiveRecoveryDependencies(
     }),
   );
   return {
-    schema: 1,
+    schema: 2,
     kind: 'archive-recovery-dependency-plan',
     status: 'dependency-closed',
-    payloadIntegrity: 'not-validated',
+    payloadIntegrity: 'internal-hashes-verified',
+    profile: 'not-validated',
     admission: 'not-checked',
     atomicity: 'none',
     archive: {

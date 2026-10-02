@@ -531,7 +531,7 @@ the existing original/ZIP bounds plus 1 MiB per XML part and 256 references,
 refuse tamper/revocation/malformed XML/duplicate IDs/unsafe targets, and pin
 the base media receipt. Do not retain XML, image bytes, alternate text or the
 recovered path in the receipt. Recheck admission, publication and original
-before publishing. Call these *declared main-document DrawingML references*;
+before publishing. Call these _declared main-document DrawingML references_;
 they do not prove Word displayed or interpreted an image. Headers, footers,
 VML, OCR, PDF assets, visual meaning, Windows and production losslessness stay
 open. Focused actual-Registrar and full Nx checks, independent review, clean
@@ -706,7 +706,7 @@ workspace and implementation, complete admitted publications, unchanged
 registration identities and exact unchanged-source pins. Recheck publication
 bytes, current registrations and diff receipt before publication. Cross-source
 relationships with an endpoint in changed/removed content must enter review;
-unchanged-source records may be only *candidate* repins, retractions stay
+unchanged-source records may be only _candidate_ repins, retractions stay
 historical, and added/changed paths enter discovery. Refuse wrong graph scope,
 tampered or changed unchanged-source pins, disabled registrations, ambiguous
 source selection and over-limit output. Keep single-source impact and existing
@@ -1436,4 +1436,39 @@ post-plan file-change limits, and all five broader production predicates.
 
 ### 12:07 UTC post-dependency handoff verification
 
-Keep the source-linked handoff. Independent read-only review matched #184's merged head and tree to the evidence, confirmed only the four intended documentation/audit files changed, and verified the audit remains a strict six-field append. The note preserves actual Registrar/Nx/package results, planner limits and all five open finish predicates. Publish this documentation increment after a clean exact-head package/check.
+Keep the source-linked handoff. Independent read-only review matched #184's
+merged head and tree to the evidence, confirmed only the four intended
+documentation/audit files changed, and verified the audit remains a strict
+six-field append. The note preserves actual Registrar/Nx/package results,
+planner limits and all five open finish predicates. Publish this documentation
+increment after a clean exact-head package/check.
+
+### 12:10 UTC recovery internal-hash hypothesis
+
+Read-only architect compared a bounded archive/OKF internal-hash preflight
+with PDF embedded-image inventory. The PDF path would require changing the
+hard-bounded Lima parser contract and could falsely infer absence from a token
+scan. Choose a narrow, read-only addition to the existing 8 MiB archive / four
+1 MiB OKF dependency planner: verify decoded archive blob hashes and
+descriptor references, and OKF file/hash keysets and UTF-8 bytes before any
+destination import. Version the receipt to distinguish internal-hash
+validation from declared-only closure. The actual Registrar fixture must show
+body/blob tampering now refuses before destination state, while a matching OKF
+body+hash with an invalid exact profile remains Registrar's responsibility. No
+host key, sharing, P-stack, package admission, atomicity or post-plan path
+binding claim. Five broader finish predicates remain open.
+
+### 12:23 UTC recovery internal-hash verification
+
+Keep the bounded schema 2 candidate. The original actual Registrar local-only
+archive/root/retracted-child plan and replay still pass. Changed archive blobs,
+malformed base64, missing/extra blob, descriptor size, and OKF body/hash or
+keyset mismatch now refuse before destination import; matching edited body and
+hash can pass the planner but Registrar rejects its exact profile. Focused 1/1,
+uncached Nx Knowledge integration 100/100, unit 43/43, daemonless typecheck
+and sync, scoped formatting and diff checks passed. The first full run omitted
+required Registrar environment and correctly refused; the corrected run passed.
+Independent candidate review found no must-fix. Keep only internal-hash and
+declared-dependency claims; profile/admission/atomicity, larger packages and
+later path bytes remain unvalidated. Exact-head package/check and PR remain.
+Five broader finish predicates remain open.

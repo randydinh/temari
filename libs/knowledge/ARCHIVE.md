@@ -304,11 +304,15 @@ Registrar exports are outside this plan's bounds (Registrar permits up to
 192 MiB for an archive bundle and 32 MiB for an OKF export); a refusal does
 not prove that such an export is invalid.
 
-The plan checks **declared dependencies**, not all package content, current
-registration or permission. It does not prevent an ancestor-directory
+The schema 2 plan checks declared dependencies and bounded **internal hashes**:
+archive blob bytes against their digests and descriptor lengths, and each OKF
+file's UTF-8 bytes against `file_sha256`. It can refuse these corrupt packages
+before any import. It does not validate the complete Registrar package profile,
+current registration or permission. It does not prevent an ancestor-directory
 symlink or file replacement after planning and does not make separate imports
 atomic. Registrar still decides whether each import is valid. See the
 [dependency-plan evidence](../../docs/evidence/knowledge-system/graph-recovery-dependency-plan-2026-10-02.md)
+and [internal-hash evidence](../../docs/evidence/knowledge-system/graph-recovery-internal-hashes-2026-10-02.md)
 for the tested scope.
 
 These exercises cover one source and at most one child. The exports are not
