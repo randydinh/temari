@@ -406,6 +406,7 @@ import './archive-graph-evaluation-gate.integration.test.js';
 import './archive-document-links.integration.test.js';
 import './archive-visible-image-inventory.integration.test.js';
 import './archive-docx-media-inventory.integration.test.js';
+import './archive-docx-drawing-refs.integration.test.js';
 import './archive-jobs.integration.test.js';
 import './archive-query-feedback.integration.test.js';
 import './archive-recovery.integration.test.js';

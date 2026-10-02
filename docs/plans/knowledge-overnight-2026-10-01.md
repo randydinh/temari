@@ -510,3 +510,39 @@ local-only recovery case passed 1/1 after the last parser and fixture edits.
 Independent read-only review found no remaining must-fix. The receipt only
 inventories DOCX package members; it cannot identify displayed images or
 their meaning. The exact-head package, PR and merge are still delivery gates.
+
+## 2026-10-02 04:52 UTC declared DOCX reference experiment
+
+PRs #154 and #155 merged, and the isolated worktree starts clean from their
+result at `739654e37efee845721011b7da51f5c034770cba`. The architect compared
+a DOCX main-document DrawingML relationship inventory with PDF embedded-asset
+inspection. DOCX can reuse the bounded pinned-media adapter without changing
+the P-stack or Registrar worker boundary; PDF would require changes to the
+pinned Lima guest, protocol and worker identity while the capability index is
+absent here. Select DOCX for this unit.
+
+The pass predicate is one actual `local-only` Registrar capture, deletion of
+the live DOCX, explicit recovery of the archived original, and a bounded
+metadata-only receipt that maps syntactic `<a:blip r:embed>` references inside
+`<w:drawing>` in `word/document.xml` through internal image relationships in
+`word/_rels/document.xml.rels` to previously inventoried `word/media/*` hashes.
+It must retain explicit gaps for unresolved or external references, enforce
+the existing original/ZIP bounds plus 1 MiB per XML part and 256 references,
+refuse tamper/revocation/malformed XML/duplicate IDs/unsafe targets, and pin
+the base media receipt. Do not retain XML, image bytes, alternate text or the
+recovered path in the receipt. Recheck admission, publication and original
+before publishing. Call these *declared main-document DrawingML references*;
+they do not prove Word displayed or interpreted an image. Headers, footers,
+VML, OCR, PDF assets, visual meaning, Windows and production losslessness stay
+open. Focused actual-Registrar and full Nx checks, independent review, clean
+package proof and a PR are required before keeping this increment.
+
+### 05:08 UTC reference checkpoint
+
+The final candidate passed actual-Registrar Knowledge integration 89/89,
+Knowledge unit tests 43/43, typecheck and Nx sync:check. The included actual
+`local-only` fixture deletes its live DOCX, explicitly recovers the original,
+maps repeated main-document references to pinned media and records gaps. The
+independent read-only reviewer found no remaining must-fix after target
+validation and bounded hash repairs. The receipt still claims declared syntax
+only. Clean canonical package, exact-head review and PR delivery remain.
