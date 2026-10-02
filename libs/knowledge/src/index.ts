@@ -22,4 +22,5 @@ export * from './lib/archive-graph-repin.js';
 export * from './lib/archive-graph-republish.js';
 export * from './lib/archive-graph-handoff.js';
 export * from './lib/archive-currentness.js';
+export * from './lib/archive-freshness-job.js';
 export * from './lib/archive-source-lifecycle.js';
