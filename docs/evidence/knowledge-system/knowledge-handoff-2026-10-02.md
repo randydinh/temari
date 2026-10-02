@@ -455,3 +455,33 @@ were sequential with new source/generation identities, so these observations
 are not an SLO, a pure hash-cost estimate, or an answer-quality decision. No
 hosted Jev call or key read occurred. All five broader finish predicates
 above remain open.
+
+## 12:03 UTC read-only recovery dependency continuation
+
+GitHub reports [#184](https://github.com/randydinh/temari/pull/184) merged at
+`617a0cc4641d87361f1785dac1b03b109dd9eb94` after independent exact-head
+review of clean commit `5bf6f4057fba3febafe871883efeedc55ac11778`.
+The reviewed and merged trees match. Focused actual Registrar recovery passed
+1/1, uncached Nx Knowledge integration 100/100, unit tests 43/43, daemonless
+typecheck and sync, scoped format and diff checks passed. The exact-head
+public-entry package/check reported `dirty:false`; relocated stock Node
+Knowledge CLI help and packaged Knowledge export loaded. GitHub listed no
+branch checks. Local merge cleanup met the occupied `main` worktree; remote
+state and tree confirm the merge.
+
+The [dependency-plan note](graph-recovery-dependency-plan-2026-10-02.md)
+describes a read-only, metadata-only check of one small archive bundle and up
+to four small OKF packages. It verifies declared source/generation/manifest
+closure, unique graph IDs, one root and root-first parent order, then returns
+package hashes. The existing synthetic `local-only` archive/root/retracted
+child fixture planned shuffled packages and used that order for actual
+Registrar replay. Missing or mismatched selectors, orphan/duplicate/cyclic
+graphs, over-budget packages and a final-component symlink refused before
+destination mutation. Tampered OKF content can pass this plan but Registrar
+import refuses it. The planner does not validate all payloads or current
+admission, or bind later path bytes to the receipt. Its 8 MiB archive and
+1 MiB OKF caps exclude valid larger Registrar exports; ancestor symlinks and
+atomicity are outside scope. No hosted Jev call or key read occurred. This
+does not establish production backup, erasure, RPO/RTO, semantic quality,
+Windows operation or a lossless system. All five broader finish predicates
+above remain open.

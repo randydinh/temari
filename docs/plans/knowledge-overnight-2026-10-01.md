@@ -1415,3 +1415,25 @@ found no must-fix after testing every selector and narrowing the symlink and
 post-plan file-change claims. Clean exact-head package/check and PR remain.
 This is not an atomic or production recovery proof; five broader finish
 predicates remain open.
+
+### 12:03 UTC recovery dependency delivery
+
+Independent exact-head review accepted clean commit
+`5bf6f4057fba3febafe871883efeedc55ac11778`. The public-entry
+package/check reported this revision with `dirty:false`; relocated stock
+Node Knowledge CLI help and packaged export loaded. GitHub reports
+[#184](https://github.com/randydinh/temari/pull/184) merged at
+`617a0cc4641d87361f1785dac1b03b109dd9eb94`, with the reviewed tree.
+Keep declared dependency closure only; production recovery and five broader
+finish predicates remain open.
+
+### 12:04 UTC post-dependency handoff hypothesis
+
+Reconcile #184 in the Knowledge handoff and update the evidence note from
+pending to delivered. Preserve exact actual Registrar/Nx/package results,
+metadata-only scope, partial package bounds, final-component symlink and
+post-plan file-change limits, and all five broader production predicates.
+
+### 12:07 UTC post-dependency handoff verification
+
+Keep the source-linked handoff. Independent read-only review matched #184's merged head and tree to the evidence, confirmed only the four intended documentation/audit files changed, and verified the audit remains a strict six-field append. The note preserves actual Registrar/Nx/package results, planner limits and all five open finish predicates. Publish this documentation increment after a clean exact-head package/check.
