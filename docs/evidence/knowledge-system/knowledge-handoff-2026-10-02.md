@@ -148,3 +148,24 @@ header/footer parts. The fixture used a `local-only` source and made no
 TypeSafe call. This does not determine which header or footer Word renders on
 a page, image meaning or full DOCX visual coverage. The five broader finish
 predicates remain open.
+
+## 06:07 UTC Markdown reference-image continuation
+
+GitHub reports [#160](https://github.com/randydinh/temari/pull/160) merged at
+`358d8e9f6fa746620bef51db425654f1ed9aa564` after independent exact-head
+review of clean commit `d3df7cd0886bbf470874c3b8fa3af82c0c424118`.
+The reviewed and merged trees match. Final actual-Registrar Knowledge
+integration passed 92/92, unit tests 43/43, uncached typecheck and Nx sync
+passed. Canonical package/check reported the reviewed head with `dirty:false`,
+and a stock Node import of its public export succeeded. GitHub listed no
+branch checks. The local merge command hit the occupied `main` worktree during
+cleanup; the remote PR state confirms the merge.
+
+The [simple reference-image receipt](reference-image-inventory-2026-10-02.md)
+resolves bounded full and collapsed Markdown image references through simple
+single-line definitions to pinned archived assets, while recording explicit
+gaps. Its actual `local-only` Registrar fixture deleted the live originals
+before archive reads and made no TypeSafe call. Conservative parsing does not
+cover all CommonMark or Markdown dialects, HTML images, rendering, visual
+meaning or continuous freshness. The five broader finish predicates above
+remain open.
