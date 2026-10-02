@@ -40,6 +40,14 @@ export interface ArchiveRecoveryDependencyReceipt {
   importOrder: Array<{ kind: 'archive' | 'graph'; sha256: string }>;
 }
 
+export interface ArchiveRecoveryDependencyRecheckReceipt {
+  schema: 1;
+  kind: 'archive-recovery-dependency-recheck';
+  status: 'unchanged-at-check';
+  planSha256: string;
+  importOrder: Array<{ kind: 'archive' | 'graph'; sha256: string }>;
+}
+
 function object(value: unknown, label: string): Record<string, unknown> {
   if (value === null || typeof value !== 'object' || Array.isArray(value))
     throw new Error(`Invalid ${label} declaration`);
@@ -63,6 +71,110 @@ function selection(value: unknown) {
 
 function selectionKey(item: ReturnType<typeof selection>): string {
   return `${item.sourceId}:${item.generation}:${item.manifestSha256}`;
+}
+
+function exactRecord(
+  value: unknown,
+  keys: readonly string[],
+  label: string,
+): Record<string, unknown> {
+  const record = object(value, label);
+  if (
+    Object.keys(record).length !== keys.length ||
+    keys.some((key) => !Object.hasOwn(record, key))
+  )
+    throw new Error(`Invalid ${label} shape`);
+  return record;
+}
+
+function boundedInteger(value: unknown, max: number, label: string): number {
+  if (
+    typeof value !== 'number' ||
+    !Number.isSafeInteger(value) ||
+    value < 1 ||
+    value > max
+  )
+    throw new Error(`Invalid ${label}`);
+  return value;
+}
+
+function expectedReceipt(value: unknown): ArchiveRecoveryDependencyReceipt {
+  const receipt = exactRecord(
+    value,
+    [
+      'schema',
+      'kind',
+      'status',
+      'payloadIntegrity',
+      'profile',
+      'admission',
+      'atomicity',
+      'archive',
+      'graphs',
+      'importOrder',
+    ],
+    'trusted recovery receipt',
+  );
+  if (
+    receipt['schema'] !== 2 ||
+    receipt['kind'] !== 'archive-recovery-dependency-plan' ||
+    receipt['status'] !== 'dependency-closed' ||
+    receipt['payloadIntegrity'] !== 'internal-hashes-verified' ||
+    receipt['profile'] !== 'not-validated' ||
+    receipt['admission'] !== 'not-checked' ||
+    receipt['atomicity'] !== 'none'
+  )
+    throw new Error('Invalid trusted recovery receipt version or claim');
+  const archive = exactRecord(
+    receipt['archive'],
+    ['sha256', 'bytes', 'selections'],
+    'trusted archive receipt',
+  );
+  hex(archive['sha256'], 64, 'trusted archive package hash');
+  boundedInteger(archive['bytes'], MAX_ARCHIVE_BYTES, 'trusted archive bytes');
+  const selections = archive['selections'];
+  if (
+    !Array.isArray(selections) ||
+    selections.length < 1 ||
+    selections.length > 100
+  )
+    throw new Error('Invalid trusted archive selections');
+  for (const value of selections) {
+    const item = exactRecord(
+      value,
+      ['sourceId', 'generation', 'manifestSha256'],
+      'trusted archive selection',
+    );
+    hex(item['sourceId'], 32, 'trusted source ID');
+    hex(item['generation'], 32, 'trusted generation');
+    hex(item['manifestSha256'], 64, 'trusted manifest hash');
+  }
+  const graphs = receipt['graphs'];
+  if (!Array.isArray(graphs) || graphs.length < 1 || graphs.length > 4)
+    throw new Error('Invalid trusted graph receipts');
+  for (const value of graphs) {
+    const graph = exactRecord(
+      value,
+      ['sha256', 'bytes', 'graphId', 'revisionSetId', 'parentGraphId'],
+      'trusted graph receipt',
+    );
+    hex(graph['sha256'], 64, 'trusted graph package hash');
+    boundedInteger(graph['bytes'], MAX_GRAPH_BYTES, 'trusted graph bytes');
+    hex(graph['graphId'], 64, 'trusted graph ID');
+    hex(graph['revisionSetId'], 64, 'trusted RevisionSet ID');
+    if (graph['parentGraphId'] !== null)
+      hex(graph['parentGraphId'], 64, 'trusted parent graph ID');
+  }
+  const order = receipt['importOrder'];
+  if (!Array.isArray(order) || order.length !== graphs.length + 1)
+    throw new Error('Invalid trusted import order');
+  for (const [index, value] of order.entries()) {
+    const item = exactRecord(value, ['kind', 'sha256'], 'trusted import step');
+    if (item['kind'] !== (index === 0 ? 'archive' : 'graph'))
+      throw new Error('Invalid trusted import step kind');
+    hex(item['sha256'], 64, 'trusted import package hash');
+  }
+  return receipt as unknown as ArchiveRecoveryDependencyReceipt;
 }
 
 function checkArchiveBlobs(archive: Record<string, unknown>): void {
@@ -367,5 +479,29 @@ export async function planArchiveRecoveryDependencies(
         sha256: graph.sha256,
       })),
     ],
+  };
+}
+
+/**
+ * Compare bounded package reads with a receipt independently pinned by the caller.
+ * The result observes bytes only at check time; it is no import lock, profile
+ * validation, admission check, or atomicity guarantee.
+ */
+export async function recheckArchiveRecoveryDependencies(
+  request: ArchiveRecoveryDependencyPlan,
+  trustedExpected: unknown,
+): Promise<ArchiveRecoveryDependencyRecheckReceipt> {
+  const expected = expectedReceipt(trustedExpected);
+  const expectedBytes = canonical(expected);
+  const current = await planArchiveRecoveryDependencies(request);
+  const currentBytes = canonical(current);
+  if (expectedBytes !== currentBytes)
+    throw new Error('Recovery packages changed since trusted plan');
+  return {
+    schema: 1,
+    kind: 'archive-recovery-dependency-recheck',
+    status: 'unchanged-at-check',
+    planSha256: hash(currentBytes),
+    importOrder: current.importOrder,
   };
 }
