@@ -15,6 +15,10 @@
       {
         "commit": "ceee15d7f89404ca003121d083a64b487085fe2c",
         "description": "Bounded audit snapshots and paging with audit-snapshot tests"
+      },
+      {
+        "commit": "59e156c5037331489ccf29b0ab24df8c84b2167c",
+        "description": "Opt-in bounded local PDF capture and tests"
       }
     ]
   },
@@ -33,7 +37,7 @@
     },
     {
       "path": "src/knowledge_agent/archive_cli.py",
-      "sha256": "543dc266c613baf8af5758b330a59bf17c50542cabaac563d321f1a88873701f"
+      "sha256": "c879b0890e0099edfd6804155c024fcc6da8b64730d50489b3b9c0555c2f2449"
     },
     {
       "path": "src/knowledge_agent/archive_worker.py",
@@ -88,6 +92,14 @@
       "sha256": "1336d00af7d373be1391b2ff71b5908593820eae27fac894b5a1f4fac5920612"
     },
     {
+      "path": "src/knowledge_agent/pdf_lima_guest.py",
+      "sha256": "5d598195f87dfa353acf7e9f987aeca7daa2921f3cb260d4bf12f26234890be8"
+    },
+    {
+      "path": "src/knowledge_agent/pdf_lima_worker.py",
+      "sha256": "6b5c54a2f08ba95da5e461c656c7a8a91114aa2c8e69c3815de45226a0e0dc8a"
+    },
+    {
       "path": "src/knowledge_agent/provider_worker.py",
       "sha256": "ac422a80ef007921d30dc50aaba63ff62ff82959eb14f1d7a810eeb27f522594"
     },
@@ -113,7 +125,7 @@
     },
     {
       "path": "src/knowledge_agent/source_archive.py",
-      "sha256": "babaf656ad8a49a804ece1f7fb94071ac73cf7e835d09ae0fbd7b066d0a0c823"
+      "sha256": "bd12ded293c2e7f99d9a8b82a0666181f28e2ebfbcb00c6173786233b47f910f"
     },
     {
       "path": "src/knowledge_agent/source_registry.py",
@@ -130,6 +142,10 @@
     {
       "path": "tests/test_audit_snapshots.py",
       "sha256": "c3e21f30a6d792840fc354c8255b51aff6e09bc6fbf80fe34900834355db3155"
+    },
+    {
+      "path": "tests/test_pdf_lima_worker.py",
+      "sha256": "1bc750cbd0cd3a3dfe65f939c25d3bc58eab14f6ab5c3eb6610dff834a52d434"
     },
     {
       "path": "tests/test_source_archive.py",
