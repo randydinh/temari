@@ -462,3 +462,51 @@ only the fresh v2 root, so no changed-content recovery success is claimed.
 The overnight run produced verified local increments but has not established
 a production lossless knowledge system. The heartbeat should be paused after
 this audit is persisted and merged.
+
+## 2026-10-02 04:23 UTC Poteto overnight continuation
+
+The user restarted the overnight playbook. The clean isolated worktree starts
+from merged main `fd55dd53e5429c1538c41b839e87fd0a7d41b7b4`; the conflicted
+primary checkout remains outside this run. The current handoff is
+`docs/evidence/knowledge-system/knowledge-handoff-2026-10-02.md`. The
+Graphify snapshot is absent in this checkout, so source selection uses that
+handoff and bounded direct inspection with the coverage gap recorded.
+
+The first new unit is a **Knowledge-only DOCX package-media inventory**. A
+read-only architect compared a new Registrar embedded-asset command with an
+adapter that accepts an explicitly recovered DOCX original. The latter avoids
+changing the bundled execution boundary while its required P-stack capability
+index is absent from this checkout. It also avoids treating PDF XObjects as a
+solved visual-meaning problem.
+
+This unit passes only if an actual local-only Registrar capture and explicit
+recovery yields a pinned DOCX whose retained original hash and byte count
+match the supplied recovered file; a bounded parser inventories `word/media/*`
+members with names, hashes and byte counts but no media bytes or recovered
+path in its receipt; source registration and publication pins are rechecked;
+tampered bytes, revoked registration, duplicate/malformed ZIP members and
+expansion-limit cases refuse. The receipt must label coverage as package media
+only and visual meaning as unevaluated. Focused and full actual-Registrar/Nx
+checks, independent exact-head review, clean package proof and a reviewable PR
+are required before keeping it. A failure is isolated or reverted with a
+decision-log row. This does not close OCR, images displayed by document XML,
+PDF embedded assets, visual meaning, Windows or production losslessness.
+
+For each later unit, check the unchanged broader finish predicate in the
+handoff, make one justified change, verify against real artifacts, and append
+the six-field hypothesis/verdict trail. The reactivated same-chat heartbeat
+will audit actual PRs and artifacts before morning handoff, then pause itself.
+The user's standing commit/push/merge instruction covers verified reviewable
+increments; do not wake them for routine permission. If repeated attempts hit
+the same genuine external blocker, stop that branch of work and record the
+evidence and next required input. Elapsed time alone never changes a failed
+finish predicate to a pass.
+
+### 04:39 UTC first-unit verification
+
+The final source passed the actual-Registrar Knowledge integration suite
+88/88, Knowledge unit tests 43/43, Nx typecheck and sync:check. The focused
+local-only recovery case passed 1/1 after the last parser and fixture edits.
+Independent read-only review found no remaining must-fix. The receipt only
+inventories DOCX package members; it cannot identify displayed images or
+their meaning. The exact-head package, PR and merge are still delivery gates.
