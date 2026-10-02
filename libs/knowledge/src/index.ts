@@ -18,6 +18,11 @@ export type {
   ArchiveDocxMediaInventoryPlan,
   ArchiveDocxMediaInventoryReceipt,
 } from './lib/archive-docx-media-inventory.js';
+export { inventoryArchiveDocxDrawingRefs } from './lib/archive-docx-drawing-refs.js';
+export type {
+  ArchiveDocxDrawingRefsPlan,
+  ArchiveDocxDrawingRefsReceipt,
+} from './lib/archive-docx-drawing-refs.js';
 export * from './lib/archive-jobs.js';
 export * from './lib/archive-query-feedback.js';
 export * from './lib/archive-graph-reviewed-change.js';
