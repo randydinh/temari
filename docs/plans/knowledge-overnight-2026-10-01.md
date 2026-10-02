@@ -1155,3 +1155,42 @@ match verified receipts. Only plan, handoff and audit files changed; the
 audit remains six-field append-only and added text contains no private path
 or raw content. Keep the narrow source-linked recovery handoff with all five
 broader production finish predicates open.
+
+## 2026-10-02 10:12 UTC child-graph retraction replay experiment
+
+PRs #176 and #177 are merged; this clean isolated branch starts from
+`2abbf04df6e6d7bd328632dc35b7966073ccc777`. A read-only architect
+compared (A) one root-plus-child lineage and retraction replay through the
+actual Registrar with (B) fixed-source BM25 cost decomposition. B would
+inform caching but remain observational; A checks a concrete gap left by the
+root-only recovery proof. Select A without changing Registrar protocol,
+P-stack execution boundaries or hosted model.
+
+Pass only if a synthetic `local-only` source has one retained archive, a root
+graph and a child that retracts one relationship. Export root and child OKF
+separately. In a fresh pre-provisioned destination, importing child before
+root must refuse without graph/retraction rows; importing archive then root
+then child must reconstruct both exact graph IDs, RevisionSet, parent pointer,
+record identities, retraction state and checked derived projections after live
+original edits/deletion. Reimporting root must not erase child retirement;
+resurrecting the retired assertion ID must refuse. Tampered child package and
+disabled access must refuse. Keep raw packages off-repository and clean them
+in `finally`; run actual Registrar focused and full Nx checks, independent
+review, clean exact-head package and PR. This proves one ordered lineage only,
+not arbitrary graph history, atomic backup, policy/erasure restore, RPO/RTO,
+Windows, semantic quality or production losslessness. The five broader
+production finish predicates remain open.
+
+### 10:26 UTC child replay verification
+
+Keep the scoped synthetic lineage proof. The final actual Registrar root and
+child case passed in uncached Nx Knowledge integration 100/100. Unit tests
+passed 43/43; typecheck, daemonless sync, scoped formatting and diff checks
+passed. The fixture compares stored source and destination lineage/retraction
+ledgers, exact child OKF and checked projections after live edits/deletion;
+child-before-root, tampered child, disabled source and assertion resurrection
+refuse without extra published graph state. All raw packages are cleaned in
+`finally`. Independent read-only review found no must-fix, while noting it
+did not rerun the checks. Clean commit, exact-head package/check and PR
+remain. General history, atomic/production recovery and all five broader
+production finish predicates remain open.
