@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { lstat } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join } from 'node:path';
-import { canonical, digest, hash, object, text } from './codec.js';
+import { canonical, digest, hash, integer, object, text } from './codec.js';
 import {
   captureArchive,
   loadArchivePublication,
@@ -34,6 +34,15 @@ export interface ArchiveSourceRecaptureInput {
 export interface ArchiveSourceResumeInput {
   readonly beforePublicationPath: string;
   readonly resultPath: string;
+  readonly beforeGraphId?: string;
+}
+
+export interface ArchiveSourceAttemptRecoveryInput {
+  readonly beforePublicationPath: string;
+  readonly beforePublicationSha256: string;
+  readonly committedPublicationSha256: string;
+  readonly attemptPath: string;
+  readonly attemptSha256: string;
   readonly beforeGraphId?: string;
 }
 
@@ -81,6 +90,11 @@ export interface ArchiveSourceResumeOutcome {
   readonly capture: ArchiveIntakeOutcome;
   readonly receiptPath: string;
   readonly receipt: ArchiveSourceResumeReceipt;
+}
+
+export interface ArchiveSourceAttemptRecoveryOutcome extends ArchiveSourceResumeOutcome {
+  readonly recovery: 'existing-result' | 'reconstructed-result';
+  readonly originalAttemptPath: string;
 }
 
 export type ArchiveSourceRecaptureOutcome =
@@ -590,6 +604,289 @@ export async function resumeArchiveSourceHandoff(
       captureBindingSha256: bindingArtifact.sha256,
     },
   });
+}
+
+/**
+ * Reconcile one caller-pinned original attempt only when its original,
+ * complete Temari publication already exists and Registrar verifies its
+ * generation, manifest and counts. Gap/capability metadata is caller-pinned
+ * local publication metadata, not independently rederived from Registrar.
+ * A missing publication is unknown and never triggers a capture probe.
+ * This does not cover crashes before publication or make handoff atomic.
+ */
+export async function recoverArchiveSourceAttempt(
+  input: ArchiveSourceAttemptRecoveryInput,
+): Promise<ArchiveSourceAttemptRecoveryOutcome> {
+  assert.deepEqual(
+    Object.keys(input).sort(),
+    (input.beforeGraphId === undefined
+      ? [
+          'beforePublicationPath',
+          'beforePublicationSha256',
+          'committedPublicationSha256',
+          'attemptPath',
+          'attemptSha256',
+        ]
+      : [
+          'beforePublicationPath',
+          'beforePublicationSha256',
+          'committedPublicationSha256',
+          'attemptPath',
+          'attemptSha256',
+          'beforeGraphId',
+        ]
+    ).sort(),
+  );
+  digest(input.beforePublicationSha256);
+  digest(input.committedPublicationSha256);
+  digest(input.attemptSha256);
+  if (input.beforeGraphId !== undefined) digest(input.beforeGraphId);
+  assert(
+    isAbsolute(input.attemptPath),
+    'Absolute capture attempt path required',
+  );
+  const attemptId =
+    /^archive-attempt-([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.json$/.exec(
+      basename(input.attemptPath),
+    );
+  assert(attemptId, 'Canonical capture attempt name required');
+  const attemptArtifact = await exactArtifact(input.attemptPath);
+  assert.equal(
+    attemptArtifact.sha256,
+    input.attemptSha256,
+    'Pinned original capture attempt changed',
+  );
+  const attempt = object(attemptArtifact.value);
+  assert.deepEqual(
+    Object.keys(attempt).sort(),
+    ['schema', 'kind', 'options', 'state'].sort(),
+    'Unexpected capture attempt shape',
+  );
+  assert.equal(attempt['schema'], 1);
+  assert.equal(attempt['kind'], 'temari-archive-attempt');
+  assert.equal(attempt['state'], 'started');
+  const after = object(attempt['options']) as unknown as ArchiveIntakeOptions;
+  assert.deepEqual(
+    Object.keys(after).sort(),
+    [
+      'task',
+      'source',
+      'readScope',
+      'transport',
+      'requestKey',
+      ...(after.ocrMode === undefined ? [] : ['ocrMode']),
+      ...(after.limits === undefined ? [] : ['limits']),
+    ].sort(),
+    'Unsupported recovery attempt options; PDF worker attempts require separate handling',
+  );
+  assert.equal(after.task.directory, dirname(input.attemptPath));
+  const beforeArtifact = await exactPublication(input.beforePublicationPath);
+  assert.equal(
+    beforeArtifact.pin.publicationSha256,
+    input.beforePublicationSha256,
+    'Pinned prior publication changed',
+  );
+  const selected = await validateSelection(
+    input.beforePublicationPath,
+    after,
+    input.beforeGraphId,
+    false,
+  );
+  const { before, transport, captureRequestKey, binding } = selected;
+  const limits = {
+    entries: 1000,
+    file_bytes: 8 * 1024 * 1024,
+    total_bytes: 64 * 1024 * 1024,
+    text_bytes: 8 * 1024 * 1024,
+    ...after.limits,
+  };
+  assert.deepEqual(
+    Object.keys(limits).sort(),
+    ['entries', 'file_bytes', 'total_bytes', 'text_bytes'].sort(),
+  );
+  for (const [key, max] of Object.entries({
+    entries: 1000,
+    file_bytes: 8 * 1024 * 1024,
+    total_bytes: 64 * 1024 * 1024,
+    text_bytes: 8 * 1024 * 1024,
+  }))
+    integer(limits[key as keyof typeof limits], 1, max);
+  const expectedBinding = {
+    schema: 1,
+    task: after.task,
+    source: after.source,
+    readScope: after.readScope,
+    limits,
+    captureRequestKey,
+    transport: transport.config,
+    implementation: transport.implementation,
+    protocolSha256: transport.protocolSha256,
+    registration: before.registration,
+    ...(after.ocrMode ? { ocrMode: after.ocrMode } : {}),
+  };
+  const bindingArtifact = await exactArtifact(
+    join(after.task.directory, `archive-binding-${binding}.json`),
+  );
+  assert.equal(
+    canonical(bindingArtifact.value),
+    canonical(expectedBinding),
+    'Persisted capture binding settings changed',
+  );
+  const committedPath = join(
+    after.task.directory,
+    `archive-publication-${binding}.json`,
+  );
+  let committedRaw: Awaited<ReturnType<typeof exactArtifact>>;
+  try {
+    committedRaw = await exactArtifact(committedPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT')
+      throw new Error(
+        'Original complete publication missing; recovery requires review',
+      );
+    throw error;
+  }
+  assert.equal(
+    committedRaw.sha256,
+    input.committedPublicationSha256,
+    'Pinned committed publication changed',
+  );
+  const siblingResultPath = join(
+    after.task.directory,
+    `archive-result-${attemptId[1]}.json`,
+  );
+  let sibling: Awaited<ReturnType<typeof exactArtifact>> | null = null;
+  try {
+    sibling = await exactArtifact(siblingResultPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+  if (sibling) {
+    const status = object(sibling.value)['status'];
+    assert.equal(status, 'published', 'Existing capture result needs review');
+    const resumed = await resumeArchiveSourceHandoff({
+      beforePublicationPath: input.beforePublicationPath,
+      resultPath: siblingResultPath,
+      ...(input.beforeGraphId ? { beforeGraphId: input.beforeGraphId } : {}),
+    });
+    assert.equal(
+      (await exactArtifact(input.attemptPath)).sha256,
+      input.attemptSha256,
+    );
+    return {
+      ...resumed,
+      recovery: 'existing-result',
+      originalAttemptPath: input.attemptPath,
+    };
+  }
+  let committedArtifact: Awaited<ReturnType<typeof exactPublication>>;
+  try {
+    committedArtifact = await exactPublication(committedPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT')
+      throw new Error(
+        'Original complete publication missing; recovery requires review',
+      );
+    throw error;
+  }
+  assert.equal(
+    committedArtifact.pin.publicationSha256,
+    input.committedPublicationSha256,
+    'Pinned committed publication changed during validation',
+  );
+  const committed = committedArtifact.publication;
+  assert.equal(
+    committed.rebind,
+    undefined,
+    'Original capture publication required',
+  );
+  assert.equal(committed.preservation, 'complete-admitted');
+  assert.equal(committed.binding, binding);
+  assert.equal(committed.captureRequestKey, captureRequestKey);
+  assert.equal(canonical(committed.task), canonical(after.task));
+  assert.equal(canonical(committed.source), canonical(after.source));
+  assert.equal(committed.readScope, after.readScope);
+  assert.equal(canonical(committed.transport), canonical(transport.config));
+  assert.equal(committed.implementation, transport.implementation);
+  assert.equal(committed.protocolSha256, transport.protocolSha256);
+  assert.equal(committed.registration, before.registration);
+  const committedInspect = await transport.invoke('inspect', [
+    after.source.id,
+    committed.generation,
+    '--manifest-sha256',
+    committed.manifestSha256,
+    '--offset',
+    '0',
+    '--limit',
+    '1',
+    '--max-bytes',
+    String(transport.config.maxStdoutBytes),
+  ]);
+  snapshot(committedInspect, committed);
+  assert.equal(committedInspect['status'], 'complete');
+  assert.equal(committedInspect['request_key'], captureRequestKey);
+  assert.equal(
+    committedInspect['request_fingerprint'],
+    committed.captureFingerprint,
+  );
+  assert.equal(committedInspect['preservation'], 'complete-admitted');
+  assert.equal(
+    canonical(committedInspect['counts']),
+    canonical(committed.counts),
+  );
+  assert(
+    observedMicros(selected.observedAt) <
+      observedMicros(committedInspect['observed_at']),
+    'Prior publication does not predate committed capture',
+  );
+  const published = await exactPublication(committedPath);
+  assert.equal(
+    published.pin.publicationSha256,
+    input.committedPublicationSha256,
+    'Committed publication changed before result reconstruction',
+  );
+  assert.equal(
+    (await exactArtifact(input.attemptPath)).sha256,
+    input.attemptSha256,
+    'Pinned original capture attempt changed before result reconstruction',
+  );
+  assert.equal(
+    (
+      await exactArtifact(
+        join(after.task.directory, `archive-binding-${binding}.json`),
+      )
+    ).sha256,
+    bindingArtifact.sha256,
+    'Original capture binding changed before result reconstruction',
+  );
+  assert.equal(
+    (await exactPublication(input.beforePublicationPath)).pin.publicationSha256,
+    input.beforePublicationSha256,
+    'Pinned prior publication changed before result reconstruction',
+  );
+  assert.equal(
+    await registrationFor(transport, before.source),
+    before.registration,
+    'Current source admission changed before result reconstruction',
+  );
+  await publishJson(siblingResultPath, {
+    status: 'published',
+    publicationPath: committedPath,
+    preservation: committed.preservation,
+    gaps: committed.gaps,
+    attemptPath: input.attemptPath,
+    resultPath: siblingResultPath,
+  } satisfies ArchiveIntakeOutcome);
+  const resumed = await resumeArchiveSourceHandoff({
+    beforePublicationPath: input.beforePublicationPath,
+    resultPath: siblingResultPath,
+    ...(input.beforeGraphId ? { beforeGraphId: input.beforeGraphId } : {}),
+  });
+  return {
+    ...resumed,
+    recovery: 'reconstructed-result',
+    originalAttemptPath: input.attemptPath,
+  };
 }
 
 interface HandoffParams {

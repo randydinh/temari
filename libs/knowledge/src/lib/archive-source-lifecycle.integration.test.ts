@@ -10,6 +10,7 @@ import { createArchiveRegistrar } from './archive-registrar.js';
 import { canonical, hash } from './codec.js';
 import {
   recaptureArchiveSource,
+  recoverArchiveSourceAttempt,
   resumeArchiveSourceHandoff,
 } from './archive-source-lifecycle.js';
 
@@ -556,6 +557,134 @@ test('ACTUAL ARCHIVE CLI: operator resumes a complete persisted v2 twice without
   await assert.rejects(resumeArchiveSourceHandoff(input));
   assert.equal(await generationCount(f), baselineGenerations);
   assert.equal(await attemptCount(options.task.directory), baselineAttempts);
+});
+
+test('ACTUAL ARCHIVE CLI: pinned original attempt reconciles a committed capture with missing result without recapture', async () => {
+  const f = await actualFixture();
+  const options = optionsFor(f, 'source-missing-result-recovery');
+  const before = await captureArchive(options);
+  assert(before.publicationPath);
+  const beforeGraphId = await graphFor(f, before.publicationPath);
+  await writeFile(join(f.base, 'sources/plan.txt'), 'Changed plan for replay.');
+  await rm(join(f.base, 'sources/owner.txt'));
+  await writeFile(join(f.base, 'sources/new.txt'), 'New private replay text.');
+  const after = await captureArchive({ ...options, requestKey: 'after' });
+  assert(after.publicationPath);
+  const afterPublication = await loadArchivePublication(after.publicationPath);
+  const originalAttemptBytes = await readFile(after.attemptPath);
+  const input = {
+    beforePublicationPath: before.publicationPath,
+    beforePublicationSha256: hash(await readFile(before.publicationPath)),
+    committedPublicationSha256: hash(await readFile(after.publicationPath)),
+    attemptPath: after.attemptPath,
+    attemptSha256: hash(originalAttemptBytes),
+    beforeGraphId,
+  };
+  const committedGenerations = await generationCount(f);
+  const committedAttempts = await attemptCount(options.task.directory);
+  const existing = await recoverArchiveSourceAttempt(input);
+  assert.equal(existing.recovery, 'existing-result');
+  assert.equal(await attemptCount(options.task.directory), committedAttempts);
+  await rm(after.resultPath);
+  await writeFile(after.resultPath, canonical({ status: 'blocked' }));
+  await assert.rejects(
+    recoverArchiveSourceAttempt(input),
+    /Existing capture result needs review/,
+  );
+  await writeFile(after.resultPath, '{malformed');
+  await assert.rejects(recoverArchiveSourceAttempt(input));
+  await rm(after.resultPath);
+  const committedPublicationBytes = await readFile(after.publicationPath);
+  const forgedPublication = JSON.parse(
+    committedPublicationBytes.toString('utf8'),
+  );
+  forgedPublication.gaps.push({
+    kind: 'unknown',
+    subject: f.source.id,
+    detail: 'forged local gap',
+  });
+  await writeFile(after.publicationPath, canonical(forgedPublication));
+  await assert.rejects(
+    recoverArchiveSourceAttempt(input),
+    /Pinned committed publication changed/,
+  );
+  await writeFile(after.publicationPath, committedPublicationBytes);
+  await rm(after.publicationPath);
+  await assert.rejects(
+    recoverArchiveSourceAttempt(input),
+    /Original complete publication missing/,
+  );
+  assert.equal(await generationCount(f), committedGenerations);
+  assert.equal(await attemptCount(options.task.directory), committedAttempts);
+  await writeFile(after.publicationPath, committedPublicationBytes);
+  const recovered = await recoverArchiveSourceAttempt(input);
+  assert.equal(recovered.recovery, 'reconstructed-result');
+  assert.equal(recovered.originalAttemptPath, after.attemptPath);
+  assert.equal(recovered.capture.attemptPath, after.attemptPath);
+  assert.equal(recovered.capture.resultPath, after.resultPath);
+  const reconstructed = JSON.parse(await readFile(after.resultPath, 'utf8'));
+  assert.deepEqual(Object.keys(reconstructed).sort(), [
+    'attemptPath',
+    'gaps',
+    'preservation',
+    'publicationPath',
+    'resultPath',
+    'status',
+  ]);
+  assert.equal(recovered.receipt.after.generation, afterPublication.generation);
+  assert.equal(
+    recovered.receipt.after.manifestSha256,
+    afterPublication.manifestSha256,
+  );
+  assert.deepEqual(recovered.receipt.diff.counts, {
+    added: 1,
+    removed: 1,
+    changed: 1,
+    unchanged: 2,
+  });
+  assert(recovered.receipt.graphImpact);
+  assert.equal(recovered.receipt.graphMutation, 'none');
+  assert.equal(await generationCount(f), committedGenerations);
+  assert.equal(await attemptCount(options.task.directory), committedAttempts);
+  assert.deepEqual(await readFile(after.attemptPath), originalAttemptBytes);
+
+  const attempt = JSON.parse(originalAttemptBytes.toString('utf8'));
+  attempt.options.requestKey = 'forged-key';
+  await writeFile(after.attemptPath, canonical(attempt));
+  await assert.rejects(
+    recoverArchiveSourceAttempt(input),
+    /Pinned original capture attempt changed/,
+  );
+  await writeFile(after.attemptPath, originalAttemptBytes);
+  await assert.rejects(
+    recoverArchiveSourceAttempt({
+      ...input,
+      beforePublicationSha256: 'f'.repeat(64),
+    }),
+    /Pinned prior publication changed/,
+  );
+  await assert.rejects(
+    recoverArchiveSourceAttempt({
+      ...input,
+      beforePublicationPath: after.publicationPath,
+      beforePublicationSha256: hash(await readFile(after.publicationPath)),
+    }),
+    /Fresh archive request key required/,
+  );
+  await exec(
+    f.config.python,
+    [
+      '-B',
+      '-c',
+      "import sqlite3,sys,json; db=sqlite3.connect(sys.argv[1]); row=json.loads(db.execute('SELECT data FROM sources WHERE id=?',(sys.argv[2],)).fetchone()[0]); row['enabled']=False; db.execute('UPDATE sources SET data=? WHERE id=?',(json.dumps(row),sys.argv[2])); db.commit()",
+      join(f.base, 'state/registry.sqlite3'),
+      f.source.id,
+    ],
+    { timeout: 60000 },
+  );
+  await assert.rejects(recoverArchiveSourceAttempt(input), /disabled/);
+  assert.equal(await generationCount(f), committedGenerations);
+  assert.equal(await attemptCount(options.task.directory), committedAttempts);
 });
 
 test('ACTUAL ARCHIVE CLI: resume refuses incomplete capture and changed admission without capture', async () => {
