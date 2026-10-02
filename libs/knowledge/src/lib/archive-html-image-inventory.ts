@@ -44,7 +44,7 @@ export interface ArchiveHtmlImage {
 }
 
 export interface ArchiveHtmlImageInventoryReceipt {
-  readonly schema: 1;
+  readonly schema: 2;
   readonly kind: 'temari-archive-html-image-inventory';
   readonly policy: 'recovered-simple-html-img-v1';
   readonly sourceId: string;
@@ -53,11 +53,14 @@ export interface ArchiveHtmlImageInventoryReceipt {
   readonly publicationPath: string;
   readonly publicationSha256: string;
   readonly sourcePath: string;
+  readonly sourceSharing: 'local-only' | 'registered-sources';
   readonly sourceOriginal: { readonly sha256: string; readonly bytes: number };
   readonly images: readonly ArchiveHtmlImage[];
   readonly currentOriginal: 'not-checked';
   readonly visualMeaning: 'not-evaluated';
-  readonly coverage: 'local-only-simple-single-line-html-img-declarations-only';
+  readonly coverage:
+    | 'local-only-simple-single-line-html-img-declarations-only'
+    | 'registered-sources-simple-single-line-html-img-declarations-only';
 }
 
 type Gap = ArchiveHtmlImage['gap'];
@@ -351,7 +354,7 @@ export async function inventoryArchiveHtmlImages(
   const transport = await archiveTransport(publication.transport);
   assert.equal(transport.implementation, publication.implementation);
   assert.equal(transport.protocolSha256, publication.protocolSha256);
-  const admission = async () => {
+  const admission = async (): Promise<'local-only' | 'registered-sources'> => {
     assert.equal(
       await registrationFor(transport, publication.source),
       publication.registration,
@@ -362,13 +365,14 @@ export async function inventoryArchiveHtmlImages(
     );
     const matches = rows.filter((row) => row['id'] === publication.source.id);
     assert.equal(matches.length, 1, 'Current source sharing unavailable');
-    assert.equal(
-      matches[0]['sharing'],
-      'local-only',
-      'Current source must be local-only',
+    const sharing = matches[0]['sharing'];
+    assert(
+      sharing === 'local-only' || sharing === 'registered-sources',
+      'Current source sharing not admitted',
     );
+    return sharing;
   };
-  await admission();
+  const sourceSharing = await admission();
 
   const originals = new Map<string, { sha256: string; bytes: number } | null>();
   let offset = 0,
@@ -504,14 +508,18 @@ export async function inventoryArchiveHtmlImages(
     sourceOriginal,
     'Recovered HTML changed during inventory',
   );
-  await admission();
+  assert.equal(
+    await admission(),
+    sourceSharing,
+    'Current source sharing changed during HTML inventory',
+  );
   assert.equal(
     hash((await readJsonWithBytes(input.publicationPath)).bytes),
     hash(saved.bytes),
     'Publication changed during HTML inventory',
   );
   const receipt: ArchiveHtmlImageInventoryReceipt = {
-    schema: 1,
+    schema: 2,
     kind: 'temari-archive-html-image-inventory',
     policy: 'recovered-simple-html-img-v1',
     sourceId: publication.source.id,
@@ -520,11 +528,12 @@ export async function inventoryArchiveHtmlImages(
     publicationPath: input.publicationPath,
     publicationSha256: hash(saved.bytes),
     sourcePath: selected,
+    sourceSharing,
     sourceOriginal,
     images,
     currentOriginal: 'not-checked',
     visualMeaning: 'not-evaluated',
-    coverage: 'local-only-simple-single-line-html-img-declarations-only',
+    coverage: `${sourceSharing}-simple-single-line-html-img-declarations-only`,
   };
   const receiptPath = join(
     publication.task.directory,
