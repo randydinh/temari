@@ -12,6 +12,7 @@ export * from './lib/archive-journey.js';
 export * from './lib/archive-evaluation-gate.js';
 export * from './lib/archive-graph-evaluation-gate.js';
 export * from './lib/archive-document-links.js';
+export * from './lib/archive-visible-image-inventory.js';
 export * from './lib/archive-jobs.js';
 export * from './lib/archive-query-feedback.js';
 export * from './lib/archive-graph-reviewed-change.js';
