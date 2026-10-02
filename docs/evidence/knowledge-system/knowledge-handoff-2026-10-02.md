@@ -261,3 +261,28 @@ independent answer-quality labels or grounds to promote BM25. No Windows
 installation, graph semantics, continuous freshness, production recovery,
 plugin lifecycle or production losslessness is proven. All five broader
 finish predicates above remain open.
+
+## 08:30 UTC BM25 scale continuation
+
+GitHub reports [#170](https://github.com/randydinh/temari/pull/170) merged at
+`b72b2c9a9233842ff68c7c73a4f0b3571f17a197` after independent exact-head
+review of clean commit `31fd3ec54b02f82bb8c34beb1a73d771a1c1a183`.
+The reviewed and merged trees match. Actual Registrar Nx Knowledge integration
+passed 96/96, unit tests 43/43, uncached typecheck and Nx sync passed. The
+final opt-in script repair was rerun through focused and full benchmark
+journeys. The public-entry package/check reported the exact clean head with
+`dirty:false`, and its relocated stock Node Knowledge export loaded. GitHub
+listed no branch checks. The local merge command encountered an occupied
+`main` worktree; remote state confirms the merge.
+
+The [synthetic local-only BM25 scale note](bm25-scale-2026-10-02.md) records
+seven fresh-process discovery samples at 100, 500 and 1,000 selected documents.
+Median observed times on this Mac were 127.425, 674.979 and 1463.777 ms.
+All 24 top citations matched pinned archive reads, index digests were stable
+within each scope, and a 33-term query refused under the 32-term cap. The
+timer includes process startup and archive selection; source count grows with
+document count. These observations are neither an isolated FTS build cost nor
+a production latency target, cache decision, answer-quality result, or reason
+to promote BM25 as default. The runner used synthetic `local-only` sources and
+made no hosted Jev or Keychain call. All five broader finish predicates above
+remain open.
