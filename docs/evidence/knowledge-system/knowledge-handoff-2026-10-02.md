@@ -190,3 +190,24 @@ set `local-only`, deleted live originals before archive reads, and made no
 TypeSafe call. This does not establish browser or Markdown rendering, full
 HTML coverage, visual meaning or continuous freshness. The five broader
 finish predicates above remain open.
+
+## 07:00 UTC multi-source graph impact continuation
+
+GitHub reports [#164](https://github.com/randydinh/temari/pull/164) merged at
+`bf68c54c7aa7f043b5bd379a5379abf2a40f79f0` after independent exact-head
+review of clean commit `0df9d59fa5ab33fdd382e6a3f662ae335d4b4cc7`.
+The reviewed and merged trees match. Final actual-Registrar Knowledge
+integration passed 95/95, focused explicit `local-only` two-source fixture
+passed 1/1, unit tests 43/43, uncached typecheck, Nx sync, formatting and diff
+checks passed. Canonical package/check reported the reviewed head with
+`dirty:false`, and a stock Node import of its public export succeeded. GitHub
+listed no branch checks. The local merge command hit the occupied `main`
+worktree during cleanup; the remote PR state confirms the merge.
+
+The [multi-source graph impact receipt](multisource-graph-impact-2026-10-02.md)
+reads an exact old 2–8-source RevisionSet and one changed source generation to
+queue cross-source relationships for review, unchanged records as candidate
+repins, and changed or added paths for discovery. It neither modifies a graph
+nor proves a relationship correct. The actual fixture used `local-only`
+sources and made no TypeSafe call. Automatic repair, continuous freshness and
+the five broader finish predicates above remain open.
