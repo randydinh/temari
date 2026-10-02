@@ -2,8 +2,10 @@
 
 This updates the historical [2026-10-01 overnight audit](overnight-audit-2026-10-01.md)
 after later merged increments. The work ran in an isolated checkout; the
-conflicted primary checkout was not used. At this reconciliation,
-`origin/main` is `344b57553b03ae7039ee4215a85388cd65b50ee6`.
+conflicted primary checkout was not used. The original reconciliation below
+observed `origin/main` at `344b57553b03ae7039ee4215a85388cd65b50ee6`.
+The later update below observes main at
+`6f310ebb8f49b38d83826063c68e2cb92c0bd721`.
 
 ## Reconciliation
 
@@ -40,6 +42,27 @@ text. The new PDF and feedback increments made no hosted calls; the earlier
 [real-corpus pilot](real-corpus-pilot-2026-09-30.md) contains the separate
 live Jev shadow evidence. No Vercel credential is used.
 
+## Update after archive recovery, image inventory, and freshness audit
+
+GitHub reports [#149](https://github.com/randydinh/temari/pull/149),
+[#151](https://github.com/randydinh/temari/pull/151), and
+[#152](https://github.com/randydinh/temari/pull/152) merged. Their reported
+result commits (`c988b6b`, `c776b46`, `6f310eb`) are ancestors of the observed
+main. Each increment had an independent exact-head review and a clean canonical
+package/check before merge; GitHub reported no branch checks for these PRs.
+
+| Increment | Verified result | Boundary |
+| --- | --- | --- |
+| [Archive-only recovery](archive-only-recovery-2026-10-02.md), #149 | An actual Registrar export/import restored one pinned generation under a separately pre-provisioned identical source registration and `local-only` setting. Exact archived citations and original bytes survived live edit/deletion; tampered blobs, wrong origin, and disabled reads refused. Full Knowledge integration passed 78/78. | This does not restore source policy, graph or derived views, retention/erasure state, or establish production RPO/RTO or Windows recovery. |
+| [Visible Markdown image inventory](visible-image-inventory-2026-10-02.md), #151 | An actual Registrar fixture resolved a retained PNG on a later manifest page, pinned its hash/byte count and recovered exact bytes. The metadata-only receipt distinguishes missing, external/unsupported, and outside-source references. Full integration passed 79/79. | No image interpretation, OCR, reference-style/HTML inventory, or embedded PDF/DOCX image coverage. |
+| [One-shot freshness audit](freshness-job-2026-10-02.md), #152 | A due-gated caller can run one pinned local audit under a fenced child-task lease and receive a durable point-in-time `unchanged`, `recapture-needed`, or `unknown-needs-review` decision. Expired pre-stage scans are capped at two; a published stage can complete without rescanning. Full integration passed 87/87. | No recurring trigger, automatic recapture, atomic filesystem snapshot, exactly-once scan across a pre-stage crash, or live freshness guarantee. |
+
+The current #152 head also passed Knowledge unit tests 43/43, Nx sync and
+typecheck, a clean canonical package/check, and a stock-Node import of its
+public export. These checks used the actual bundled Registrar on this macOS
+host. The new three increments made no hosted Jev call and did not change the
+direct TypeSafe Keychain or registered-source/local-only policy.
+
 ## Finish predicate still open
 
 1. **Representative answer quality.** Collect real knowledge-worker questions
@@ -52,8 +75,9 @@ live Jev shadow evidence. No Vercel credential is used.
    test linked images under explicit admission, and assess OCR and visual
    meaning separately. A searchable PDF's text does not cover a scanned page
    or chart. Preserve unsupported meaning as a gap.
-3. **Continuous graph and source evolution.** Schedule bounded source audits
-   and recapture with durable runtime leases; reconcile dependent indexes and
+3. **Continuous graph and source evolution.** Connect the now-leased one-shot
+   audit to a verified recurring trigger; design and test automatic recapture
+   crash/retry and next-generation selection; reconcile dependent indexes and
    graph assertions. Authenticate semantic corrections, then measure relation
    precision, recall, stale-edge repair and rollback on changed generations.
 4. **Operational recovery.** Exercise backup/restore of bytes, manifests,
