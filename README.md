@@ -21,6 +21,9 @@ explain ownership scopes, integration, independent review, and verification gate
 The [planning, scheduling and knowledge-map guide](docs/dashboard-autonomy.md)
 covers retained goal proposals, durable recurring checks, pinned Registrar maps
 and their recovery boundaries.
+The [open-work review guide](docs/open-work-review.md) covers the read-only saved
+inventory of chats/worktrees, local filters, coverage/freshness, independent
+capture verification and preservation gaps before reconciliation.
 The [task continuity guide](docs/task-continuity.md) covers agent pickup, chat links,
 handoffs, evidence, and exact-run Archon controls. Successful agent findings need
 coordinator review; only eligible canonical evidence plus explicit acceptance can
@@ -42,7 +45,9 @@ tree — [docs/overlays.md](docs/overlays.md).
 - **Operate the dashboard:** [setup and supported journeys](docs/task-dashboard.md).
   Choose a saved goal, verification recipe, investigation swarm, configured
   implementation plan, or validated natural-goal proposal. Use Schedules for
-  fixed recurring checks and Knowledge map for pinned Registrar paths/anchors. Coding produces an external integration candidate for
+  fixed recurring checks, Knowledge map for pinned Registrar paths/anchors, and
+  Review open work for captured chats/worktrees with explicit coverage and
+  preservation gaps. Coding produces an external integration candidate for
   coordinator review; it does not apply changes to the source checkout or publish them.
 - **Pick up unfinished work:** [task continuity and recovery](docs/task-continuity.md).
   Use workspace-scoped `pickup` before creating work, explicitly `enter` the matching

@@ -44,7 +44,7 @@
           "typecheck"
         ],
         "options": {
-          "command": "tsc --ignoreConfig --noEmit --module nodenext --moduleResolution nodenext --target es2022 --types node --strict --skipLibCheck tools/task-view.mts tools/task-continuity.mts tools/task-view.test.mts tools/task-continuity.test.mts tools/task-native.test.mts tools/dashboard-controller.mts tools/dashboard-controller.test.mts tools/dashboard-swarm.mts tools/dashboard-swarm.test.mts tools/dashboard-native.test.mts tools/dashboard-implementation.mts tools/dashboard-implementation.test.mts tools/dashboard-planner.mts tools/dashboard-planner.test.mts tools/dashboard-scheduler.mts tools/dashboard-scheduler.test.mts tools/dashboard-knowledge.mts tools/dashboard-knowledge.test.mts",
+          "command": "tsc --ignoreConfig --noEmit --module nodenext --moduleResolution nodenext --target es2022 --types node --strict --skipLibCheck tools/task-view.mts tools/task-continuity.mts tools/task-view.test.mts tools/task-continuity.test.mts tools/task-native.test.mts tools/dashboard-controller.mts tools/dashboard-controller.test.mts tools/dashboard-swarm.mts tools/dashboard-swarm.test.mts tools/dashboard-native.test.mts tools/dashboard-implementation.mts tools/dashboard-implementation.test.mts tools/dashboard-planner.mts tools/dashboard-planner.test.mts tools/dashboard-scheduler.mts tools/dashboard-scheduler.test.mts tools/dashboard-knowledge.mts tools/dashboard-knowledge.test.mts tools/dashboard-open-work.mts tools/dashboard-open-work.test.mts",
           "cwd": "{workspaceRoot}"
         }
       },
@@ -140,6 +140,14 @@
         "cache": false,
         "options": {
           "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 tools/dashboard-knowledge.test.mts",
+          "cwd": "{workspaceRoot}"
+        }
+      },
+      "open-work-test": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 tools/dashboard-open-work.test.mts",
           "cwd": "{workspaceRoot}"
         }
       }

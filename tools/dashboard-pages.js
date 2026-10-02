@@ -2,6 +2,9 @@
 const pages = {
   view: 'tasks',
   knowledge: null,
+  openWork: null,
+  openWorkRequest: 0,
+  openWorkLoading: false,
   schedules: null,
   selectedNode: null,
   selectedSource: null,
@@ -21,7 +24,7 @@ function pageError(error) {
   byId('error').hidden = false;
 }
 async function selectDashboardView(view, updateUrl = true) {
-  pages.view = ['tasks', 'schedules', 'knowledge'].includes(view)
+  pages.view = ['tasks', 'schedules', 'knowledge', 'open-work'].includes(view)
     ? view
     : 'tasks';
   for (const button of document.querySelectorAll('[data-view]'))
@@ -29,13 +32,14 @@ async function selectDashboardView(view, updateUrl = true) {
       'aria-pressed',
       String(button.dataset.view === pages.view),
     );
-  for (const key of ['tasks', 'schedules', 'knowledge'])
+  for (const key of ['tasks', 'schedules', 'knowledge', 'open-work'])
     byId(`${key}-page`).hidden = key !== pages.view;
   if (updateUrl) {
     const url = new URL(location.href);
     url.searchParams.set('view', pages.view);
     history.replaceState(null, '', url);
   }
+  if (pages.view === 'open-work') await loadOpenWork();
   if (pages.view === 'knowledge') await loadKnowledge();
   if (pages.view === 'schedules') await loadSchedules();
 }
@@ -183,6 +187,251 @@ function selectKnowledgeView(view) {
   );
   renderKnowledge();
 }
+function openWorkMetadata(values) {
+  const list = el('dl', 'metadata-list');
+  for (const [label, value] of values)
+    list.append(el('dt', '', label), el('dd', '', value));
+  return list;
+}
+function openWorkTime(value) {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime())
+    ? date.toLocaleString(undefined, { timeZoneName: 'short' })
+    : 'Not recorded';
+}
+function openWorkState(status) {
+  if (status === 'active') return 'Active at capture';
+  if (status === 'idle') return 'Idle at capture';
+  return 'Writer state unknown';
+}
+function openWorkCount(value) {
+  return value === null || value === undefined ? 'Not observed' : String(value);
+}
+function updateOpenWorkAge() {
+  const data = pages.openWork;
+  if (data?.state !== 'available') return;
+  const captureAge = Date.now() - Date.parse(data.capture.capturedAt);
+  const freshness = data.capture.freshness === 'future' || captureAge < 0
+    ? 'future'
+    : data.capture.freshness === 'stale' || captureAge > 15 * 60 * 1000
+      ? 'stale'
+      : 'fresh';
+  const label = freshness === 'fresh'
+    ? 'Fresh capture (15-minute window)'
+    : freshness === 'future'
+      ? 'Future timestamp — timing needs attention'
+      : 'Stale capture — older than 15 minutes';
+  byId('open-work-status').textContent =
+    `${label} · captured ${openWorkTime(data.capture.capturedAt)} · ${data.chats.length} chats · ${data.worktrees.length} worktrees`;
+  const warning = byId('open-work-age-warning');
+  if (warning) {
+    warning.hidden = freshness === 'fresh';
+    warning.textContent = freshness === 'future'
+      ? 'The capture is dated in the future. Check its clock and capture evidence before relying on its timing.'
+      : 'These rows are historical. A new host capture and approved digest are needed to show newer observations.';
+  }
+}
+async function loadOpenWork() {
+  const request = ++pages.openWorkRequest;
+  pages.openWork = null;
+  pages.openWorkLoading = true;
+  renderOpenWork();
+  try {
+    const data = await readDashboardJson('/api/open-work');
+    if (
+      data.schema !== 1 ||
+      !['available', 'unavailable', 'not-configured'].includes(data.state) ||
+      !Array.isArray(data.chats) ||
+      !Array.isArray(data.worktrees) ||
+      !Array.isArray(data.sourceRefs) ||
+      !Array.isArray(data.gaps) ||
+      (data.state === 'available' && (!data.capture || !data.coverage))
+    )
+      throw new Error('Invalid capture response.');
+    if (request !== pages.openWorkRequest) return;
+    pages.openWork = data;
+  } catch {
+    if (request !== pages.openWorkRequest) return;
+    // A failed reread must never leave previously verified rows on screen.
+    pages.openWork = null;
+  } finally {
+    if (request === pages.openWorkRequest) {
+      pages.openWorkLoading = false;
+      renderOpenWork();
+    }
+  }
+}
+function renderOpenWork() {
+  const data = pages.openWork;
+  const available = data?.state === 'available';
+  const chats = byId('open-work-chats');
+  const worktrees = byId('open-work-worktrees');
+  const gaps = byId('open-work-gaps');
+  const empty = byId('open-work-empty');
+  const provenance = byId('open-work-provenance-body');
+  for (const node of [chats, worktrees, gaps, empty, provenance])
+    node.replaceChildren();
+  byId('open-work-chat-count').textContent = '0';
+  byId('open-work-worktree-count').textContent = '0';
+  byId('open-work-provenance').hidden = !available;
+  byId('open-work-columns').hidden = !available;
+  byId('refresh-open-work').disabled = pages.openWorkLoading;
+  for (const id of ['open-work-search', 'open-work-kind', 'open-work-state'])
+    byId(id).disabled = !available;
+  empty.hidden = available;
+  gaps.hidden = !available && !data?.gaps?.length;
+  if (!available) {
+    const loading = pages.openWorkLoading;
+    const unconfigured = data?.state === 'not-configured';
+    byId('open-work-status').textContent = loading
+      ? 'Checking the pinned saved capture…'
+      : unconfigured
+        ? 'No saved capture is configured.'
+        : 'Saved capture unavailable. Previous rows have been cleared.';
+    empty.append(
+      el('span', 'empty-symbol', '◎'),
+      el('h2', '', loading ? 'Reading saved work' : unconfigured ? 'Connect a saved capture' : 'This capture needs attention'),
+      el('p', '', loading
+        ? 'Checking the saved inventory and its approved digest.'
+        : unconfigured
+          ? 'An operator can capture chats and worktrees, verify the inventory and pin it when starting the dashboard.'
+          : 'The saved inventory could not be read or verified. Reload checks the same capture again; a new capture requires a new approved pin.'),
+    );
+    for (const gap of data?.gaps ?? []) gaps.append(el('p', '', gap));
+    return;
+  }
+  const capture = data.capture;
+  gaps.append(el('h2', '', 'Coverage and gaps'));
+  gaps.append(el('p', '', `Chats: ${data.coverage.chatScope}. Listing limit: ${data.coverage.chatLimit}. All chats are not accounted for by this capture.`));
+  gaps.append(el('p', '', `Worktrees: ${data.coverage.worktreeScope}. Preservation remains unverified; counts describe observed metadata.`));
+  const ageWarning = el('p', 'open-work-warning');
+  ageWarning.id = 'open-work-age-warning';
+  gaps.append(ageWarning);
+  updateOpenWorkAge();
+  for (const [label, values] of [
+    ['Unavailable hosts', data.coverage.unavailableHosts],
+    ['Unavailable sources', data.coverage.unavailableSources],
+  ])
+    if (values?.length) gaps.append(el('p', 'open-work-warning', `${label}: ${values.join(', ')}`));
+  const uniqueGaps = [...new Set([...(data.coverage.gaps ?? []), ...data.gaps])];
+  if (uniqueGaps.length) {
+    const list = el('ul', 'open-work-gap-list');
+    for (const gap of uniqueGaps) list.append(el('li', '', gap));
+    gaps.append(list);
+  }
+  const needle = byId('open-work-search').value.trim().toLowerCase();
+  const kind = byId('open-work-kind').value;
+  const selectedState = byId('open-work-state').value;
+  byId('open-work-state').disabled = kind === 'worktrees';
+  const byWorktree = new Map(data.worktrees.map((row) => [row.id, row]));
+  const visibleChats = kind === 'worktrees' ? [] : data.chats.filter((chat) => {
+    const worktree = byWorktree.get(chat.worktreeId);
+    const matchesState = !selectedState || (selectedState === 'unknown'
+      ? !['active', 'idle'].includes(chat.status)
+      : chat.status === selectedState);
+    return (!kind || chat.kind === kind) && matchesState &&
+      [chat.title, chat.id, chat.hostId, chat.cwd, worktree?.root, worktree?.branch]
+        .some((value) => String(value ?? '').toLowerCase().includes(needle));
+  });
+  const visibleWorktrees = ['codex', 'chatgpt'].includes(kind) ? [] : data.worktrees.filter((worktree) =>
+    [worktree.root, worktree.branch, worktree.id, worktree.head]
+      .some((value) => String(value ?? '').toLowerCase().includes(needle)),
+  );
+  byId('open-work-chat-section').hidden = kind === 'worktrees';
+  byId('open-work-worktree-section').hidden = ['codex', 'chatgpt'].includes(kind);
+  byId('open-work-columns').classList.toggle('open-work-single-column', Boolean(kind));
+  byId('open-work-chat-count').textContent = `${visibleChats.length} / ${data.chats.length}`;
+  byId('open-work-worktree-count').textContent = `${visibleWorktrees.length} / ${data.worktrees.length}`;
+  for (const chat of visibleChats) {
+    const card = el('article', 'open-work-card');
+    card.dataset.openWorkChatId = chat.id;
+    const heading = el('h3');
+    if (chat.kind === 'codex' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(chat.id)) {
+      const link = el('a', '', chat.title);
+      link.href = `codex://threads/${encodeURIComponent(chat.id)}`;
+      heading.append(link);
+    } else heading.textContent = chat.title;
+    const worktree = byWorktree.get(chat.worktreeId);
+    card.append(
+      heading,
+      el('p', `open-work-badge${chat.status === 'active' ? ' open-work-warning' : ''}`, `${chat.kind === 'codex' ? 'Codex' : 'ChatGPT'} · ${openWorkState(chat.status)}`),
+      openWorkMetadata([
+        ['Host', chat.hostId ?? 'Not recorded'],
+        ['Worktree', worktree?.root ?? 'No captured worktree association'],
+        ['Chat workspace', chat.cwd ?? 'Not recorded'],
+        ['Last update', chat.updatedAt === null ? 'Not recorded' : openWorkTime(chat.updatedAt * 1000)],
+      ]),
+    );
+    if (worktree) {
+      const show = el('button', 'quiet', 'Show worktree');
+      show.type = 'button';
+      show.addEventListener('click', () => {
+        byId('open-work-search').value = worktree.root;
+        byId('open-work-kind').value = 'worktrees';
+        renderOpenWork();
+        byId('open-work-worktrees').scrollIntoView({ block: 'start' });
+      });
+      card.append(show);
+    }
+    chats.append(card);
+  }
+  for (const worktree of visibleWorktrees) {
+    const card = el('article', 'open-work-card');
+    card.dataset.openWorkWorktreeId = worktree.id;
+    card.append(
+      el('h3', 'open-work-root', worktree.root),
+      el('p', 'open-work-badge', !worktree.exists ? 'Not present at capture' : worktree.clean === null ? 'Local changes not observed' : worktree.clean ? 'No local changes at capture' : 'Local changes at capture'),
+      openWorkMetadata([
+        ['Branch', worktree.branch ?? 'Not recorded'],
+        ['Conflicted paths', openWorkCount(worktree.unresolvedPathCount)],
+        ['Untracked paths', openWorkCount(worktree.untrackedPathCount)],
+        ['Commits outside baseline', openWorkCount(worktree.commitsNotInMain)],
+        ['Preservation', 'Unverified — metadata only'],
+      ]),
+    );
+    const detail = el('details', 'open-work-card-detail');
+    detail.append(el('summary', '', 'Revision and associated chats'));
+    const associated = data.chats.filter((chat) => chat.worktreeId === worktree.id);
+    detail.append(openWorkMetadata([
+      ['Worktree ID', worktree.id],
+      ['Observed revision', worktree.head ?? 'Not observed'],
+    ]));
+    const list = el('ul');
+    for (const chat of associated) list.append(el('li', '', `${chat.title} · ${openWorkState(chat.status)}`));
+    detail.append(associated.length ? list : el('p', 'event-detail', 'No associated chats in this bounded capture.'));
+    card.append(detail);
+    worktrees.append(card);
+  }
+  if (!visibleChats.length)
+    chats.append(el('p', 'open-work-list-empty', data.chats.length ? 'No captured chats match these filters.' : 'No chats were returned by this capture.'));
+  if (!visibleWorktrees.length)
+    worktrees.append(el('p', 'open-work-list-empty', data.worktrees.length ? 'No captured worktrees match these filters.' : 'No worktrees were returned by this capture.'));
+  if (!visibleChats.length && !visibleWorktrees.length) {
+    empty.hidden = false;
+    empty.append(el('h2', '', data.chats.length || data.worktrees.length ? 'No matching captured work' : 'This capture has no rows'), el('p', '', data.chats.length || data.worktrees.length ? 'Change the local search or filters to see more of this saved inventory.' : 'Review its coverage and gaps. An empty capture does not establish that all work is complete.'));
+  }
+  provenance.append(openWorkMetadata([
+    ['Capture ID', capture.id],
+    ['Manifest SHA-256', capture.sha256],
+    ['Captured at (UTC)', capture.capturedAt],
+    ['Last file check (UTC)', capture.assessedAt],
+    ['Main baseline', data.baseline],
+    ['Writer state', 'Not checked'],
+    ['Closure eligibility', 'Not assessed'],
+  ]));
+  provenance.append(el('p', 'event-detail', 'Source references identify capture evidence. The dashboard does not open or verify those sources.'));
+  for (const ref of data.sourceRefs)
+    provenance.append(openWorkMetadata([[ref.kind, ref.sha256]]));
+}
+byId('refresh-open-work').addEventListener('click', loadOpenWork);
+byId('open-work-search').addEventListener('input', renderOpenWork);
+for (const id of ['open-work-kind', 'open-work-state'])
+  byId(id).addEventListener('change', renderOpenWork);
+// Age the displayed capture while it is open; this collects no new host data.
+setInterval(() => {
+  if (!document.hidden && pages.view === 'open-work' && pages.openWork)
+    updateOpenWorkAge();
+}, 60000);
 async function loadKnowledge() {
   byId('knowledge-status').textContent =
     'Checking configured Registrar publications…';
@@ -748,6 +997,7 @@ byId('schedule-form').addEventListener('submit', async (event) => {
   }
 });
 byId('refresh').addEventListener('click', () => {
+  if (pages.view === 'open-work') loadOpenWork();
   if (pages.view === 'knowledge') loadKnowledge();
   if (pages.view === 'schedules') loadSchedules();
 });

@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { createOpenWorkReader } from './dashboard-open-work.mjs';
 import { request, type Server } from 'node:http';
 import test, { type TestContext } from 'node:test';
 import {
@@ -43,6 +47,7 @@ async function writableServer(t: TestContext, controller: TaskViewController) {
 async function rawRequest(
   url: string,
   options: {
+    method?: string;
     headers: Record<string, string | string[]>;
     body?: string | Buffer;
     setHost?: boolean;
@@ -53,7 +58,7 @@ async function rawRequest(
     const req = request(
       url,
       {
-        method: 'POST',
+        method: options.method ?? 'POST',
         headers: options.headers,
         setHost: options.setHost ?? true,
       },
@@ -120,6 +125,7 @@ test('read-only task view serves retained task data and rejects mutation and for
     csrfToken: null,
     config: null,
     archonBaseUrl: 'http://127.0.0.1:3091',
+    openWorkAvailable: false,
     knowledgeAvailable: false,
     schedulingAvailable: false,
   });
@@ -169,10 +175,18 @@ test('read-only task view serves retained task data and rejects mutation and for
   assert.match(html, /Expand folders to inspect/);
   assert.equal((await fetch(`${base}/task-view.js`)).status, 200);
   assert.equal((await fetch(`${base}/task-view.css`)).status, 200);
-  const dashboardPages = await (await fetch(`${base}/dashboard-pages.js`)).text();
+  const dashboardPages = await (
+    await fetch(`${base}/dashboard-pages.js`)
+  ).text();
   assert.match(dashboardPages, /No content source is connected yet/);
-  assert.match(dashboardPages, /node\.kind === 'path' \? parts : parts\.slice\(0, -1\)/);
-  assert.match(dashboardPages, /pages\.knowledgeView === 'sources' && sourceEmpty/);
+  assert.match(
+    dashboardPages,
+    /node\.kind === 'path' \? parts : parts\.slice\(0, -1\)/,
+  );
+  assert.match(
+    dashboardPages,
+    /pages\.knowledgeView === 'sources' && sourceEmpty/,
+  );
   assert.equal((await fetch(base, { method: 'HEAD' })).status, 200);
 });
 
@@ -321,27 +335,41 @@ test('task view exposes reconciliation reads and delegates only intent controls'
     },
     reconciliationConfirm: async (attemptId, input) => {
       calls.push(['confirm', attemptId, input]);
-      return { ...view, state: 'observed', candidate: { readiness: 'not-ready' }, terminal: false };
+      return {
+        ...view,
+        state: 'observed',
+        candidate: { readiness: 'not-ready' },
+        terminal: false,
+      };
     },
   });
   const read = await fetch(`${base}/api/reconciliation/${view.attemptId}`);
   assert.equal(read.status, 200);
-  assert.equal((await read.json() as typeof view).terminal, false);
-  assert.equal(
-    (await fetch(`${base}/api/reconciliation/missing`)).status,
-    404,
-  );
+  assert.equal(((await read.json()) as typeof view).terminal, false);
+  assert.equal((await fetch(`${base}/api/reconciliation/missing`)).status, 404);
   const created = await fetch(`${base}/api/reconciliation`, {
-    method: 'POST', headers, body: JSON.stringify({ idempotencyKey: 'intent-1' }),
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ idempotencyKey: 'intent-1' }),
   });
   assert.equal(created.status, 200);
-  const blocked = await fetch(`${base}/api/reconciliation/${view.attemptId}/invalidate`, {
-    method: 'POST', headers, body: JSON.stringify({}),
-  });
+  const blocked = await fetch(
+    `${base}/api/reconciliation/${view.attemptId}/invalidate`,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({}),
+    },
+  );
   assert.equal(blocked.status, 200);
-  const confirmed = await fetch(`${base}/api/reconciliation/${view.attemptId}/confirm`, {
-    method: 'POST', headers, body: JSON.stringify({ confirmation: {} }),
-  });
+  const confirmed = await fetch(
+    `${base}/api/reconciliation/${view.attemptId}/confirm`,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ confirmation: {} }),
+    },
+  );
   assert.equal(confirmed.status, 200);
   assert.deepEqual(calls, [
     ['create', { idempotencyKey: 'intent-1' }],
@@ -655,4 +683,143 @@ test('schedule mutations retain local-origin protection and knowledge selections
   );
   assert.deepEqual(calls, ['create', 'known']);
   assert.equal((await fetch(`${base}/dashboard-pages.js`)).status, 200);
+});
+
+test('open-work is available without controls and allows only query-free GET/HEAD', async (t) => {
+  let calls = 0;
+  const server = await startTaskViewServer({
+    runtime: emptyReader,
+    archonBaseUrl: 'http://127.0.0.1:3091',
+    port: 0,
+    openWork: {
+      async describe() {
+        calls++;
+        return { state: 'unavailable', chats: [], worktrees: [] };
+      },
+    },
+  });
+  t.after(() => closeServer(server));
+  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  const dashboard = await (await fetch(`${base}/api/dashboard`)).json();
+  assert.equal(dashboard.openWorkAvailable, true);
+  assert.equal(dashboard.mode, 'read-only');
+  const response = await fetch(`${base}/api/open-work`);
+  assert.deepEqual(await response.json(), {
+    state: 'unavailable',
+    chats: [],
+    worktrees: [],
+  });
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.ok(response.headers.get('content-security-policy'));
+  const head = await fetch(`${base}/api/open-work`, { method: 'HEAD' });
+  assert.equal(head.status, 200);
+  assert.equal(await head.text(), '');
+  assert.equal(calls, 2);
+  for (const query of [
+    '?path=/secret',
+    '?manifestPath=/secret',
+    '?sha256=anything',
+  ]) {
+    assert.equal((await fetch(`${base}/api/open-work${query}`)).status, 400);
+  }
+  for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+    assert.equal(
+      (await fetch(`${base}/api/open-work`, { method })).status,
+      405,
+    );
+  }
+  assert.equal((await fetch(`${base}/api/open-work/secret`)).status, 404);
+  assert.equal(
+    (
+      await rawRequest(`${base}/api/open-work`, {
+        method: 'GET',
+        headers: { host: 'foreign.example' },
+      })
+    ).status,
+    403,
+  );
+  assert.equal(calls, 2);
+});
+
+test('unconfigured open-work returns an honest empty projection', async (t) => {
+  const server = await startTaskViewServer({
+    runtime: emptyReader,
+    archonBaseUrl: 'http://127.0.0.1:3091',
+    port: 0,
+  });
+  t.after(() => closeServer(server));
+  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  const result = await (await fetch(`${base}/api/open-work`)).json();
+  assert.equal(result.state, 'not-configured');
+  assert.equal(result.configured, false);
+  assert.equal(result.capture, null);
+  assert.equal(result.coverage, null);
+  assert.equal(result.readOnly, true);
+  assert.equal(result.currentWriterState, 'not-checked');
+  assert.equal(result.closureEligibility, 'not-assessed');
+  assert.deepEqual(result.chats, []);
+  assert.deepEqual(result.worktrees, []);
+  assert.equal(
+    (await (await fetch(`${base}/api/dashboard`)).json()).openWorkAvailable,
+    false,
+  );
+});
+
+test('open-work HTTP refresh clears a previously available capture when its pinned file changes', async (t) => {
+  const root = await mkdtemp(join(process.cwd(), '.open-work-http-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const manifestPath = join(root, 'capture.json');
+  const bytes = JSON.stringify({
+    schema: 1,
+    id: 'http-capture',
+    capturedAt: new Date().toISOString(),
+    baseline: 'a'.repeat(40),
+    coverage: {
+      chatScope: 'fixture',
+      chatLimit: 1,
+      allChats: false,
+      worktreeScope: 'none',
+      unavailableHosts: [],
+      unavailableSources: [],
+      gaps: [],
+    },
+    chats: [
+      {
+        id: 'thread',
+        title: 'Unobserved writer',
+        kind: 'chatgpt',
+        hostId: null,
+        cwd: null,
+        status: 'notLoaded',
+        updatedAt: null,
+        worktreeId: null,
+      },
+    ],
+    worktrees: [],
+    sourceRefs: [{ kind: 'provenance-only', sha256: 'b'.repeat(64) }],
+  });
+  await writeFile(manifestPath, bytes);
+  const server = await startTaskViewServer({
+    runtime: emptyReader,
+    archonBaseUrl: 'http://127.0.0.1:3091',
+    port: 0,
+    openWork: createOpenWorkReader({
+      manifestPath,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+    }),
+  });
+  t.after(() => closeServer(server));
+  const url = `http://127.0.0.1:${(server.address() as { port: number }).port}/api/open-work`;
+  const first = await (await fetch(url)).json();
+  assert.equal(first.state, 'available');
+  assert.equal(first.chats[0].status, 'notLoaded');
+  assert.equal(first.sourceRefs.length, 1);
+  await writeFile(manifestPath, bytes + ' ');
+  const changed = await (await fetch(url)).json();
+  assert.equal(changed.state, 'unavailable');
+  assert.deepEqual(changed.chats, []);
+  assert.equal(changed.capture, null);
+  assert.equal(changed.baseline, null);
+  await rm(manifestPath);
+  assert.equal((await (await fetch(url)).json()).state, 'unavailable');
 });

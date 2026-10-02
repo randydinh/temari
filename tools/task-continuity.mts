@@ -15,6 +15,7 @@ import {
   type HarnessSelection,
 } from '../libs/runtime/src/index.js';
 import { platformInfo } from '../packages/initializer/src/lib/platform.js';
+import { createOpenWorkReader } from './dashboard-open-work.mjs';
 import { startTaskViewServer } from './task-view.mjs';
 import {
   DashboardController,
@@ -86,6 +87,9 @@ The trusted config fixes the workspace, preparation directory, and verification
 recipes. Browser requests cannot supply executable commands or evidence paths.
 Reconciliation controls are unavailable unless that config also supplies its
 explicit reconciliation store, source, candidate, check, and comparison inputs.
+serve also accepts paired --open-work-manifest ABSOLUTE_JSON --open-work-sha256 HEX
+for a pinned read-only capture, without Archon or control configuration. Refresh
+rereads only that saved capture; source references are provenance only.
 See docs/task-continuity.md for full examples and recovery rules.
 `;
 
@@ -128,10 +132,17 @@ export async function createTaskContinuityReconciliationDashboard(
         async readCurrentSnapshot({ expected }) {
           const task = await runtime.snapshot(expected.taskId);
           if (task.workspaceRoot !== config.workspaceRoot) {
-            throw new Error('Current reconciliation task is outside the configured workspace.');
+            throw new Error(
+              'Current reconciliation task is outside the configured workspace.',
+            );
           }
-          const run = task.runs.find((item) => item.runId === task.currentRunId);
-          if (!run) throw new Error('Current reconciliation task has no bound current run.');
+          const run = task.runs.find(
+            (item) => item.runId === task.currentRunId,
+          );
+          if (!run)
+            throw new Error(
+              'Current reconciliation task has no bound current run.',
+            );
           return {
             taskId: task.taskId,
             taskVersion: String(task.version),
@@ -173,6 +184,8 @@ export async function runTaskCommand(
       'archon-url': { type: 'string' },
       port: { type: 'string' },
       'control-config': { type: 'string' },
+      'open-work-manifest': { type: 'string' },
+      'open-work-sha256': { type: 'string' },
       help: { type: 'boolean', short: 'h' },
     },
   });
@@ -201,6 +214,27 @@ export async function runTaskCommand(
     throw new Error('Unknown task command. Use --help.');
   if (values['control-config'] && command !== 'serve')
     throw new Error('--control-config is only supported by serve.');
+  const hasOpenWork =
+    values['open-work-manifest'] !== undefined ||
+    values['open-work-sha256'] !== undefined;
+  if (hasOpenWork && command !== 'serve')
+    throw new Error(
+      '--open-work-manifest and --open-work-sha256 are only supported by serve.',
+    );
+  if (
+    hasOpenWork &&
+    (values['open-work-manifest'] === undefined ||
+      values['open-work-sha256'] === undefined)
+  )
+    throw new Error(
+      '--open-work-manifest and --open-work-sha256 must be paired.',
+    );
+  const openWork = hasOpenWork
+    ? createOpenWorkReader({
+        manifestPath: values['open-work-manifest']!,
+        sha256: values['open-work-sha256']!,
+      })
+    : undefined;
   const dashboardConfig = values['control-config']
     ? await loadDashboardConfig(
         absolute(values['control-config'], '--control-config'),
@@ -280,7 +314,10 @@ export async function runTaskCommand(
   }
   if (command === 'serve') {
     const reconciliation = dashboardConfig
-      ? await createTaskContinuityReconciliationDashboard(dashboardConfig, runtime)
+      ? await createTaskContinuityReconciliationDashboard(
+          dashboardConfig,
+          runtime,
+        )
       : undefined;
     const controller = dashboardConfig
       ? new DashboardController({
@@ -346,6 +383,7 @@ export async function runTaskCommand(
     if (scheduler) await tick();
     let clock: ReturnType<typeof setInterval> | null = null;
     const server = await startTaskViewServer({
+      openWork,
       runtime,
       ...(controller ? { controller } : {}),
       ...(scheduler
