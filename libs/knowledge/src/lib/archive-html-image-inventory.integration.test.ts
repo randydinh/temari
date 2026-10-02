@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { test } from 'node:test';
@@ -11,6 +11,7 @@ import { canonical, hash } from './codec.js';
 import { inventoryArchiveHtmlImages } from './archive-html-image-inventory.js';
 
 const exec = promisify(execFile);
+const shellQuote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
 const png = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WcLxW0AAAAASUVORK5CYII=',
   'base64',
@@ -133,6 +134,7 @@ test('ACTUAL Registrar: recovered local-only HTML images pin declarations, origi
     recoveredOriginalPath,
   };
   const { receipt, receiptPath } = await inventoryArchiveHtmlImages(plan);
+  assert.equal(receipt.schema, 2);
   assert.equal(receipt.images.length, 9);
   assert.deepEqual(receipt.sourceOriginal, {
     sha256: hash(html),
@@ -142,6 +144,7 @@ test('ACTUAL Registrar: recovered local-only HTML images pin declarations, origi
     receipt.coverage,
     'local-only-simple-single-line-html-img-declarations-only',
   );
+  assert.equal(receipt.sourceSharing, 'local-only');
   assert.equal(receipt.currentOriginal, 'not-checked');
   assert.equal(receipt.visualMeaning, 'not-evaluated');
   assert.equal(
@@ -254,10 +257,14 @@ test('ACTUAL Registrar: recovered local-only HTML images pin declarations, origi
     )['sharing'],
     'registered-sources',
   );
-  await assert.rejects(
-    () => inventoryArchiveHtmlImages(plan),
-    /Current source must be local-only/,
+  const switched = await inventoryArchiveHtmlImages(plan);
+  assert.equal(switched.receipt.schema, 2);
+  assert.equal(switched.receipt.sourceSharing, 'registered-sources');
+  assert.equal(
+    switched.receipt.coverage,
+    'registered-sources-simple-single-line-html-img-declarations-only',
   );
+  assert.notEqual(switched.receiptPath, receiptPath);
   assert.equal(
     (
       await cli(python, registrarSource, workspace, 'sources', [
@@ -275,6 +282,135 @@ test('ACTUAL Registrar: recovered local-only HTML images pin declarations, origi
   await assert.rejects(
     () => inventoryArchiveHtmlImages(plan),
     /Admitted source disabled/,
+  );
+});
+
+test('ACTUAL Registrar: default registered-sources HTML inventory pins recovered originals and refuses a mode change during inventory', async () => {
+  const python = process.env['TEMARI_REGISTRAR_PYTHON'] ?? '';
+  const registrarSource = process.env['TEMARI_REGISTRAR_SOURCE'] ?? '';
+  assert(python && registrarSource);
+  const f = await prepareRegistrar({
+    python,
+    registrarSource,
+    documents: [
+      { path: 'seed.txt', bytes: Buffer.from('HTML sharing seed\n') },
+    ],
+  });
+  const workspace = join(f.base, 'state');
+  const html = '<!doctype html>\n<p>😀</p><img src="pixel.png">\n';
+  const htmlPath = join(f.base, 'sources/gallery.html');
+  const assetPath = join(f.base, 'sources/pixel.png');
+  await writeFile(htmlPath, html);
+  await writeFile(assetPath, png);
+  const sourceRows = (
+    await cli(python, registrarSource, workspace, 'sources', ['list'])
+  )['sources'] as { id: string; sharing: string }[];
+  assert.equal(
+    sourceRows.find((row) => row.id === f.source.id)?.sharing,
+    'registered-sources',
+  );
+
+  // A fixed executable keeps the transport implementation pin intact. Only
+  // test-owned registry state changes on the third admitted list call.
+  const pythonWrapper = join(f.base, 'python-wrapper.sh');
+  const armPath = join(f.base, 'change-sharing.arm');
+  const countPath = join(f.base, 'list-count');
+  await writeFile(
+    pythonWrapper,
+    `#!/bin/sh
+if [ "$4" = "sources" ] && [ "$7" = "list" ] && [ -f ${shellQuote(armPath)} ]; then
+  n=0
+  if [ -f ${shellQuote(countPath)} ]; then n=$(cat ${shellQuote(countPath)}); fi
+  n=$((n+1))
+  printf '%s' "$n" > ${shellQuote(countPath)}
+  if [ "$n" = "3" ]; then
+    ${shellQuote(python)} -B -m knowledge_agent.cli sources --workspace ${shellQuote(workspace)} set-sharing ${shellQuote(f.source.id)} local-only >/dev/null || exit $?
+  fi
+fi
+exec ${shellQuote(python)} "$@"
+`,
+  );
+  await chmod(pythonWrapper, 0o700);
+  const task = {
+    id: 'html-default-sharing',
+    directory: join(f.base, 'task'),
+    authorityRef: 'synthetic-registered-html-image-inventory',
+  };
+  const intake = await runArchiveIntake({
+    task,
+    intakes: [
+      {
+        task,
+        source: f.source,
+        readScope: 'source-root',
+        requestKey: 'html-default-sharing-v1',
+        transport: {
+          python: pythonWrapper,
+          registrarSource,
+          workspace,
+        },
+      },
+    ],
+  });
+  assert.equal(intake.status, 'published');
+  const publicationPath = intake.outcomes[0].publicationPath;
+  assert(publicationPath);
+  const publication = await loadArchivePublication(publicationPath);
+  assert.equal(publication.preservation, 'complete-admitted');
+  await rm(htmlPath);
+  await rm(assetPath);
+  const recoveredOriginalPath = join(f.base, 'recovered-default-gallery.html');
+  const recovered = await cli(python, registrarSource, workspace, 'archive', [
+    'recover',
+    f.source.id,
+    publication.generation,
+    'gallery.html',
+    recoveredOriginalPath,
+  ]);
+  assert.equal(recovered['sha256'], hash(html));
+  assert.deepEqual(await readFile(recoveredOriginalPath), Buffer.from(html));
+  const plan = {
+    publicationPath,
+    sourcePath: 'gallery.html',
+    recoveredOriginalPath,
+  };
+  const { receipt, receiptPath } = await inventoryArchiveHtmlImages(plan);
+  assert.equal(receipt.schema, 2);
+  assert.equal(receipt.sourceSharing, 'registered-sources');
+  assert.equal(
+    receipt.coverage,
+    'registered-sources-simple-single-line-html-img-declarations-only',
+  );
+  assert.deepEqual(receipt.sourceOriginal, {
+    sha256: hash(html),
+    bytes: Buffer.byteLength(html),
+  });
+  assert.equal(receipt.images.length, 1);
+  assert.equal(receipt.images[0].targetPath, 'pixel.png');
+  assert.deepEqual(receipt.images[0].original, {
+    sha256: hash(png),
+    bytes: png.length,
+  });
+  assert.equal(receipt.images[0].gap, null);
+  assert.equal(receipt.images[0].quoteSha256, hash('<img src="pixel.png">'));
+  assert.equal(receipt.currentOriginal, 'not-checked');
+  assert.equal(receipt.visualMeaning, 'not-evaluated');
+  const serialized = await readFile(receiptPath, 'utf8');
+  for (const forbidden of ['<img', 'recovered-default-gallery', '😀'])
+    assert(!serialized.includes(forbidden));
+
+  await writeFile(armPath, 'armed');
+  await assert.rejects(
+    () => inventoryArchiveHtmlImages(plan),
+    /Current source sharing changed during HTML inventory/,
+  );
+  assert.equal(await readFile(countPath, 'utf8'), '4');
+  const changedRows = (
+    await cli(python, registrarSource, workspace, 'sources', ['list'])
+  )['sources'] as { id: string; sharing: string }[];
+  assert.equal(
+    changedRows.find((row) => row.id === f.source.id)?.sharing,
+    'local-only',
   );
 });
 

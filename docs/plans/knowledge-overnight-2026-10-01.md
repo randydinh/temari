@@ -1014,3 +1014,39 @@ reviewed head, the handoff's Registrar, Nx and package claims match sanitized
 evidence, the audit remains six-field append-only, and no private corpus or
 report path enters the added text. Keep the source-linked handoff with the
 local-only syntax boundary; all five production finish predicates remain open.
+
+## 2026-10-02 09:19 UTC archived HTML sharing admission experiment
+
+PRs #172 and #173 are merged; this clean isolated branch starts from
+`4abcd9f3d60d946ad7f354f60ab95b1093b6e5c3`. A read-only architect
+compared (A) admitting the default `registered-sources` mode to the bounded
+standalone HTML declaration inventory, (B) graph and archive operational
+recovery, and (C) BM25 cost decomposition. The inventory is local parsing
+only, while its current local-only check excludes the Registrar default.
+Graph recovery needs lineage and retraction semantics; cost decomposition is
+diagnostic. Select A as a narrow default-source capability increment.
+
+Pass only if the adapter retains the source sharing mode at start, admits only
+`local-only` or `registered-sources`, and rechecks the same mode before writing
+the receipt, alongside all existing archive, registration, publication and
+recovered-original pins. Record the admitted mode without implying permission
+for a hosted call. Verify both modes through actual Registrar capture and
+recovery, including sharing revocation or change, while keeping the metadata
+receipt free of raw HTML and image bytes. Keep existing local-only behavior,
+syntax bounds and explicit visual-meaning gap. Require focused actual
+Registrar and full Nx checks, independent review, clean exact-head package
+and reviewable PR. The five production finish predicates remain open.
+
+### 09:32 UTC archived HTML sharing verification
+
+Keep the scoped admission change. New schema-2 metadata receipts record the
+current sharing mode while preserving the earlier local-only coverage literal
+and unchanged parser policy. Actual Registrar focused cases passed 3/3 for
+both sharing modes, retained recovery after live HTML and PNG deletion,
+cross-run mode change, and a deterministic mid-run change refusal. The final
+uncached Nx Knowledge integration passed 99/99, unit tests 43/43, typecheck,
+sync and scoped format passed. Independent read-only review found no remaining
+must-fix after correcting receipt versioning. This is bookend policy checking,
+not a transactional sharing snapshot or hosted-call authorization. Clean
+commit, exact-head package/check and PR delivery remain; visual meaning and
+the five broader production finish predicates remain open.
