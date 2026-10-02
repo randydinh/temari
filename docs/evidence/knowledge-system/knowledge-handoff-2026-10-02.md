@@ -169,3 +169,24 @@ before archive reads and made no TypeSafe call. Conservative parsing does not
 cover all CommonMark or Markdown dialects, HTML images, rendering, visual
 meaning or continuous freshness. The five broader finish predicates above
 remain open.
+
+## 06:33 UTC Markdown raw-HTML image continuation
+
+GitHub reports [#162](https://github.com/randydinh/temari/pull/162) merged at
+`814a4699060be04670a81dff8febea9b5fa285f3` after independent exact-head
+review of clean commit `6f581f2e9af16fde7aed3e50de0ae606c9aaa6d9`.
+The reviewed and merged trees match. Final actual-Registrar Knowledge
+integration passed 94/94, focused explicit `local-only` capture/delete/read
+and recovery cases passed 2/2, unit tests 43/43, uncached typecheck and Nx sync
+passed. Canonical package/check reported the reviewed head with `dirty:false`,
+and a stock Node import of its public export succeeded. GitHub listed no
+branch checks. The local merge command hit the occupied `main` worktree during
+cleanup; the remote PR state confirms the merge.
+
+The [Markdown raw-HTML image receipt](markdown-html-image-inventory-2026-10-02.md)
+records bounded simple `<img src="...">` declarations in archived Markdown
+with pinned target metadata and explicit gaps. The actual Registrar fixture
+set `local-only`, deleted live originals before archive reads, and made no
+TypeSafe call. This does not establish browser or Markdown rendering, full
+HTML coverage, visual meaning or continuous freshness. The five broader
+finish predicates above remain open.
