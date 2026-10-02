@@ -1528,3 +1528,29 @@ read-only review found no must-fix. The caller must independently pin its
 prior receipt; full Registrar profile/admission, the later import path-open
 race, atomicity and five broader finish predicates remain open. Exact-head
 package/check and PR remain.
+
+### 12:46 UTC recovery identity-recheck delivery
+
+Independent exact-head review accepted clean commit
+`22f46e9bf46944ecda05e899c62e38a3b6a4601b`. The public-entry
+package/check reported this revision with `dirty:false`; relocated stock
+Node Knowledge CLI help and packaged recheck export loaded. GitHub reports
+[#188](https://github.com/randydinh/temari/pull/188) merged at
+`49ea58fe5950244c44c3e56e26c4a5ffe28c6f3d` with the reviewed tree.
+Keep at-check drift detection only. Caller pinning, later path opens, full
+profile/admission, atomicity and five broader finish predicates remain open.
+
+### 12:47 UTC post-recheck handoff hypothesis
+
+Reconcile #187 and #188 in the Knowledge handoff and update the recheck
+evidence from pending to delivered. Preserve actual Registrar/Nx/package
+results, trusted-prior and at-check qualifiers, and five broader predicates.
+
+### 12:49 UTC post-recheck handoff verification
+
+Keep the source-linked handoff. Independent read-only review matched #187
+and #188 merged heads and trees to retained actual Registrar/Nx/package
+evidence, confirmed four intended documentation/audit files and a strict
+six-field append, and found no private or raw source text in added bytes.
+The note keeps the trusted-prior, at-check and TOCTOU limits and all five
+finish predicates open. Publish after clean exact-head package/check.

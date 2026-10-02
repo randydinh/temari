@@ -519,3 +519,34 @@ post-plan file changes and atomic import remain outside the plan. This does
 not establish production backup, RPO/RTO, semantic quality, Windows
 operation or a lossless system. No hosted Jev call or key read occurred.
 All five broader finish predicates above remain open.
+
+## 12:46 UTC bounded recovery recheck continuation
+
+GitHub reports [#187](https://github.com/randydinh/temari/pull/187)
+merged at `2011d99b7b422b9e8ca9c542fb263dc8a1af9724` after its #186
+handoff passed independent exact-head review and clean package/check. GitHub
+reports [#188](https://github.com/randydinh/temari/pull/188) merged at
+`49ea58fe5950244c44c3e56e26c4a5ffe28c6f3d` after independent
+exact-head review of clean commit
+`22f46e9bf46944ecda05e899c62e38a3b6a4601b`; reviewed and merged
+trees match. Focused actual Registrar fixture passed 1/1; uncached Nx
+Knowledge integration passed 100/100, unit tests 43/43, daemonless typecheck
+and sync, scoped format and diff checks passed. The exact-head public-entry
+package/check reported `dirty:false`; relocated stock Node Knowledge CLI
+help and packaged recheck export loaded. GitHub listed no branch checks.
+Local merge cleanup met the occupied `main` worktree; remote state and
+tree confirm the merge.
+
+The [recheck note](graph-recovery-recheck-2026-10-02.md) describes a
+read-only comparison of bounded package bytes and dependency metadata
+against a caller-trusted earlier schema 2 plan. Unchanged and shuffled
+OKF path order returned `unchanged-at-check`; same-path archive or OKF
+repacking, internally self-consistent changed OKF content, missing package,
+symlink and malformed expected receipt refused before destination mutation.
+The actual Registrar fixture still replays the original archive/root/child
+lineage and retraction. This result observes bytes only at check time. It
+does not authenticate the caller's prior plan, lock paths, remove the gap
+before Registrar reopens them, validate the full package or source admission,
+or make separate imports atomic. The 8 MiB archive and 1 MiB per-OKF caps
+remain. No hosted Jev call or key read occurred. All five broader finish
+predicates above remain open.
