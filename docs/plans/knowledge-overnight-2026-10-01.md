@@ -1343,3 +1343,30 @@ resulting `UPSTREAM.json` digest. The payload verifier's focused tests pass.
 The source and digest pins must enter one clean reviewed commit before the
 exact-head package/check. This is required installer integrity maintenance,
 not a change in upstream attribution, sharing or hosted-model policy.
+
+### 11:32 UTC manifest hash reuse delivery
+
+Independent exact-head review accepted clean commit
+`65aead3f363cc922933430f7974b3f8ee715c565`. The public-entry
+package/check reported that revision with `dirty:false`; relocated stock
+Node Knowledge CLI help loaded. GitHub reports
+[#182](https://github.com/randydinh/temari/pull/182) merged at
+`cbbbee00048472cc40624e88b9788576f0fca267`, with the reviewed tree.
+Keep the local hash reuse and required payload pins. The timed improvement
+is observational, while SLO, quality and five broader production finish
+predicates remain open.
+
+### 11:33 UTC post-hash handoff hypothesis
+
+Reconcile #182's verified merged scope in the Knowledge handoff and the
+per-discovery evidence note. Record actual Registrar/Nx/payload/package
+checks, the one-call reuse boundary, same-host measurements, and limitations.
+Preserve all five broader production finish predicates.
+
+### 11:35 UTC post-hash handoff verification
+
+Independent read-only review confirmed #182's merged tree matches reviewed
+head `65aead3`, and the handoff's actual Registrar, Nx, payload, package and
+benchmark claims match retained evidence. Only intended docs/audit changed;
+the audit is six-field append-only, added text has no private path or source
+content, and all five broader production finish predicates remain open.
