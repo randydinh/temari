@@ -427,3 +427,31 @@ sequential CLI and in-process blocks cannot isolate startup. These times are
 not an SLO, cache decision, default-ranker promotion or answer-quality gate.
 No hosted Jev call or key read occurred. All five broader finish predicates
 above remain open.
+
+## 11:32 UTC manifest hash reuse continuation
+
+GitHub reports [#182](https://github.com/randydinh/temari/pull/182) merged at
+`cbbbee00048472cc40624e88b9788576f0fca267` after independent exact-head
+review of clean commit `65aead3f363cc922933430f7974b3f8ee715c565`.
+The reviewed and merged trees match. The expanded two-source actual Registrar
+case passed, uncached Nx Knowledge integration passed 100/100, unit tests
+43/43, daemonless typecheck and sync passed. Registrar payload verification
+passed 6/6. The exact-head public-entry package/check reported `dirty:false`,
+and a relocated stock Node Knowledge CLI help command loaded. GitHub listed
+no branch checks. Local merge cleanup met the occupied `main` worktree;
+remote PR state and tree confirm the merge.
+
+The [per-discovery hash note](bm25-manifest-hash-2026-10-02.md) records a
+single-call reuse of the selected archive manifest hash already computed for
+the continuation binding. `_selection`/`_load` validation and final
+`_recheck` remain. The two-source fixture checks exact and BM25 pins, order,
+pagination and policy/integrity refusals. The bundled Registrar source and
+manifest pins were updated to preserve installer integrity. The opt-in
+synthetic `local-only` diagnostic matched fixture settings and selected bytes
+across before/after runs, with 48 independently checked top citations per
+run. In-process medians for 100/500/1,000 documents changed from
+41.401/846.399/3276.202 ms to 7.007/30.857/59.601 ms on this Mac. Runs
+were sequential with new source/generation identities, so these observations
+are not an SLO, a pure hash-cost estimate, or an answer-quality decision. No
+hosted Jev call or key read occurred. All five broader finish predicates
+above remain open.

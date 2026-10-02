@@ -60,6 +60,11 @@ resulting manifest digest; the payload verifier's focused tests pass. This
 maintains the bundle's integrity check and does not alter upstream attribution.
 
 The actual Registrar and Nx checks are recorded in the overnight decision
-log. Exact-head package/check and review are pending. This does not establish
-answer quality, continuous graph correction, visual meaning, production
-recovery, Windows operation or a production lossless system.
+log. The clean exact-head package/check reported commit
+`65aead3f363cc922933430f7974b3f8ee715c565` with `dirty:false`; a
+relocated stock Node Knowledge CLI help command loaded, and independent
+exact-head review found no must-fix. [PR #182](https://github.com/randydinh/temari/pull/182)
+merged at `cbbbee00048472cc40624e88b9788576f0fca267` with the same tree.
+This does not establish answer quality, continuous graph correction, visual
+meaning, production recovery, Windows operation or a production lossless
+system.
