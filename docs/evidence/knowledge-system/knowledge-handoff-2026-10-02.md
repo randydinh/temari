@@ -128,3 +128,23 @@ relationships to pinned media and records unresolved or linked cases as gaps.
 It was verified on a `local-only` Registrar source without a TypeSafe call.
 It covers syntax in one DOCX part, not rendering, image meaning or full DOCX
 visual coverage. The five broader finish predicates remain open.
+
+## 05:37 UTC DOCX header/footer continuation
+
+GitHub reports [#158](https://github.com/randydinh/temari/pull/158) merged at
+`e8eca407676bda5a718bd60ae8e0eb142815b3af` after independent exact-head
+review of clean commit `f351c1fe7602b8d3e17ee2a2dbe4faeeb9c27c2a`.
+Final actual-Registrar Knowledge integration passed 90/90, the focused local
+capture/delete/recover case passed 1/1, unit tests passed 43/43, typecheck
+and Nx sync passed. Canonical package/check reported that exact head with
+`dirty:false`; a stock Node import of its public export succeeded. GitHub
+listed no branch checks. The local merge command hit the occupied `main`
+worktree during cleanup, but the remote PR state confirms the merge.
+
+The [declared header/footer receipt](docx-header-footer-refs-2026-10-02.md)
+links direct section declarations through selected part relationships to
+pinned package media. Its residual-media field is scoped only to selected
+header/footer parts. The fixture used a `local-only` source and made no
+TypeSafe call. This does not determine which header or footer Word renders on
+a page, image meaning or full DOCX visual coverage. The five broader finish
+predicates remain open.
