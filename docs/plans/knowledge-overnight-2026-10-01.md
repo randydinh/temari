@@ -1078,3 +1078,52 @@ claims match verified receipts. Only plan, handoff and audit files changed,
 the audit retains its six-field append-only prefix, and added text contains
 no private path or raw content. Keep this source-linked handoff; all five
 broader production finish predicates remain open.
+
+## 2026-10-02 09:46 UTC paired archive and root-graph recovery experiment
+
+PRs #174 and #175 are merged; this clean isolated branch starts from
+`fe7ba5ff6f0c440a3653b5ae2e5e370becd4ef70`. A read-only architect
+compared (A) a test-only actual-Registrar invariant for separate archive and
+root-graph export/import with checked derived projection and (B) a fixed-source
+BM25 cost decomposition. The latter would improve a future cache decision but
+remain observational. Choose A to exercise an operational recovery gap without
+changing Registrar protocol, P-stack execution boundaries or hosted models.
+
+Pass only if a synthetic `local-only` source with two captured text originals
+and a pinned root graph can be exported as separate archive and OKF packages,
+then replayed in a fresh pre-provisioned workspace after the live originals
+are edited or deleted. Verify exact graph/revision identities, record anchors,
+archived read/recover pins and checked deterministic projection. Require
+wrong-order, tampered-package and disabled-registration refusals without
+publishing an invalid graph. Keep raw export packages off-repository; the OKF
+may contain labels and quotes. Scope to one root graph and one source, with
+actual Registrar focused and full Nx checks, independent review, a clean
+exact-head package and PR. This does not establish atomic backup, policy or
+erasure-state restore, child graph history, retractions, RPO/RTO, Windows,
+semantic graph correctness or production losslessness. The five broader
+production finish predicates remain open.
+
+### 09:51 UTC daemonless Nx sync checkpoint
+
+The first daemonless Nx sync check exposed one missing generated TypeScript
+project reference in `packages/workflow-runtime/tsconfig.lib.json`, despite a
+daemon-backed check reporting up to date. The workspace's `pnpm nx sync`
+generator added only the existing `libs/runtime/tsconfig.lib.json` reference;
+`NX_DAEMON=false pnpm nx sync:check` then passed. Retain this necessary
+generated config repair with the recovery proof, and rerun final Nx checks
+without `--skipSync`. The earlier interrupted integration is not final
+evidence.
+
+### 10:01 UTC paired recovery verification
+
+Keep the bounded synthetic proof. The final actual Registrar focused case
+passed 1/1 and uncached Nx Knowledge integration passed 100/100 after the
+fixture gained `finally` cleanup of its private archive and OKF packages.
+Unit tests passed 43/43; typecheck, daemonless sync and scoped formatting
+passed. The test verified wrong-order, tampered archive and OKF, and disabled
+access refusals alongside exact imported graph/RevisionSet, three pinned
+records, projection and recovered bytes. Independent read-only review found
+no must-fix. The one generated Nx project reference was checked separately.
+Clean commit, exact-head package/check and PR remain. Atomic backup,
+retractions, policy/erasure restore, RPO/RTO, Windows and five broader
+production finish predicates remain open.

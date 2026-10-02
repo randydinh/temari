@@ -416,5 +416,6 @@ import './archive-docx-header-footer-refs.integration.test.js';
 import './archive-jobs.integration.test.js';
 import './archive-query-feedback.integration.test.js';
 import './archive-recovery.integration.test.js';
+import './archive-graph-recovery.integration.test.js';
 import './archive-graph-reviewed-change.integration.test.js';
 import './archive-source-lifecycle.integration.test.js';
