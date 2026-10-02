@@ -25,6 +25,29 @@ export interface ArchiveReviewedGraphChange {
   };
 }
 
+export interface ArchiveReviewedGraphChangeReceipt {
+  readonly schema: 1;
+  readonly kind: 'temari-archive-reviewed-graph-change';
+  readonly policy: 'operator-selected-exact-archived-markdown-link-v1';
+  readonly parentGraphId: string;
+  readonly graphId: string;
+  readonly revisionSetId: string;
+  readonly reviewerRef: string;
+  readonly reason: string;
+  readonly retractedAssertionIds: readonly string[];
+  readonly addedAssertionId: string | null;
+  readonly draftSha256: string;
+  readonly publicationPins: readonly {
+    readonly path: string;
+    readonly sha256: string;
+    readonly sourceId: string;
+    readonly generation: string;
+    readonly manifestSha256: string;
+  }[];
+  readonly currentOriginal: 'not-checked';
+  readonly reviewerAuthenticated: false;
+}
+
 function fields(value: object, allowed: readonly string[]) {
   assert.deepEqual(Object.keys(value).sort(), [...allowed].sort(), 'Unexpected review fields');
 }
@@ -160,7 +183,7 @@ export async function publishReviewedArchiveGraphChange(review: ArchiveReviewedG
     assert.equal(canonical(finalPins[index].publication), canonical(publications[index]),
       'Publication changed during graph review');
   }
-  const receipt = {
+  const receipt: ArchiveReviewedGraphChangeReceipt = {
     schema: 1, kind: 'temari-archive-reviewed-graph-change',
     policy: 'operator-selected-exact-archived-markdown-link-v1',
     parentGraphId: review.parentGraphId, graphId,

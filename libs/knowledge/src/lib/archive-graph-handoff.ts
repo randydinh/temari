@@ -1,4 +1,4 @@
-/** An explicit, receipt-pinned evaluation of a reviewed v2 graph root. */
+/** Explicit, receipt-pinned evaluations of a reviewed v2 root or its reviewed child. */
 import assert from 'node:assert/strict';
 import { lstat } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join } from 'node:path';
@@ -6,6 +6,7 @@ import {
   loadArchivePublication,
   registrationFor,
 } from './archive-intake.js';
+import { verifyReviewedArchiveGraphChild } from './archive-graph-child-handoff.js';
 import { createArchiveGraphReader } from './archive-graph.js';
 import { readAllGraphRecords } from './archive-graph-impact.js';
 import type { ArchiveGraphRepinReceipt } from './archive-graph-repin.js';
@@ -21,6 +22,7 @@ import { canonical, digest, hash, object, text } from './codec.js';
 import { publishJson, readJsonWithBytes } from './durable.js';
 
 export interface ReviewedArchiveGraphEvaluationInput {
+  /** Content-addressed fresh-root review, also required for child evaluation. */
   readonly reviewReceiptPath: string;
   readonly caseId: string;
   /** Operator case metadata only; this method does not execute search. */
@@ -145,14 +147,11 @@ async function canonicalReceipt<T>(path: string, prefix: string): Promise<{
   return { receipt, sha256 };
 }
 
-/** Evaluates a selected v2 root; it never publishes or promotes a graph. */
-export async function evaluateReviewedArchiveGraphRoot(
+/** Shared root authority and trial checks; neither route publishes a graph. */
+async function evaluateReviewedArchiveGraph(
   input: ReviewedArchiveGraphEvaluationInput,
-): Promise<{
-  readonly trial: ArchiveGraphTrial;
-  readonly receipt: ReviewedArchiveGraphEvaluationReceipt;
-  readonly receiptPath: string;
-}> {
+  childReviewReceiptPath?: string,
+) {
   validateInput(input);
   const { receipt: review, sha256: reviewSha256 } =
     await canonicalReceipt<ArchiveGraphRepublishReceipt>(
@@ -175,6 +174,7 @@ export async function evaluateReviewedArchiveGraphRoot(
       review.proposalReceiptPath,
       'archive-graph-repin',
     );
+  assert.equal(proposal.schema, 1);
   assert.equal(proposal.kind, 'temari-archive-graph-repin-proposal');
   assert.equal(proposal.status, 'proposal-only');
   assert.equal(proposal.policy, 'bounded-unchanged-v2-evidence-v1');
@@ -233,6 +233,7 @@ export async function evaluateReviewedArchiveGraphRoot(
   assert.equal(publication.generation, pin.generation);
   assert.equal(publication.manifestSha256, pin.manifestSha256);
   assert.equal(dirname(input.reviewReceiptPath), publication.task.directory);
+  assert.equal(dirname(review.proposalReceiptPath), publication.task.directory);
   assert(input.lexical.every((item) => item.sourceId === publication.source.id));
   assert(input.expected.every((item) => item.sourceId === publication.source.id));
   const revisionSet = {
@@ -260,6 +261,8 @@ export async function evaluateReviewedArchiveGraphRoot(
   assert.equal(hash(draftSaved.bytes), review.afterGraphId, 'Graph draft pin changed');
   assert.equal((await lstat(review.draftPath)).mode & 0o077, 0);
   const draft = object(draftSaved.value);
+  assert.deepEqual(Object.keys(draft).sort(), ['assertions', 'nodes', 'parent', 'revision_set', 'schema']);
+  assert.equal(draft['schema'], 1);
   assert.equal(draft['parent'], null);
   assert.equal(canonical(draft['revision_set']), canonical(revisionSet));
   const draftRecords = [
@@ -283,6 +286,13 @@ export async function evaluateReviewedArchiveGraphRoot(
     'Reviewed graph differs from pinned draft',
   );
 
+  const verifyChild = () => verifyReviewedArchiveGraphChild({
+    receiptPath: childReviewReceiptPath!, rootGraphId: review.afterGraphId,
+    revisionSetId: review.afterRevisionSetId, publication, pin,
+    parentRecords: graph.records,
+  });
+  const child = childReviewReceiptPath === undefined ? null : await verifyChild();
+  const graphId = child?.review.graphId ?? review.afterGraphId;
   const provider = await createArchiveRegistrar({
     publications: [pin.publicationPath],
     readScope: 'source-root',
@@ -303,7 +313,7 @@ export async function evaluateReviewedArchiveGraphRoot(
     assert.equal(check.basis, 'archive-snapshot');
   }
   const trial = await evaluateArchiveGraphTrial({
-    graphId: review.afterGraphId,
+    graphId,
     publications: [pin.publicationPath],
     scope: [publication.source],
     provider,
@@ -312,6 +322,45 @@ export async function evaluateReviewedArchiveGraphRoot(
     topK: input.topK,
     taskDirectory: publication.task.directory,
   });
+  if (child) {
+    const afterChild = await verifyChild();
+    assert.equal(afterChild.sha256, child.sha256, 'Child review changed during trial');
+  }
+  assert.equal((await lstat(review.draftPath)).mode & 0o077, 0);
+  const finalRoot = await readAllGraphRecords(reader, review.afterGraphId, publication.source);
+  assert.equal(canonical(finalRoot), canonical(graph), 'Root graph changed during trial');
+  let trialCheckpointSha256: string | null = null;
+  assert.equal(trial.checkpointPath === null, trial.status === 'gap');
+  if (trial.checkpointPath !== null) {
+    assert.equal(dirname(trial.checkpointPath), publication.task.directory);
+    const checkpointSaved = await readJsonWithBytes(trial.checkpointPath);
+    const checkpoint = object(checkpointSaved.value);
+    assert.equal(checkpointSaved.bytes.toString('utf8'), canonical(checkpoint));
+    trialCheckpointSha256 = hash(checkpointSaved.bytes);
+    assert.equal(
+      basename(trial.checkpointPath),
+      `archive-graph-trial-${trialCheckpointSha256}.json`,
+      'Trial checkpoint name does not bind content',
+    );
+    assert.equal(checkpoint['schema'], 1);
+    assert.equal(checkpoint['kind'], 'temari-archive-graph-trial');
+    assert.equal(checkpoint['graphId'], graphId);
+    assert(
+      input.lexical.some((item) => canonical(item) === canonical(checkpoint['seed'])),
+      'Trial seed is outside supplied lexical shortlist',
+    );
+    assert.equal(canonical(checkpoint['provider']), canonical(provider.identity));
+    assert.equal(canonical(checkpoint['added']), canonical(trial.added));
+    assert.equal(canonical(checkpoint['gaps']), canonical(trial.gaps));
+    assert.equal(checkpoint['targetReadAttempts'], trial.targetReadAttempts);
+    assert.equal(checkpoint['projectionNodeCount'], trial.projectionNodeCount);
+    assert.equal(checkpoint['policy'], trial.policy);
+    assert.equal(checkpoint['fullDocumentRead'], false);
+    assert.equal(
+      Array.isArray(checkpoint['evidence']) ? checkpoint['evidence'].length : -1,
+      trial.verifiedEvidenceCount,
+    );
+  }
   // A trial can write a checkpoint. Recheck the authority and pins before its
   // summary can be published, so a stale run cannot be reported as current.
   assert.equal(
@@ -335,37 +384,12 @@ export async function evaluateReviewedArchiveGraphRoot(
     publication.registration,
     'Current source admission changed during trial',
   );
-  let trialCheckpointSha256: string | null = null;
-  assert.equal(trial.checkpointPath === null, trial.status === 'gap');
-  if (trial.checkpointPath !== null) {
-    assert.equal(dirname(trial.checkpointPath), publication.task.directory);
-    const checkpointSaved = await readJsonWithBytes(trial.checkpointPath);
-    const checkpoint = object(checkpointSaved.value);
-    assert.equal(checkpointSaved.bytes.toString('utf8'), canonical(checkpoint));
-    trialCheckpointSha256 = hash(checkpointSaved.bytes);
-    assert.equal(
-      basename(trial.checkpointPath),
-      `archive-graph-trial-${trialCheckpointSha256}.json`,
-      'Trial checkpoint name does not bind content',
-    );
-    assert.equal(checkpoint['schema'], 1);
-    assert.equal(checkpoint['kind'], 'temari-archive-graph-trial');
-    assert.equal(checkpoint['graphId'], review.afterGraphId);
-    assert(
-      input.lexical.some((item) => canonical(item) === canonical(checkpoint['seed'])),
-      'Trial seed is outside supplied lexical shortlist',
-    );
-    assert.equal(canonical(checkpoint['provider']), canonical(provider.identity));
-    assert.equal(canonical(checkpoint['added']), canonical(trial.added));
-    assert.equal(canonical(checkpoint['gaps']), canonical(trial.gaps));
-    assert.equal(checkpoint['targetReadAttempts'], trial.targetReadAttempts);
-    assert.equal(checkpoint['projectionNodeCount'], trial.projectionNodeCount);
-    assert.equal(checkpoint['policy'], trial.policy);
-    assert.equal(checkpoint['fullDocumentRead'], false);
-    assert.equal(
-      Array.isArray(checkpoint['evidence']) ? checkpoint['evidence'].length : -1,
-      trial.verifiedEvidenceCount,
-    );
+  if (child) {
+    assert.equal(hash((await readJsonWithBytes(childReviewReceiptPath!)).bytes), child.sha256);
+    const childDraftPath = join(publication.task.directory,
+      `archive-graph-reviewed-draft-${child.review.draftSha256}.json`);
+    assert.equal(hash((await readJsonWithBytes(childDraftPath, 524_288)).bytes), child.review.draftSha256);
+    assert.equal((await lstat(childDraftPath)).mode & 0o077, 0);
   }
   const receipt: ReviewedArchiveGraphEvaluationReceipt = {
     schema: 1,
@@ -378,7 +402,7 @@ export async function evaluateReviewedArchiveGraphRoot(
     sourceId: publication.source.id,
     generation: publication.generation,
     manifestSha256: publication.manifestSha256,
-    graphId: review.afterGraphId,
+    graphId,
     revisionSetId: review.afterRevisionSetId,
     selectedRecordIds: selected,
     mappingSha256: hash(canonical(review.recordMapping)),
@@ -407,10 +431,60 @@ export async function evaluateReviewedArchiveGraphRoot(
     currentOriginal: 'not-checked',
     semanticCorrectness: 'not-verified',
   };
+  if (child) {
+    const childReceipt: ReviewedArchiveGraphChildEvaluationReceipt = {
+      ...receipt,
+      kind: 'temari-reviewed-v2-child-graph-evaluation',
+      policy: 'explicit-reviewed-child-trial-v1',
+      rootGraphId: review.afterGraphId,
+      childReviewReceiptPath: childReviewReceiptPath!,
+      childReviewReceiptSha256: child.sha256,
+      childDraftSha256: child.review.draftSha256,
+      retractedAssertionCount: child.review.retractedAssertionIds.length,
+      addedAssertionCount: child.review.addedAssertionId === null ? 0 : 1,
+    };
+    const receiptPath = join(publication.task.directory,
+      `archive-graph-v2-child-evaluation-${hash(canonical(childReceipt))}.json`);
+    await publishJson(receiptPath, childReceipt);
+    return { trial, receipt: childReceipt, receiptPath };
+  }
   const receiptPath = join(
     publication.task.directory,
     `archive-graph-v2-evaluation-${hash(canonical(receipt))}.json`,
   );
   await publishJson(receiptPath, receipt);
   return { trial, receipt, receiptPath };
+}
+
+/** Evaluate only the explicitly reviewed fresh root. */
+export async function evaluateReviewedArchiveGraphRoot(input: ReviewedArchiveGraphEvaluationInput) {
+  const result = await evaluateReviewedArchiveGraph(input);
+  assert(result.receipt.kind === 'temari-reviewed-v2-graph-evaluation');
+  return { ...result, receipt: result.receipt };
+}
+
+export interface ReviewedArchiveGraphChildEvaluationInput extends ReviewedArchiveGraphEvaluationInput {
+  readonly childReviewReceiptPath: string;
+}
+
+/** Both content-addressed reviews are required; arbitrary child IDs are not accepted. */
+export async function evaluateReviewedArchiveGraphChild(input: ReviewedArchiveGraphChildEvaluationInput) {
+  const { childReviewReceiptPath, ...rootInput } = input;
+  assert(isAbsolute(childReviewReceiptPath));
+  const result = await evaluateReviewedArchiveGraph(rootInput, childReviewReceiptPath);
+  assert(result.receipt.kind === 'temari-reviewed-v2-child-graph-evaluation');
+  return { ...result, receipt: result.receipt };
+}
+
+export interface ReviewedArchiveGraphChildEvaluationReceipt extends Omit<
+  ReviewedArchiveGraphEvaluationReceipt, 'kind' | 'policy'
+> {
+  readonly kind: 'temari-reviewed-v2-child-graph-evaluation';
+  readonly policy: 'explicit-reviewed-child-trial-v1';
+  readonly rootGraphId: string;
+  readonly childReviewReceiptPath: string;
+  readonly childReviewReceiptSha256: string;
+  readonly childDraftSha256: string;
+  readonly retractedAssertionCount: number;
+  readonly addedAssertionCount: number;
 }
