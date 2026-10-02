@@ -48,6 +48,18 @@ export interface ArchiveFreshnessJobTickResult {
   readonly stagePath: string | null;
   readonly auditReceiptPath: string | null;
 }
+export interface CompletedArchiveFreshnessDecision {
+  readonly specPath: string;
+  readonly specSha256: string;
+  readonly stagePath: string;
+  readonly stageSha256: string;
+  readonly auditReceiptPath: string;
+  readonly auditReceiptSha256: string;
+  readonly publicationPath: string;
+  readonly publicationSha256: string;
+  readonly sourceId: string;
+  readonly decision: Decision;
+}
 
 function fields(
   value: unknown,
@@ -165,6 +177,38 @@ export async function loadArchiveFreshnessJobSpec(
   assert.equal(dirname(path), publication.task.directory);
   assert.equal(basename(path), `archive-freshness-spec-${specSha(spec)}.json`);
   return spec;
+}
+
+/** Validate one completed, currently admitted freshness decision without scanning. */
+export async function loadCompletedArchiveFreshnessDecision(
+  specPath: string,
+): Promise<CompletedArchiveFreshnessDecision> {
+  const spec = await loadArchiveFreshnessJobSpec(specPath);
+  const publication = await publicationFor(spec);
+  const path = stagePath(spec, publication.task.directory);
+  const stage = await loadStage(spec, publication);
+  assert(stage, 'Completed freshness decision requires a durable stage');
+  const store = await FileChildTaskStore.create(
+    join(publication.task.directory, 'archive-freshness-child-tasks'),
+  );
+  const record = await store.load(identifiers(spec).taskId);
+  assert.equal(record?.status, completion(stage.decision));
+  assert.deepEqual(record?.result?.evidencePaths, [path]);
+  await assertCurrentAdmission(publication);
+  const artifact = await readJsonWithBytes(path);
+  assert.equal(artifact.bytes.toString('utf8'), canonical(stage));
+  return {
+    specPath,
+    specSha256: hash(canonical(spec)),
+    stagePath: path,
+    stageSha256: hash(artifact.bytes),
+    auditReceiptPath: stage.auditReceiptPath,
+    auditReceiptSha256: stage.auditReceiptSha256,
+    publicationPath: spec.publicationPath,
+    publicationSha256: spec.publicationSha256,
+    sourceId: publication.source.id,
+    decision: stage.decision,
+  };
 }
 
 function decide(receipt: ArchiveCurrentnessPagedReceipt): Decision {

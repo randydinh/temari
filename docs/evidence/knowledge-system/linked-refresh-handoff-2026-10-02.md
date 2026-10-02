@@ -1,0 +1,11 @@
+# Linked refresh handoff
+
+The existing due-gated freshness job observes one pinned source and ends with `recapture-needed` on a complete changed audit. It does not capture a new generation. This increment adds a separate durable Knowledge child job that pins that completed audit and its prior publication, then invokes one recapture and produces a pinned diff with optional read-only graph-impact review.
+
+The job uses a deterministic request key and fixed task ID for one source and prior publication. An exclusive capture-start marker prevents a reclaimed worker from initiating a second capture after a stale worker has passed the no-attempt check. The lease is renewed during work and task completion is fenced. A saved complete capture result can resume the handoff without another capture. A missing result, blocked capture, changed admission, ambiguous attempt, tampered artifact or conflicting spec stops for review. The graph is not changed by this job.
+
+The actual Registrar fixtures exercise concurrent ticks against edited, added and removed originals; a v1-pinned graph produces review, repin and discovery queues. They also cover unchanged and partial audits, revocation, conflicting/tampered specs, saved-result resume, missing-result review block, terminal dependent-receipt tampering and an expired capture-start marker with no second generation or attempt. Independent review found and resolved a duplicate-initiation race and a terminal receipt integrity gap.
+
+This is one linked, operator-specified cycle. It has no recurring trigger or source-head compare-and-swap ledger, so out-of-band captures and different prior generations are not serialized. A stale worker may finish its sole Registrar capture after lease loss, leaving review rather than a completed job. Checks and artifact writes are not atomic, and the job cannot automatically authenticate a missing result's publication hash. No hosted model or key is involved. Representative answer quality, visual meaning, production recovery and Windows/plugin lifecycle remain open.
+
+Verification on the isolated checkout: focused actual Registrar 4/4, uncached Knowledge integration 105/105, Knowledge unit 43/43, Knowledge typecheck, `nx sync:check`, scoped Prettier and `git diff --check` passed. The PR and merge outcome will be recorded in the production decision trail after delivery.
