@@ -1472,3 +1472,31 @@ Independent candidate review found no must-fix. Keep only internal-hash and
 declared-dependency claims; profile/admission/atomicity, larger packages and
 later path bytes remain unvalidated. Exact-head package/check and PR remain.
 Five broader finish predicates remain open.
+
+### 12:27 UTC recovery internal-hash delivery
+
+Independent exact-head review accepted clean commit
+`c539bdf300aa7cc7f6bc8796e0cb7cde81d24453`. The public-entry
+package/check reported that revision with `dirty:false`; relocated stock
+Node Knowledge CLI help and packaged planner export loaded. GitHub reports
+[#186](https://github.com/randydinh/temari/pull/186) merged at
+`738dc07229366ffeb2870e31b941682b27e19b63` with the reviewed tree.
+Keep internal-hash preflight only; full Registrar profile, admission,
+atomicity, post-plan file bytes and five broader finish predicates remain
+open.
+
+### 12:28 UTC post-internal-hash handoff hypothesis
+
+Reconcile #185 and #186 in the Knowledge handoff and update the internal-hash
+evidence from pending to delivered. Preserve exact actual Registrar/Nx/package
+results, metadata-only scope, size and validation limits, and all five
+broader production finish predicates.
+
+### 12:31 UTC post-internal-hash handoff verification
+
+Keep the source-linked handoff. Independent read-only review matched #185 and
+#186 merged heads and trees to the evidence, confirmed only four intended
+documentation/audit files changed and a strict six-field audit append, and
+found no private content or raw source in the added text. The note preserves
+actual Registrar/Nx/package results, schema 2's limited claim and all five
+open finish predicates. Publish after clean exact-head package/check.

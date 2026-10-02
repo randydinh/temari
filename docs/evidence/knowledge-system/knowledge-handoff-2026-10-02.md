@@ -485,3 +485,37 @@ atomicity are outside scope. No hosted Jev call or key read occurred. This
 does not establish production backup, erasure, RPO/RTO, semantic quality,
 Windows operation or a lossless system. All five broader finish predicates
 above remain open.
+
+## 12:27 UTC bounded internal-hash continuation
+
+GitHub reports [#185](https://github.com/randydinh/temari/pull/185)
+merged at `f1009458907ca499abdb17a1b04e5dd055f54685` after its
+source-linked #184 handoff passed exact-head package/check and independent
+review. GitHub reports [#186](https://github.com/randydinh/temari/pull/186)
+merged at `738dc07229366ffeb2870e31b941682b27e19b63` after independent
+exact-head review of clean commit
+`c539bdf300aa7cc7f6bc8796e0cb7cde81d24453`; reviewed and merged
+trees match. The public-entry package/check reported `dirty:false`; relocated
+stock Node Knowledge CLI help and the packaged planner export loaded. GitHub
+listed no branch checks. The local merge cleanup again met the occupied
+`main` worktree; remote state and tree confirm the merge.
+
+The [internal-hash note](graph-recovery-internal-hashes-2026-10-02.md)
+records schema 2 of the bounded read-only archive/OKF dependency plan.
+It verifies decoded archive blob hashes and descriptor lengths, plus OKF
+file keysets and UTF-8 hashes, before returning the import order. The
+existing synthetic `local-only` actual Registrar fixture still replays
+archive/root/retracted child exactly. Corrupt bodies or internal declarations
+now refuse before destination mutation; a matching forged OKF body and
+hash can still pass this plan but Registrar rejects its exact profile.
+Focused actual Registrar test passed 1/1; uncached Nx Knowledge integration
+passed 100/100, unit tests 43/43, daemonless typecheck and sync, scoped
+format and diff checks passed. The first integration attempt lacked explicit
+Registrar environment and refused; the corrected run passed.
+
+The planner's 8 MiB archive and 1 MiB per-OKF caps exclude larger valid
+exports. Complete Registrar profile, current admission, ancestor symlinks,
+post-plan file changes and atomic import remain outside the plan. This does
+not establish production backup, RPO/RTO, semantic quality, Windows
+operation or a lossless system. No hosted Jev call or key read occurred.
+All five broader finish predicates above remain open.
