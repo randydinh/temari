@@ -110,3 +110,21 @@ current source registration. It emits bounded `word/media/*` hashes and byte
 counts only. It does not determine whether document XML displays a member or
 what an image means. The fixture used `local-only`; this increment made no
 TypeSafe call. The broader five finish predicates above remain open.
+
+## 05:10 UTC DOCX declared-reference continuation
+
+GitHub reports [#156](https://github.com/randydinh/temari/pull/156) merged at
+`ddf974f92cd0f6246571ecdc44c5f6829c2c71c3` after independent exact-head
+review of clean commit `4f305bc964c8234905abe1568683942f8fa49e9b`.
+Final actual-Registrar Knowledge integration passed 89/89, unit tests 43/43,
+typecheck and Nx sync passed. The canonical package/check reported that exact
+head with `dirty:false`; a stock Node import of its public export succeeded.
+GitHub listed no branch checks. As with #154, the local merge command returned
+an error switching to `main`, but the remote PR state confirms the merge.
+
+The [declared DOCX reference receipt](docx-drawing-refs-2026-10-02.md) maps
+main-document DrawingML `r:embed` declarations through internal image
+relationships to pinned media and records unresolved or linked cases as gaps.
+It was verified on a `local-only` Registrar source without a TypeSafe call.
+It covers syntax in one DOCX part, not rendering, image meaning or full DOCX
+visual coverage. The five broader finish predicates remain open.
