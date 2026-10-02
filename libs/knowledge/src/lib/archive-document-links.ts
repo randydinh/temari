@@ -234,8 +234,11 @@ function links(body: string): Candidate[] {
         if (visible[end] === '(') parentheses++;
         else if (visible[end] === ')' && --parentheses === 0) { end++; break; }
       }
+      let slashCount = 0;
+      while (i > slashCount && visible[i - slashCount - 1] === '\\') slashCount++;
       if (parentheses === 0) found.push({ start: i,
-        quote: body.slice(i, end), destination: '', image: true, escaped: false });
+        quote: body.slice(i, end), destination: body.slice(j + 2, end - 1),
+        image: true, escaped: slashCount % 2 === 1 });
     }
     while (end < visible.length && visible[end] !== '\n' && depth !== 0) end++;
     for (let k = i; k < end; k++) if (masked[k] !== '\r' && masked[k] !== '\n') masked[k] = ' ';
@@ -254,6 +257,29 @@ function links(body: string): Candidate[] {
     });
   }
   return found.sort((a, b) => a.start - b.start);
+}
+
+/** Exact visible inline images; source text and alt text stay with the caller. */
+export function visibleArchivedMarkdownImages(body: string): readonly {
+  start: number;
+  quote: string;
+  destination: string;
+  escaped: boolean;
+}[] {
+  return links(body).filter((item) => item.image).map(
+    ({ start, quote, destination, escaped }) =>
+      ({ start, quote, destination, escaped }),
+  );
+}
+
+/** Full retained UTF-8 text under the same 65,536-codepoint link boundary. */
+export async function readArchivedMarkdownForInventory(
+  provider: KnowledgeProvider,
+  publication: Publication,
+  path: string,
+): Promise<{ body: string; first: KnowledgeEvidence } | null> {
+  const result = await archivedText(provider, publication, path);
+  return result && { body: result.body, first: result.first };
 }
 
 function destination(source: string, raw: string): string | null {
