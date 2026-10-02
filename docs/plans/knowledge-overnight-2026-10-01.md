@@ -1194,3 +1194,30 @@ refuse without extra published graph state. All raw packages are cleaned in
 did not rerun the checks. Clean commit, exact-head package/check and PR
 remain. General history, atomic/production recovery and all five broader
 production finish predicates remain open.
+
+### 10:30 UTC child replay delivery
+
+Independent exact-head review accepted clean commit
+`27466aa3cf350b31a0c7c4b818a6974b7951f5e8`. The public-entry
+package/check reported the revision with `dirty:false`, and a relocated
+stock Node graph reader loaded. GitHub reports
+[#178](https://github.com/randydinh/temari/pull/178) merged at
+`231c032c6432d8095cbeed3810f35e5a7631d3f8`, with the reviewed tree.
+Keep the narrow root-plus-child retraction replay proof. General history,
+atomic/production recovery and five broader finish predicates remain open.
+
+### 10:31 UTC post-child handoff hypothesis
+
+Reconcile #178's merged scope in the Knowledge handoff. State the actual
+Registrar/Nx/package evidence, ordered three-package replay, retraction and
+resurrection refusal, private fixture cleanup and nonproduction limits.
+Preserve all five broader finish predicates.
+
+### 10:32 UTC post-child handoff verification
+
+Independent read-only review found no must-fix: #178 is merged with a tree
+matching the reviewed head, and the handoff's actual Registrar, Nx and
+package claims match source evidence. Only plan, handoff and audit changed;
+the audit remains six-field append-only and added text contains no private
+path or raw fixture content. Keep this narrow source-linked handoff with all
+five broader production finish predicates open.

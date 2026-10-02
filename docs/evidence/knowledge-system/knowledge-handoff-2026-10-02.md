@@ -369,3 +369,32 @@ policy, access grants, erasure state, child graph history, retractions or
 arbitrary derived views, and establishes no RPO/RTO, Windows support,
 semantic correctness or production losslessness. It used no Jev call or key
 read. All five broader finish predicates above remain open.
+
+## 10:30 UTC root and retracted-child replay continuation
+
+GitHub reports [#178](https://github.com/randydinh/temari/pull/178) merged at
+`231c032c6432d8095cbeed3810f35e5a7631d3f8` after independent exact-head
+review of clean commit `27466aa3cf350b31a0c7c4b818a6974b7951f5e8`.
+The reviewed and merged trees match. The final actual Registrar child case
+passed in uncached Nx Knowledge integration 100/100; unit tests 43/43,
+typecheck, daemonless sync, scoped format and diff checks passed. The
+exact-head public-entry package reported `dirty:false`; its manifest check
+and relocated stock Node graph reader passed. GitHub listed no branch
+checks. The local merge command encountered an occupied `main` worktree;
+remote state confirms the merge.
+
+The [retracted-child replay proof](graph-retraction-replay-2026-10-02.md)
+extends the earlier synthetic `local-only` test to one root and one child
+that retracts a relationship. Ordered archive, root OKF and child OKF imports
+into a pre-provisioned destination preserve exact graph and RevisionSet IDs,
+the parent pointer, stored record and retraction ledger, and checked derived
+projections after live originals change or disappear. Child-before-root,
+tampered child, disabled source and retired-assertion resurrection cases
+refuse without extra graph state; reimporting the root leaves the retirement
+in place. The raw synthetic packages are removed in `finally`.
+
+This covers only one ordered source lineage. It does not establish atomic
+backup, arbitrary graph history, policy or erasure restore, RPO/RTO, Windows
+support, semantic quality, visual meaning or production losslessness. No
+hosted Jev call or key read occurred. All five broader finish predicates
+remain open.
