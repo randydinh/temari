@@ -1221,3 +1221,46 @@ package claims match source evidence. Only plan, handoff and audit changed;
 the audit remains six-field append-only and added text contains no private
 path or raw fixture content. Keep this narrow source-linked handoff with all
 five broader production finish predicates open.
+
+## 2026-10-02 10:36 UTC fixed-source BM25 component experiment
+
+PRs #178 and #179 are merged; this clean isolated branch starts from
+`7a3e1ccda12cc86fa423ebf089f2ff82e49e25a8`. A read-only architect
+compared (A) an opt-in one-source actual-Registrar BM25 cost decomposition
+with (B) a paired archive/graph backup preflight. A addresses the known
+confounder in #170's source-count and startup-inclusive medians; B requires
+a separate consistency and policy contract before it could be trusted as a
+restore plan. Select A as observational evidence before any cache or ranker
+change. No Registrar or P-stack production code changes.
+
+Pass only if one synthetic `local-only` source has pinned 100, 500 and 1,000
+document generations under the same query and source scope, with a warmup and
+seven measured samples per size. Record fresh CLI total, repeated in-process
+discovery total and a process-local wrapper around `_bm25_rank` to time its
+FTS create/insert/query/sort stage; pair residual discovery minus rank without
+calling it pure archive validation. Independently verify selected generation,
+manifest, original/representation pins, stable index digest and archived top
+citation outside timers. Keep raw samples and host details in private output;
+commit only sanitized aggregates and limitations. Run focused smoke, actual
+Registrar full Nx, unit/typecheck, daemonless sync, independent review, a clean
+exact-head package and PR. No SLO, cache decision, default-ranker promotion,
+answer quality, hosted call, production losslessness or Windows claim. The
+five broader production finish predicates remain open.
+
+### 10:53 UTC fixed-source BM25 component verification
+
+Keep the opt-in observational diagnostic. The actual Registrar 5/10/20 smoke
+and 100/500/1,000 full one-source run completed with 48 independently
+archive-verified top citations and stable selected index digests. On this Mac,
+in-process median discovery was 41.401/846.399/3276.202 ms; wrapped BM25
+helper median was 0.656/1.915/3.421 ms. The paired residual includes mixed
+non-rank archive/Python work and cannot be labeled pure validation. CLI and
+in-process blocks ran sequentially, so their difference does not isolate
+startup. Private raw report SHA-256 is
+`936ea3e1f28c3f45a1672e9582064d727528577b75b1ff0378df130809d8c18c`;
+only sanitized aggregates are public. Nx Knowledge integration passed 100/100,
+unit 43/43, daemonless typecheck and sync passed; scoped formatting and diff
+checks passed. Initial daemon sync failure and post-target zsh wrapper error
+are recorded accurately in verification. Independent read-only review found
+no must-fix. Clean commit, exact-head package/check and PR remain. No cache,
+SLO, answer-quality, default-ranker or production finish decision follows.
