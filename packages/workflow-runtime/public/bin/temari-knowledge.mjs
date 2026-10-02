@@ -18,7 +18,7 @@ const defaultHome = join(homedir(), '.local', 'share', 'temari-knowledge');
 const serverName = 'temari-content-registrar';
 const registrarVersion = '0.1.0';
 // Reviewed payload inventory, including recorded downstream changes, is a trust anchor.
-const registrarManifestSha256 = '95da2a2cc4e01de8d378dc79e9b742dd661584bbc65eaf6502caaa26b951e467';
+const registrarManifestSha256 = '066cab5179b726d94dfc8d3e8286033ff5e6c2650b0c66a7d4d7a34c414bda88';
 const registrarCommit = '760926907669ae34bd1861732edbbf8f5afaf588';
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
