@@ -275,6 +275,23 @@ Original byte recovery is a separate Registrar operator action:
 Run it in the selected Registrar environment. The destination must be new and
 outside registered roots and the workspace. Temari exposes no recovery method.
 
+## Paired archive and root graph replay: synthetic proof only
+
+The [actual Registrar proof](../../docs/evidence/knowledge-system/graph-recovery-2026-10-02.md)
+exports one pinned archive generation and one parent-null archived graph as
+**separate** packages. A fresh workspace must already have the same source ID,
+root and enabled access policy. Import the archive package first; a graph OKF
+import before its referenced generation exists refuses. Then import the OKF,
+read the exact graph ID and RevisionSet, and use `graph-check` on a derived
+projection. The OKF contains labels and anchor quotes, so protect it as source
+content. Keep both export packages outside the plugin and source roots.
+
+This exercise covers one root graph and one source only. The two exports are
+not atomic, and import does not provision registration or restore policy,
+erasure state, child graph lineage, retractions, or arbitrary derived views.
+It is not a production backup, disaster-recovery, RPO/RTO or semantic-graph
+correctness claim. Disabled registration still refuses graph access.
+
 ## Failures and trust boundary
 
 - Scope errors, traversal, noncanonical paths, changed query/configuration cursors,
