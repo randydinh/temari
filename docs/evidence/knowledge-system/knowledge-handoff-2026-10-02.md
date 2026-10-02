@@ -398,3 +398,32 @@ backup, arbitrary graph history, policy or erasure restore, RPO/RTO, Windows
 support, semantic quality, visual meaning or production losslessness. No
 hosted Jev call or key read occurred. All five broader finish predicates
 remain open.
+
+## 10:57 UTC fixed-source BM25 component continuation
+
+GitHub reports [#180](https://github.com/randydinh/temari/pull/180) merged at
+`66e59a0ed3abbeea282d3102c2fe1d86853df334` after independent exact-head
+review of clean commit `d81b49168830b80e3817e9fd616d861cbd49fe83`.
+The reviewed and merged trees match. Actual Registrar Nx Knowledge
+integration passed 100/100, unit tests 43/43, daemonless typecheck and sync
+passed; scoped format and diff checks passed. An initial daemon typecheck
+reported stale sync, while the daemonless check passed. The integration
+target succeeded, although a subsequent shell wrapper statement failed.
+The exact-head public-entry package reported `dirty:false`; its manifest
+check and relocated stock Node Knowledge export passed. GitHub listed no
+branch checks. The local merge command encountered an occupied `main`
+worktree; remote state confirms the merge.
+
+The [fixed-source BM25 component note](bm25-cost-2026-10-02.md) describes
+one synthetic `local-only` source with pinned 100, 500 and 1,000-document
+generations. Seven samples after one warmup measured fresh CLI discovery,
+in-process discovery and a process-local wrapper around the BM25 rank helper;
+48 top citations were independently checked against retained archive reads,
+with stable index digests. Median in-process discovery was
+41.401/846.399/3276.202 ms; wrapped helper median was
+0.656/1.915/3.421 ms on this Mac. Raw samples and host details stayed off
+repository. The paired residual includes mixed archive and Python work; the
+sequential CLI and in-process blocks cannot isolate startup. These times are
+not an SLO, cache decision, default-ranker promotion or answer-quality gate.
+No hosted Jev call or key read occurred. All five broader finish predicates
+above remain open.

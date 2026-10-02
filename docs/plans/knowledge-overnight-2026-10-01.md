@@ -1264,3 +1264,30 @@ checks passed. Initial daemon sync failure and post-target zsh wrapper error
 are recorded accurately in verification. Independent read-only review found
 no must-fix. Clean commit, exact-head package/check and PR remain. No cache,
 SLO, answer-quality, default-ranker or production finish decision follows.
+
+### 10:57 UTC fixed-source BM25 component delivery
+
+Independent exact-head review accepted clean commit
+`d81b49168830b80e3817e9fd616d861cbd49fe83`. The public-entry
+package/check reported this revision with `dirty:false`; a relocated stock
+Node Knowledge export loaded. GitHub reports
+[#180](https://github.com/randydinh/temari/pull/180) merged at
+`66e59a0ed3abbeea282d3102c2fe1d86853df334`, with the reviewed tree.
+Keep the observational one-source decomposition only. Cache, SLO,
+answer-quality and five broader finish predicates remain open.
+
+### 10:58 UTC post-BM25-component handoff hypothesis
+
+Reconcile #180's verified merged scope in the Knowledge handoff. Record
+observational timing definitions, 48 pinned citation checks, exact Nx and
+package verification, and why the residual and route difference cannot be
+used as pure validation or startup costs. Preserve five production predicates.
+
+### 10:59 UTC post-BM25-component handoff verification
+
+Independent read-only review found no must-fix: #180 is merged with a tree
+matching the reviewed head, and the handoff's measurements, actual
+Registrar/Nx and package claims match sanitized evidence. Only plan,
+handoff and audit changed; the audit remains six-field append-only and
+added prose contains no private path or raw content. Keep the observational
+handoff with all five broader production finish predicates open.
