@@ -5,7 +5,7 @@ import { basename, join } from 'node:path';
 import { promisify } from 'node:util';
 import { test } from 'node:test';
 import { prepareRegistrar } from '../support/prepare.js';
-import { hash } from './codec.js';
+import { canonical, hash } from './codec.js';
 import { runArchiveIntake, runArchiveQuery } from './archive-journey.js';
 import { recordArchiveQueryFeedback } from './archive-query-feedback.js';
 
@@ -172,5 +172,214 @@ test('operator feedback pins a real query and archive documents without source t
   await assert.rejects(
     () => recordArchiveQueryFeedback(input),
     /Admitted source disabled/,
+  );
+});
+
+async function negativeFixture(
+  query: string,
+  discoveryMode: 'exact' | 'bm25',
+  currentLocalOnly = false,
+) {
+  const python = process.env['TEMARI_REGISTRAR_PYTHON'];
+  const registrarSource = process.env['TEMARI_REGISTRAR_SOURCE'];
+  assert(python && registrarSource);
+  const f = await prepareRegistrar({
+    python,
+    registrarSource,
+    documents: [
+      {
+        path: 'one.md',
+        bytes: Buffer.from('sharedterm one partial context\n'),
+      },
+      {
+        path: 'two.md',
+        bytes: Buffer.from('sharedterm two partial context\n'),
+      },
+    ],
+  });
+  const task = {
+    id: 'negative-feedback',
+    directory: join(f.base, 'task'),
+    authorityRef: 'synthetic-negative-feedback',
+  };
+  const intake = await runArchiveIntake({
+    task,
+    intakes: [
+      {
+        task,
+        source: f.source,
+        readScope: 'source-root',
+        requestKey: 'negative-v1',
+        transport: {
+          python,
+          registrarSource,
+          workspace: join(f.base, 'state'),
+        },
+      },
+    ],
+  });
+  assert.equal(intake.status, 'published');
+  assert(intake.handoffPath);
+  if (currentLocalOnly)
+    await exec(python, [
+      '-c',
+      "import sqlite3,sys,json; db=sqlite3.connect(sys.argv[1]); row=json.loads(db.execute('SELECT data FROM sources WHERE id=?',(sys.argv[2],)).fetchone()[0]); row['sharing']='local-only'; db.execute('UPDATE sources SET data=? WHERE id=?',(json.dumps(row),sys.argv[2])); db.commit()",
+      join(f.base, 'state/registry.sqlite3'),
+      f.source.id,
+    ]);
+  const searched = await runArchiveQuery({
+    handoffPath: intake.handoffPath,
+    id: 'negative-query',
+    query,
+    sourceIds: [f.source.id],
+    topK: 2,
+    discoveryMode,
+    hostedTextApproved: currentLocalOnly,
+  });
+  const input = {
+    reportPath: searched.reportPath,
+    query,
+    reviewerRef: 'operator:synthetic',
+    reason: 'Displayed first excerpts did not answer this question.',
+  };
+  return { f, searched, input };
+}
+
+test('ACTUAL Registrar: negative feedback pins every verified ranked first excerpt without an absence claim', async () => {
+  const { f, searched, input } = await negativeFixture('sharedterm', 'bm25');
+  assert.equal(searched.report.query.ranked.length, 2);
+  assert.equal(searched.report.query.shortlistVerified, true);
+  assert.equal(searched.report.query.jevSharing, 'case-opt-out');
+  const selected = {
+    ...input,
+    assessment: 'shortlist-excerpts-unanswered' as const,
+  };
+  const { receipt, receiptPath } = await recordArchiveQueryFeedback(selected);
+  assert.match(
+    basename(receiptPath),
+    /^archive-query-negative-feedback-[a-f0-9]{64}\.json$/,
+  );
+  assert.equal(receipt.assessment, 'shortlist-excerpts-unanswered');
+  assert.equal(receipt.scope.readMode, 'first-1000-codepoints');
+  assert.equal(receipt.scope.fullDocumentRead, false);
+  assert.equal(receipt.scope.corpusAbsenceClaim, false);
+  assert.deepEqual(
+    receipt.ranked.map(({ evidenceId: _id, ...pin }) => pin),
+    searched.report.query.ranked,
+  );
+  assert(
+    receipt.ranked.every((item) => /^[a-f0-9]{64}$/.test(item.evidenceId)),
+  );
+  assert.equal(
+    receipt.shortlistCheckpointPath,
+    searched.report.query.retrievalCheckpointPath,
+  );
+  assert.equal(
+    receipt.shortlistCheckpointSha256,
+    hash(await readFile(receipt.shortlistCheckpointPath!)),
+  );
+  assert.equal(
+    (await recordArchiveQueryFeedback(selected)).receiptPath,
+    receiptPath,
+  );
+  const body = await readFile(receiptPath, 'utf8');
+  assert(!body.includes('sharedterm one partial context'));
+  assert(!body.includes('sharedterm two partial context'));
+  assert(!body.includes('absence'));
+
+  await assert.rejects(
+    () =>
+      recordArchiveQueryFeedback({
+        ...selected,
+        assessment: 'empty-shortlist-observed',
+      }),
+    /Shortlist is not empty/,
+  );
+  await assert.rejects(
+    () =>
+      recordArchiveQueryFeedback({
+        ...selected,
+        query: 'different',
+      }),
+    /Query differs from report/,
+  );
+  await assert.rejects(
+    () =>
+      recordArchiveQueryFeedback({
+        ...selected,
+        ranked: [searched.report.query.ranked[0]],
+      } as typeof selected),
+    /Invalid negative feedback input fields/,
+  );
+
+  const shortlistPath = receipt.shortlistCheckpointPath!;
+  const shortlistBytes = await readFile(shortlistPath);
+  const alteredShortlist = JSON.parse(shortlistBytes.toString());
+  alteredShortlist.ranked.pop();
+  await writeFile(shortlistPath, canonical(alteredShortlist));
+  await assert.rejects(
+    () => recordArchiveQueryFeedback(selected),
+    /Shortlist content address changed/,
+  );
+  await writeFile(shortlistPath, shortlistBytes);
+
+  const reportBytes = await readFile(searched.reportPath);
+  const alteredReport = JSON.parse(reportBytes.toString());
+  alteredReport.query.ranked.pop();
+  await writeFile(searched.reportPath, canonical(alteredReport));
+  await assert.rejects(() => recordArchiveQueryFeedback(selected));
+  await writeFile(searched.reportPath, reportBytes);
+
+  await exec(f.config.python, [
+    '-c',
+    "import sqlite3,sys,json; db=sqlite3.connect(sys.argv[1]); row=json.loads(db.execute('SELECT data FROM sources WHERE id=?',(sys.argv[2],)).fetchone()[0]); row['enabled']=False; db.execute('UPDATE sources SET data=? WHERE id=?',(json.dumps(row),sys.argv[2])); db.commit()",
+    join(f.base, 'state/registry.sqlite3'),
+    f.source.id,
+  ]);
+  await assert.rejects(
+    () => recordArchiveQueryFeedback(selected),
+    /Admitted source disabled/,
+  );
+});
+
+test('ACTUAL Registrar: negative feedback remains local when current sharing becomes local-only', async () => {
+  const { searched, input } = await negativeFixture('sharedterm', 'bm25', true);
+  assert.equal(searched.report.query.jevSharing, 'current-local-only');
+  assert.equal(searched.report.query.ranked.length, 2);
+  const { receipt } = await recordArchiveQueryFeedback({
+    ...input,
+    assessment: 'shortlist-excerpts-unanswered',
+  });
+  assert.equal(receipt.ranked.length, 2);
+  assert.equal(receipt.scope.corpusAbsenceClaim, false);
+});
+
+test('ACTUAL Registrar: empty shortlist feedback records only an observed query-page miss', async () => {
+  const { searched, input } = await negativeFixture(
+    'not-in-this-source-token',
+    'exact',
+  );
+  assert.equal(searched.report.query.ranked.length, 0);
+  assert.equal(searched.report.query.retrievalCheckpointPath, null);
+  const { receipt, receiptPath } = await recordArchiveQueryFeedback({
+    ...input,
+    assessment: 'empty-shortlist-observed',
+  });
+  assert.equal(receipt.ranked.length, 0);
+  assert.equal(receipt.shortlistCheckpointPath, null);
+  assert.equal(receipt.shortlistCheckpointSha256, null);
+  assert.equal(receipt.scope.corpusAbsenceClaim, false);
+  assert.equal(receipt.reportSha256, hash(await readFile(searched.reportPath)));
+  assert.equal(
+    (await readFile(receiptPath, 'utf8')).includes('corpusAbsenceClaim'),
+    true,
+  );
+  await assert.rejects(
+    () =>
+      recordArchiveQueryFeedback({
+        ...input,
+        assessment: 'shortlist-excerpts-unanswered',
+      }),
+    /No excerpts to assess/,
   );
 });
