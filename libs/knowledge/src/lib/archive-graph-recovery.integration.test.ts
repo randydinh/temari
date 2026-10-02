@@ -415,8 +415,10 @@ test('ACTUAL Registrar: ordered root and retracted-child OKF replay preserves gr
       archivePackagePath: archivePackage,
       graphPackagePaths: packagePaths,
     });
+    assert.equal(planned.schema, 2);
     assert.equal(planned.status, 'dependency-closed');
-    assert.equal(planned.payloadIntegrity, 'not-validated');
+    assert.equal(planned.payloadIntegrity, 'internal-hashes-verified');
+    assert.equal(planned.profile, 'not-validated');
     assert.equal(planned.admission, 'not-checked');
     assert.equal(planned.atomicity, 'none');
     assert.deepEqual(planned.archive.selections, [
@@ -637,6 +639,137 @@ test('ACTUAL Registrar: ordered root and retracted-child OKF replay preserves gr
         graphPackagePaths: [okfPackage, symlinkPath],
       }),
       /Recovery package is unreadable/,
+    );
+    async function refuseInternalHashes(
+      archivePath: string,
+      graphPaths: string[],
+      reason: RegExp,
+    ) {
+      await assert.rejects(
+        planArchiveRecoveryDependencies({
+          archivePackagePath: archivePath,
+          graphPackagePaths: graphPaths,
+        }),
+        reason,
+      );
+      assert.deepEqual(await counts(restoredState), [0, 0, 0, 0, 0]);
+    }
+    const archivePayload = JSON.parse(
+      await readFile(archivePackage, 'utf8'),
+    ) as {
+      blobs: Record<string, string>;
+      generations: Array<{
+        manifest_sha256: string;
+        manifest: { documents: Array<{ original: { bytes: number } }> };
+      }>;
+    };
+    const blobKey = Object.keys(archivePayload.blobs)[0];
+    assert(blobKey);
+    async function archiveVariant(
+      name: string,
+      mutate: (payload: typeof archivePayload) => void,
+    ) {
+      const payload = structuredClone(archivePayload);
+      mutate(payload);
+      const path = join(f.base, name);
+      await writeFile(path, canonical(payload));
+      return path;
+    }
+    const changedBlob = await archiveVariant('changed-blob.json', (payload) => {
+      payload.blobs[blobKey] = Buffer.from('forged-blob').toString('base64');
+    });
+    await refuseInternalHashes(
+      changedBlob,
+      packagePaths,
+      /archive blob hash mismatch/i,
+    );
+    const malformedBase64 = await archiveVariant(
+      'malformed-base64.json',
+      (payload) => {
+        payload.blobs[blobKey] = '@@@';
+      },
+    );
+    await refuseInternalHashes(
+      malformedBase64,
+      packagePaths,
+      /archive blob base64/i,
+    );
+    const missingBlob = await archiveVariant('missing-blob.json', (payload) => {
+      delete payload.blobs[blobKey];
+    });
+    await refuseInternalHashes(
+      missingBlob,
+      packagePaths,
+      /archive descriptor blob missing/i,
+    );
+    const extraBlob = await archiveVariant('extra-blob.json', (payload) => {
+      payload.blobs[hash('unreferenced')] =
+        Buffer.from('unreferenced').toString('base64');
+    });
+    await refuseInternalHashes(
+      extraBlob,
+      packagePaths,
+      /unreferenced archive blob/i,
+    );
+    const wrongDescriptorSize = await archiveVariant(
+      'wrong-descriptor-size.json',
+      (payload) => {
+        payload.generations[0].manifest.documents[0].original.bytes += 1;
+        payload.generations[0].manifest_sha256 = hash(
+          canonical(payload.generations[0].manifest),
+        );
+      },
+    );
+    await refuseInternalHashes(
+      wrongDescriptorSize,
+      packagePaths,
+      /archive descriptor length mismatch/i,
+    );
+    const changedOkf = structuredClone(exportedChild.body) as {
+      files: Record<string, string>;
+      file_sha256: Record<string, string>;
+    };
+    const okfKey = `${ids.link}.md`;
+    changedOkf.files[okfKey] += '\nforged child';
+    const changedOkfPath = join(f.base, 'changed-okf-body.json');
+    await writeFile(changedOkfPath, canonical(changedOkf));
+    await refuseInternalHashes(
+      archivePackage,
+      [okfPackage, changedOkfPath],
+      /OKF file hash mismatch/,
+    );
+    const wrongOkfHash = structuredClone(
+      exportedChild.body,
+    ) as typeof changedOkf;
+    wrongOkfHash.file_sha256[okfKey] = 'f'.repeat(64);
+    const wrongOkfHashPath = join(f.base, 'changed-okf-hash.json');
+    await writeFile(wrongOkfHashPath, canonical(wrongOkfHash));
+    await refuseInternalHashes(
+      archivePackage,
+      [okfPackage, wrongOkfHashPath],
+      /OKF file hash mismatch/,
+    );
+    const missingOkfHash = structuredClone(
+      exportedChild.body,
+    ) as typeof changedOkf;
+    delete missingOkfHash.file_sha256[okfKey];
+    const missingOkfHashPath = join(f.base, 'missing-okf-hash.json');
+    await writeFile(missingOkfHashPath, canonical(missingOkfHash));
+    await refuseInternalHashes(
+      archivePackage,
+      [okfPackage, missingOkfHashPath],
+      /OKF file hash keyset mismatch/,
+    );
+    const extraOkfHash = structuredClone(
+      exportedChild.body,
+    ) as typeof changedOkf;
+    extraOkfHash.file_sha256['extra.md'] = hash('unused');
+    const extraOkfHashPath = join(f.base, 'extra-okf-hash.json');
+    await writeFile(extraOkfHashPath, canonical(extraOkfHash));
+    await refuseInternalHashes(
+      archivePackage,
+      [okfPackage, extraOkfHashPath],
+      /OKF file hash keyset mismatch/,
     );
     assert.deepEqual(
       await counts(restoredState),
@@ -881,16 +1014,9 @@ test('ACTUAL Registrar: ordered root and retracted-child OKF replay preserves gr
       assert.deepEqual(await readFile(destination), bytes);
     }
 
-    const tamperedArchive = JSON.parse(await readFile(archivePackage, 'utf8'));
-    const blobKey = Object.keys(tamperedArchive.blobs)[0];
-    assert(blobKey);
-    tamperedArchive.blobs[blobKey] =
-      Buffer.from('forged-blob').toString('base64');
-    const badArchivePackage = join(f.base, 'tampered-archive-package.json');
-    await writeFile(badArchivePackage, canonical(tamperedArchive));
     await refused(
       archiveTamperState,
-      ['import', badArchivePackage],
+      ['import', changedBlob],
       /blob integrity mismatch/,
     );
     assert.deepEqual(await counts(archiveTamperState), [0, 0, 0, 0, 0]);
@@ -924,23 +1050,24 @@ test('ACTUAL Registrar: ordered root and retracted-child OKF replay preserves gr
       ],
       graphId,
     );
-    const tamperedChild = JSON.parse(await readFile(childOkfPackage, 'utf8'));
-    tamperedChild.files[`${ids.link}.md`] += '\nforged child';
-    const badChildPackage = join(f.base, 'tampered-child-graph.okf.json');
-    await writeFile(badChildPackage, canonical(tamperedChild));
+    const matchingChild = structuredClone(changedOkf);
+    matchingChild.file_sha256[okfKey] = hash(matchingChild.files[okfKey]);
+    const matchingChildPath = join(f.base, 'matching-child-hashes.okf.json');
+    await writeFile(matchingChildPath, canonical(matchingChild));
     const tamperedPlan = await planArchiveRecoveryDependencies({
       archivePackagePath: archivePackage,
-      graphPackagePaths: [badChildPackage, okfPackage],
+      graphPackagePaths: [matchingChildPath, okfPackage],
     });
     assert.equal(tamperedPlan.status, 'dependency-closed');
-    assert.equal(tamperedPlan.payloadIntegrity, 'not-validated');
+    assert.equal(tamperedPlan.payloadIntegrity, 'internal-hashes-verified');
+    assert.equal(tamperedPlan.profile, 'not-validated');
     assert.equal(
       tamperedPlan.graphs[1].sha256,
-      hash(await readFile(badChildPackage)),
+      hash(await readFile(matchingChildPath)),
     );
     await refused(
       childTamperState,
-      ['graph-import-okf', badChildPackage],
+      ['graph-import-okf', matchingChildPath],
       /OKF profile mismatch/,
     );
     assert.deepEqual(await counts(childTamperState), [1, 1, 1, 3, 0]);
