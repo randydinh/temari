@@ -736,3 +736,42 @@ GitHub reports [#164](https://github.com/randydinh/temari/pull/164) merged at
 trees match. Keep the plan-only multi-source review queue. Automatic graph
 mutation, semantic correctness, continuous freshness and production
 losslessness remain open.
+
+## 2026-10-02 07:08 UTC multi-source anchor proposal experiment
+
+PRs #164 and #165 are merged; this isolated branch starts from
+`efcd05f2b38ae4fb6cabd4c860a6d4e6aa511be6`. A read-only architect compared
+an exact source-aware anchor repin proposal for #164's unchanged candidate
+records with direct multi-source graph publication or BM25 index caching.
+Publishing a new root would mutate graph state and needs operator selection
+and replay semantics. Persistent BM25 caching changes Registrar storage and
+requires a latency benchmark. Select a Knowledge-only proposal receipt.
+
+Pass only if a content-addressed #164 impact receipt is recomputed and matches,
+the exact old 2–8-source graph RevisionSet and new changed-source generation
+are admitted, and every candidate's source-aware anchor is checked against
+retained text and original/representation/quote hashes. Bound candidate
+records to 64, unique anchors to 128, spans to 1–2048 code points, graph
+records to 1,500 and output to 1 MiB. Map changed-source anchors to v2 and
+unchanged-source anchors to their identical pinned generations. Partition
+every candidate into eligible or explicit deferral; relationship records are
+eligible only when both endpoint nodes are eligible, and `supersedes` remains
+deferred. Recheck impact/diff, old graph, publications and current source
+registrations before emitting a metadata-only proposal. Admission or archive
+integrity failure refuses the whole run, rather than becoming a content
+mismatch. The receipt may compute the expected new full RevisionSet but must
+say `proposal-only`, `graphMutation:none`, `afterGraphId:null` and
+`currentOriginal:not-checked`. No graph publication, semantic-correctness,
+automatic repair, continuous freshness, measured retrieval lift or production
+losslessness claim. Actual local-only Registrar, full Nx, independent review,
+clean exact-head package and PR delivery are required.
+
+### 07:20 UTC multi-source anchor proposal checkpoint
+
+The final actual Registrar fixture explicitly set A and B to `local-only` and
+passed 1/1. Uncached Nx Knowledge integration passed 96/96, unit tests 43/43,
+typecheck, Nx sync, formatting and diff checks passed. An independent read-only
+Codex router review found no must-fix in impact recomputation, source-aware
+retained anchor reads, candidate partitioning, failure propagation, bounds or
+privacy. The proposal leaves the graph unchanged and does not prove semantic
+correctness. Clean exact-head package, commit review and PR delivery remain.
