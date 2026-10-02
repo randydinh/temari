@@ -785,3 +785,52 @@ GitHub reports [#166](https://github.com/randydinh/temari/pull/166) merged at
 `832b4f50149e0ea2baf0be45057b606caff65e05`; the reviewed and merged
 trees match. Keep the proposal-only receipt. Graph publication, semantic
 correctness, continuous freshness and production losslessness remain open.
+
+## 2026-10-02 07:39 UTC relocated real-corpus Mac experiment
+
+PRs #166 and #167 are merged; this clean isolated branch starts from
+`e18521a85c2f035eb39ad192ec88964e9c664470`. A read-only architect compared
+a bounded latest-artifact relocated Mac end-to-end run on the previously copied
+private corpus with another graph proposal/publication mechanic. Direct graph
+publication needs operator identity, selection and replay semantics; another
+synthetic graph receipt would not establish knowledge-worker quality. The
+copied Nx, non-Nx and mixed-document corpus and prior private diagnostic state
+are present. Select the relocated artifact journey.
+
+Pass only if a clean exact-head public-entry package/check succeeds, its
+artifact is relocated outside the checkout, and a cold setup uses bundled
+Registrar with state outside the immutable artifact. Fix a private sample
+selection before queries across Nx, non-Nx and mixed-document families.
+Register/capture all three as `local-only` through installed paths, prove
+complete admitted original preservation, execute bounded pinned search or the
+public two-job journey on at least one query per family, verify every returned
+citation against archived bytes, record an unsupported or visual gap and a
+no-answer diagnostic, and recover exact bytes for at least one document asset
+or PDF. Keep all corpus files, questions, source paths, raw reports and the
+Keychain key out of Git. Make local-only credential non-use observable by
+unsetting `TYPESAFE_API_KEY` and using a private failing `security` shim whose
+call log must remain empty; do not read the real key. Record only sanitized
+package/payload/corpus revisions, stage IDs, counts, hashes and gaps. The old
+agent-authored, inspected question set can be a diagnostic only, never a
+ranker-promotion or answerability gate. No Windows, production losslessness,
+no-answer correctness, visual meaning, continuous freshness, semantic graph
+quality or end-user plugin lifecycle claim. Independent review, exact package
+proof and a reviewable PR are required.
+
+### 07:52 UTC relocated real-corpus checkpoint
+
+The clean `e18521a` public-entry artifact passed Nx package/check, relocated
+artifact checks before and after use, and cold bundled Registrar setup in a
+fresh temporary home. A fixed private selection of 5 non-Nx, 6 mixed-document
+and 5 Nx files produced three complete-admitted `local-only` publications;
+16/16 archived original SHA-256 and byte counts matched. Three bounded family
+BM25 diagnostics each returned one independently archive-verified citation;
+the fixed nonce no-answer diagnostic returned no ranked result. Exact PNG and
+PDF original bytes recovered. The default Mac run retained three no-text
+representations and explicit visual gaps. With `TYPESAFE_API_KEY` unset, a
+failing `security` shim recorded zero calls; no hosted attempt was reported.
+An independent read-only reviewer matched sanitized claims to private
+receipts and found no must-fix or public evidence leakage. Keep this as a
+packaged Mac wiring diagnostic only. It does not establish answer quality,
+OCR/visual meaning, Windows, production losslessness or plugin lifecycle.
+Clean exact-head doc review and PR delivery remain.
