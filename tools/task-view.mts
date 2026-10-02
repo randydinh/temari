@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { emptyOpenWork } from './dashboard-open-work.mjs';
 
 export interface TaskViewReader {
   listSnapshots(): Promise<readonly { readonly taskId: string }[]>;
@@ -12,6 +13,7 @@ export interface TaskViewReader {
 
 export interface TaskViewOptions {
   readonly runtime: TaskViewReader;
+  readonly openWork?: { describe(): Promise<unknown> };
   readonly archonBaseUrl: string;
   readonly controller?: TaskViewController;
   readonly knowledge?: {
@@ -33,7 +35,10 @@ export interface TaskViewController {
   action(taskId: string, input: unknown): Promise<unknown>;
   reconciliationView?(attemptId: string): Promise<unknown>;
   reconciliationCreate?(input: unknown): Promise<unknown>;
-  reconciliationInvalidate?(attemptId: string, input: unknown): Promise<unknown>;
+  reconciliationInvalidate?(
+    attemptId: string,
+    input: unknown,
+  ): Promise<unknown>;
   reconciliationConfirm?(attemptId: string, input: unknown): Promise<unknown>;
 }
 
@@ -218,6 +223,22 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
         return;
       }
       const url = new URL(request.url ?? '/', `http://${request.headers.host}`);
+      if (url.pathname === '/api/open-work') {
+        if (request.method !== 'GET' && request.method !== 'HEAD') {
+          response.setHeader('Allow', 'GET, HEAD');
+          send(405, { error: 'Open work is read-only.' });
+          return;
+        }
+        if ((request.url ?? '').includes('?'))
+          throw new RequestError(400, 'Unexpected open-work query.');
+        send(
+          200,
+          options.openWork
+            ? await options.openWork.describe()
+            : emptyOpenWork(),
+        );
+        return;
+      }
       const actionMatch =
         /^\/api\/tasks\/([A-Za-z0-9][A-Za-z0-9._-]{0,127})\/actions$/.exec(
           url.pathname,
@@ -281,12 +302,16 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
         )
           throw new RequestError(400, 'Scheduling is not configured.');
         if (
-          (url.pathname === '/api/reconciliation' || reconciliationActionMatch) &&
+          (url.pathname === '/api/reconciliation' ||
+            reconciliationActionMatch) &&
           (!options.controller?.reconciliationCreate ||
             !options.controller.reconciliationInvalidate ||
             !options.controller.reconciliationConfirm)
         )
-          throw new RequestError(400, 'Merge reconciliation is not configured.');
+          throw new RequestError(
+            400,
+            'Merge reconciliation is not configured.',
+          );
         const result = reconciliationActionMatch
           ? reconciliationActionMatch[2] === 'invalidate'
             ? await options.controller!.reconciliationInvalidate!(
@@ -299,13 +324,13 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
               )
           : url.pathname === '/api/reconciliation'
             ? await options.controller!.reconciliationCreate!(input)
-          : scheduleMatch
-          ? await options.schedules!.update(scheduleMatch[1]!, input)
-          : url.pathname === '/api/schedules'
-            ? await options.schedules!.create(input)
-            : actionMatch
-              ? await options.controller!.action(actionMatch[1]!, input)
-              : await options.controller!.create(input);
+            : scheduleMatch
+              ? await options.schedules!.update(scheduleMatch[1]!, input)
+              : url.pathname === '/api/schedules'
+                ? await options.schedules!.create(input)
+                : actionMatch
+                  ? await options.controller!.action(actionMatch[1]!, input)
+                  : await options.controller!.create(input);
         send(200, result);
         return;
       }
@@ -317,6 +342,7 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
             ? await options.controller.describe()
             : null,
           archonBaseUrl,
+          openWorkAvailable: Boolean(options.openWork),
           knowledgeAvailable: Boolean(options.knowledge),
           schedulingAvailable: Boolean(options.schedules),
         });
@@ -335,13 +361,19 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
       }
       if (reconciliationViewMatch) {
         if (!options.controller?.reconciliationView)
-          throw new RequestError(400, 'Merge reconciliation is not configured.');
+          throw new RequestError(
+            400,
+            'Merge reconciliation is not configured.',
+          );
         if (url.search)
           throw new RequestError(400, 'Unexpected reconciliation query.');
         const view = await options.controller.reconciliationView(
           reconciliationViewMatch[1]!,
         );
-        send(view ? 200 : 404, view ?? { error: 'Reconciliation attempt not found.' });
+        send(
+          view ? 200 : 404,
+          view ?? { error: 'Reconciliation attempt not found.' },
+        );
         return;
       }
       if (

@@ -19,6 +19,7 @@
         <button data-view="knowledge" aria-pressed="false">
           Knowledge map
         </button>
+        <button data-view="open-work" aria-pressed="false">Review open work</button>
       </nav>
       <div class="top-actions">
         <span id="connection" role="status">Loading…</span
@@ -165,6 +166,46 @@
         </aside>
       </div>
       <section id="knowledge-gaps" aria-label="Map coverage gaps"></section>
+    </section>
+    <section id="open-work-page" class="secondary-page" aria-label="Review open work" hidden>
+      <div class="page-heading">
+        <div>
+          <span class="eyebrow">SAVED HOST CAPTURE</span>
+          <h1>Review open work</h1>
+          <p>See captured chats, their worktrees and work that still needs attention.</p>
+        </div>
+        <button id="refresh-open-work" class="quiet">Reload capture</button>
+      </div>
+      <div class="open-work-notice">
+        <p>Saved capture · read-only · current writer state not checked · closure eligibility not assessed.</p>
+        <p>Idle does not mean done. Work must be checked and preserved before anything is closed. Reload rereads this saved capture; it does not collect a new inventory.</p>
+      </div>
+      <p id="open-work-status" class="open-work-status" role="status" aria-live="polite"></p>
+      <section id="open-work-gaps" class="open-work-notice" aria-label="Capture coverage and gaps"></section>
+      <div class="map-tools open-work-tools">
+        <label>Find captured work<input id="open-work-search" type="search" placeholder="Title, host, branch or root…" /></label>
+        <label>Show<select id="open-work-kind">
+          <option value="">Chats and worktrees</option>
+          <option value="codex">Codex chats</option>
+          <option value="chatgpt">ChatGPT chats</option>
+          <option value="worktrees">Worktrees</option>
+        </select></label>
+        <label>Chat state at capture<select id="open-work-state">
+          <option value="">All captured states</option>
+          <option value="active">Active at capture</option>
+          <option value="idle">Idle at capture</option>
+          <option value="unknown">Writer state unknown</option>
+        </select></label>
+      </div>
+      <div id="open-work-empty" class="knowledge-empty" hidden></div>
+      <div id="open-work-columns" class="open-work-columns" hidden>
+        <section id="open-work-chat-section" aria-label="Captured chats"><h2>Chats <span id="open-work-chat-count" class="count">0</span></h2><div id="open-work-chats"></div></section>
+        <section id="open-work-worktree-section" aria-label="Captured worktrees"><h2>Worktrees <span id="open-work-worktree-count" class="count">0</span></h2><div id="open-work-worktrees"></div></section>
+      </div>
+      <details id="open-work-provenance" class="continuation" hidden>
+        <summary>Capture provenance</summary>
+        <div id="open-work-provenance-body"></div>
+      </details>
     </section>
     <div id="error" class="error-banner" role="alert" hidden></div>
     <dialog id="goal-dialog" aria-labelledby="goal-dialog-title">

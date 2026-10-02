@@ -241,3 +241,45 @@ test('host entry, handoff and scoped pickup survive separate CLI processes', asy
     /Pickup limit/,
   );
 });
+
+test('open-work CLI flags are paired, serve-only and validated before store access', async () => {
+  const pin = 'a'.repeat(64);
+  await assert.rejects(
+    runTaskCommand([
+      'list',
+      '--open-work-manifest',
+      '/capture',
+      '--open-work-sha256',
+      pin,
+    ]),
+    /only supported by serve/,
+  );
+  await assert.rejects(
+    runTaskCommand(['serve', '--open-work-manifest', '/capture']),
+    /must be paired/,
+  );
+  await assert.rejects(
+    runTaskCommand(['serve', '--open-work-sha256', pin]),
+    /must be paired/,
+  );
+  await assert.rejects(
+    runTaskCommand([
+      'serve',
+      '--open-work-manifest',
+      'relative',
+      '--open-work-sha256',
+      pin,
+    ]),
+    /absolute path/,
+  );
+  await assert.rejects(
+    runTaskCommand([
+      'serve',
+      '--open-work-manifest',
+      '/capture',
+      '--open-work-sha256',
+      'bad',
+    ]),
+    /64hex/,
+  );
+});

@@ -29,6 +29,13 @@ Goal planning, once/recurring scheduling and the separate Registrar map are
 covered in [the autonomy guide](dashboard-autonomy.md), including configuration,
 recovery, ownership and honest evidence limits.
 
+**Review open work** adds a read-only view of an explicit saved host capture of
+chats and worktrees. Use its local search, captured activity labels, observed Git
+counts and coverage gaps to locate unfinished work. Reload rereads the approved
+capture; preservation and closure remain unverified. See the
+[open-work review guide](open-work-review.md) for capture publication, independent
+verification and discrepancy handling.
+
 ## Before you begin
 
 - Use the repository's supported Node/Bun environment and pnpm **11.25.0**.
