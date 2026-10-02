@@ -33,6 +33,8 @@ const generatedFiles = [
   'bin/codex-parallel.mjs',
   'bin/qa-evaluator.mjs',
   'bin/qa-evaluator-worker.mjs',
+  'bin/qa-product-policy-control.mjs',
+  'bin/qa-temari-policy-semantic.mjs',
 ];
 const publicFiles = [
   ['packages/workflow-runtime/public/policy.json', 'policy.json'],
@@ -41,6 +43,8 @@ const publicFiles = [
     '.codex-plugin/plugin.json',
   ],
   ['packages/workflow-runtime/host/entry.mjs', 'host/entry.mjs'],
+  ['packages/workflow-runtime/host/qa.mjs', 'host/qa.mjs'],
+  ['packages/workflow-runtime/host/qa-capability.mjs', 'host/qa-capability.mjs'],
   [
     'packages/workflow-runtime/host/task-tracking.mjs',
     'host/task-tracking.mjs',
@@ -89,6 +93,8 @@ const publicFiles = [
     'bin/poteto-mode.mjs',
   ],
   ['packages/workflow-runtime/public/bin/closeout.mjs', 'bin/closeout.mjs'],
+  ['packages/workflow-runtime/public/qa/ticket-acceptance-v1.md', 'qa/ticket-acceptance-v1.md'],
+  ['packages/workflow-runtime/public/qa/verify-temari-public-v1.md', 'qa/verify-temari-public-v1.md'],
   [
     'packages/workflow-runtime/public/skills/temari/SKILL.md',
     'skills/temari/SKILL.md',
@@ -357,7 +363,7 @@ export async function checkPublicEntryArtifact(root, expectedManifestSha256) {
   assertPolicy(policy);
   const plugin = JSON.parse(files.get('.codex-plugin/plugin.json').toString());
   assert.equal(plugin.name, 'temari');
-  assert.equal(plugin.version, '0.15.4+codex.1');
+  assert.equal(plugin.version, '0.15.4+codex.2');
   assert.equal(plugin.skills, './skills/');
   assert(files.has('skills/temari-knowledge/SKILL.md'));
   assert(files.has('bin/temari-knowledge.mjs'));
@@ -455,6 +461,8 @@ export async function packagePublicEntries(
       ['tools/run-codex-parallel.mts', generatedFiles[0]],
       ['tools/run-qa-evaluator-local.mjs', generatedFiles[1]],
       ['tools/qa-evaluator-worker.mjs', generatedFiles[2]],
+      ['tools/qa-product-policy-control.mjs', generatedFiles[3]],
+      ['tools/qa-temari-policy-semantic.mjs', generatedFiles[4]],
     ];
     for (const [source, destination] of bundles) {
       const bundle = join(staging, destination);

@@ -482,8 +482,22 @@ export async function prepareTaskTracking({
       });
       started = true;
     },
-    async finish(receipt, error) {
+    async finish(receipt, error, domainOutcome) {
       try {
+        if (domainOutcome !== undefined) {
+          exactFields(domainOutcome, ['summary', 'nextAction', 'blocker', 'contextRefs']);
+          text(domainOutcome.summary, 'domain summary', 4096);
+          text(domainOutcome.nextAction, 'domain next action', 4096);
+          if (domainOutcome.blocker !== null) text(domainOutcome.blocker, 'domain blocker', 4096);
+          assert(Array.isArray(domainOutcome.contextRefs) &&
+            domainOutcome.contextRefs.length <= 4, 'Domain outcome context is bounded.');
+          for (const ref of domainOutcome.contextRefs) {
+            exactFields(ref, ['kind', 'location', 'sha256']);
+            text(ref.kind, 'domain context kind', 512);
+            absolute(ref.location);
+            assert.match(ref.sha256 ?? '', /^[a-f0-9]{64}$/);
+          }
+        }
         if (!started) await this.start();
         const status = receipt?.status;
         const summary = receipt
@@ -505,6 +519,12 @@ export async function prepareTaskTracking({
                 ? `Host outcome ${status} requires attention.`
                 : `Host execution interrupted${error instanceof Error ? `: ${error.message.slice(0, 1024)}` : '.'}`,
           contextRefs,
+          ...(domainOutcome === undefined ? {} : {
+            summary: domainOutcome.summary,
+            nextAction: domainOutcome.nextAction,
+            blocker: domainOutcome.blocker,
+            contextRefs: [...contextRefs, ...domainOutcome.contextRefs],
+          }),
         };
         await store.handoffTask({ ...command(sidecar, 'outcome', 2), handoff });
       } catch (failure) {

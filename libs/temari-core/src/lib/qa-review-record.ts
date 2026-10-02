@@ -141,6 +141,8 @@ export interface QaReviewRecord {
   readonly digest: string;
   readonly authorId: string;
   readonly assignment: QaAssignment;
+  /** Pinned source excerpts for evaluator comparison; authority is still reviewed. */
+  readonly intentSources?: readonly QaIntentSource[];
   readonly plan: QaReviewPlan;
   readonly areaDecisions: readonly QaAreaDecision[];
   readonly scenarios: readonly QaScenarioRecord[];
@@ -150,6 +152,13 @@ export interface QaReviewRecord {
   readonly dispositionBasis: string;
   readonly externalWriteReceipts: readonly QaExternalWriteReceipt[];
   readonly residualRisks: readonly string[];
+}
+
+export interface QaIntentSource {
+  readonly requirementRef: string;
+  readonly revision: string;
+  readonly authorityRef: string;
+  readonly expectedOutcome: string;
 }
 
 export type QaReviewRecordInput = Omit<QaReviewRecord, 'digest'>;
@@ -632,6 +641,30 @@ export function validateQaReviewRecord(
   }
 
   issues.push(...validateQaAssignment(record.assignment));
+  const intentKeys = new Set<string>();
+  record.intentSources?.forEach((source, index) => {
+    const field = `intentSources[${index}]`;
+    for (const key of [
+      'requirementRef',
+      'revision',
+      'authorityRef',
+      'expectedOutcome',
+    ] as const)
+      nonEmpty(source[key], `${field}.${key}`, issues);
+    const key = `${source.requirementRef}:${source.revision}`;
+    if (intentKeys.has(key))
+      issues.push(`${field} duplicates an intent source.`);
+    intentKeys.add(key);
+    const requirementIndex = record.assignment.requirementRefs.indexOf(
+      source.requirementRef,
+    );
+    if (
+      requirementIndex < 0 ||
+      record.assignment.requirementRevisions[requirementIndex] !==
+        source.revision
+    )
+      issues.push(`${field} must match an assigned requirement and revision.`);
+  });
   if (record.plan.tier !== record.assignment.tier) {
     issues.push('plan.tier must match assignment.tier.');
   }
