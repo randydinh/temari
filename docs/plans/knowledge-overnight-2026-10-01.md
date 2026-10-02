@@ -628,3 +628,13 @@ unit tests passed 43/43, uncached typecheck and Nx sync:check passed. The
 independent read-only reviewer found no must-fix after fixture and privacy
 wording repairs. The receipt covers conservative simple syntax only. Clean
 exact-head package, commit review and PR delivery remain.
+
+### 06:07 UTC reference-image delivery
+
+Independent exact-head review accepted clean commit
+`d3df7cd0886bbf470874c3b8fa3af82c0c424118`. Canonical package/check
+reported that head with `dirty:false`, and its stock Node export loaded.
+GitHub reports [#160](https://github.com/randydinh/temari/pull/160) merged at
+`358d8e9f6fa746620bef51db425654f1ed9aa564`; the reviewed and merged
+trees match. Keep the scoped receipt. Full Markdown dialects, page rendering,
+visual meaning, recurring freshness and production losslessness remain open.
