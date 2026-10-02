@@ -1500,3 +1500,31 @@ documentation/audit files changed and a strict six-field audit append, and
 found no private content or raw source in the added text. The note preserves
 actual Registrar/Nx/package results, schema 2's limited claim and all five
 open finish predicates. Publish after clean exact-head package/check.
+
+### 12:33 UTC recovery identity-recheck hypothesis
+
+Read-only architect compared a bounded pre-import package identity recheck
+with duplicating exact OKF profile validation. The latter needs Registrar
+validation API/payload pins or drift-prone TypeScript rendering; PDF image
+inventory also requires a bounded Linux parser contract change. Choose a
+read-only recheck of the existing schema 2 dependency receipt immediately
+before operator import. Recompute the same bounded package hashes and normalized
+dependency order, compare the entire receipt to a trusted prior receipt, and
+refuse a replaced or missing package before destination mutation. Shuffled
+input OKF paths with identical bytes must remain equivalent. This is an
+observation at recheck time, not a lock, TOCTOU elimination, atomic restore
+or full Registrar validation. Preserve five broader finish predicates.
+
+### 12:43 UTC recovery identity-recheck verification
+
+Keep the advisory at-check candidate. The actual Registrar local-only
+archive/root/retracted-child fixture passed unchanged and shuffled-path
+rechecks; same-path repacks, self-consistent altered OKF, missing package,
+symlink and malformed expected receipt refuse before destination state.
+Original packages still replay with exact lineage and retraction. Focused
+1/1, uncached Nx Knowledge integration 100/100, unit 43/43, daemonless
+typecheck and sync, scoped format and diff checks passed. Independent
+read-only review found no must-fix. The caller must independently pin its
+prior receipt; full Registrar profile/admission, the later import path-open
+race, atomicity and five broader finish predicates remain open. Exact-head
+package/check and PR remain.

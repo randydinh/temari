@@ -6,7 +6,10 @@ import { test } from 'node:test';
 import { promisify } from 'node:util';
 import { prepareRegistrar } from '../support/prepare.js';
 import { canonical, hash } from './codec.js';
-import { planArchiveRecoveryDependencies } from './archive-recovery-dependency-plan.js';
+import {
+  planArchiveRecoveryDependencies,
+  recheckArchiveRecoveryDependencies,
+} from './archive-recovery-dependency-plan.js';
 
 const exec = promisify(execFile);
 
@@ -460,6 +463,38 @@ test('ACTUAL Registrar: ordered root and retracted-child OKF replay preserves gr
     const planText = canonical(planned);
     for (const privateValue of [f.base, 'synthetic signal', 'Synthetic signal'])
       assert(!planText.includes(privateValue));
+    const rechecked = await recheckArchiveRecoveryDependencies(
+      { archivePackagePath: archivePackage, graphPackagePaths: packagePaths },
+      planned,
+    );
+    assert.equal(rechecked.status, 'unchanged-at-check');
+    assert.equal(rechecked.planSha256, hash(canonical(planned)));
+    assert.deepEqual(rechecked.importOrder, planned.importOrder);
+    assert.deepEqual(
+      await recheckArchiveRecoveryDependencies(
+        {
+          archivePackagePath: archivePackage,
+          graphPackagePaths: [okfPackage, childOkfPackage],
+        },
+        planned,
+      ),
+      rechecked,
+      'Shuffled graph path input must reproduce the same normalized receipt',
+    );
+    await assert.rejects(
+      recheckArchiveRecoveryDependencies(
+        { archivePackagePath: archivePackage, graphPackagePaths: packagePaths },
+        { ...planned, schema: 1 },
+      ),
+      /Invalid trusted recovery receipt version or claim/,
+    );
+    await assert.rejects(
+      recheckArchiveRecoveryDependencies(
+        { archivePackagePath: archivePackage, graphPackagePaths: packagePaths },
+        { ...planned, untrustedExtra: true },
+      ),
+      /Invalid trusted recovery receipt shape/,
+    );
     assert.deepEqual(await counts(restoredState), [0, 0, 0, 0, 0]);
 
     await assert.rejects(
@@ -770,6 +805,105 @@ test('ACTUAL Registrar: ordered root and retracted-child OKF replay preserves gr
       archivePackage,
       [okfPackage, extraOkfHashPath],
       /OKF file hash keyset mismatch/,
+    );
+    const originalArchiveBytes = await readFile(archivePackage);
+    const originalChildBytes = await readFile(childOkfPackage);
+    const sameArchivePayload = JSON.parse(
+      originalArchiveBytes.toString('utf8'),
+    );
+    await writeFile(
+      archivePackage,
+      JSON.stringify(sameArchivePayload, null, 2),
+    );
+    assert.equal(
+      (
+        await planArchiveRecoveryDependencies({
+          archivePackagePath: archivePackage,
+          graphPackagePaths: packagePaths,
+        })
+      ).status,
+      'dependency-closed',
+    );
+    await assert.rejects(
+      recheckArchiveRecoveryDependencies(
+        { archivePackagePath: archivePackage, graphPackagePaths: packagePaths },
+        planned,
+      ),
+      /Recovery packages changed since trusted plan/,
+    );
+    await writeFile(archivePackage, originalArchiveBytes);
+    await writeFile(
+      childOkfPackage,
+      JSON.stringify(exportedChild.body, null, 2),
+    );
+    assert.equal(
+      (
+        await planArchiveRecoveryDependencies({
+          archivePackagePath: archivePackage,
+          graphPackagePaths: packagePaths,
+        })
+      ).status,
+      'dependency-closed',
+    );
+    await assert.rejects(
+      recheckArchiveRecoveryDependencies(
+        { archivePackagePath: archivePackage, graphPackagePaths: packagePaths },
+        planned,
+      ),
+      /Recovery packages changed since trusted plan/,
+    );
+    await writeFile(childOkfPackage, originalChildBytes);
+    const selfConsistentChild = structuredClone(changedOkf);
+    selfConsistentChild.file_sha256[okfKey] = hash(
+      selfConsistentChild.files[okfKey],
+    );
+    await writeFile(childOkfPackage, canonical(selfConsistentChild));
+    assert.equal(
+      (
+        await planArchiveRecoveryDependencies({
+          archivePackagePath: archivePackage,
+          graphPackagePaths: packagePaths,
+        })
+      ).status,
+      'dependency-closed',
+    );
+    await assert.rejects(
+      recheckArchiveRecoveryDependencies(
+        { archivePackagePath: archivePackage, graphPackagePaths: packagePaths },
+        planned,
+      ),
+      /Recovery packages changed since trusted plan/,
+    );
+    await writeFile(childOkfPackage, originalChildBytes);
+    await rm(childOkfPackage);
+    await assert.rejects(
+      recheckArchiveRecoveryDependencies(
+        { archivePackagePath: archivePackage, graphPackagePaths: packagePaths },
+        planned,
+      ),
+      /Recovery package is unreadable/,
+    );
+    await symlink(okfPackage, childOkfPackage);
+    await assert.rejects(
+      recheckArchiveRecoveryDependencies(
+        { archivePackagePath: archivePackage, graphPackagePaths: packagePaths },
+        planned,
+      ),
+      /Recovery package is unreadable/,
+    );
+    await rm(childOkfPackage);
+    await writeFile(childOkfPackage, originalChildBytes);
+    assert.equal(
+      (
+        await recheckArchiveRecoveryDependencies(
+          {
+            archivePackagePath: archivePackage,
+            graphPackagePaths: packagePaths,
+          },
+          planned,
+        )
+      ).status,
+      'unchanged-at-check',
     );
     assert.deepEqual(
       await counts(restoredState),

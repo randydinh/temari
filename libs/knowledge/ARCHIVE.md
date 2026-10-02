@@ -310,9 +310,16 @@ file's UTF-8 bytes against `file_sha256`. It can refuse these corrupt packages
 before any import. It does not validate the complete Registrar package profile,
 current registration or permission. It does not prevent an ancestor-directory
 symlink or file replacement after planning and does not make separate imports
-atomic. Registrar still decides whether each import is valid. See the
-[dependency-plan evidence](../../docs/evidence/knowledge-system/graph-recovery-dependency-plan-2026-10-02.md)
-and [internal-hash evidence](../../docs/evidence/knowledge-system/graph-recovery-internal-hashes-2026-10-02.md)
+atomic. Registrar still decides whether each import is valid. Before replay, call
+`recheckArchiveRecoveryDependencies` with the same selected paths and a prior
+plan receipt independently pinned by your workflow. It recomputes the bounded
+plan and returns `unchanged-at-check` with a plan hash only if the complete
+receipt still matches; input OKF path order can vary. Recheck again as close
+to each import as practical. This detects drift only at check time and does
+not lock paths or prevent a later replacement. See the
+[dependency-plan evidence](../../docs/evidence/knowledge-system/graph-recovery-dependency-plan-2026-10-02.md),
+[internal-hash evidence](../../docs/evidence/knowledge-system/graph-recovery-internal-hashes-2026-10-02.md),
+and [recheck evidence](../../docs/evidence/knowledge-system/graph-recovery-recheck-2026-10-02.md)
 for the tested scope.
 
 These exercises cover one source and at most one child. The exports are not
