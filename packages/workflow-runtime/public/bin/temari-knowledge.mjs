@@ -7,6 +7,7 @@ import { existsSync, realpathSync } from 'node:fs';
 import { lstat, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 
 const artifact = fileURLToPath(new URL('..', import.meta.url));
 const registrar = join(artifact, 'registrar');
@@ -73,6 +74,7 @@ function usage() {
        temari-knowledge setup [--home ABS] [--python PYTHON_3_12] [--connect-codex]
                               [--workspace ABS] [--codex CODEX]
        temari-knowledge connect-codex [--home ABS] [--workspace ABS] [--codex CODEX]
+       temari-knowledge disconnect-codex [--home ABS] [--workspace ABS] [--codex CODEX]
        temari-knowledge journey-intake|journey-query|journey-jobs-create|journey-jobs-tick|journey-search|archive-collect ...
 
 Setup builds a wheel from the pinned bundled Registrar source and installs it in
@@ -302,6 +304,131 @@ async function connectCodex(flags) {
   return { status: 'connected', serverName, workspace, python: place.python };
 }
 
+function exactKeys(value, keys) {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.keys(value).length === keys.length &&
+    keys.every((key) => Object.hasOwn(value, key))
+  );
+}
+
+function selectedCodexEntry(value, place, workspace) {
+  if (
+    !exactKeys(value, [
+      'name',
+      'enabled',
+      'disabled_reason',
+      'transport',
+      'enabled_tools',
+      'disabled_tools',
+      'startup_timeout_sec',
+      'tool_timeout_sec',
+    ])
+  )
+    return false;
+  const transport = value.transport;
+  return (
+    value.name === serverName &&
+    value.enabled === true &&
+    value.disabled_reason === null &&
+    value.enabled_tools === null &&
+    value.disabled_tools === null &&
+    value.startup_timeout_sec === null &&
+    value.tool_timeout_sec === null &&
+    exactKeys(transport, [
+      'type',
+      'command',
+      'args',
+      'env',
+      'env_vars',
+      'cwd',
+    ]) &&
+    transport.type === 'stdio' &&
+    transport.command === place.python &&
+    Array.isArray(transport.args) &&
+    transport.args.length === 6 &&
+    transport.args.every(
+      (item, index) =>
+        item ===
+        ['-m', 'knowledge_agent.cli', 'mcp', 'serve', '--workspace', workspace][
+          index
+        ],
+    ) &&
+    transport.env === null &&
+    Array.isArray(transport.env_vars) &&
+    transport.env_vars.length === 0 &&
+    transport.cwd === null
+  );
+}
+
+async function getCodexEntry(codex) {
+  const result = await invoke(codex, ['mcp', 'get', serverName, '--json'], {
+    capture: true,
+    allowFailure: true,
+  });
+  assert(
+    Buffer.byteLength(result.stdout) <= 65536 &&
+      Buffer.byteLength(result.stderr) <= 65536,
+    'Codex MCP inspection exceeded its output bound.',
+  );
+  if (result.code !== 0) {
+    const lines = result.stderr.trim().split(/\r?\n/u);
+    if (
+      result.code === 1 &&
+      result.stdout.trim() === '' &&
+      /^Error: No MCP server named ['"]?temari-content-registrar['"]? found\.?$/u.test(
+        lines.at(-1),
+      ) &&
+      lines.slice(0, -1).every((line) =>
+        line.startsWith('WARNING: proceeding, even though we could not create PATH aliases: '))
+    )
+      return { status: 'absent' };
+    throw new Error('Codex MCP inspection failed.');
+  }
+  let entry;
+  try {
+    entry = JSON.parse(result.stdout);
+  } catch {
+    throw new Error('Codex MCP inspection returned invalid JSON.');
+  }
+  return { status: 'present', entry };
+}
+
+async function disconnectCodex(flags) {
+  const place = locations(flags);
+  const workspace = flags['--workspace'] ?? place.workspace;
+  assert(isAbsolute(workspace), '--workspace must be absolute.');
+  const codex = flags['--codex'] ?? 'codex';
+  const first = await getCodexEntry(codex);
+  if (first.status === 'absent')
+    return { status: 'already-disconnected', serverName };
+  assert(
+    selectedCodexEntry(first.entry, place, workspace),
+    'Codex MCP entry differs from the selected Knowledge connection; inspect it before removal.',
+  );
+  const second = await getCodexEntry(codex);
+  assert(
+    second.status === 'present' &&
+      selectedCodexEntry(second.entry, place, workspace) &&
+      isDeepStrictEqual(first.entry, second.entry),
+    'Codex MCP entry changed before removal.',
+  );
+  const removed = await invoke(codex, ['mcp', 'remove', serverName], {
+    capture: true,
+    allowFailure: true,
+  });
+  assert.equal(removed.code, 0, 'Codex MCP removal failed.');
+  const after = await getCodexEntry(codex);
+  assert.equal(
+    after.status,
+    'absent',
+    'Codex MCP entry remains after removal.',
+  );
+  return { status: 'disconnected', serverName };
+}
+
 async function main(argv) {
   const [command, ...rest] = argv;
   if (!command || command === '--help' || command === 'help') {
@@ -332,6 +459,18 @@ async function main(argv) {
   }
   if (command === 'connect-codex') {
     console.log(JSON.stringify(await connectCodex(options(rest, ['--home', '--workspace', '--codex'])), null, 2));
+    return;
+  }
+  if (command === 'disconnect-codex') {
+    console.log(
+      JSON.stringify(
+        await disconnectCodex(
+          options(rest, ['--home', '--workspace', '--codex']),
+        ),
+        null,
+        2,
+      ),
+    );
     return;
   }
   assert(existsSync(knowledgeCli), 'Compiled knowledge CLI is missing.');

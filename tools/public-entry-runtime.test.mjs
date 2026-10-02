@@ -13,6 +13,7 @@ import {
   realpath,
   rename,
   rm,
+  stat,
   symlink,
   unlink,
   writeFile,
@@ -73,6 +74,89 @@ async function childResult(args, expectedCode = 0, env = {}) {
 async function child(args, expectedCode = 0) {
   const result = await childResult(args, expectedCode);
   return JSON.parse(result.stdout);
+}
+
+function expectedKnowledgeEntry(home, workspace) {
+  return {
+    name: 'temari-content-registrar',
+    enabled: true,
+    disabled_reason: null,
+    transport: {
+      type: 'stdio',
+      command: join(home, 'venv', 'bin', 'python'),
+      args: [
+        '-m',
+        'knowledge_agent.cli',
+        'mcp',
+        'serve',
+        '--workspace',
+        workspace,
+      ],
+      env: null,
+      env_vars: [],
+      cwd: null,
+    },
+    enabled_tools: null,
+    disabled_tools: null,
+    startup_timeout_sec: null,
+    tool_timeout_sec: null,
+  };
+}
+
+async function statefulFakeCodex(root, codex) {
+  const entryPath = join(root, 'fake-codex-entry.json');
+  const controlPath = join(root, 'fake-codex-control.json');
+  const countPath = join(root, 'fake-codex-get-count.txt');
+  const logPath = join(root, 'fake-codex-operations.jsonl');
+  const script = `#!/usr/bin/env node
+const fs = require('node:fs');
+const entryPath = ${JSON.stringify(entryPath)};
+const controlPath = ${JSON.stringify(controlPath)};
+const countPath = ${JSON.stringify(countPath)};
+const logPath = ${JSON.stringify(logPath)};
+const args = process.argv.slice(2);
+const control = fs.existsSync(controlPath) ? JSON.parse(fs.readFileSync(controlPath, 'utf8')) : {};
+fs.appendFileSync(logPath, JSON.stringify(args) + '\\n');
+if (args[0] !== 'mcp') process.exit(2);
+if (args[1] === 'get') {
+  const count = (fs.existsSync(countPath) ? Number(fs.readFileSync(countPath, 'utf8')) : 0) + 1;
+  fs.writeFileSync(countPath, String(count));
+  if (control.getMode === 'error') { console.error('TOP_SECRET inspection error'); process.exit(2); }
+  if (control.getMode === 'malformed') { process.stdout.write('TOP_SECRET{invalid'); process.exit(0); }
+  if (!fs.existsSync(entryPath)) {
+    if (control.getMode === 'absent-warning')
+      console.error('WARNING: proceeding, even though we could not create PATH aliases: Operation not permitted (os error 1)');
+    console.error('Error: No MCP server named temari-content-registrar found.');
+    process.exit(1);
+  }
+  const entry = JSON.parse(fs.readFileSync(entryPath, 'utf8'));
+  if (control.getMode === 'changed-second' && count === 2)
+    entry.transport.cwd = '/changed-between-reads';
+  process.stdout.write(JSON.stringify(entry));
+  process.exit(0);
+}
+if (args[1] === 'remove') {
+  if (control.removeMode === 'error') { console.error('TOP_SECRET removal error'); process.exit(2); }
+  if (control.removeMode !== 'still-present') fs.rmSync(entryPath, { force: true });
+  process.exit(0);
+}
+if (args[1] === 'add') {
+  const separator = args.indexOf('--');
+  if (separator < 0 || args[2] !== 'temari-content-registrar') process.exit(2);
+  const command = args[separator + 1];
+  const serverArgs = args.slice(separator + 2);
+  fs.writeFileSync(entryPath, JSON.stringify({
+    name: 'temari-content-registrar', enabled: true, disabled_reason: null,
+    transport: { type: 'stdio', command, args: serverArgs, env: null, env_vars: [], cwd: null },
+    enabled_tools: null, disabled_tools: null, startup_timeout_sec: null, tool_timeout_sec: null,
+  }));
+  process.exit(0);
+}
+process.exit(2);
+`;
+  await writeFile(codex, script);
+  await chmod(codex, 0o755);
+  return { entryPath, controlPath, countPath, logPath };
 }
 
 function request(entry, overrides = {}) {
@@ -180,6 +264,36 @@ test('relocated Knowledge cold install keeps state outside the artifact and conn
   ]);
   const marker = join(home, 'workspace', 'preserved.txt');
   await writeFile(marker, 'recipient data\n');
+  const stateful = await statefulFakeCodex(root, codex);
+  await writeFile(
+    stateful.entryPath,
+    JSON.stringify(expectedKnowledgeEntry(home, join(home, 'workspace'))),
+  );
+  const disconnected = await child([
+    launcher,
+    'disconnect-codex',
+    '--home',
+    home,
+    '--codex',
+    codex,
+  ]);
+  assert.equal(disconnected.status, 'disconnected');
+  await assert.rejects(lstat(stateful.entryPath), { code: 'ENOENT' });
+  assert.equal(await readFile(marker, 'utf8'), 'recipient data\n');
+  assert((await stat(join(home, 'venv', 'bin', 'python'))).isFile());
+  const reconnected = await child([
+    launcher,
+    'connect-codex',
+    '--home',
+    home,
+    '--codex',
+    codex,
+  ]);
+  assert.equal(reconnected.status, 'connected');
+  assert.deepEqual(
+    JSON.parse(await readFile(stateful.entryPath, 'utf8')),
+    expectedKnowledgeEntry(home, join(home, 'workspace')),
+  );
   const repeated = await child([launcher, 'setup', '--home', home]);
   assert.equal(repeated.setup, 'already-installed');
   assert.equal(await readFile(marker, 'utf8'), 'recipient data\n');
@@ -236,6 +350,159 @@ test('relocated Knowledge cold install keeps state outside the artifact and conn
     manifest,
   );
   assert.equal((await lstat(join(artifact, 'registrar/UPSTREAM.json'))).isFile(), true);
+});
+
+test('Knowledge disconnect removes only the exact selected Codex entry and retains local data', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'temari knowledge-disconnect-'));
+  t.after(async () => rm(root, { recursive: true, force: true }));
+  const home = join(root, 'state');
+  const workspace = join(home, 'workspace');
+  const customWorkspace = join(root, 'custom-workspace');
+  const codex = join(root, 'fake-codex');
+  const launcher = join(output, 'bin/temari-knowledge.mjs');
+  await mkdir(workspace, { recursive: true });
+  await mkdir(customWorkspace);
+  await mkdir(join(home, 'venv', 'bin'), { recursive: true });
+  const data = join(workspace, 'retained.txt');
+  const customData = join(customWorkspace, 'retained.txt');
+  const python = join(home, 'venv', 'bin', 'python');
+  await writeFile(data, 'local source data\n');
+  await writeFile(customData, 'custom source data\n');
+  await writeFile(python, 'venv marker\n');
+  const fake = await statefulFakeCodex(root, codex);
+  const command = (extra = []) => [
+    launcher,
+    'disconnect-codex',
+    '--home',
+    home,
+    '--codex',
+    codex,
+    ...extra,
+  ];
+  async function removeCount() {
+    const lines = (await readFile(fake.logPath, 'utf8')).trim().split('\n');
+    return lines.filter((line) => JSON.parse(line)[1] === 'remove').length;
+  }
+  const absent = await child(command());
+  assert.equal(absent.status, 'already-disconnected');
+  assert.equal(await removeCount(), 0);
+  await writeFile(fake.controlPath, JSON.stringify({ getMode: 'absent-warning' }));
+  assert.equal((await child(command())).status, 'already-disconnected');
+  await unlink(fake.controlPath);
+  assert.equal(await removeCount(), 0);
+
+  const selected = expectedKnowledgeEntry(home, workspace);
+  await writeFile(fake.entryPath, JSON.stringify(selected));
+  const removed = await child(command());
+  assert.equal(removed.status, 'disconnected');
+  await assert.rejects(lstat(fake.entryPath), { code: 'ENOENT' });
+  assert.equal((await child(command())).status, 'already-disconnected');
+  assert.equal(await removeCount(), 1);
+  assert.equal(await readFile(data, 'utf8'), 'local source data\n');
+  assert.equal(await readFile(python, 'utf8'), 'venv marker\n');
+
+  const custom = expectedKnowledgeEntry(home, customWorkspace);
+  await writeFile(fake.entryPath, JSON.stringify(custom));
+  const wrongSelection = await childResult(command(), 1);
+  assert.match(
+    wrongSelection.stderr,
+    /differs from the selected Knowledge connection/,
+  );
+  assert.deepEqual(JSON.parse(await readFile(fake.entryPath, 'utf8')), custom);
+  assert.equal(
+    (await child(command(['--workspace', customWorkspace]))).status,
+    'disconnected',
+  );
+  assert.equal(await readFile(customData, 'utf8'), 'custom source data\n');
+  assert.equal(await removeCount(), 2);
+
+  const mismatches = [
+    (item) => {
+      item.name = 'another-server';
+    },
+    (item) => {
+      item.enabled = false;
+    },
+    (item) => {
+      item.transport.type = 'http';
+    },
+    (item) => {
+      item.transport.command = '/other/python';
+    },
+    (item) => {
+      item.transport.args[5] = '/other/workspace';
+    },
+    (item) => {
+      item.transport.args.push('--extra');
+    },
+    (item) => {
+      item.transport.env = { TOKEN: 'TOP_SECRET' };
+    },
+    (item) => {
+      item.transport.env_vars = ['TOKEN'];
+    },
+    (item) => {
+      item.transport.cwd = '/other';
+    },
+    (item) => {
+      item.transport.extra = true;
+    },
+    (item) => {
+      item.enabled_tools = [];
+    },
+    (item) => {
+      item.disabled_tools = [];
+    },
+    (item) => {
+      item.startup_timeout_sec = 5;
+    },
+    (item) => {
+      item.tool_timeout_sec = 5;
+    },
+    (item) => {
+      item.extra = true;
+    },
+  ];
+  for (const change of mismatches) {
+    const item = structuredClone(selected);
+    change(item);
+    const bytes = JSON.stringify(item);
+    await writeFile(fake.entryPath, bytes);
+    const beforeRemoves = await removeCount();
+    const refused = await childResult(command(), 1);
+    assert.match(
+      refused.stderr,
+      /differs from the selected Knowledge connection/,
+    );
+    assert(!refused.stderr.includes('TOP_SECRET'));
+    assert.equal(await readFile(fake.entryPath, 'utf8'), bytes);
+    assert.equal(await removeCount(), beforeRemoves);
+  }
+
+  await writeFile(fake.entryPath, JSON.stringify(selected));
+  for (const getMode of ['malformed', 'error', 'changed-second']) {
+    await writeFile(fake.controlPath, JSON.stringify({ getMode }));
+    await writeFile(fake.countPath, '0');
+    const beforeRemoves = await removeCount();
+    const refused = await childResult(command(), 1);
+    assert(!refused.stderr.includes('TOP_SECRET'));
+    assert.equal(await removeCount(), beforeRemoves);
+    assert.deepEqual(
+      JSON.parse(await readFile(fake.entryPath, 'utf8')),
+      selected,
+    );
+  }
+  for (const removeMode of ['error', 'still-present']) {
+    await writeFile(fake.controlPath, JSON.stringify({ removeMode }));
+    const refused = await childResult(command(), 1);
+    assert(!refused.stderr.includes('TOP_SECRET'));
+    assert.deepEqual(
+      JSON.parse(await readFile(fake.entryPath, 'utf8')),
+      selected,
+    );
+  }
+  assert.equal(await readFile(data, 'utf8'), 'local source data\n');
+  assert.equal(await readFile(python, 'utf8'), 'venv marker\n');
 });
 
 test('relocated QA entry runs the packaged evaluator without source-checkout access', async () => {
