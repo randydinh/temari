@@ -13,10 +13,11 @@ function report(
   host: string,
   available: readonly HostCapability[],
   notes: HostCapabilityReport['notes'] = {},
+  declared: readonly HostCapability[] = available,
 ): HostCapabilityReport {
   const have = new Set(available);
   const provenance = Object.fromEntries(
-    available.map((capability) => [
+    declared.map((capability) => [
       capability,
       {
         status: 'unproven' as const,
@@ -51,14 +52,21 @@ export const genericAdapter: HostAdapter = {
 export const cursorAdapter: HostAdapter = {
   id: 'cursor',
   capabilities() {
-    return report('cursor', [
-      'subagents',
-      'parallelism',
-      'model_diversity',
-      'worktree_isolation',
-      'durable_delivery',
-      'forge',
-    ]);
+    // The legacy Cursor HOST.md maps these operations, but there is no
+    // installed Nx Cursor journey or capability observation for this adapter.
+    return report(
+      'cursor',
+      [],
+      {
+        subagents: 'Declared by legacy Cursor mapping; no Nx host proof.',
+        parallelism: 'Declared by legacy Cursor mapping; no Nx host proof.',
+        model_diversity: 'Declared by legacy Cursor mapping; no Nx host proof.',
+        worktree_isolation: 'No Cursor worktree isolation proof.',
+        durable_delivery: 'No Cursor delivery proof.',
+        forge: 'No Cursor forge proof.',
+      },
+      HOST_CAPABILITIES,
+    );
   },
 };
 
