@@ -684,3 +684,44 @@ GitHub reports [#162](https://github.com/randydinh/temari/pull/162) merged at
 trees match. Keep this bounded syntax receipt. HTML rendering, visual meaning,
 PDF assets, continuous freshness, Windows and production losslessness remain
 open.
+
+## 2026-10-02 06:39 UTC two-source graph impact experiment
+
+PRs #162 and #163 are merged; this clean isolated branch starts from
+`fb208a90bbc884e273965b533fe1a4856abf3fd1`. A read-only architect compared
+a bounded Knowledge-only graph impact plan for one changed source in an exact
+multi-source RevisionSet with a BM25 caching change. The former closes a
+cross-source relationship review gap without mutating graph state. Registrar
+currently builds a bounded in-memory SQLite search index per discovery; a
+persistent cache would change Registrar storage/protocol and needs a measured
+latency benchmark and execution-boundary review. Select the read-only graph
+impact plan.
+
+Pass only if an actual `local-only` Registrar fixture registers/captures two
+sources, publishes an exact two-source graph, changes one source, captures its
+new generation, and uses pinned old/new publications plus the old full graph
+RevisionSet to produce a metadata-only review queue. Bound inputs to 2–8
+unique sources and a single changed source; require identical pinned transport,
+workspace and implementation, complete admitted publications, unchanged
+registration identities and exact unchanged-source pins. Recheck publication
+bytes, current registrations and diff receipt before publication. Cross-source
+relationships with an endpoint in changed/removed content must enter review;
+unchanged-source records may be only *candidate* repins, retractions stay
+historical, and added/changed paths enter discovery. Refuse wrong graph scope,
+tampered or changed unchanged-source pins, disabled registrations, ambiguous
+source selection and over-limit output. Keep single-source impact and existing
+repin/publish contracts unchanged. This is plan-only: no automatic graph
+mutation, semantic correctness, transitive inference, continuous freshness or
+retrieval-quality claim. Focused actual-Registrar, full Nx, independent review,
+clean exact-head package and PR delivery are required.
+
+### 06:56 UTC two-source graph impact checkpoint
+
+The final actual Registrar fixture explicitly set both source policies to
+`local-only` and passed 1/1 after adding removed-anchor and nine-source
+assertions. Final uncached Nx Knowledge integration passed 95/95, unit tests
+43/43, typecheck, Nx sync, formatting and diff checks passed. A separate
+read-only Codex router review found no must-fix and documented the initially
+missing negative assertions, now present. The plan neither mutates a graph nor
+proves semantic correctness. Clean exact-head package, commit review and PR
+delivery remain.

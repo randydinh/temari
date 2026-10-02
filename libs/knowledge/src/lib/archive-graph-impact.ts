@@ -73,8 +73,11 @@ async function verifyPublicationPin(pin: ArchiveGenerationDiffPin) {
 export async function readAllGraphRecords(
   reader: Awaited<ReturnType<typeof createArchiveGraphReader>>,
   graphId: string,
-  source: Awaited<ReturnType<typeof loadArchivePublication>>['source'],
+  source:
+    | Awaited<ReturnType<typeof loadArchivePublication>>['source']
+    | readonly Awaited<ReturnType<typeof loadArchivePublication>>['source'][],
 ) {
+  const scope = Array.isArray(source) ? source : [source];
   const records: ArchiveGraphRecord[] = [];
   const recordIds = new Set<string>();
   const cursors = new Set<string>();
@@ -84,7 +87,7 @@ export async function readAllGraphRecords(
   for (;;) {
     const page = await reader.read({
       graphId,
-      scope: [source],
+      scope,
       limit: 200,
       maxBytes: 1_048_576,
       cursor,

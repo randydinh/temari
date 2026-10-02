@@ -394,6 +394,7 @@ test('ACTUAL CLI: implementation files beyond retrieval.py and configuration are
 import './archive.integration.test.js';
 import './archive-generation-diff.integration.test.js';
 import './archive-graph-impact.integration.test.js';
+import './archive-graph-multisource-impact.integration.test.js';
 import './archive-graph-repin.integration.test.js';
 import './archive-graph-republish.integration.test.js';
 import './archive-graph-handoff.integration.test.js';
