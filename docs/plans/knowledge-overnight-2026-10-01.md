@@ -1050,3 +1050,31 @@ must-fix after correcting receipt versioning. This is bookend policy checking,
 not a transactional sharing snapshot or hosted-call authorization. Clean
 commit, exact-head package/check and PR delivery remain; visual meaning and
 the five broader production finish predicates remain open.
+
+### 09:38 UTC archived HTML sharing delivery
+
+Independent exact-head review accepted clean commit
+`3b043186111b70e2620fbf7c737b875bd85ab642` after removing temporary
+log paths from public evidence. The public-entry package/check reported this
+revision with `dirty:false`; its manifest and relocated stock Node export
+checks passed. GitHub reports
+[#174](https://github.com/randydinh/temari/pull/174) merged at
+`ce4ea89d5f68de5fbcfb4ff6cf2beed39e8995a9`, with the same reviewed tree.
+Keep the bounded default-source admission and schema-2 receipt. The five
+production finish predicates remain open.
+
+### 09:39 UTC post-sharing handoff hypothesis
+
+Reconcile #174's merged scope in the Knowledge handoff. State actual
+Registrar/Nx/package evidence, historical schema-1 interpretation,
+bookend-only sharing stability and no hosted permission, while preserving all
+five broader production finish predicates.
+
+### 09:41 UTC post-sharing handoff verification
+
+Independent read-only review found no must-fix: #174 is merged with a tree
+matching the reviewed head; the handoff's actual Registrar, Nx and package
+claims match verified receipts. Only plan, handoff and audit files changed,
+the audit retains its six-field append-only prefix, and added text contains
+no private path or raw content. Keep this source-linked handoff; all five
+broader production finish predicates remain open.
