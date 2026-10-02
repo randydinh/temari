@@ -908,3 +908,30 @@ candidate Nx Knowledge integration passed 96/96 actual Registrar cases, unit
 the opt-in benchmark and evidence note. No hosted call or Keychain lookup
 was used. Clean commit, exact-head package/check and PR delivery remain.
 The five broader production finish predicates remain open.
+
+### 08:30 UTC BM25 scale delivery
+
+Independent exact-head review accepted clean commit
+`31fd3ec54b02f82bb8c34beb1a73d771a1c1a183`. The public-entry package
+reported that revision with `dirty:false`; its manifest check and a relocated
+stock Node Knowledge import passed. GitHub reports
+[#170](https://github.com/randydinh/temari/pull/170) merged at
+`b72b2c9a9233842ff68c7c73a4f0b3571f17a197`, with the same reviewed tree.
+Keep the observational local-only latency baseline. The five production
+finish predicates remain open.
+
+### 08:31 UTC post-BM25 handoff hypothesis
+
+Append #170's measured scope, exact package and review evidence, and narrow
+interpretation to the Knowledge handoff. Do not turn synthetic timings into a
+production SLO, cache decision or BM25 default-ranker promotion; keep the five
+broader production finish predicates open.
+
+### 08:33 UTC post-BM25 handoff verification
+
+Independent read-only review found no must-fix: #170's merge tree matches its
+reviewed head, the handoff timing and integrity claims match the sanitized
+report and checks, the audit trail remains strict six-field append-only, and
+the added text contains no private corpus or report path. Keep this as a
+source-linked documentation increment; all five production finish predicates
+remain open.
