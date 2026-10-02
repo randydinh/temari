@@ -967,7 +967,7 @@ def discover_snapshot(registry, query, *, source_ids, snapshot_generations, limi
         bm25_rows, bm25_text_bytes = [], 0
         snapshots = [{key: identity[key] for key in ('source_id', 'generation', 'manifest_sha256')}
                      for identity in binding['snapshots']]
-        for manifest in manifests:
+        for manifest, selected_snapshot in zip(manifests, binding['snapshots']):
             for item in manifest['documents']:
                 omissions = set(item['gaps'])
                 # Derive omissions for schema 1 captures predating explicit preservation gaps.
@@ -981,7 +981,7 @@ def discover_snapshot(registry, query, *, source_ids, snapshot_generations, limi
                     indexed += 1
                     text = _blob(db, rep['sha256'], rep['bytes']).decode()
                     identity = dict(source_id=manifest['source_id'], path=item['path'],
-                        snapshot_generation=manifest['generation'], manifest_sha256=digest(canonical(manifest)),
+                        snapshot_generation=manifest['generation'], manifest_sha256=selected_snapshot['manifest_sha256'],
                         sha256=item['original']['sha256'], representation_sha256=rep['sha256'],
                         extractor_signature=rep['extractor_signature'])
                     if mode == 'bm25':

@@ -125,7 +125,7 @@
     },
     {
       "path": "src/knowledge_agent/source_archive.py",
-      "sha256": "bd12ded293c2e7f99d9a8b82a0666181f28e2ebfbcb00c6173786233b47f910f"
+      "sha256": "93f2eb545747056aaa778924acf51e40c1dae19be26fdf93cf4bf19b609f120b"
     },
     {
       "path": "src/knowledge_agent/source_registry.py",

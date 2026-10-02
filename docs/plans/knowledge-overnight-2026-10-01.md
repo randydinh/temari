@@ -1291,3 +1291,55 @@ Registrar/Nx and package claims match sanitized evidence. Only plan,
 handoff and audit changed; the audit remains six-field append-only and
 added prose contains no private path or raw content. Keep the observational
 handoff with all five broader production finish predicates open.
+
+## 2026-10-02 11:05 UTC per-discovery manifest hash experiment
+
+On latest merged main after #181, a read-only architect compared (A) reusing
+each selected manifest's already computed binding hash inside one discovery
+call with (B) a paired archive/graph backup preflight. The current discovery
+path serializes and hashes the complete manifest once for the binding and once
+per represented document, even after `_load` validated it. The fixed-source
+diagnostic suggests non-rank work dominates at larger document counts, but
+does not isolate this cost. Choose A as a narrow local computation change;
+B needs a broader consistency and policy contract. No persistent cache,
+ranker change, hosted call or P-stack boundary change.
+
+Keep only if actual Registrar exact and BM25 discovery retain manifest pins,
+ordering, continuation binding and policy/integrity refusals across multiple
+sources; the existing one-source 100/500/1,000 diagnostic retains stable
+index digests and pinned top citations; focused and full Nx Knowledge checks,
+daemonless sync/typecheck, clean package/check and independent exact-head
+review pass. Compare before/after timing observationally on this host without
+making an SLO or attributing every residual millisecond to hashing. Production
+quality and the five broader finish predicates remain open.
+
+### 11:23 UTC manifest hash reuse verification
+
+Keep the scoped per-call reuse candidate. The actual Registrar two-source
+exact/BM25 focused case passed after an independent reviewer requested and
+received an explicit ranked-order assertion. The uncached Nx Knowledge
+integration passed 100/100; unit passed 43/43, daemonless typecheck and sync
+passed. Both opt-in one-source reports used identical fixture/helper settings
+and 48 independently checked citations apiece. In-process medians for
+100/500/1,000 documents changed from 41.401/846.399/3276.202 ms to
+7.007/30.857/59.601 ms; helper medians stayed near 0.6/1.9/3.4 ms. The
+second raw report SHA-256 is
+`560707e54d78e19d13adb89c7c00b6aa594f5688db9422ecf2aac2421ef47e81`.
+Sequential host runs are observational and the between-run index digests
+contain fresh source/generation identities. Independent source/test and
+evidence reviewers found no must-fix. An initial benchmark command lacked
+PyYAML, a historical `.venv` path was absent, and the first full integration
+attempt lacked its required explicit Registrar environment; a pinned local
+`uv` environment and explicit source/Python values resolved setup. Generated
+bytecode was removed. Clean commit, exact-head package/check and PR remain;
+SLO, answer quality and five broader production finish predicates stay open.
+
+### 11:27 UTC bundled payload pin repair
+
+The first public-entry package refused the changed Registrar source because
+the bundled payload inventory still held its old SHA-256. Update only the
+`source_archive.py` inventory digest and the two existing pins for the
+resulting `UPSTREAM.json` digest. The payload verifier's focused tests pass.
+The source and digest pins must enter one clean reviewed commit before the
+exact-head package/check. This is required installer integrity maintenance,
+not a change in upstream attribution, sharing or hosted-model policy.
