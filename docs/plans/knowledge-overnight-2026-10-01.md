@@ -1370,3 +1370,48 @@ head `65aead3`, and the handoff's actual Registrar, Nx, payload, package and
 benchmark claims match retained evidence. Only intended docs/audit changed;
 the audit is six-field append-only, added text has no private path or source
 content, and all five broader production finish predicates remain open.
+
+## 2026-10-02 11:43 UTC read-only recovery dependency experiment
+
+On latest merged main after #183, a read-only architect compared (A) a
+bounded PDF embedded-image declaration inventory with (B) a read-only
+dependency plan for one archive bundle and ordered root/child OKF packages.
+The PDF route requires changes to the hard-bounded Lima parser contract and
+cannot infer image absence from raw bytes. Select B for a narrow pre-import
+closure check. Existing actual Registrar replay proves ordered import only
+when the operator already chose compatible packages; it discovers a missing
+archive or orphan child after earlier imports may have changed the destination.
+
+Keep only if a bounded, descriptor-bound read with final-component symlink
+refusal of one archive bundle (at most 8 MiB) and up to four OKF packages
+(at most 1 MiB each) produces a metadata-only `dependency-closed` receipt: exact
+package hashes/bytes, archive source/generation/manifest pins, unique graph
+IDs, one root, parent closure, acyclic root-first order and every graph
+selector declared by the included archive. Planner must perform no import or
+mutation and explicitly say payload integrity and admission are unvalidated,
+atomicity is absent. Extend the existing local-only actual Registrar
+archive/root/retracted-child fixture to plan shuffled inputs, replay the
+planned order, and refuse missing/mismatched/duplicate/orphan/over-budget or
+symlink inputs before any destination mutation. A package tampered internally
+may pass declaration planning but must be rejected by actual Registrar import.
+Ancestor-directory symlinks and file replacement after planning are outside
+this proof; the caller must recheck selected package hashes before import.
+Use focused and full Nx checks, independent review, clean exact-head package
+and PR. No production backup, erasure, RPO/RTO, Windows, semantic quality or
+hosted Jev claim; all five broader production finish predicates stay open.
+
+### 12:00 UTC recovery dependency verification
+
+Keep the read-only declared-dependency candidate. The existing actual
+Registrar local-only archive/root/retracted-child fixture passed after
+planning shuffled packages and importing the reported order. Missing archive,
+first- and second-selector mismatch, orphan/duplicate/cyclic graph, both
+package size bounds and a final-component symlink refuse before destination
+mutation. A tampered OKF file body may pass planning but Registrar import
+refuses it, matching the explicit integrity gap. Focused case passed 1/1;
+uncached Nx Knowledge integration 100/100, unit 43/43, daemonless typecheck
+and sync, scoped format and diff checks passed. Independent candidate review
+found no must-fix after testing every selector and narrowing the symlink and
+post-plan file-change claims. Clean exact-head package/check and PR remain.
+This is not an atomic or production recovery proof; five broader finish
+predicates remain open.

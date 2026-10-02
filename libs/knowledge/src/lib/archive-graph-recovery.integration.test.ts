@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { promisify } from 'node:util';
 import { prepareRegistrar } from '../support/prepare.js';
 import { canonical, hash } from './codec.js';
+import { planArchiveRecoveryDependencies } from './archive-recovery-dependency-plan.js';
 
 const exec = promisify(execFile);
 
@@ -409,6 +410,240 @@ test('ACTUAL Registrar: ordered root and retracted-child OKF replay preserves gr
     await writeFile(childOkfPackage, canonical(exportedChild.body));
     assert.notEqual(childOkfPackage, okfPackage);
 
+    const packagePaths = [childOkfPackage, okfPackage];
+    const planned = await planArchiveRecoveryDependencies({
+      archivePackagePath: archivePackage,
+      graphPackagePaths: packagePaths,
+    });
+    assert.equal(planned.status, 'dependency-closed');
+    assert.equal(planned.payloadIntegrity, 'not-validated');
+    assert.equal(planned.admission, 'not-checked');
+    assert.equal(planned.atomicity, 'none');
+    assert.deepEqual(planned.archive.selections, [
+      { sourceId: f.source.id, generation, manifestSha256: manifest },
+    ]);
+    assert.equal(planned.archive.sha256, hash(await readFile(archivePackage)));
+    assert.equal(
+      planned.archive.bytes,
+      (await readFile(archivePackage)).length,
+    );
+    assert.deepEqual(
+      planned.graphs.map((entry) => [entry.graphId, entry.parentGraphId]),
+      [
+        [graphId, null],
+        [childGraphId, graphId],
+      ],
+    );
+    const expectedHashes = await Promise.all(
+      [archivePackage, okfPackage, childOkfPackage].map(async (path) =>
+        hash(await readFile(path)),
+      ),
+    );
+    assert.deepEqual(planned.importOrder, [
+      { kind: 'archive', sha256: expectedHashes[0] },
+      { kind: 'graph', sha256: expectedHashes[1] },
+      { kind: 'graph', sha256: expectedHashes[2] },
+    ]);
+    for (const [index, path] of [okfPackage, childOkfPackage].entries()) {
+      const raw = await readFile(path);
+      assert.equal(planned.graphs[index].sha256, hash(raw));
+      assert.equal(planned.graphs[index].bytes, raw.length);
+    }
+    const plannedPaths = new Map(
+      expectedHashes.map((sha256, index) => [
+        sha256,
+        [archivePackage, okfPackage, childOkfPackage][index],
+      ]),
+    );
+    const planText = canonical(planned);
+    for (const privateValue of [f.base, 'synthetic signal', 'Synthetic signal'])
+      assert(!planText.includes(privateValue));
+    assert.deepEqual(await counts(restoredState), [0, 0, 0, 0, 0]);
+
+    await assert.rejects(
+      planArchiveRecoveryDependencies({
+        archivePackagePath: join(f.base, 'missing-archive.json'),
+        graphPackagePaths: packagePaths,
+      }),
+      /Recovery package is unreadable/,
+    );
+    const badArchivePin = JSON.parse(
+      await readFile(archivePackage, 'utf8'),
+    ) as {
+      generations: Array<{ manifest_sha256: string; manifest: object }>;
+    };
+    badArchivePin.generations[0].manifest_sha256 = 'f'.repeat(64);
+    const badArchivePinPath = join(f.base, 'bad-archive-pin.json');
+    await writeFile(badArchivePinPath, canonical(badArchivePin));
+    await assert.rejects(
+      planArchiveRecoveryDependencies({
+        archivePackagePath: badArchivePinPath,
+        graphPackagePaths: packagePaths,
+      }),
+      /manifest declaration pin mismatch/,
+    );
+    const duplicateArchive = JSON.parse(
+      await readFile(archivePackage, 'utf8'),
+    ) as {
+      generations: Array<{
+        manifest_sha256: string;
+        manifest: Record<string, unknown>;
+      }>;
+    };
+    const duplicateManifest = {
+      ...duplicateArchive.generations[0].manifest,
+      request_key: 'same-generation-different-envelope',
+    };
+    duplicateArchive.generations.push({
+      manifest_sha256: hash(canonical(duplicateManifest)),
+      manifest: duplicateManifest,
+    });
+    const duplicateArchivePath = join(
+      f.base,
+      'duplicate-archive-generation.json',
+    );
+    await writeFile(duplicateArchivePath, canonical(duplicateArchive));
+    await assert.rejects(
+      planArchiveRecoveryDependencies({
+        archivePackagePath: duplicateArchivePath,
+        graphPackagePaths: packagePaths,
+      }),
+      /Duplicate archive generation/,
+    );
+    await assert.rejects(
+      planArchiveRecoveryDependencies({
+        archivePackagePath: archivePackage,
+        graphPackagePaths: [childOkfPackage],
+      }),
+      /exactly one root/,
+    );
+    const mismatched = structuredClone(exportedChild.body) as {
+      graph: {
+        revision_set: { selections: Array<{ manifest_sha256: string }> };
+      };
+      graph_id: string;
+      revision_set_id: string;
+    };
+    mismatched.graph.revision_set.selections[0].manifest_sha256 = 'f'.repeat(
+      64,
+    );
+    mismatched.revision_set_id = hash(canonical(mismatched.graph.revision_set));
+    mismatched.graph_id = hash(canonical(mismatched.graph));
+    const mismatchedPath = join(f.base, 'mismatched-child.okf.json');
+    await writeFile(mismatchedPath, canonical(mismatched));
+    await assert.rejects(
+      planArchiveRecoveryDependencies({
+        archivePackagePath: archivePackage,
+        graphPackagePaths: [okfPackage, mismatchedPath],
+      }),
+      /outside included archive declarations/,
+    );
+    const missingSecond = structuredClone(exportedChild.body) as {
+      graph: {
+        revision_set: {
+          selections: Array<{
+            source_id: string;
+            generation: string;
+            manifest_sha256: string;
+          }>;
+        };
+      };
+      graph_id: string;
+      revision_set_id: string;
+    };
+    missingSecond.graph.revision_set.selections.push({
+      source_id: '4'.repeat(32),
+      generation: '5'.repeat(32),
+      manifest_sha256: '6'.repeat(64),
+    });
+    missingSecond.revision_set_id = hash(
+      canonical(missingSecond.graph.revision_set),
+    );
+    missingSecond.graph_id = hash(canonical(missingSecond.graph));
+    const missingSecondPath = join(f.base, 'missing-second-selector.okf.json');
+    await writeFile(missingSecondPath, canonical(missingSecond));
+    await assert.rejects(
+      planArchiveRecoveryDependencies({
+        archivePackagePath: archivePackage,
+        graphPackagePaths: [okfPackage, missingSecondPath],
+      }),
+      /outside included archive declarations/,
+    );
+    const orphan = structuredClone(exportedChild.body) as {
+      graph: { parent: string | null };
+      graph_id: string;
+    };
+    orphan.graph.parent = 'e'.repeat(64);
+    orphan.graph_id = hash(canonical(orphan.graph));
+    const orphanPath = join(f.base, 'orphan-child.okf.json');
+    await writeFile(orphanPath, canonical(orphan));
+    await assert.rejects(
+      planArchiveRecoveryDependencies({
+        archivePackagePath: archivePackage,
+        graphPackagePaths: [okfPackage, orphanPath],
+      }),
+      /Orphan graph parent/,
+    );
+    await assert.rejects(
+      planArchiveRecoveryDependencies({
+        archivePackagePath: archivePackage,
+        graphPackagePaths: [okfPackage, okfPackage],
+      }),
+      /Duplicate graph ID/,
+    );
+    const cycleA = structuredClone(exportedChild.body) as {
+      graph: { parent: string | null };
+      graph_id: string;
+    };
+    const cycleB = structuredClone(cycleA);
+    cycleA.graph_id = 'a'.repeat(64);
+    cycleB.graph_id = 'b'.repeat(64);
+    cycleA.graph.parent = cycleB.graph_id;
+    cycleB.graph.parent = cycleA.graph_id;
+    const cycleAPath = join(f.base, 'cycle-a.okf.json');
+    const cycleBPath = join(f.base, 'cycle-b.okf.json');
+    await writeFile(cycleAPath, canonical(cycleA));
+    await writeFile(cycleBPath, canonical(cycleB));
+    await assert.rejects(
+      planArchiveRecoveryDependencies({
+        archivePackagePath: archivePackage,
+        graphPackagePaths: [okfPackage, cycleBPath, cycleAPath],
+      }),
+      /Cyclic graph parent/,
+    );
+    const largePath = join(f.base, 'oversized-child.okf.json');
+    await writeFile(largePath, Buffer.alloc(1024 * 1024 + 1, 0x20));
+    await assert.rejects(
+      planArchiveRecoveryDependencies({
+        archivePackagePath: archivePackage,
+        graphPackagePaths: [okfPackage, largePath],
+      }),
+      /bounded regular file/,
+    );
+    const largeArchivePath = join(f.base, 'oversized-archive.json');
+    await writeFile(largeArchivePath, Buffer.alloc(8 * 1024 * 1024 + 1, 0x20));
+    await assert.rejects(
+      planArchiveRecoveryDependencies({
+        archivePackagePath: largeArchivePath,
+        graphPackagePaths: packagePaths,
+      }),
+      /bounded regular file/,
+    );
+    const symlinkPath = join(f.base, 'linked-child.okf.json');
+    await symlink(childOkfPackage, symlinkPath);
+    await assert.rejects(
+      planArchiveRecoveryDependencies({
+        archivePackagePath: archivePackage,
+        graphPackagePaths: [okfPackage, symlinkPath],
+      }),
+      /Recovery package is unreadable/,
+    );
+    assert.deepEqual(
+      await counts(restoredState),
+      [0, 0, 0, 0, 0],
+      'Planning and every refusal must leave destination state unchanged',
+    );
+
     await refused(
       restoredState,
       ['graph-import-okf', okfPackage],
@@ -421,7 +656,7 @@ test('ACTUAL Registrar: ordered root and retracted-child OKF replay preserves gr
     );
     const importedArchive = await archive(restoredState, [
       'import',
-      archivePackage,
+      plannedPaths.get(planned.importOrder[0].sha256)!,
     ]);
     assert.equal(importedArchive.code, 0);
     assert.equal(importedArchive.body['imported_generations'], 1);
@@ -438,7 +673,7 @@ test('ACTUAL Registrar: ordered root and retracted-child OKF replay preserves gr
     );
     const importedGraph = await archive(restoredState, [
       'graph-import-okf',
-      okfPackage,
+      plannedPaths.get(planned.importOrder[1].sha256)!,
     ]);
     assert.equal(importedGraph.code, 0);
     assert.equal(importedGraph.body['graph_id'], graphId);
@@ -446,7 +681,7 @@ test('ACTUAL Registrar: ordered root and retracted-child OKF replay preserves gr
     assert.deepEqual(await counts(restoredState), [1, 1, 1, 3, 0]);
     const importedChild = await archive(restoredState, [
       'graph-import-okf',
-      childOkfPackage,
+      plannedPaths.get(planned.importOrder[2].sha256)!,
     ]);
     assert.equal(importedChild.code, 0);
     assert.equal(importedChild.body['graph_id'], childGraphId);
@@ -693,6 +928,16 @@ test('ACTUAL Registrar: ordered root and retracted-child OKF replay preserves gr
     tamperedChild.files[`${ids.link}.md`] += '\nforged child';
     const badChildPackage = join(f.base, 'tampered-child-graph.okf.json');
     await writeFile(badChildPackage, canonical(tamperedChild));
+    const tamperedPlan = await planArchiveRecoveryDependencies({
+      archivePackagePath: archivePackage,
+      graphPackagePaths: [badChildPackage, okfPackage],
+    });
+    assert.equal(tamperedPlan.status, 'dependency-closed');
+    assert.equal(tamperedPlan.payloadIntegrity, 'not-validated');
+    assert.equal(
+      tamperedPlan.graphs[1].sha256,
+      hash(await readFile(badChildPackage)),
+    );
     await refused(
       childTamperState,
       ['graph-import-okf', badChildPackage],

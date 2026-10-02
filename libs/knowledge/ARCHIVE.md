@@ -292,6 +292,25 @@ archive and root, import the child to retain its parent pointer and retired
 assertion ID. Child-before-root and resurrection attempts refuse. Protect all
 three packages and import in that order.
 
+For a read-only declaration check before any import, the Knowledge library
+exports `planArchiveRecoveryDependencies`. Pass the archive bundle path and
+one to four root/child OKF paths in any order. It reads at most 8 MiB from the
+archive and 1 MiB from each OKF, refuses a symlink at each package path's
+final component, and returns package SHA-256 values with a root-first
+`importOrder`. The receipt contains no package path or source content. Map
+those hashes back to the files you selected, and recheck each file's hash
+immediately before invoking Registrar's import commands. Valid larger
+Registrar exports are outside this plan's bounds (Registrar permits up to
+192 MiB for an archive bundle and 32 MiB for an OKF export); a refusal does
+not prove that such an export is invalid.
+
+The plan checks **declared dependencies**, not all package content, current
+registration or permission. It does not prevent an ancestor-directory
+symlink or file replacement after planning and does not make separate imports
+atomic. Registrar still decides whether each import is valid. See the
+[dependency-plan evidence](../../docs/evidence/knowledge-system/graph-recovery-dependency-plan-2026-10-02.md)
+for the tested scope.
+
 These exercises cover one source and at most one child. The exports are not
 atomic, and import does not provision registration or restore policy, erasure
 state, arbitrary graph history, or arbitrary derived views. They are not a
