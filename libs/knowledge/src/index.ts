@@ -14,6 +14,7 @@ export * from './lib/archive-graph-evaluation-gate.js';
 export * from './lib/archive-document-links.js';
 export * from './lib/archive-visible-image-inventory.js';
 export * from './lib/archive-reference-image-inventory.js';
+export * from './lib/archive-markdown-html-image-inventory.js';
 export { inventoryArchiveDocxMedia } from './lib/archive-docx-media-inventory.js';
 export type {
   ArchiveDocxMediaInventoryPlan,
