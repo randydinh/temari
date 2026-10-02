@@ -232,3 +232,32 @@ and explicitly defers unsupported or dependent records. The actual fixture
 used `local-only` sources and made no TypeSafe call. This does not repin or
 publish an active graph, prove relationship meaning, or establish continuous
 freshness. The five broader finish predicates above remain open.
+
+## 07:56 UTC relocated Mac real-corpus continuation
+
+GitHub reports [#168](https://github.com/randydinh/temari/pull/168) merged at
+`cde71a1670998e653bec773fe707309b51562298` after independent exact-head
+review of clean commit `72d5bce884b256484a98618b2dd3c57a11e800ba`.
+The reviewed and merged trees match. The public-entry artifact passed Nx
+package/check at the clean base, relocated checks before and after use, and a
+cold bundled Registrar setup in a fresh temporary home. GitHub listed no
+branch checks. The local merge command encountered an occupied `main`
+worktree, while the remote PR state confirms the merge.
+
+The [sanitized relocated-corpus evidence](relocated-real-corpus-2026-10-02.md)
+records a fixed 16-file sample across non-Nx, mixed-document and Nx sources.
+Three complete-admitted `local-only` captures retained 16/16 original hashes
+and byte counts. Three family BM25 diagnostic queries returned one
+archive-verified pinned citation each; one fixed nonce diagnostic returned no
+ranked result. An archived PNG and PDF recovered to their original hashes.
+Three mixed files still had no text representation under the default Mac
+capture path, and visual meaning remains a gap. The direct TypeSafe Jev
+credential was not read or invoked: the private failing credential shim
+recorded zero calls with `TYPESAFE_API_KEY` unset.
+
+This establishes Mac package wiring on the sampled local-only corpus only.
+The queries were agent-authored and previously inspected, so they are not
+independent answer-quality labels or grounds to promote BM25. No Windows
+installation, graph semantics, continuous freshness, production recovery,
+plugin lifecycle or production losslessness is proven. All five broader
+finish predicates above remain open.

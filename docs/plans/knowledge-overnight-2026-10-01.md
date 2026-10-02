@@ -834,3 +834,31 @@ receipts and found no must-fix or public evidence leakage. Keep this as a
 packaged Mac wiring diagnostic only. It does not establish answer quality,
 OCR/visual meaning, Windows, production losslessness or plugin lifecycle.
 Clean exact-head doc review and PR delivery remain.
+
+### 07:56 UTC relocated real-corpus delivery
+
+Independent exact-head review accepted clean commit
+`72d5bce884b256484a98618b2dd3c57a11e800ba`, after removal of a private
+receipt path from the newly appended audit row. GitHub reports
+[#168](https://github.com/randydinh/temari/pull/168) merged at
+`cde71a1670998e653bec773fe707309b51562298`; the merged and reviewed trees
+match. Keep the sanitized, local-only Mac package diagnostic. The three
+diagnostic BM25 citations and nonce miss do not establish answerability or
+ranker promotion. The five broader finish predicates remain open.
+
+### 07:57 UTC post-corpus handoff hypothesis
+
+Reconcile #168's verified and merged artifact with the current Knowledge
+handoff, retaining the exact package and corpus counts and the narrow boundary.
+The handoff must continue to state that answer quality, visual meaning,
+continuous graph and source evolution, operational recovery, and Windows and
+plugin lifecycle remain unproven.
+
+### 07:59 UTC post-corpus handoff verification
+
+Independent read-only review found no must-fix: #168's GitHub merge tree equals
+the reviewed head, the handoff counts and boundaries match the sanitized
+evidence, the appended audit rows preserve the six-field append-only trail,
+and no private path, query or report filename enters the added text. Keep the
+handoff as a documentation increment. The five production finish predicates
+remain open.
