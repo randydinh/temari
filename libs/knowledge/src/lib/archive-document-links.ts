@@ -107,7 +107,7 @@ async function archivedText(provider: KnowledgeProvider, publication: Publicatio
 }
 
 /** Mask comments, frontmatter and code without changing UTF-16 indices. */
-function visibleMarkdown(body: string): string {
+export function visibleMarkdown(body: string): string {
   const blank = (part: string) => part.replace(/[^\r\n]/g, ' ');
   const multilineHtml = new Set([
     'article', 'aside', 'blockquote', 'body', 'caption', 'center', 'dd',

@@ -586,3 +586,45 @@ typecheck and Nx sync:check. Independent read-only review found no must-fix
 after the per-part reference bound and narrowly scoped residual-media field
 were repaired. This remains declared syntax only. Clean exact-head package,
 independent commit review and PR delivery remain before keeping it on main.
+
+## 2026-10-02 05:52 UTC simple Markdown reference-image experiment
+
+PRs #158 and #159 are merged, and this clean isolated branch starts from
+`b31cf478c7f73686b4715928141068b77f7eb66f`. A read-only architect compared
+reference-style Markdown image coverage with a recurring source-refresh
+trigger. The existing inline-image inventory explicitly omits reference
+syntax. A true recurring trigger would change the workflow execution boundary
+while its capability index is absent; joining a non-atomic point-in-time audit
+to automatic recapture also needs durable retry and source-race semantics.
+Select a separate Knowledge-only reference-image receipt.
+
+The pass predicate is an actual `local-only` Registrar capture of Markdown and
+PNG assets, deletion of the live originals, and pinned archive reads that
+resolve explicit full and collapsed `![alt][id]` / `![alt][]` uses through
+simple single-line `[id]: relative-image-path` definitions, including forward
+definitions. Bound selected Markdown files to 1–64, each to 65,536 code
+points, uses to 256 total, definitions to 256 per file, and manifest scans to
+1,000 rows/50 pages under the pinned response cap. Preserve each use's exact
+code-point span and quote hash; pin resolved targets to retained original
+SHA-256/bytes and distinguish unresolved, missing, outside-source, external
+and unsupported gaps. Refuse ambiguous duplicate normalized labels and
+over-limit inputs. Mask escaped syntax, code, comments and frontmatter;
+define case/whitespace normalization explicitly. Recheck publication and
+current source registration before receipt publication. Emit no alt text,
+separate raw target or external URL field, Markdown body, image bytes or
+recovered local path; a normalized local target path may equal a simple raw
+destination. Keep the merged inline-image receipt contract unchanged. The new
+receipt covers only
+simple reference-style syntax, not Markdown rendering, all dialects, visual
+meaning, OCR, continuous freshness, Windows or production losslessness.
+Focused actual-Registrar, full Nx, independent review, clean exact-head
+package and PR delivery are required before keeping it.
+
+### 06:04 UTC reference-image checkpoint
+
+The final actual local-only Registrar Knowledge integration passed 92/92,
+including both new cases and the existing inline-image regression. Knowledge
+unit tests passed 43/43, uncached typecheck and Nx sync:check passed. The
+independent read-only reviewer found no must-fix after fixture and privacy
+wording repairs. The receipt covers conservative simple syntax only. Clean
+exact-head package, commit review and PR delivery remain.
