@@ -1127,3 +1127,31 @@ no must-fix. The one generated Nx project reference was checked separately.
 Clean commit, exact-head package/check and PR remain. Atomic backup,
 retractions, policy/erasure restore, RPO/RTO, Windows and five broader
 production finish predicates remain open.
+
+### 10:05 UTC paired recovery delivery
+
+Independent exact-head review accepted clean commit
+`3acf1744126ad6a172da215ae35a3bf030387d55`. The public-entry
+package/check reported this revision with `dirty:false`, and a relocated
+stock Node graph reader loaded. GitHub reports
+[#176](https://github.com/randydinh/temari/pull/176) merged at
+`8652bff9c9e49a436017a552799d72a9979b2569`, with the reviewed tree.
+Keep only the synthetic one-source replay invariant and generated Nx
+reference repair. Production recovery and five broader finish predicates
+remain open.
+
+### 10:06 UTC post-recovery handoff hypothesis
+
+Reconcile PR #176's verified merged scope in the Knowledge handoff. Record
+separate archive and OKF packages, exact replay checks and negative cases,
+the generated Nx reference, private fixture cleanup and nonproduction limits.
+Preserve the five broader finish predicates.
+
+### 10:07 UTC post-recovery handoff verification
+
+Independent read-only review found no must-fix: #176's merged tree matches
+the reviewed head, and the handoff's actual Registrar, Nx and package claims
+match verified receipts. Only plan, handoff and audit files changed; the
+audit remains six-field append-only and added text contains no private path
+or raw content. Keep the narrow source-linked recovery handoff with all five
+broader production finish predicates open.
