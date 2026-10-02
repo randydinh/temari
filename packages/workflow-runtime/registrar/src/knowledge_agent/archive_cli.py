@@ -2,6 +2,7 @@
 import argparse
 import json
 from pathlib import Path
+import signal
 import sqlite3
 
 from knowledge_agent.source_registry import SourceRegistry
@@ -16,6 +17,10 @@ def main(argv=None):
     capture.add_argument('--request-key', required=True)
     capture.add_argument('--limits', type=json.loads, help='JSON object; bounded entries/file_bytes/total_bytes/text_bytes')
     capture.add_argument('--ocr-mode', choices=['none', 'macos-vision'], default='none')
+    capture.add_argument('--pdf-worker-profile', type=Path,
+                         help='Absolute JSON profile for the opt-in local Lima PDF worker')
+    capture.add_argument('--pdf-worker-profile-sha256',
+                         help='Expected SHA-256 of the exact local PDF profile bytes')
     generations = commands.add_parser('generations')
     generations.add_argument('source_id')
     inspect = commands.add_parser('inspect')
@@ -108,7 +113,18 @@ def main(argv=None):
             'graph-retract':'retract_graph',
             'graph-projection':'graph_projection', 'graph-check':'check_graph_projection',
             'graph-export-okf':'export_graph_okf', 'graph-import-okf':'import_graph_okf'})[command]
-        result = getattr(registry, method)(**args)
+        prior_term = None
+        if command == 'capture':
+            # Let Python unwind archive/tempfile/guest-job finally blocks during
+            # Temari's graceful cancellation interval.
+            def cancel_capture(_signal, _frame):
+                raise SystemExit(143)
+            prior_term = signal.signal(signal.SIGTERM, cancel_capture)
+        try:
+            result = getattr(registry, method)(**args)
+        finally:
+            if prior_term is not None:
+                signal.signal(signal.SIGTERM, prior_term)
         print(json.dumps(result, ensure_ascii=False, separators=(',', ':')))
         return 0
     except (ValueError, OSError, sqlite3.Error, UnicodeError) as exc:

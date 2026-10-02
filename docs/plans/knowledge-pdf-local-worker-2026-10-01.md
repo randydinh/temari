@@ -58,3 +58,29 @@ the implementation. A read-only architect reviews the boundary before code;
 an independent reviewer checks the integrated commit. The coordinator owns
 the isolated worktree, source verification, decision log, and PR. The
 conflicted primary checkout remains untouched.
+
+## Verified candidate
+
+The opt-in `lima-cgroup-v2-v1` bridge now runs through both the Registrar CLI
+and Temari `captureArchive` on this Apple silicon Mac. The profile binds the
+Lima binary, guest image and Python interpreter identities to the request;
+the guest checks a 512 MiB cgroup memory cap, zero swap, a private network
+namespace, reduced privileges, and the pinned PDF parser version. The host
+copies at most one 8 MiB PDF into a private guest job after arming a detached
+45-second cleanup watchdog. The Temari capture is limited to 32 entries and
+eight PDF extractions per source. The default unconfigured Mac path still
+retains originals and reports `pdf-memory-boundary-unavailable`.
+
+The local smoke captured a searchable PDF, read its `pdf-text` representation,
+and recovered the original bytes with the expected SHA-256. Separate host
+smokes covered an image-only/blank PDF gap, same-key replay, changed-profile
+refusal, wrong-image refusal, unavailable native memory boundary, and a
+SIGKILL/concurrent-job cleanup path. The focused Registrar suite passed
+10/10, knowledge unit tests passed 43/43, actual-Registrar integration passed
+74/74 on the final code, and Nx sync was clean. Exact-commit review and a
+reviewable PR are the remaining delivery checks.
+
+This is a first searchable-PDF text unit for one tested Mac and disposable
+guest. It does not claim OCR for scanned pages, visual meaning, complete guest
+dependency attestation, a default installer route, Windows support, or a
+production lossless knowledge system.

@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
+  chmod,
   cp,
   mkdir,
   readFile,
@@ -29,6 +30,7 @@ import {
   type ArchiveIntakeOutcome,
 } from './archive-intake.js';
 import { createArchiveRegistrar } from './archive-registrar.js';
+import { ArchiveFailure, archiveTransport } from './archive-transport.js';
 import { canonical, hash } from './codec.js';
 import {
   collectKnowledge,
@@ -418,6 +420,96 @@ test('ACTUAL ARCHIVE CLI: durable pre-capture binding, interrupted publication r
       }),
     ).sort(),
     ['discover', 'identity', 'read', 'revalidate'],
+  );
+});
+
+test('ACTUAL ARCHIVE CLI: opt-in PDF profile bytes are pinned before capture and a changed profile cannot replay the same key', async () => {
+  const f = await fixture();
+  const profilePath = join(f.base, 'pdf-worker-profile.json');
+  const firstProfile = '{"marker":"first-local-profile"}';
+  await writeFile(profilePath, firstProfile);
+  await chmod(profilePath, 0o600);
+  const options = { ...f.options, pdfWorkerProfilePath: profilePath };
+  const first = await captureArchive(options);
+  assert.equal(first.status, 'blocked'); // Deliberately invalid worker schema.
+  const key = `temari-archive-v1:${hash(canonical({ task: options.task, key: options.requestKey }))}`;
+  const bindingPath = join(
+    options.task.directory,
+    `archive-binding-${hash(key)}.json`,
+  );
+  const bindingBytes = await readFile(bindingPath, 'utf8');
+  const binding = JSON.parse(bindingBytes);
+  assert.equal(binding.limits.entries, 32);
+  assert.deepEqual(binding.pdfWorkerProfile, {
+    path: profilePath,
+    sha256: hash(firstProfile),
+  });
+  assert(!bindingBytes.includes('first-local-profile'));
+  await writeFile(profilePath, '{"marker":"changed-local-profile"}');
+  const replay = await captureArchive(options);
+  assert.equal(replay.status, 'blocked');
+  assert.match(
+    await readFile(replay.resultPath, 'utf8'),
+    /Immutable request\/publication collision/,
+  );
+  assert.equal(await readFile(bindingPath, 'utf8'), bindingBytes);
+  const tooMany = await captureArchive({
+    ...options,
+    requestKey: 'too-many-entries',
+    limits: { entries: 33 },
+  });
+  assert.equal(tooMany.status, 'blocked');
+  assert.match(await readFile(tooMany.resultPath, 'utf8'), /Invalid integer/);
+  await chmod(profilePath, 0o622);
+  await assert.rejects(
+    captureArchive({ ...options, requestKey: 'unsafe-permissions' }),
+    /Writable PDF worker profile refused/,
+  );
+});
+
+test('ACTUAL ARCHIVE CLI: opt-in PDF capture receives its bounded deadline without changing the normal transport timeout', async () => {
+  const f = await fixture();
+  const profilePath = join(f.base, 'invalid-pdf-profile.json');
+  const profile = '{"marker":"deliberately-invalid"}';
+  await writeFile(profilePath, profile);
+  await chmod(profilePath, 0o600);
+  const transport = await archiveTransport({
+    ...f.options.transport,
+    timeoutMs: 1,
+  });
+  const ordinaryArgs = [
+    f.source.id,
+    '--request-key',
+    'pdf-timeout-smoke',
+    '--limits',
+    canonical({
+      entries: 1,
+      file_bytes: 8 * 1024 * 1024,
+      total_bytes: 64 * 1024 * 1024,
+      text_bytes: 8 * 1024 * 1024,
+    }),
+  ];
+  await assert.rejects(
+    transport.invoke('capture', ordinaryArgs),
+    (error: unknown) => {
+      assert(error instanceof ArchiveFailure);
+      assert.match(error.message, /timed out, or exceeded output bound/);
+      return true;
+    },
+  );
+  await assert.rejects(
+    transport.invoke('capture', [
+      ...ordinaryArgs,
+      '--pdf-worker-profile',
+      profilePath,
+      '--pdf-worker-profile-sha256',
+      hash(profile),
+    ]),
+    (error: unknown) => {
+      assert(error instanceof ArchiveFailure);
+      assert.match(error.message, /Registrar archive operation refused/);
+      return true;
+    },
   );
 });
 
