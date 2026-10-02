@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { existsSync, realpathSync } from 'node:fs';
-import { lstat, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, writeFile } from 'node:fs/promises';
+import { link, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
@@ -17,6 +17,8 @@ const knowledgeCli = join(
 );
 const defaultHome = join(homedir(), '.local', 'share', 'temari-knowledge');
 const serverName = 'temari-content-registrar';
+const providerSelectionKind = 'temari-knowledge-provider-selection';
+const providerSelectionMaxBytes = 256;
 const registrarVersion = '0.1.0';
 // Reviewed payload inventory, including recorded downstream changes, is a trust anchor.
 const registrarManifestSha256 = '4a7d33e24e849dfd89fa1259a86475e99a2668487562aaee7811fb610171c88e';
@@ -75,7 +77,9 @@ function usage() {
                               [--workspace ABS] [--codex CODEX]
        temari-knowledge connect-codex [--home ABS] [--workspace ABS] [--codex CODEX]
        temari-knowledge disconnect-codex [--home ABS] [--workspace ABS] [--codex CODEX]
-       temari-knowledge journey-intake|journey-query|journey-jobs-create|journey-jobs-tick|journey-search|archive-collect ...
+       temari-knowledge disable [--home ABS] [--workspace ABS] [--codex CODEX]
+       temari-knowledge enable [--home ABS]
+       temari-knowledge journey-intake|journey-query|journey-jobs-create|journey-jobs-tick|journey-search|archive-collect ... [--home ABS]
 
 Setup builds a wheel from the pinned bundled Registrar source and installs it in
 a user-local Python venv. The registry and archives live outside the plugin.
@@ -125,7 +129,142 @@ function locations(flags) {
     python,
     workspace: join(selected, 'workspace'),
     receipt: join(selected, 'installation.json'),
+    providerSelection: join(selected, 'provider-selection.json'),
   };
+}
+
+function selectionRecord(selection, phase) {
+  return { schemaVersion: 1, kind: providerSelectionKind, selection, phase };
+}
+
+function canonicalSelectionBytes(record) {
+  return `${JSON.stringify(record)}\n`;
+}
+
+async function readProviderSelection(place) {
+  let file;
+  try {
+    file = await lstat(place.providerSelection);
+  } catch (error) {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  }
+  assert(file.isFile() && !file.isSymbolicLink() && file.size <= providerSelectionMaxBytes,
+    'Provider selection must be a bounded regular file.');
+  const bytes = await readFile(place.providerSelection);
+  assert(bytes.length <= providerSelectionMaxBytes,
+    'Provider selection exceeded its byte bound.');
+  let parsed;
+  try {
+    parsed = JSON.parse(bytes.toString('utf8'));
+  } catch {
+    throw new Error('Provider selection is malformed.');
+  }
+  const valid = parsed?.schemaVersion === 1 && parsed.kind === providerSelectionKind &&
+    ((parsed.selection === 'registrar' && parsed.phase === 'ready') ||
+     (parsed.selection === 'disabled' && ['disabling', 'disabled'].includes(parsed.phase)));
+  assert(valid && bytes.equals(Buffer.from(canonicalSelectionBytes(selectionRecord(
+    parsed.selection, parsed.phase,
+  )))), 'Provider selection is unknown or noncanonical.');
+  return parsed;
+}
+
+function effectiveSelection(record) {
+  return record ?? { selection: 'registrar', phase: 'uninitialized' };
+}
+
+async function assertRegistrarSelected(place) {
+  const selected = effectiveSelection(await readProviderSelection(place));
+  assert(selected.selection === 'registrar',
+    `Knowledge provider selection is ${selected.phase}; run enable after reviewing the local installation.`);
+}
+
+async function publishProviderSelection(place, record, { onlyAbsent = false } = {}) {
+  await mkdir(place.home, { recursive: true, mode: 0o700 });
+  await readProviderSelection(place);
+  const temporary = `${place.providerSelection}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temporary, canonicalSelectionBytes(record), { flag: 'wx', mode: 0o600 });
+    if (onlyAbsent) {
+      try {
+        await link(temporary, place.providerSelection);
+      } catch (error) {
+        if (error.code !== 'EEXIST') throw error;
+      }
+    } else {
+      await rename(temporary, place.providerSelection);
+    }
+  } finally {
+    await rm(temporary, { force: true });
+  }
+  return await readProviderSelection(place);
+}
+
+async function withProviderSelectionLock(place, operation) {
+  await mkdir(place.home, { recursive: true, mode: 0o700 });
+  const lockPath = join(place.home, 'provider-selection.lock');
+  const helper = spawn('python3', ['-u', '-c', `
+import fcntl, os, stat, sys, time
+path = sys.argv[1]
+fd = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+if not stat.S_ISREG(os.fstat(fd).st_mode):
+    sys.exit(2)
+deadline = time.monotonic() + 5
+while True:
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        break
+    except BlockingIOError:
+        if time.monotonic() >= deadline:
+            sys.exit(3)
+        time.sleep(0.05)
+sys.stdout.write('locked\\n')
+sys.stdout.flush()
+sys.stdin.buffer.read()
+`, lockPath], { stdio: ['pipe', 'pipe', 'pipe'] });
+  helper.stderr.resume();
+  helper.stdin.on('error', () => {});
+  let ready = false;
+  const closed = new Promise((resolvePromise) => helper.once('close', resolvePromise));
+  const acquired = new Promise((resolvePromise, reject) => {
+    let output = '';
+    helper.stdout.setEncoding('utf8');
+    helper.stdout.on('data', (chunk) => {
+      output += chunk;
+      if (output === 'locked\n') {
+        ready = true;
+        resolvePromise();
+      } else if (output.length > 16 || output.includes('\n')) {
+        reject(new Error('Provider selection lock returned an invalid response.'));
+      }
+    });
+    helper.on('error', () => reject(new Error('Provider selection lock could not start.')));
+    helper.on('close', (code) => {
+      if (!ready) reject(new Error(code === 3
+        ? 'Provider selection is busy; retry after inspecting the local state.'
+        : 'Provider selection lock is invalid or unavailable.'));
+    });
+  });
+  let lockAcquired = false;
+  try {
+    await acquired;
+    lockAcquired = true;
+    return await operation();
+  } finally {
+    if (lockAcquired) helper.stdin.end();
+    else if (helper.exitCode === null) helper.kill('SIGTERM');
+    const code = await closed;
+    if (lockAcquired) assert.equal(code, 0,
+      'Provider selection lock ended unexpectedly; inspect the local state.');
+  }
+}
+
+async function initializeProviderSelection(place) {
+  const current = await readProviderSelection(place);
+  if (current) return current;
+  return await publishProviderSelection(place, selectionRecord('registrar', 'ready'), {
+    onlyAbsent: true,
+  });
 }
 
 async function installationReceipt(place) {
@@ -211,6 +350,7 @@ async function installedVersion(python) {
 
 async function status(flags) {
   const place = locations(flags);
+  const selection = effectiveSelection(await readProviderSelection(place));
   await verifyRegistrarPayload();
   return {
     schemaVersion: 1,
@@ -226,6 +366,11 @@ async function status(flags) {
     registrarSourceAvailable: existsSync(join(registrar, 'pyproject.toml')),
     platformSupport: process.platform === 'win32' ? 'use-wsl2' : 'local',
     codexConnection: 'not-checked',
+    providerSelection: {
+      selection: selection.selection,
+      phase: selection.phase,
+      persisted: selection.phase !== 'uninitialized',
+    },
   };
 }
 
@@ -233,9 +378,12 @@ async function setup(flags) {
   assert(process.platform !== 'win32',
     'Native Windows setup is unsupported. Run this launcher in WSL2 with Python 3.12.');
   const place = locations(flags);
+  await readProviderSelection(place);
+  if (flags['--connect-codex']) await assertRegistrarSelected(place);
   const source = await verifyRegistrarPayload();
   const existing = await installedVersion(place.python);
   if (await currentInstallation(place)) {
+    await initializeProviderSelection(place);
     return { ...(await status(flags)), setup: 'already-installed' };
   }
   const selectedPython = flags['--python'] ?? 'python3.12';
@@ -275,6 +423,7 @@ async function setup(flags) {
     flag: 'wx', mode: 0o600,
   });
   await rename(tempReceipt, place.receipt);
+  await initializeProviderSelection(place);
   return { ...(await status(flags)), setup: existing ? 'repaired' : 'installed' };
 }
 
@@ -282,6 +431,7 @@ async function connectCodex(flags) {
   assert(process.platform !== 'win32',
     'Native Windows connection is unsupported here. Configure Windows Codex to launch the WSL2 Python MCP server.');
   const place = locations(flags);
+  await assertRegistrarSelected(place);
   await verifyRegistrarPayload();
   assert(await currentInstallation(place),
     'Run setup before connecting Codex.');
@@ -297,6 +447,7 @@ async function connectCodex(flags) {
     `${serverName} is already configured; inspect it before changing the connection.`);
   assert.match(existing.stderr, /No MCP server named/u,
     'Could not establish that the Codex MCP name is unused.');
+  await assertRegistrarSelected(place);
   await invoke(codex, [
     'mcp', 'add', serverName, '--', place.python,
     '-m', 'knowledge_agent.cli', 'mcp', 'serve', '--workspace', workspace,
@@ -429,6 +580,65 @@ async function disconnectCodex(flags) {
   return { status: 'disconnected', serverName };
 }
 
+async function disableKnowledge(flags) {
+  const place = locations(flags);
+  await readProviderSelection(place);
+  const workspace = flags['--workspace'] ?? place.workspace;
+  assert(isAbsolute(workspace), '--workspace must be absolute.');
+  const codex = flags['--codex'] ?? 'codex';
+  let inspected;
+  try {
+    inspected = await getCodexEntry(codex);
+  } catch {
+    await publishProviderSelection(place, selectionRecord('disabled', 'disabling'));
+    return {
+      status: 'partial', providerSelection: 'disabling', codexConnection: 'unverified',
+      reason: 'codex-inspection-failed',
+    };
+  }
+  assert(inspected.status === 'absent' ||
+    selectedCodexEntry(inspected.entry, place, workspace),
+  'Codex MCP entry differs from the selected Knowledge connection; provider selection was not changed.');
+  await publishProviderSelection(place, selectionRecord('disabled', 'disabling'));
+  try {
+    await disconnectCodex(flags);
+    await publishProviderSelection(place, selectionRecord('disabled', 'disabled'));
+    return { status: 'disabled', providerSelection: 'disabled', codexConnection: 'absent' };
+  } catch {
+    return {
+      status: 'partial', providerSelection: 'disabling', codexConnection: 'unverified',
+      reason: 'codex-disconnect-unverified',
+    };
+  }
+}
+
+async function enableKnowledge(flags, expectedSelection) {
+  const place = locations(flags);
+  assert(isDeepStrictEqual(await readProviderSelection(place), expectedSelection),
+    'Provider selection changed while enabling; retry explicitly.');
+  assert(expectedSelection?.phase !== 'disabling',
+    'Complete or resolve the partial disable before enabling Knowledge.');
+  await verifyRegistrarPayload();
+  assert(await currentInstallation(place), 'Run setup before enabling Knowledge.');
+  await publishProviderSelection(place, selectionRecord('registrar', 'ready'));
+  return { status: 'enabled', providerSelection: 'registrar', codexConnection: 'not-changed' };
+}
+
+function delegatedArgs(args) {
+  const forwarded = [];
+  let home;
+  for (let index = 0; index < args.length; index++) {
+    if (args[index] !== '--home') {
+      forwarded.push(args[index]);
+      continue;
+    }
+    assert(home === undefined && args[index + 1] &&
+      !args[index + 1].startsWith('--'), 'Expected one absolute --home value.');
+    home = args[++index];
+  }
+  return { home, forwarded };
+}
+
 async function main(argv) {
   const [command, ...rest] = argv;
   if (!command || command === '--help' || command === 'help') {
@@ -450,31 +660,53 @@ async function main(argv) {
     assert(flags['--connect-codex'] ||
       (flags['--workspace'] === undefined && flags['--codex'] === undefined),
     '--workspace and --codex require --connect-codex.');
-    const installed = await setup(flags);
-    const connection = flags['--connect-codex']
-      ? await connectCodex(flags)
-      : undefined;
+    const { installed, connection } = await withProviderSelectionLock(
+      locations(flags), async () => ({
+        installed: await setup(flags),
+        connection: flags['--connect-codex'] ? await connectCodex(flags) : undefined,
+      }),
+    );
     console.log(JSON.stringify({ ...installed, ...(connection ? { connection } : {}) }, null, 2));
     return;
   }
   if (command === 'connect-codex') {
-    console.log(JSON.stringify(await connectCodex(options(rest, ['--home', '--workspace', '--codex'])), null, 2));
+    const flags = options(rest, ['--home', '--workspace', '--codex']);
+    console.log(JSON.stringify(await withProviderSelectionLock(
+      locations(flags), () => connectCodex(flags),
+    ), null, 2));
     return;
   }
   if (command === 'disconnect-codex') {
+    const flags = options(rest, ['--home', '--workspace', '--codex']);
     console.log(
       JSON.stringify(
-        await disconnectCodex(
-          options(rest, ['--home', '--workspace', '--codex']),
-        ),
+        await withProviderSelectionLock(locations(flags), () => disconnectCodex(flags)),
         null,
         2,
       ),
     );
     return;
   }
+  if (command === 'disable') {
+    const flags = options(rest, ['--home', '--workspace', '--codex']);
+    const outcome = await withProviderSelectionLock(locations(flags), () => disableKnowledge(flags));
+    console.log(JSON.stringify(outcome, null, 2));
+    if (outcome.status === 'partial') process.exitCode = 1;
+    return;
+  }
+  if (command === 'enable') {
+    const flags = options(rest, ['--home']);
+    const place = locations(flags);
+    const expectedSelection = await readProviderSelection(place);
+    console.log(JSON.stringify(await withProviderSelectionLock(
+      place, () => enableKnowledge(flags, expectedSelection),
+    ), null, 2));
+    return;
+  }
+  const delegated = delegatedArgs(rest);
+  await assertRegistrarSelected(locations({ '--home': delegated.home }));
   assert(existsSync(knowledgeCli), 'Compiled knowledge CLI is missing.');
-  const result = await invoke(process.execPath, [knowledgeCli, command, ...rest], {
+  const result = await invoke(process.execPath, [knowledgeCli, command, ...delegated.forwarded], {
     allowFailure: true,
   });
   process.exitCode = result.code;
