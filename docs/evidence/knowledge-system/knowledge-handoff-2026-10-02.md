@@ -312,3 +312,30 @@ path, ambiguity and size refusals. The current adapter deliberately refuses
 interprets image meaning; OCR, visual coverage, Windows, graph recovery and
 all five broader finish predicates above remain open. No hosted Jev call or
 Keychain read occurred.
+
+## 09:38 UTC archived HTML sharing continuation
+
+GitHub reports [#174](https://github.com/randydinh/temari/pull/174) merged at
+`ce4ea89d5f68de5fbcfb4ff6cf2beed39e8995a9` after independent exact-head
+review of clean commit `3b043186111b70e2620fbf7c737b875bd85ab642`.
+The reviewed and merged trees match. Final actual Registrar focused HTML cases
+passed 3/3, uncached Nx Knowledge integration 99/99, unit tests 43/43,
+typecheck, Nx sync and scoped formatting passed. The exact-head public-entry
+package reported `dirty:false`; its manifest check and relocated stock Node
+Knowledge export passed. GitHub listed no branch checks. The local merge
+command encountered an occupied `main` worktree; remote state confirms the
+merge.
+
+The [sharing admission note](html-image-sharing-2026-10-02.md) describes how
+the local HTML declaration inventory now accepts either `local-only` or
+Registrar's default `registered-sources` mode. New schema-2 metadata receipts
+record the current mode and preserve the earlier local-only coverage literal;
+schema-1 receipts remain historical local-only records without a mode field.
+The actual default-mode fixture deleted live HTML and PNG, recovered the exact
+HTML original and checked retained image pins. A deterministic mid-run mode
+change refused. These are start/end policy observations, not an atomic
+sharing snapshot or permission for a hosted Jev call. The adapter made no
+hosted call or key read. It does not prove browser rendering, visual meaning,
+continuous freshness, Windows behavior, graph recovery, answer quality, or
+production losslessness. All five broader finish predicates above remain
+open.
