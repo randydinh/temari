@@ -58,7 +58,11 @@ actual import, demonstrating the `payloadIntegrity: not-validated` limit.
 Uncached Nx Knowledge integration passed 100/100, unit tests 43/43,
 daemonless typecheck and sync passed, scoped formatting and diff checks
 passed. Independent candidate review found no must-fix after the second
-selector and boundary corrections. Clean exact-head package/check and PR
-remain pending. No hosted Jev call or key read occurred. The five broader
-production finish predicates in the
+selector and boundary corrections. Clean exact-head package/check reported
+commit `5bf6f4057fba3febafe871883efeedc55ac11778` with `dirty:false`;
+relocated stock Node Knowledge CLI help and the packaged Knowledge export
+loaded. Independent exact-head review found no must-fix.
+[PR #184](https://github.com/randydinh/temari/pull/184) merged at
+`617a0cc4641d87361f1785dac1b03b109dd9eb94` with the reviewed tree.
+No hosted Jev call or key read occurred. The five broader production finish predicates in the
 [Knowledge handoff](knowledge-handoff-2026-10-02.md) remain open.
