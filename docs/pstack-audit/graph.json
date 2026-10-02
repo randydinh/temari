@@ -1,0 +1,2134 @@
+{
+  "schemaVersion": 1,
+  "scope": "Temari public entries and v4.1 bundled P-stack skills and playbooks, with adjacent ownership boundaries",
+  "reviewedAt": "2026-10-02",
+  "evidenceRule": "documented and source_reference edges describe checked source; review_recommendation edges are proposals, not current behavior",
+  "nodes": [
+    {
+      "id": "component:archon",
+      "kind": "harness",
+      "label": "Managed Archon",
+      "source": "libs/archon-harness/src/lib/archon-harness.ts"
+    },
+    {
+      "id": "component:execution-harness",
+      "kind": "contract",
+      "label": "ExecutionHarness port",
+      "source": "libs/contracts/src/lib/execution-harness.ts"
+    },
+    {
+      "id": "component:orch-store",
+      "kind": "legacy-runtime",
+      "label": "Orchestrate plain-file store",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/scripts/orch/store.ts"
+    },
+    {
+      "id": "component:pstack-v4.1",
+      "kind": "bundle",
+      "label": "Bundled P-stack v4.1 catalog",
+      "source": "packages/workflow-runtime/assets/v4.1/UPSTREAM.md"
+    },
+    {
+      "id": "external:benny",
+      "kind": "external",
+      "label": "Benny automation pack",
+      "upstream": "https://github.com/cursor/plugins/tree/main/pstack/automations/benny"
+    },
+    {
+      "id": "external:overnight-guide",
+      "kind": "external",
+      "label": "P-stack overnight guide",
+      "upstream": "https://github.com/cursor/plugins/blob/main/pstack/docs/guide/07-overnight.md"
+    },
+    {
+      "id": "external:ralph-loop",
+      "kind": "external",
+      "label": "Ralph Loop",
+      "upstream": "https://github.com/cursor/plugins/tree/main/ralph-loop"
+    },
+    {
+      "id": "external:third-party",
+      "kind": "external",
+      "label": "Third-party MCP marketplace",
+      "upstream": "https://github.com/cursor/plugins/tree/main/third_party"
+    },
+    {
+      "id": "owner:host",
+      "kind": "owner",
+      "label": "Host adapter"
+    },
+    {
+      "id": "owner:poteto",
+      "kind": "owner",
+      "label": "Poteto"
+    },
+    {
+      "id": "owner:runtime",
+      "kind": "owner",
+      "label": "Temari runtime"
+    },
+    {
+      "id": "owner:temari",
+      "kind": "owner",
+      "label": "Temari"
+    },
+    {
+      "id": "playbook:authoring-a-skill",
+      "kind": "playbook",
+      "label": "Authoring or modifying a skill",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/authoring-a-skill.md"
+    },
+    {
+      "id": "playbook:autonomous-run",
+      "kind": "playbook",
+      "label": "Autonomous run",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/autonomous-run.md"
+    },
+    {
+      "id": "playbook:autopilot-full",
+      "kind": "playbook",
+      "label": "Autopilot-full",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/autopilot-full.md"
+    },
+    {
+      "id": "playbook:autopilot-stack",
+      "kind": "playbook",
+      "label": "Autopilot-stack",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/autopilot-stack.md"
+    },
+    {
+      "id": "playbook:babysit",
+      "kind": "playbook",
+      "label": "Babysit",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/babysit.md"
+    },
+    {
+      "id": "playbook:bug-fix",
+      "kind": "playbook",
+      "label": "Bug fix",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/bug-fix.md"
+    },
+    {
+      "id": "playbook:eval",
+      "kind": "playbook",
+      "label": "Eval",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/eval.md"
+    },
+    {
+      "id": "playbook:feature",
+      "kind": "playbook",
+      "label": "Feature",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/feature.md"
+    },
+    {
+      "id": "playbook:hillclimb",
+      "kind": "playbook",
+      "label": "Hillclimb",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/hillclimb.md"
+    },
+    {
+      "id": "playbook:investigation",
+      "kind": "playbook",
+      "label": "Investigation",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/investigation.md"
+    },
+    {
+      "id": "playbook:lightweight-engineering",
+      "kind": "playbook",
+      "label": "Lightweight engineering",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/lightweight-engineering.md"
+    },
+    {
+      "id": "playbook:multi-phase-plan",
+      "kind": "playbook",
+      "label": "Multi-phase or multi-PR plan",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/multi-phase-plan.md"
+    },
+    {
+      "id": "playbook:opening-a-pr",
+      "kind": "playbook",
+      "label": "Opening a PR",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/opening-a-pr.md"
+    },
+    {
+      "id": "playbook:orchestrate",
+      "kind": "playbook",
+      "label": "Orchestrate",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/orchestrate.md"
+    },
+    {
+      "id": "playbook:pause-safely",
+      "kind": "playbook",
+      "label": "Pause safely",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/pause-safely.md"
+    },
+    {
+      "id": "playbook:perf-issue",
+      "kind": "playbook",
+      "label": "Perf issue",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/perf-issue.md"
+    },
+    {
+      "id": "playbook:prototype",
+      "kind": "playbook",
+      "label": "Prototype",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/prototype.md"
+    },
+    {
+      "id": "playbook:refactoring",
+      "kind": "playbook",
+      "label": "Refactoring",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/refactoring.md"
+    },
+    {
+      "id": "playbook:runtime-forensics",
+      "kind": "playbook",
+      "label": "Runtime forensics",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/runtime-forensics.md"
+    },
+    {
+      "id": "playbook:session-pickup",
+      "kind": "playbook",
+      "label": "Session pickup",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/session-pickup.md"
+    },
+    {
+      "id": "playbook:shipping",
+      "kind": "playbook",
+      "label": "Shipping",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/shipping.md"
+    },
+    {
+      "id": "playbook:trace-forensics",
+      "kind": "playbook",
+      "label": "Trace forensics",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/trace-forensics.md"
+    },
+    {
+      "id": "playbook:visual-parity",
+      "kind": "playbook",
+      "label": "Visual parity",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/visual-parity.md"
+    },
+    {
+      "id": "playbook:worktree-cleanup",
+      "kind": "playbook",
+      "label": "Worktree and simulator cleanup",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/worktree-cleanup.md"
+    },
+    {
+      "id": "principle:principle-attack-the-premise",
+      "kind": "principle",
+      "label": "principle-attack-the-premise",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-attack-the-premise/SKILL.md",
+      "description": "Apply when two or more fixes that share one premise have failed the same gate. Take a census of which actors hold the imbalance before the next fix, then question the premise instead of writing another fix that assumes it."
+    },
+    {
+      "id": "principle:principle-boundary-discipline",
+      "kind": "principle",
+      "label": "principle-boundary-discipline",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-boundary-discipline/SKILL.md",
+      "description": "Apply when wiring validation, error handling, or framework adapters. Concentrate guards at system boundaries (CLI, config, network, external APIs); trust internal types and keep business logic in pure functions."
+    },
+    {
+      "id": "principle:principle-build-the-lever",
+      "kind": "principle",
+      "label": "principle-build-the-lever",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-build-the-lever/SKILL.md",
+      "description": "Apply to any non-trivial work, not just bulk work: edits, migrations, analyses, checks. Build the tool that does it or proves it (codemod, script, generator, or a skill your subagents follow) instead of working by hand. The tool is the artifact a reviewer can rerun."
+    },
+    {
+      "id": "principle:principle-encode-lessons-in-structure",
+      "kind": "principle",
+      "label": "principle-encode-lessons-in-structure",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-encode-lessons-in-structure/SKILL.md",
+      "description": "Apply when you catch yourself writing the same instruction a second time, or notice a recurring correction. Encode the rule as a lint, metadata flag, runtime check, or script instead of more text."
+    },
+    {
+      "id": "principle:principle-exhaust-the-design-space",
+      "kind": "principle",
+      "label": "principle-exhaust-the-design-space",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-exhaust-the-design-space/SKILL.md",
+      "description": "Apply when facing a novel UI interaction or architectural decision with no precedent in the codebase. Build 2-3 competing prototypes and compare side by side before committing."
+    },
+    {
+      "id": "principle:principle-experience-first",
+      "kind": "principle",
+      "label": "principle-experience-first",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-experience-first/SKILL.md",
+      "description": "Apply when product, UX, or feature-scope tradeoffs come up. Choose user delight over implementation convenience; ship fewer polished features over more rough ones."
+    },
+    {
+      "id": "principle:principle-fix-root-causes",
+      "kind": "principle",
+      "label": "principle-fix-root-causes",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-fix-root-causes/SKILL.md",
+      "description": "Apply when debugging. Trace each symptom to its root cause and fix it there; reproduce first, ask why until you reach it, resist nil-check guards that silence crashes."
+    },
+    {
+      "id": "principle:principle-foundational-thinking",
+      "kind": "principle",
+      "label": "principle-foundational-thinking",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-foundational-thinking/SKILL.md",
+      "description": "Apply before writing logic: choosing core types and data structures, sequencing scaffold-vs-feature work, asking what concurrent actors share. Get the data structures right so downstream code becomes obvious."
+    },
+    {
+      "id": "principle:principle-guard-the-context-window",
+      "kind": "principle",
+      "label": "principle-guard-the-context-window",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-guard-the-context-window/SKILL.md",
+      "description": "Apply when context is filling up: large outputs, long files, repeated reads, fan-out planning. Route bulk to subagents; keep summaries in the main thread, not raw payloads."
+    },
+    {
+      "id": "principle:principle-laziness-protocol",
+      "kind": "principle",
+      "label": "principle-laziness-protocol",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-laziness-protocol/SKILL.md",
+      "description": "Apply when refactoring, evaluating diff size, or tempted to add abstractions, layers, or signal threading. Bias toward deletion and the smallest change that solves the problem."
+    },
+    {
+      "id": "principle:principle-make-operations-idempotent",
+      "kind": "principle",
+      "label": "principle-make-operations-idempotent",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-make-operations-idempotent/SKILL.md",
+      "description": "Apply when designing commands, lifecycle steps, or processing loops that run amid crashes, restarts, and retries. Converge to the same end state regardless of partial prior runs."
+    },
+    {
+      "id": "principle:principle-migrate-callers-then-delete-legacy-apis",
+      "kind": "principle",
+      "label": "principle-migrate-callers-then-delete-legacy-apis",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-migrate-callers-then-delete-legacy-apis/SKILL.md",
+      "description": "Apply when introducing a new internal API while old callers still exist. Migrate callers and delete the old API in the same wave instead of preserving compatibility layers."
+    },
+    {
+      "id": "principle:principle-minimize-reader-load",
+      "kind": "principle",
+      "label": "principle-minimize-reader-load",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-minimize-reader-load/SKILL.md",
+      "description": "Apply when reviewing or shaping code that's hard to trace. Count layers between question and answer, and hidden state in the reader's head; collapse one-caller wrappers and shrink mutable scope."
+    },
+    {
+      "id": "principle:principle-model-the-domain",
+      "kind": "principle",
+      "label": "principle-model-the-domain",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-model-the-domain/SKILL.md",
+      "description": "Apply when writing stateful logic, or when code branches a lot or repeats a shape assumption across files. Encode the domain in a structure instead of scattered conditionals."
+    },
+    {
+      "id": "principle:principle-never-block-on-the-human",
+      "kind": "principle",
+      "label": "principle-never-block-on-the-human",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-never-block-on-the-human/SKILL.md",
+      "description": "Apply when tempted to ask 'should I do X?' on reversible work. Proceed, present the result, let the human course-correct after the fact; reserve confirmation for irreversible actions."
+    },
+    {
+      "id": "principle:principle-outcome-oriented-execution",
+      "kind": "principle",
+      "label": "principle-outcome-oriented-execution",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-outcome-oriented-execution/SKILL.md",
+      "description": "Apply during planned rewrites and migrations with explicit phase boundaries. Converge on the target architecture; don't preserve smooth intermediate states with throwaway compatibility code."
+    },
+    {
+      "id": "principle:principle-prove-it-works",
+      "kind": "principle",
+      "label": "principle-prove-it-works",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-prove-it-works/SKILL.md",
+      "description": "Apply after completing a task, before declaring done. Verify against the real artifact (run the feature, read the actual value, inspect the diff), not a proxy, self-report, or 'it compiles.'"
+    },
+    {
+      "id": "principle:principle-redesign-from-first-principles",
+      "kind": "principle",
+      "label": "principle-redesign-from-first-principles",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-redesign-from-first-principles/SKILL.md",
+      "description": "Apply when integrating a new requirement into an existing design. Redesign as if the requirement had been a foundational assumption from day one, instead of bolting it on."
+    },
+    {
+      "id": "principle:principle-separate-before-serializing-shared-state",
+      "kind": "principle",
+      "label": "principle-separate-before-serializing-shared-state",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-separate-before-serializing-shared-state/SKILL.md",
+      "description": "Apply when concurrent actors might write to the same file, branch, key, or state object. Eliminate the sharing first; serialize structurally only when one shared writer is a real invariant."
+    },
+    {
+      "id": "principle:principle-sequence-verifiable-units",
+      "kind": "principle",
+      "label": "principle-sequence-verifiable-units",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-sequence-verifiable-units/SKILL.md",
+      "description": "Apply to multi-step work (sweeps, migrations, runs of similar edits) and to how you stack commits and PRs. Break work into small units that each end in a verifiable state, check each before the next, and order delivery so the sequence proves itself to a reviewer."
+    },
+    {
+      "id": "principle:principle-subtract-before-you-add",
+      "kind": "principle",
+      "label": "principle-subtract-before-you-add",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-subtract-before-you-add/SKILL.md",
+      "description": "Apply when sequencing an addition, refactor, or rewrite. Remove dead code, redundant validators, and stub references first, then build on the simpler base."
+    },
+    {
+      "id": "principle:principle-test-behavior-not-implementation",
+      "kind": "principle",
+      "label": "principle-test-behavior-not-implementation",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-test-behavior-not-implementation/SKILL.md",
+      "description": "Apply when you write, change, or keep a test. Call the code the way its users do and assert the result they observe against a literal expected value. If the test would still pass when every imported function returns undefined, rewrite the assertion or delete the test."
+    },
+    {
+      "id": "principle:principle-type-system-discipline",
+      "kind": "principle",
+      "label": "principle-type-system-discipline",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/principle-type-system-discipline/SKILL.md",
+      "description": "Apply when designing types, reviewing a function signature, or writing code in any statically-typed language. Make illegal states unrepresentable, brand semantic primitives, parse external data at boundaries, refuse to lie to the compiler, exhaust variants, derive from authoritative schemas."
+    },
+    {
+      "id": "public-entry:closeout",
+      "kind": "public-entry",
+      "label": "closeout",
+      "source": "packages/workflow-runtime/public/skills/closeout/SKILL.md"
+    },
+    {
+      "id": "public-entry:poteto-mode",
+      "kind": "public-entry",
+      "label": "poteto-mode",
+      "source": "packages/workflow-runtime/public/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "id": "public-entry:temari",
+      "kind": "public-entry",
+      "label": "temari",
+      "source": "packages/workflow-runtime/public/skills/temari/SKILL.md"
+    },
+    {
+      "id": "public-skill:qa-review-verification",
+      "kind": "public-skill",
+      "label": "QA verification",
+      "source": "packages/workflow-runtime/public/skills/qa-review-verification/SKILL.md"
+    },
+    {
+      "id": "public-skill:temari-knowledge",
+      "kind": "public-skill",
+      "label": "Temari Knowledge",
+      "source": "packages/workflow-runtime/public/skills/temari-knowledge/SKILL.md"
+    },
+    {
+      "id": "public:policy",
+      "kind": "admission",
+      "label": "Public admission policy",
+      "source": "packages/workflow-runtime/public/policy.json"
+    },
+    {
+      "id": "skill:architect",
+      "kind": "skill",
+      "label": "architect",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/architect/SKILL.md",
+      "description": "Sketch types, signatures, and module structure before code, then stay in the loop while implementation fills in. Use for /architect, 'architect this', 'design this', or non-trivial work where jumping to code would lock in the wrong shape."
+    },
+    {
+      "id": "skill:arena",
+      "kind": "skill",
+      "label": "arena",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/arena/SKILL.md",
+      "description": "Spawn N parallel candidates at the same task, pick a base, graft the strongest parts of the losers into it. Use for /arena, 'arena this', 'throw it in the arena', or when one attempt at a non-trivial artifact would lock in the wrong shape."
+    },
+    {
+      "id": "skill:automate-me",
+      "kind": "skill",
+      "label": "automate-me",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/automate-me/SKILL.md",
+      "description": "Use for \\\"automate me\\\", \\\"create/update/refresh my -mode skill\\\", \\\"turn/capture my preferences or working style into a skill\\\", or wanting agents to follow how the user works. Drafts or revises a personal -mode skill via packaged skill-authoring and unslop, optionally pulling fresh evidence from recent transcripts."
+    },
+    {
+      "id": "skill:blast-radius",
+      "kind": "skill",
+      "label": "blast-radius",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/blast-radius/SKILL.md",
+      "description": "Find what a change could break somewhere else before it ships, beyond the diff, and prove the one fact it's safe because of by running real code instead of writing it up. Use for 'blast radius of X', 'what could this break', or reviewing a small diff you don't trust."
+    },
+    {
+      "id": "skill:bro",
+      "kind": "skill",
+      "label": "bro",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/bro/SKILL.md",
+      "description": "Restate the last message in plain human language, with no jargon."
+    },
+    {
+      "id": "skill:closeout",
+      "kind": "skill",
+      "label": "closeout",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/closeout/SKILL.md",
+      "description": "Close an agent task only after its task-owned work, verification, decisions, and approved preferences have durable homes. Use for /closeout or an explicit request to persist the task and archive it."
+    },
+    {
+      "id": "skill:create-verification-skill",
+      "kind": "skill",
+      "label": "create-verification-skill",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/create-verification-skill/SKILL.md",
+      "description": "Generate a project-local verification skill that drives your app the way a user does — any language, framework, or platform. Use for /create-verification-skill, \\\"make a control skill for this repo\\\", or when a project has no scripted way to prove UI/CLI/service behavior."
+    },
+    {
+      "id": "skill:deslop",
+      "kind": "skill",
+      "label": "deslop",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/deslop/SKILL.md",
+      "description": "Review a pending code or documentation diff before commit and remove generated clutter, unrelated edits, redundant guards, dead compatibility paths, and narrating comments without changing intended behavior."
+    },
+    {
+      "id": "skill:figure-it-out",
+      "kind": "skill",
+      "label": "figure-it-out",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/figure-it-out/SKILL.md",
+      "description": "Design an auditable playbook when no narrower one fits: a large migration, an ambitious multi-part change, or work a human reviews after stepping away. Scales rigor to the task, runs a hypothesis loop, and logs decisions via show-me-your-work. Use for /figure-it-out, 'figure it out', a large migration, or when no narrower playbook applies."
+    },
+    {
+      "id": "skill:how",
+      "kind": "skill",
+      "label": "how",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/how/SKILL.md",
+      "description": "Use for \\\"how does X work\\\", code walkthroughs before changing something, and placement / ownership / layering questions (\\\"where should this live\\\", \\\"which package owns this\\\", \\\"is this the right layer\\\"). Explains subsystem architecture, runtime flow, onboarding mental models. Use why for motivation."
+    },
+    {
+      "id": "skill:interrogate",
+      "kind": "skill",
+      "label": "interrogate",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/interrogate/SKILL.md",
+      "description": "Use for \\\"interrogate\\\", \\\"adversarial review\\\", \\\"multi-model review\\\", \\\"challenge this\\\", \\\"stress test this code\\\", \\\"find blind spots\\\", or \\\"tear this apart\\\". Multiple LLM reviewers challenge changes from independent angles."
+    },
+    {
+      "id": "skill:maintain-verification-skill",
+      "kind": "skill",
+      "label": "maintain-verification-skill",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/maintain-verification-skill/SKILL.md",
+      "description": "Periodic pass that keeps a project's verification skill and feature map honest: parallel source readers per feature, one live session driving every feature, at most one PR of proven corrections. Use for /maintain-verification-skill or \\\"audit the verify skill\\\"."
+    },
+    {
+      "id": "skill:make-bot-ui",
+      "kind": "skill",
+      "label": "make-bot-ui",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/make-bot-ui/SKILL.md",
+      "description": "Use when building a custom UI (page, dashboard, buttons) that should wake a Grok Bot over a webhook, when the user must provide a webhook sender key, or when exposing that UI on Tailscale."
+    },
+    {
+      "id": "skill:merge-reconciliation",
+      "kind": "skill",
+      "label": "merge-reconciliation",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/merge-reconciliation/SKILL.md",
+      "description": "Reconcile a Git merge, rebase, cherry-pick, or overlapping worker patch without losing work. Use when a candidate has unresolved paths, competing changes, stale candidate evidence, or an integration checkout that must be rebuilt and independently verified. Preserve the source checkout, require an explicit confirmation before mutation, and use the canonical runtime task and evidence records."
+    },
+    {
+      "id": "skill:no-comments",
+      "kind": "skill",
+      "label": "no-comments",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/no-comments/SKILL.md",
+      "description": "Spawn Comment Sicko, fix accepted findings, and offer encodings for claimed constraints."
+    },
+    {
+      "id": "skill:poteto-mode",
+      "kind": "skill",
+      "label": "poteto-mode",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md",
+      "description": "poteto's agent style for concise, detailed responses, deliberate subagents, unslopped prose, simple code, and verified work. Use for poteto, /poteto-mode, or requests to work in this style."
+    },
+    {
+      "id": "skill:recall",
+      "kind": "skill",
+      "label": "recall",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/recall/SKILL.md",
+      "description": "Reconstruct your recent working context from your own chat history, live state, and the shared record (user reports, prior fixes, incidents), then hand back a tight current-state brief. Use for 'recall my work on X', 'catch me up', 'what have I been working on', 'where did I leave off', before starting or resuming work."
+    },
+    {
+      "id": "skill:reflect",
+      "kind": "skill",
+      "label": "reflect",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/reflect/SKILL.md",
+      "description": "Spawn three parallel review subagents over the active transcript, surface learnings, and route each to a concrete edit on an existing skill. Use when the user says reflect."
+    },
+    {
+      "id": "skill:seq-log-review",
+      "kind": "skill",
+      "label": "seq-log-review",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/seq-log-review/SKILL.md",
+      "description": "Review or investigate logs and traces in Seq for a concrete operational question by using an approved read-only Seq MCP provider. Use for bounded Seq incident review, event or trace investigation, and evidence-backed comparisons. Do not use for generic log review, Seq ingestion, server administration, alert setup, or MCP installation."
+    },
+    {
+      "id": "skill:setup-pstack",
+      "kind": "skill",
+      "label": "setup-pstack",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/setup-pstack/SKILL.md",
+      "description": "Configure which models pstack uses per role and at what reasoning budget. Detects your available models and writes an always-applied rule that overrides the skill defaults. Use for /setup-pstack, \"configure pstack models\", \"pstack budget\", or changing pstack's model choices."
+    },
+    {
+      "id": "skill:show-me-your-work",
+      "kind": "skill",
+      "label": "show-me-your-work",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/show-me-your-work/SKILL.md",
+      "description": "Keep a reviewable decision trail for long-running or unattended work: a TSV log with one row per decision (what, why, evidence, result). Local by default; commit it when a reviewer needs the trail to trust the result. Use for /show-me-your-work, autonomous or multi-phase runs, or work a human reviews after stepping away."
+    },
+    {
+      "id": "skill:skill-authoring",
+      "kind": "skill",
+      "label": "skill-authoring",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/skill-authoring/SKILL.md",
+      "description": "Create or revise portable agent skills whose triggers, instructions, resources, and checks must work without an unbundled authoring skill."
+    },
+    {
+      "id": "skill:swarm",
+      "kind": "skill",
+      "label": "swarm",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/swarm/SKILL.md",
+      "description": "Fan out N parallel workers, drain them, and return one report. Use for /swarm, 'swarm this', or parallel coverage, races, gauntlets, and exploration."
+    },
+    {
+      "id": "skill:tdd",
+      "kind": "skill",
+      "label": "tdd",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/tdd/SKILL.md",
+      "description": "Use only when the user explicitly asks for TDD, a failing test, or a regression test, OR when the bug has an obvious cheap local test target. Skip when the test path is unclear, expensive, integration-heavy, or not requested."
+    },
+    {
+      "id": "skill:teach",
+      "kind": "skill",
+      "label": "teach",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/teach/SKILL.md",
+      "description": "Explain a body of work plainly so a person actually understands it. Runs the `how` and `why` skills and weaves what they find into one clear explanation. Use for 'teach me this', 'help me really understand X', 'explain this change or subsystem to me'."
+    },
+    {
+      "id": "skill:technical-writing",
+      "kind": "skill",
+      "label": "technical-writing",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/technical-writing/SKILL.md",
+      "description": "Layered technical-writing standard: Diátaxis structure, Google developer style sentences, STE instruction rules, Global English syntax. Use for /technical-writing or when writing or reviewing docs, RFCs, readmes, PR descriptions, or commit messages."
+    },
+    {
+      "id": "skill:temari",
+      "kind": "skill",
+      "label": "temari",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/temari/SKILL.md",
+      "description": "Use Temari as a provider-neutral conversational partner when the user addresses Temari or wants help choosing, shaping, or continuing work. Temari owns the conversation and submits every software engineering request, including trivial work, to the packaged poteto-mode skill for proportional routing. Do not trigger merely because a request mentions the Temari codebase."
+    },
+    {
+      "id": "skill:typescript-best-practices",
+      "kind": "skill",
+      "label": "typescript-best-practices",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/typescript-best-practices/SKILL.md",
+      "description": "TypeScript best practices. Use when reading or editing any .ts or .tsx file."
+    },
+    {
+      "id": "skill:unslop",
+      "kind": "skill",
+      "label": "unslop",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/unslop/SKILL.md",
+      "description": "Cut AI tells from any writing. Must always apply."
+    },
+    {
+      "id": "skill:why",
+      "kind": "skill",
+      "label": "why",
+      "source": "packages/workflow-runtime/assets/v4.1/skills/why/SKILL.md",
+      "description": "Use for 'why does X work this way', 'why we picked Y', design rationale, regressions, postmortems, or data-backed thresholds. Discovers available MCPs and queries each evidence category (source control, issue tracker, long-form docs, real-time chat, infrastructure observability, error tracking, product analytics warehouse) in parallel, then returns a cited read on decisions and tradeoffs. Use how for runtime behavior."
+    }
+  ],
+  "edges": [
+    {
+      "from": "component:archon",
+      "to": "component:execution-harness",
+      "relation": "implements",
+      "basis": "documented",
+      "evidence": "docs/decisions/2026-09-22-archon-harness.md"
+    },
+    {
+      "from": "component:orch-store",
+      "to": "owner:runtime",
+      "relation": "overlaps",
+      "basis": "review_recommendation",
+      "evidence": "docs/pstack-audit/index.md"
+    },
+    {
+      "from": "external:benny",
+      "to": "skill:poteto-mode",
+      "relation": "uses_shared_skills",
+      "basis": "documented",
+      "evidence": "docs/pstack-audit/index.md"
+    },
+    {
+      "from": "external:overnight-guide",
+      "to": "playbook:autonomous-run",
+      "relation": "drives_one_task_to_predicate",
+      "basis": "documented",
+      "evidence": "https://github.com/cursor/plugins/blob/main/pstack/docs/guide/07-overnight.md"
+    },
+    {
+      "from": "external:overnight-guide",
+      "to": "playbook:autopilot-full",
+      "relation": "handles_independent_pr_queue",
+      "basis": "documented",
+      "evidence": "https://github.com/cursor/plugins/blob/main/pstack/docs/guide/07-overnight.md"
+    },
+    {
+      "from": "external:overnight-guide",
+      "to": "playbook:orchestrate",
+      "relation": "handles_multi_day_program",
+      "basis": "documented",
+      "evidence": "https://github.com/cursor/plugins/blob/main/pstack/docs/guide/07-overnight.md"
+    },
+    {
+      "from": "external:overnight-guide",
+      "to": "playbook:autopilot-stack",
+      "relation": "handles_reviewed_stack",
+      "basis": "documented",
+      "evidence": "https://github.com/cursor/plugins/blob/main/pstack/docs/guide/07-overnight.md"
+    },
+    {
+      "from": "external:overnight-guide",
+      "to": "skill:figure-it-out",
+      "relation": "plans_overnight_task",
+      "basis": "documented",
+      "evidence": "https://github.com/cursor/plugins/blob/main/pstack/docs/guide/07-overnight.md"
+    },
+    {
+      "from": "external:ralph-loop",
+      "to": "playbook:autonomous-run",
+      "relation": "separate_loop_mechanism",
+      "basis": "documented",
+      "evidence": "docs/pstack-audit/index.md"
+    },
+    {
+      "from": "external:third-party",
+      "to": "skill:why",
+      "relation": "optional_evidence_provider",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/why/SKILL.md"
+    },
+    {
+      "from": "owner:runtime",
+      "to": "component:execution-harness",
+      "relation": "selects",
+      "basis": "documented",
+      "evidence": "docs/decisions/2026-09-22-archon-harness.md"
+    },
+    {
+      "from": "owner:temari",
+      "to": "skill:poteto-mode",
+      "relation": "routes_engineering_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/temari/SKILL.md"
+    },
+    {
+      "from": "playbook:authoring-a-skill",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:autonomous-run",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:autonomous-run",
+      "to": "owner:temari",
+      "relation": "program_or_lifecycle_candidate",
+      "basis": "review_recommendation",
+      "evidence": "docs/pstack-audit/index.md"
+    },
+    {
+      "from": "playbook:autopilot-full",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:autopilot-full",
+      "to": "owner:temari",
+      "relation": "program_or_lifecycle_candidate",
+      "basis": "review_recommendation",
+      "evidence": "docs/pstack-audit/index.md"
+    },
+    {
+      "from": "playbook:autopilot-full",
+      "to": "playbook:babysit",
+      "relation": "references_playbook",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/autopilot-full.md"
+    },
+    {
+      "from": "playbook:autopilot-full",
+      "to": "playbook:shipping",
+      "relation": "references_playbook",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/autopilot-full.md"
+    },
+    {
+      "from": "playbook:autopilot-stack",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:autopilot-stack",
+      "to": "owner:temari",
+      "relation": "program_or_lifecycle_candidate",
+      "basis": "review_recommendation",
+      "evidence": "docs/pstack-audit/index.md"
+    },
+    {
+      "from": "playbook:autopilot-stack",
+      "to": "playbook:babysit",
+      "relation": "references_playbook",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/autopilot-stack.md"
+    },
+    {
+      "from": "playbook:babysit",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:babysit",
+      "to": "owner:host",
+      "relation": "mechanical_execution",
+      "basis": "review_recommendation",
+      "evidence": "docs/pstack-audit/index.md"
+    },
+    {
+      "from": "playbook:babysit",
+      "to": "playbook:shipping",
+      "relation": "references_playbook",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/babysit.md"
+    },
+    {
+      "from": "playbook:bug-fix",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:eval",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:feature",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:feature",
+      "to": "principle:principle-model-the-domain",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/feature.md"
+    },
+    {
+      "from": "playbook:hillclimb",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:hillclimb",
+      "to": "playbook:autonomous-run",
+      "relation": "references_playbook",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/hillclimb.md"
+    },
+    {
+      "from": "playbook:investigation",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:lightweight-engineering",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:multi-phase-plan",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:multi-phase-plan",
+      "to": "owner:temari",
+      "relation": "program_or_lifecycle_candidate",
+      "basis": "review_recommendation",
+      "evidence": "docs/pstack-audit/index.md"
+    },
+    {
+      "from": "playbook:multi-phase-plan",
+      "to": "playbook:autopilot-full",
+      "relation": "references_playbook",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/multi-phase-plan.md"
+    },
+    {
+      "from": "playbook:multi-phase-plan",
+      "to": "playbook:autopilot-stack",
+      "relation": "references_playbook",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/multi-phase-plan.md"
+    },
+    {
+      "from": "playbook:multi-phase-plan",
+      "to": "playbook:opening-a-pr",
+      "relation": "references_playbook",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/multi-phase-plan.md"
+    },
+    {
+      "from": "playbook:multi-phase-plan",
+      "to": "playbook:orchestrate",
+      "relation": "references_playbook",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/multi-phase-plan.md"
+    },
+    {
+      "from": "playbook:multi-phase-plan",
+      "to": "playbook:prototype",
+      "relation": "references_playbook",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/multi-phase-plan.md"
+    },
+    {
+      "from": "playbook:multi-phase-plan",
+      "to": "playbook:shipping",
+      "relation": "references_playbook",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/multi-phase-plan.md"
+    },
+    {
+      "from": "playbook:multi-phase-plan",
+      "to": "skill:how",
+      "relation": "references_skill",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/multi-phase-plan.md"
+    },
+    {
+      "from": "playbook:multi-phase-plan",
+      "to": "skill:interrogate",
+      "relation": "references_skill",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/multi-phase-plan.md"
+    },
+    {
+      "from": "playbook:multi-phase-plan",
+      "to": "skill:show-me-your-work",
+      "relation": "references_skill",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/multi-phase-plan.md"
+    },
+    {
+      "from": "playbook:multi-phase-plan",
+      "to": "skill:swarm",
+      "relation": "references_skill",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/multi-phase-plan.md"
+    },
+    {
+      "from": "playbook:opening-a-pr",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:opening-a-pr",
+      "to": "owner:host",
+      "relation": "mechanical_execution",
+      "basis": "review_recommendation",
+      "evidence": "docs/pstack-audit/index.md"
+    },
+    {
+      "from": "playbook:orchestrate",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:orchestrate",
+      "to": "principle:principle-encode-lessons-in-structure",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/orchestrate.md"
+    },
+    {
+      "from": "playbook:orchestrate",
+      "to": "principle:principle-separate-before-serializing-shared-state",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/orchestrate.md"
+    },
+    {
+      "from": "playbook:orchestrate",
+      "to": "owner:temari",
+      "relation": "program_or_lifecycle_candidate",
+      "basis": "review_recommendation",
+      "evidence": "docs/pstack-audit/index.md"
+    },
+    {
+      "from": "playbook:orchestrate",
+      "to": "playbook:babysit",
+      "relation": "references_playbook",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/orchestrate.md"
+    },
+    {
+      "from": "playbook:orchestrate",
+      "to": "component:orch-store",
+      "relation": "uses",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/orchestrate.md"
+    },
+    {
+      "from": "playbook:pause-safely",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:pause-safely",
+      "to": "owner:temari",
+      "relation": "program_or_lifecycle_candidate",
+      "basis": "review_recommendation",
+      "evidence": "docs/pstack-audit/index.md"
+    },
+    {
+      "from": "playbook:perf-issue",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:perf-issue",
+      "to": "playbook:hillclimb",
+      "relation": "references_playbook",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/perf-issue.md"
+    },
+    {
+      "from": "playbook:prototype",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:refactoring",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:refactoring",
+      "to": "principle:principle-foundational-thinking",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/refactoring.md"
+    },
+    {
+      "from": "playbook:refactoring",
+      "to": "principle:principle-laziness-protocol",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/refactoring.md"
+    },
+    {
+      "from": "playbook:refactoring",
+      "to": "principle:principle-migrate-callers-then-delete-legacy-apis",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/refactoring.md"
+    },
+    {
+      "from": "playbook:refactoring",
+      "to": "principle:principle-minimize-reader-load",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/refactoring.md"
+    },
+    {
+      "from": "playbook:refactoring",
+      "to": "principle:principle-model-the-domain",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/refactoring.md"
+    },
+    {
+      "from": "playbook:refactoring",
+      "to": "principle:principle-prove-it-works",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/refactoring.md"
+    },
+    {
+      "from": "playbook:refactoring",
+      "to": "principle:principle-redesign-from-first-principles",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/refactoring.md"
+    },
+    {
+      "from": "playbook:refactoring",
+      "to": "principle:principle-subtract-before-you-add",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/refactoring.md"
+    },
+    {
+      "from": "playbook:runtime-forensics",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:session-pickup",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:session-pickup",
+      "to": "principle:principle-guard-the-context-window",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/session-pickup.md"
+    },
+    {
+      "from": "playbook:session-pickup",
+      "to": "principle:principle-prove-it-works",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/session-pickup.md"
+    },
+    {
+      "from": "playbook:session-pickup",
+      "to": "owner:temari",
+      "relation": "program_or_lifecycle_candidate",
+      "basis": "review_recommendation",
+      "evidence": "docs/pstack-audit/index.md"
+    },
+    {
+      "from": "playbook:shipping",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:shipping",
+      "to": "owner:host",
+      "relation": "mechanical_execution",
+      "basis": "review_recommendation",
+      "evidence": "docs/pstack-audit/index.md"
+    },
+    {
+      "from": "playbook:shipping",
+      "to": "playbook:babysit",
+      "relation": "references_playbook",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/shipping.md"
+    },
+    {
+      "from": "playbook:trace-forensics",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:trace-forensics",
+      "to": "principle:principle-guard-the-context-window",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/trace-forensics.md"
+    },
+    {
+      "from": "playbook:visual-parity",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:worktree-cleanup",
+      "to": "owner:poteto",
+      "relation": "current_method_catalog",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "playbook:worktree-cleanup",
+      "to": "principle:principle-build-the-lever",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/worktree-cleanup.md"
+    },
+    {
+      "from": "playbook:worktree-cleanup",
+      "to": "principle:principle-encode-lessons-in-structure",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/worktree-cleanup.md"
+    },
+    {
+      "from": "playbook:worktree-cleanup",
+      "to": "principle:principle-guard-the-context-window",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/worktree-cleanup.md"
+    },
+    {
+      "from": "playbook:worktree-cleanup",
+      "to": "principle:principle-prove-it-works",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/worktree-cleanup.md"
+    },
+    {
+      "from": "playbook:worktree-cleanup",
+      "to": "owner:host",
+      "relation": "mechanical_execution",
+      "basis": "review_recommendation",
+      "evidence": "docs/pstack-audit/index.md"
+    },
+    {
+      "from": "principle:principle-attack-the-premise",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-attack-the-premise/SKILL.md"
+    },
+    {
+      "from": "principle:principle-attack-the-premise",
+      "to": "principle:principle-build-the-lever",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-attack-the-premise/SKILL.md"
+    },
+    {
+      "from": "principle:principle-attack-the-premise",
+      "to": "principle:principle-fix-root-causes",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-attack-the-premise/SKILL.md"
+    },
+    {
+      "from": "principle:principle-attack-the-premise",
+      "to": "principle:principle-laziness-protocol",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-attack-the-premise/SKILL.md"
+    },
+    {
+      "from": "principle:principle-attack-the-premise",
+      "to": "principle:principle-redesign-from-first-principles",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-attack-the-premise/SKILL.md"
+    },
+    {
+      "from": "principle:principle-boundary-discipline",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-boundary-discipline/SKILL.md"
+    },
+    {
+      "from": "principle:principle-build-the-lever",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-build-the-lever/SKILL.md"
+    },
+    {
+      "from": "principle:principle-build-the-lever",
+      "to": "principle:principle-encode-lessons-in-structure",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-build-the-lever/SKILL.md"
+    },
+    {
+      "from": "principle:principle-build-the-lever",
+      "to": "principle:principle-laziness-protocol",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-build-the-lever/SKILL.md"
+    },
+    {
+      "from": "principle:principle-build-the-lever",
+      "to": "principle:principle-prove-it-works",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-build-the-lever/SKILL.md"
+    },
+    {
+      "from": "principle:principle-encode-lessons-in-structure",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-encode-lessons-in-structure/SKILL.md"
+    },
+    {
+      "from": "principle:principle-exhaust-the-design-space",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-exhaust-the-design-space/SKILL.md"
+    },
+    {
+      "from": "principle:principle-experience-first",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-experience-first/SKILL.md"
+    },
+    {
+      "from": "principle:principle-fix-root-causes",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-fix-root-causes/SKILL.md"
+    },
+    {
+      "from": "principle:principle-foundational-thinking",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-foundational-thinking/SKILL.md"
+    },
+    {
+      "from": "principle:principle-guard-the-context-window",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-guard-the-context-window/SKILL.md"
+    },
+    {
+      "from": "principle:principle-laziness-protocol",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-laziness-protocol/SKILL.md"
+    },
+    {
+      "from": "principle:principle-make-operations-idempotent",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-make-operations-idempotent/SKILL.md"
+    },
+    {
+      "from": "principle:principle-migrate-callers-then-delete-legacy-apis",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-migrate-callers-then-delete-legacy-apis/SKILL.md"
+    },
+    {
+      "from": "principle:principle-minimize-reader-load",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-minimize-reader-load/SKILL.md"
+    },
+    {
+      "from": "principle:principle-minimize-reader-load",
+      "to": "principle:principle-guard-the-context-window",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-minimize-reader-load/SKILL.md"
+    },
+    {
+      "from": "principle:principle-model-the-domain",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-model-the-domain/SKILL.md"
+    },
+    {
+      "from": "principle:principle-never-block-on-the-human",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-never-block-on-the-human/SKILL.md"
+    },
+    {
+      "from": "principle:principle-outcome-oriented-execution",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-outcome-oriented-execution/SKILL.md"
+    },
+    {
+      "from": "principle:principle-prove-it-works",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-prove-it-works/SKILL.md"
+    },
+    {
+      "from": "principle:principle-redesign-from-first-principles",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-redesign-from-first-principles/SKILL.md"
+    },
+    {
+      "from": "principle:principle-separate-before-serializing-shared-state",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-separate-before-serializing-shared-state/SKILL.md"
+    },
+    {
+      "from": "principle:principle-sequence-verifiable-units",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-sequence-verifiable-units/SKILL.md"
+    },
+    {
+      "from": "principle:principle-subtract-before-you-add",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-subtract-before-you-add/SKILL.md"
+    },
+    {
+      "from": "principle:principle-test-behavior-not-implementation",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-test-behavior-not-implementation/SKILL.md"
+    },
+    {
+      "from": "principle:principle-type-system-discipline",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/principle-type-system-discipline/SKILL.md"
+    },
+    {
+      "from": "public-entry:closeout",
+      "to": "skill:closeout",
+      "relation": "adapts_source_skill",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/skills/closeout/SKILL.md"
+    },
+    {
+      "from": "public-entry:poteto-mode",
+      "to": "skill:poteto-mode",
+      "relation": "adapts_source_skill",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "public-entry:temari",
+      "to": "skill:temari",
+      "relation": "adapts_source_skill",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/skills/temari/SKILL.md"
+    },
+    {
+      "from": "public-entry:temari",
+      "to": "public-skill:qa-review-verification",
+      "relation": "invokes_supporting_skill",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/skills/temari/SKILL.md"
+    },
+    {
+      "from": "public:policy",
+      "to": "public-entry:closeout",
+      "relation": "declares_entry",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/policy.json"
+    },
+    {
+      "from": "public:policy",
+      "to": "public-entry:poteto-mode",
+      "relation": "declares_entry",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/policy.json"
+    },
+    {
+      "from": "public:policy",
+      "to": "public-entry:temari",
+      "relation": "declares_entry",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/policy.json"
+    },
+    {
+      "from": "skill:architect",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/architect/SKILL.md"
+    },
+    {
+      "from": "skill:arena",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/arena/SKILL.md"
+    },
+    {
+      "from": "skill:automate-me",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/automate-me/SKILL.md"
+    },
+    {
+      "from": "skill:automate-me",
+      "to": "owner:host",
+      "relation": "optional_capability",
+      "basis": "review_recommendation",
+      "evidence": "docs/pstack-audit/index.md"
+    },
+    {
+      "from": "skill:blast-radius",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/blast-radius/SKILL.md"
+    },
+    {
+      "from": "skill:bro",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/bro/SKILL.md"
+    },
+    {
+      "from": "skill:bro",
+      "to": "owner:host",
+      "relation": "optional_capability",
+      "basis": "review_recommendation",
+      "evidence": "docs/pstack-audit/index.md"
+    },
+    {
+      "from": "skill:closeout",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/closeout/SKILL.md"
+    },
+    {
+      "from": "skill:closeout",
+      "to": "owner:temari",
+      "relation": "current_entry",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/closeout/SKILL.md"
+    },
+    {
+      "from": "skill:create-verification-skill",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/create-verification-skill/SKILL.md"
+    },
+    {
+      "from": "skill:deslop",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/deslop/SKILL.md"
+    },
+    {
+      "from": "skill:figure-it-out",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/figure-it-out/SKILL.md"
+    },
+    {
+      "from": "skill:how",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/how/SKILL.md"
+    },
+    {
+      "from": "skill:interrogate",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/interrogate/SKILL.md"
+    },
+    {
+      "from": "skill:maintain-verification-skill",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/maintain-verification-skill/SKILL.md"
+    },
+    {
+      "from": "skill:make-bot-ui",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/make-bot-ui/SKILL.md"
+    },
+    {
+      "from": "skill:make-bot-ui",
+      "to": "owner:host",
+      "relation": "optional_capability",
+      "basis": "review_recommendation",
+      "evidence": "docs/pstack-audit/index.md"
+    },
+    {
+      "from": "skill:merge-reconciliation",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/merge-reconciliation/SKILL.md"
+    },
+    {
+      "from": "skill:merge-reconciliation",
+      "to": "owner:temari",
+      "relation": "current_entry",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/merge-reconciliation/SKILL.md"
+    },
+    {
+      "from": "skill:merge-reconciliation",
+      "to": "skill:poteto-mode",
+      "relation": "references_skill",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/merge-reconciliation/SKILL.md"
+    },
+    {
+      "from": "skill:no-comments",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/no-comments/SKILL.md"
+    },
+    {
+      "from": "skill:no-comments",
+      "to": "principle:principle-fix-root-causes",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/no-comments/SKILL.md"
+    },
+    {
+      "from": "skill:no-comments",
+      "to": "principle:principle-redesign-from-first-principles",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/no-comments/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "owner:poteto",
+      "relation": "current_entry",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-attack-the-premise",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-boundary-discipline",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-build-the-lever",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-encode-lessons-in-structure",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-exhaust-the-design-space",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-experience-first",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-fix-root-causes",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-foundational-thinking",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-guard-the-context-window",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-laziness-protocol",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-make-operations-idempotent",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-migrate-callers-then-delete-legacy-apis",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-minimize-reader-load",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-model-the-domain",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-never-block-on-the-human",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-outcome-oriented-execution",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-prove-it-works",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-redesign-from-first-principles",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-separate-before-serializing-shared-state",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-sequence-verifiable-units",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-subtract-before-you-add",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-test-behavior-not-implementation",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "principle:principle-type-system-discipline",
+      "relation": "invokes_principle",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:authoring-a-skill",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:autonomous-run",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:autopilot-full",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:autopilot-stack",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:babysit",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:bug-fix",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:eval",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:feature",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:hillclimb",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:investigation",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:lightweight-engineering",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:multi-phase-plan",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:opening-a-pr",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:orchestrate",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:pause-safely",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:perf-issue",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:prototype",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:refactoring",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:runtime-forensics",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:session-pickup",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:shipping",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:trace-forensics",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:visual-parity",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:poteto-mode",
+      "to": "playbook:worktree-cleanup",
+      "relation": "routes_to",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "skill:recall",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/recall/SKILL.md"
+    },
+    {
+      "from": "skill:recall",
+      "to": "owner:temari",
+      "relation": "lifecycle_candidate",
+      "basis": "review_recommendation",
+      "evidence": "docs/pstack-audit/index.md"
+    },
+    {
+      "from": "skill:reflect",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/reflect/SKILL.md"
+    },
+    {
+      "from": "skill:reflect",
+      "to": "owner:host",
+      "relation": "optional_capability",
+      "basis": "review_recommendation",
+      "evidence": "docs/pstack-audit/index.md"
+    },
+    {
+      "from": "skill:seq-log-review",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/seq-log-review/SKILL.md"
+    },
+    {
+      "from": "skill:setup-pstack",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/setup-pstack/SKILL.md"
+    },
+    {
+      "from": "skill:setup-pstack",
+      "to": "owner:host",
+      "relation": "optional_capability",
+      "basis": "review_recommendation",
+      "evidence": "docs/pstack-audit/index.md"
+    },
+    {
+      "from": "skill:show-me-your-work",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/show-me-your-work/SKILL.md"
+    },
+    {
+      "from": "skill:skill-authoring",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/skill-authoring/SKILL.md"
+    },
+    {
+      "from": "skill:swarm",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/swarm/SKILL.md"
+    },
+    {
+      "from": "skill:tdd",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/tdd/SKILL.md"
+    },
+    {
+      "from": "skill:teach",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/teach/SKILL.md"
+    },
+    {
+      "from": "skill:technical-writing",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/technical-writing/SKILL.md"
+    },
+    {
+      "from": "skill:temari",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/temari/SKILL.md"
+    },
+    {
+      "from": "skill:temari",
+      "to": "owner:temari",
+      "relation": "current_entry",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/temari/SKILL.md"
+    },
+    {
+      "from": "skill:temari",
+      "to": "skill:merge-reconciliation",
+      "relation": "references_skill",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/temari/SKILL.md"
+    },
+    {
+      "from": "skill:temari",
+      "to": "skill:poteto-mode",
+      "relation": "references_skill",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/temari/SKILL.md"
+    },
+    {
+      "from": "skill:temari",
+      "to": "skill:seq-log-review",
+      "relation": "references_skill",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/temari/SKILL.md"
+    },
+    {
+      "from": "skill:typescript-best-practices",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/typescript-best-practices/SKILL.md"
+    },
+    {
+      "from": "skill:unslop",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/unslop/SKILL.md"
+    },
+    {
+      "from": "skill:why",
+      "to": "component:pstack-v4.1",
+      "relation": "bundled_in",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/why/SKILL.md"
+    }
+  ]
+}
