@@ -935,3 +935,56 @@ report and checks, the audit trail remains strict six-field append-only, and
 the added text contains no private corpus or report path. Keep this as a
 source-linked documentation increment; all five production finish predicates
 remain open.
+
+## 2026-10-02 08:37 UTC archived HTML image inventory experiment
+
+PRs #170 and #171 are merged; this clean isolated branch starts from
+`9d616535c7f76c644ec10d05f3422dd991b85053`. A read-only architect
+compared (A) source-linked image declarations in archived standalone HTML,
+(B) graph/derived-view recovery alongside archive bytes, and (C) further BM25
+cost decomposition. The relocated mixed corpus includes HTML, while the
+current Markdown HTML inventory admits only `.md`/`.markdown`, and Registrar's
+HTML text representation strips the markup needed to pin `<img>` declarations.
+Graph recovery needs a separate lineage, retraction and access-state contract;
+the BM25 decomposition remains diagnostic. Select a bounded Knowledge-only
+HTML declaration receipt from an explicitly recovered original.
+
+Pass only if a complete-admitted `local-only` source contains selected HTML and
+image assets, an actual Registrar capture retains their original bytes, and
+the adapter verifies the HTML recovered-original hash and byte count against
+the pinned manifest. Bound strict UTF-8 input to 64 KiB and at most 256 simple
+single-line `<img src="relative.ext">` declarations, each at most 1,024
+characters; exclude comment/script/style/template regions and classify
+ambiguous syntax as a gap or refusal. Resolve only admitted local targets from
+the complete paged archived manifest; distinguish missing, external,
+unsupported and outside-source paths. Pin declarations by quote hash and
+Unicode code-point span into the recovered original, and targets by archived
+original hash/bytes. Recheck publication and registration around reads, refuse
+tampered recovery or changed admission, delete live originals before fixture
+reads, and keep the receipt metadata-only with `currentOriginal:not-checked`
+and `visualMeaning:not-evaluated`. No renderer, visual meaning, OCR, hosted
+Jev call, continuous freshness or production-losslessness claim. Focused
+actual Registrar and full Nx checks, independent review, clean exact-head
+package and PR delivery are required.
+
+### 09:07 UTC archived HTML checkpoint
+
+The corrected Knowledge-only adapter verifies a recovered `.html`/`.htm`
+original against a complete pinned actual Registrar manifest, scans bounded
+simple image declarations, and resolves source-relative assets from all
+manifest pages. The explicit `local-only` fixture deleted live HTML and PNG
+before recovery, checked an image on a later page, and passed focused actual
+Registrar cases 2/2. It rejects changed recovered bytes, changed publication
+or admission, over-budget and ambiguous markup. Early independent review
+found two false-declaration cases: CR-only multiline tags and literal `<img>`
+inside RCDATA. The builder repaired these, added fixtures, and also refused
+`<base>` and unsupported raw-text contexts rather than asserting a false
+asset relationship. A second read-only review found no must-fix.
+
+Final corrected-source Nx Knowledge integration passed 98/98; unit 43/43,
+uncached typecheck, Nx sync and scoped formatting passed. The receipt stays
+metadata-only and explicitly reports `currentOriginal:not-checked` and
+`visualMeaning:not-evaluated`. It currently supports only `local-only`
+registrations; registered-sources are deliberately refused. Clean commit,
+exact-head package/check and PR delivery remain. HTML rendering, visual
+meaning and all five broader production finish predicates stay open.
