@@ -638,3 +638,38 @@ GitHub reports [#160](https://github.com/randydinh/temari/pull/160) merged at
 `358d8e9f6fa746620bef51db425654f1ed9aa564`; the reviewed and merged
 trees match. Keep the scoped receipt. Full Markdown dialects, page rendering,
 visual meaning, recurring freshness and production losslessness remain open.
+
+## 2026-10-02 06:11 UTC Markdown raw-HTML image experiment
+
+PRs #160 and #161 are merged. This isolated branch starts from
+`4c12c2ca2dab200dcf4b5837eaec77ce2205a201`. A read-only architect compared
+bounded `<img>` declarations in archived Markdown with embedded PDF asset
+inventory. The PDF path would need changes to the pinned local worker and its
+protocol, which crosses the missing P-stack capability index. Select a
+separate Knowledge-only Markdown raw-HTML receipt.
+
+The pass predicate is an actual `local-only` Registrar capture of Markdown and
+PNG, deletion of live originals, and a pinned archived read of only simple
+single-line `<img ... src="relative-path" ...>` declarations in `.md` or
+`.markdown`. Bound selected files, text code points, tag length/count and
+manifest paging. Preserve exact code-point tag span and quote hash, pin
+retained target original SHA-256/bytes, and distinguish missing, outside-source,
+external, unsupported and malformed gaps. Exclude code, comments and
+frontmatter; reject ambiguous duplicate `src` and over-limit inputs. Recheck
+current registration and publication before metadata-only receipt publication.
+No raw `src`, alt text, URL, markup body, image bytes or recovered path field.
+Keep inline and reference-image receipt contracts unchanged. The receipt does
+not establish Markdown/browser rendering, standalone HTML, `srcset`/`picture`
+selection, CSS images, PDF visuals, OCR, visual meaning, continuous freshness,
+Windows or production losslessness. Focused actual-Registrar, full Nx,
+independent review, clean exact-head package and PR delivery are required.
+
+### 06:31 UTC Markdown raw-HTML checkpoint
+
+The final actual `local-only` Registrar fixture passed 2/2 after explicitly
+setting source sharing, and final uncached Nx Knowledge integration passed
+94/94. Knowledge unit tests passed 43/43; uncached typecheck, Nx sync:check and
+diff checks passed. Independent read-only review found no must-fix after
+scanner overlap, escaped-start and declaration false positives were repaired.
+The receipt remains conservative declared syntax only. Clean exact-head
+package, commit review and PR delivery remain.
