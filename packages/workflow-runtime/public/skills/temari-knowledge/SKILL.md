@@ -42,6 +42,17 @@ archives, credentials, and task artifacts stay outside the plugin. Uninstalling
 or replacing the plugin does not remove them. Source deletion or purge is a
 separate operator action.
 
+To disconnect only the Codex MCP entry, run
+`node bin/temari-knowledge.mjs disconnect-codex`. Use the same `--home ABS` and
+`--workspace ABS` values used to connect it; `--codex CODEX` selects a different
+Codex executable. The command checks the exact `temari-content-registrar`
+stdio entry twice before removing it by name and reports an already absent
+entry as success. It refuses a modified entry or an uncertain Codex response. It leaves
+the virtual environment, Registrar workspace, sources, and archives in place.
+Run `connect-codex` to reconnect after checking the local installation. Codex
+can change its entry between the final check and removal; a changed entry in
+that gap may still be removed because the CLI cannot make that operation atomic.
+
 ## Use source-backed context
 
 Select a source scope and a bounded question before invoking intake, search, or

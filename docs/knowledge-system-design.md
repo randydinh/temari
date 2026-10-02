@@ -147,6 +147,46 @@ archive discovery, reads and revalidation. The journey still imports Registrar
 capture and Jev directly; Jev's endpoint and model are fixed in its adapter.
 There is no separate knowledge-plugin install/uninstall lifecycle yet.
 
+### Repository and plugin flow — clarified 2026-10-02
+
+Temari currently packages a pinned copy of `randydinh/content-registrar` in its
+own verified bundle. It does not fetch Registrar from GitHub at install or run
+time. `packages/workflow-runtime/registrar/UPSTREAM.json` pins upstream commit
+`760926907669ae34bd1861732edbbf8f5afaf588` and records downstream Temari
+changes. A push to either repository does not update the other automatically.
+Temari workflow changes belong in Temari; Registrar engine changes must be
+reconciled back to the Registrar repository and then brought into Temari at a
+reviewed pin. Both repositories are private today, so sharing requires granted
+access or a separately delivered verified bundle. Public distribution also
+requires an explicit owner decision on Registrar's distribution terms.
+
+The owner reaffirmed Registrar as the default Knowledge agent and wants it
+independently installable, shareable, disableable and replaceable. The existing
+`KnowledgeProvider` contract covers discovery, read and revalidation, but
+archive capture, BM25 and graph flows, the installed CLI and Jev sharing checks
+are still Registrar-specific. A matching MCP disconnect is only a host control;
+it does not disable those paths. The staged lifecycle adds an explicit active
+provider state that survives upgrades, gates the Knowledge entrypoints, and
+then moves Registrar into its own pinned plugin artifact. A replacement must
+declare supported capabilities; unsupported archive/graph operations refuse.
+Old publications, graph pins and receipts retain their Registrar identity, and
+uninstall retains user data by default. There is no silent model fallback:
+direct TypeSafe Jev remains the only hosted model under the registered-source
+and local-only policy.
+
+Independent installation does not require every capability to have a separate
+Git repository. Nx can keep Temari's contracts, coordinator and adapters in
+owned projects while publishing independently versioned plugin artifacts. The
+current workspace has twelve Nx projects and no projects classified as apps;
+moving folders into three apps by itself would not prevent same-file Git
+conflicts. Split source repositories only where access, license, independent
+release cadence or host distribution calls for it. Registrar already has a
+separate source repository, so reconcile its downstream changes there before
+an independent release. Consume released providers by exact version, artifact
+digest and capability/protocol contract, with producer conformance and Temari
+installed-artifact compatibility checks. Shared contract and version-pin
+changes still require coordinated integration even across repositories.
+
 Build order now:
 
 1. Finish a useful admitted-source journey: captured originals, extraction
