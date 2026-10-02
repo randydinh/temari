@@ -1168,6 +1168,166 @@ test('ACTUAL ARCHIVE CLI: two explicit source publications preserve separate ori
   assert(a.ok && b.ok);
   assert.equal(a.value.evidence.sha256, b.value.evidence.sha256);
   assert.notEqual(a.value.evidence.id, b.value.evidence.id);
+
+  const otherPublication = await loadArchivePublication(second.publicationPath);
+  const pins = new Map([
+    [
+      f.source.id,
+      {
+        generation: f.publication.generation,
+        sha256: f.publication.manifestSha256,
+      },
+    ],
+    [
+      otherSource.id,
+      {
+        generation: otherPublication.generation,
+        sha256: otherPublication.manifestSha256,
+      },
+    ],
+  ]);
+  const snapshots = JSON.stringify(
+    Object.fromEntries([...pins].map(([id, pin]) => [id, pin.generation])),
+  );
+  const discoverArgs = (mode: 'exact' | 'bm25', cursor?: string) => [
+    'discover',
+    'proposal',
+    '--source',
+    f.source.id,
+    '--source',
+    otherSource.id,
+    '--snapshots',
+    snapshots,
+    '--limit',
+    '1',
+    '--mode',
+    mode,
+    ...(cursor ? ['--cursor', cursor] : []),
+  ];
+  async function refused(args: string[], expected: RegExp) {
+    try {
+      await cli(f, args);
+      assert.fail('Registrar unexpectedly accepted invalid discovery');
+    } catch (error) {
+      const failure = error as { code: number; stdout: string };
+      assert.equal(failure.code, 2, String(error));
+      const response = JSON.parse(failure.stdout) as {
+        status: string;
+        error: string;
+      };
+      assert.equal(response.status, 'invalid');
+      assert.match(response.error, expected);
+    }
+  }
+  async function allPages(mode: 'exact' | 'bm25') {
+    const pages: Array<Record<string, unknown>> = [];
+    let cursor: string | undefined;
+    do {
+      const page = (await cli(f, discoverArgs(mode, cursor))) as Record<
+        string,
+        unknown
+      >;
+      pages.push(page);
+      assert.equal(page['matched_documents'], 3);
+      assert.equal(page['indexed_documents'], 5);
+      assert.equal(page['offset'], pages.length - 1);
+      assert.equal(page['returned_documents'], 1);
+      assert.deepEqual(
+        page['snapshots'],
+        [...pins]
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([source_id, pin]) => ({
+            source_id,
+            generation: pin.generation,
+            manifest_sha256: pin.sha256,
+          })),
+      );
+      cursor = page['next_cursor'] as string | undefined;
+      assert(pages.length <= 3, 'Discovery cursor must make progress');
+    } while (cursor);
+    assert.equal(pages.length, 3);
+    assert.equal(pages[2]['exhausted'], true);
+    const found = pages.flatMap(
+      (page) => page['documents'] as Array<Record<string, unknown>>,
+    );
+    assert.deepEqual(
+      new Set(found.map((row) => `${row['source_id']}:${row['path']}`)),
+      new Set([
+        `${f.source.id}:plan.txt`,
+        `${f.source.id}:update.txt`,
+        `${otherSource.id}:plan.txt`,
+      ]),
+    );
+    for (const row of found) {
+      const pin = pins.get(String(row['source_id']));
+      assert(pin);
+      assert.equal(row['snapshot_generation'], pin.generation);
+      assert.equal(row['manifest_sha256'], pin.sha256);
+    }
+    return { pages, found };
+  }
+  const exact = await allPages('exact');
+  assert.deepEqual(
+    exact.found.map((row) => [row['source_id'], row['path']]),
+    [...exact.found]
+      .sort(
+        (left, right) =>
+          String(left['source_id']).localeCompare(String(right['source_id'])) ||
+          String(left['path']).localeCompare(String(right['path'])),
+      )
+      .map((row) => [row['source_id'], row['path']]),
+  );
+  const ranked = await allPages('bm25');
+  assert(ranked.found.every((row) => typeof row['score'] === 'number'));
+  const rankedKeys = ranked.found.map((row): [number, string, string] => [
+    Number(row['score']),
+    String(row['source_id']),
+    String(row['path']),
+  ]);
+  assert.deepEqual(
+    rankedKeys,
+    [...rankedKeys].sort(
+      (left, right) =>
+        left[0] - right[0] ||
+        left[1].localeCompare(right[1]) ||
+        left[2].localeCompare(right[2]),
+    ),
+    'BM25 results must order by score, then source ID and path',
+  );
+  assert.equal(
+    ranked.pages[0]['index_digest'],
+    ranked.pages[2]['index_digest'],
+  );
+  assert.equal(
+    ranked.pages[0]['index_digest'],
+    (await cli(f, discoverArgs('bm25')))['index_digest'],
+  );
+  await refused(
+    discoverArgs('bm25', String(exact.pages[0]['next_cursor'])),
+    /continuation binding changed/,
+  );
+  await refused(
+    discoverArgs('exact', String(ranked.pages[0]['next_cursor'])),
+    /continuation binding changed/,
+  );
+
+  await python(
+    f,
+    'from pathlib import Path; import sys; from knowledge_agent.source_registry import SourceRegistry; SourceRegistry(Path(sys.argv[1])).disable(sys.argv[2])',
+    [join(f.base, 'state'), otherSource.id],
+  );
+  await refused(discoverArgs('exact'), /source is disabled/);
+  await python(
+    f,
+    'from pathlib import Path; import sys; from knowledge_agent.source_registry import SourceRegistry; SourceRegistry(Path(sys.argv[1])).enable(sys.argv[2])',
+    [join(f.base, 'state'), otherSource.id],
+  );
+  await python(
+    f,
+    "import sqlite3,sys; db=sqlite3.connect(sys.argv[1]); db.execute('UPDATE archive_generations SET manifest=? WHERE id=?',(b'{}',sys.argv[2])); db.commit()",
+    [join(f.base, 'state/registry.sqlite3'), otherPublication.generation],
+  );
+  await refused(discoverArgs('bm25'), /archive manifest integrity mismatch/);
 });
 
 test('ACTUAL ARCHIVE CLI: competing first captures converge and reader operations leave Registrar state unchanged', async () => {
