@@ -988,3 +988,29 @@ metadata-only and explicitly reports `currentOriginal:not-checked` and
 registrations; registered-sources are deliberately refused. Clean commit,
 exact-head package/check and PR delivery remain. HTML rendering, visual
 meaning and all five broader production finish predicates stay open.
+
+### 09:10 UTC archived HTML delivery
+
+Independent exact-head review accepted clean commit
+`2801293ced3588007ce419b7a0cbc04450cf9091`. The public-entry package
+reported that revision with `dirty:false`; its manifest check and a relocated
+stock Node import of the new Knowledge export passed. GitHub reports
+[#172](https://github.com/randydinh/temari/pull/172) merged at
+`c37ea22672cd7b16dbeb47ebc1cf30eee0d4bf8d`, with the same reviewed tree.
+Keep only the local-only syntax receipt and explicit gaps. All five production
+finish predicates remain open.
+
+### 09:11 UTC post-HTML handoff hypothesis
+
+Reconcile #172's verified and merged scope in the Knowledge handoff. Preserve
+the recovered-original, pinned target, local-only and parser refusal evidence
+without implying browser rendering, visual understanding or support for
+`registered-sources` sharing. The five broader finish predicates remain open.
+
+### 09:12 UTC post-HTML handoff verification
+
+Independent read-only review found no must-fix: #172's merge tree equals the
+reviewed head, the handoff's Registrar, Nx and package claims match sanitized
+evidence, the audit remains six-field append-only, and no private corpus or
+report path enters the added text. Keep the source-linked handoff with the
+local-only syntax boundary; all five production finish predicates remain open.
