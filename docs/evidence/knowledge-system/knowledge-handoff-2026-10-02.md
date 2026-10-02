@@ -286,3 +286,29 @@ a production latency target, cache decision, answer-quality result, or reason
 to promote BM25 as default. The runner used synthetic `local-only` sources and
 made no hosted Jev or Keychain call. All five broader finish predicates above
 remain open.
+
+## 09:10 UTC archived standalone HTML image continuation
+
+GitHub reports [#172](https://github.com/randydinh/temari/pull/172) merged at
+`c37ea22672cd7b16dbeb47ebc1cf30eee0d4bf8d` after independent exact-head
+review of clean commit `2801293ced3588007ce419b7a0cbc04450cf9091`.
+The reviewed and merged trees match. Final actual Registrar Nx Knowledge
+integration passed 98/98; focused cases 2/2, unit 43/43, uncached typecheck,
+Nx sync and scoped formatting passed. The exact-head public-entry package
+reported `dirty:false`; its manifest check and a relocated stock Node import
+of the new export passed. GitHub listed no branch checks. The local merge
+command encountered an occupied `main` worktree; remote state confirms the
+merge.
+
+The [archived HTML image receipt](html-image-inventory-2026-10-02.md) checks
+one explicitly recovered `.html`/`.htm` original against its pinned manifest
+hash and byte count, records bounded simple single-line `<img>` declarations
+with Unicode spans and quote hashes, and links source-relative local targets
+to retained original hashes and byte counts from the complete paged manifest.
+The actual `local-only` fixture deleted live HTML and PNG before recovery,
+proved a target on a later manifest page, and exercised tamper, admission,
+path, ambiguity and size refusals. The current adapter deliberately refuses
+`registered-sources` sharing. It neither determines browser rendering nor
+interprets image meaning; OCR, visual coverage, Windows, graph recovery and
+all five broader finish predicates above remain open. No hosted Jev call or
+Keychain read occurred.
