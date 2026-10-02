@@ -23,6 +23,11 @@ export type {
   ArchiveDocxDrawingRefsPlan,
   ArchiveDocxDrawingRefsReceipt,
 } from './lib/archive-docx-drawing-refs.js';
+export { inventoryArchiveDocxHeaderFooterRefs } from './lib/archive-docx-header-footer-refs.js';
+export type {
+  ArchiveDocxHeaderFooterPlan,
+  ArchiveDocxHeaderFooterReceipt,
+} from './lib/archive-docx-header-footer-refs.js';
 export * from './lib/archive-jobs.js';
 export * from './lib/archive-query-feedback.js';
 export * from './lib/archive-graph-reviewed-change.js';

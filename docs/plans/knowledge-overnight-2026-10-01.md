@@ -546,3 +546,43 @@ maps repeated main-document references to pinned media and records gaps. The
 independent read-only reviewer found no remaining must-fix after target
 validation and bounded hash repairs. The receipt still claims declared syntax
 only. Clean canonical package, exact-head review and PR delivery remain.
+
+## 2026-10-02 05:23 UTC declared DOCX header/footer experiment
+
+PRs #156 and #157 are merged, and this clean isolated branch starts from
+`b0a010e9f8155e3387490f9c6429680de5b2a4d5`. A read-only architect compared
+declared DOCX header/footer relationship mapping with automatic recapture
+after the one-shot freshness audit. The latter would join a non-atomic
+observation to a mutating capture and needs fresh request keys, crash recovery,
+and source-change race policy. Select the Knowledge-only DOCX mapping unit.
+
+The pass predicate is an actual `local-only` Registrar capture, deletion of
+the live DOCX and explicit recovery of the pinned original. A separate
+metadata-only receipt must resolve direct `w:headerReference` and
+`w:footerReference` declarations in `w:sectPr` through internal matching
+relationships in `word/_rels/document.xml.rels` to safe header/footer parts,
+then resolve each part's declared DrawingML image references through its own
+relationship part to verified `word/media/*` hashes. Preserve repeated
+declarations, unresolved/linked/wrong-type/missing-media gaps and media not
+referenced by the selected header/footer parts. Reuse the 8 MiB original,
+1,000 ZIP member, 32 MiB expansion,
+256 media bounds, and add at most 32 selected parts, 1 MiB per XML part,
+8 MiB cumulative XML, 256 declarations and drawing references each, 1,000
+relationships per part, a 1 MiB worker response and 30-second deadline.
+Unsafe paths, duplicate IDs, malformed XML, DTD/entities, and over-limit
+inputs refuse. Recheck original, publication, source admission and base media
+receipt before publishing. Keep raw XML, image bytes, alternate text, external
+URLs and recovered path out of the receipt. Label coverage as declared
+header/footer DrawingML only: section inheritance, page-effective rendering,
+visual meaning, other DOCX modes, PDF images, Windows and production
+losslessness remain open. Focused actual-Registrar and full Nx checks,
+independent review, clean exact-head package proof and PR delivery are needed.
+
+### 05:34 UTC header/footer checkpoint
+
+The final candidate passed actual-Registrar Knowledge integration 90/90,
+focused local-only capture/delete/recovery 1/1, Knowledge unit tests 43/43,
+typecheck and Nx sync:check. Independent read-only review found no must-fix
+after the per-part reference bound and narrowly scoped residual-media field
+were repaired. This remains declared syntax only. Clean exact-head package,
+independent commit review and PR delivery remain before keeping it on main.
