@@ -107,6 +107,14 @@
         "command": "node tools/public-entry-runtime.mjs package",
         "cache": false
       },
+      "knowledge-plugin-package": {
+        "command": "node tools/knowledge-plugin.mjs package",
+        "cache": false
+      },
+      "knowledge-plugin-test": {
+        "command": "node --test tools/knowledge-plugin.test.mjs",
+        "cache": false
+      },
       "nx06-safety-test": {
         "command": "node --test tools/nx06-safety.test.mjs",
         "cache": false
