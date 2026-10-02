@@ -111,7 +111,7 @@ function finish(value, code = 0) {
 
 function usage() {
   throw new Error(
-    'Usage: entry policy | admit --request ABS_JSON | start|resume --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX [--task-tracking ABS_JSON --expected-task-tracking-sha256 HEX] | run-workers --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX | temari qa --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX | closeout verify --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX --expected-current ABS_JSON --expected-current-sha256 HEX',
+    'Usage: entry policy | admit --request ABS_JSON | start|resume --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX [--task-tracking ABS_JSON --expected-task-tracking-sha256 HEX] | run-workers --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX | temari qa|qa-resume|qa-result --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX [--qa-execution-selection ABS_JSON --expected-qa-execution-selection-sha256 HEX --task-tracking ABS_JSON --expected-task-tracking-sha256 HEX] | closeout verify --request ABS_JSON --expected-request-sha256 HEX --expected-manifest-sha256 HEX --expected-current ABS_JSON --expected-current-sha256 HEX',
   );
 }
 
@@ -134,6 +134,13 @@ function policyDescription(entry, policy) {
           qaRoute: 'qa-review',
           qaProfile: policy.qa.profile,
           qaHostStatus: policy.qa.evaluator,
+          qaContract: {
+            owner: policy.qa.owner,
+            allowedActions: policy.qa.allowedActions,
+            externalWrites: policy.qa.externalWrites,
+            callerDeclaredCapabilitiesAreNotProof:
+              policy.admission.callerDeclaredCapabilitiesAreNotProof,
+          },
         }
       : {}),
     policyId: policy.policyId,
@@ -291,14 +298,14 @@ async function admitEngineering(entry, request, policy, trusted = false) {
   };
 }
 
-export async function verifyBundle(expectedDigest) {
+export async function verifyBundle(expectedDigest, artifactRoot = root) {
   assert.match(
     expectedDigest ?? '',
     /^[a-f0-9]{64}$/,
     'External artifact digest required.',
   );
   const manifestBytes = await readBoundedFile(
-    join(root, 'public-entry-manifest.json'),
+    join(artifactRoot, 'public-entry-manifest.json'),
     MANIFEST_BYTES,
   );
   assert.equal(
@@ -327,7 +334,7 @@ export async function verifyBundle(expectedDigest) {
       }
     }
   }
-  await walk(root);
+  await walk(artifactRoot);
   const listed = manifest.files.map((record) => record.path);
   assert.deepEqual(
     actual.sort(),
@@ -355,7 +362,7 @@ export async function verifyBundle(expectedDigest) {
         record.bytes <= FILE_BYTES,
       'Artifact file size is invalid.',
     );
-    const bytes = await readBoundedFile(join(root, record.path), record.bytes);
+    const bytes = await readBoundedFile(join(artifactRoot, record.path), record.bytes);
     assert.equal(
       bytes.length,
       record.bytes,
@@ -368,7 +375,7 @@ export async function verifyBundle(expectedDigest) {
     );
   }
   return JSON.parse(
-    utf8.decode(await readBoundedFile(join(root, 'policy.json'), POLICY_BYTES)),
+    utf8.decode(await readBoundedFile(join(artifactRoot, 'policy.json'), POLICY_BYTES)),
   );
 }
 
@@ -710,7 +717,7 @@ async function startBridge(mode, request, policy, digests, trackingSelection) {
   }
 }
 
-async function startQa(request, requestSha256, policy) {
+async function startQa(request, requestSha256, policy, execution = {}) {
   exactFields(request, [
     'schemaVersion',
     'entry',
@@ -744,7 +751,13 @@ async function startQa(request, requestSha256, policy) {
     'areaDecisions',
     'scenarios',
     'residualRisks',
-  ]);
+  ], ['intentSources', 'projectVerifierId']);
+  if (request.review.intentSources !== undefined) {
+    assert(Array.isArray(request.review.intentSources) &&
+      request.review.intentSources.length <= 64);
+    request.review.intentSources.forEach((source) => exactFields(source,
+      ['requirementRef', 'revision', 'authorityRef', 'expectedOutcome']));
+  }
   exactFields(
     request.assignment,
     [
@@ -822,6 +835,30 @@ async function startQa(request, requestSha256, policy) {
     request.invocation.revision,
     'QA candidate must match the invocation revision.',
   );
+  const loadGuidance = async (path) => {
+    const content = await readBoundedFile(join(root, path), 64 * 1024);
+    return { path, sha256: sha256(content), text: utf8.decode(content) };
+  };
+  const guidance = {
+    playbookId: 'ticket-acceptance-v1',
+    playbook: await loadGuidance('qa/ticket-acceptance-v1.md'),
+    evidenceSkill: await loadGuidance('skills/qa-review-verification/SKILL.md'),
+    projectVerifier: { status: 'missing-project-profile', execution: 'not-observed' },
+    execution: 'not-observed',
+  };
+  if (request.review.projectVerifierId !== undefined) {
+    assert.equal(request.review.projectVerifierId, 'temari-public-v1',
+      'Unsupported QA project verifier.');
+    const marker = await readJson(join(request.invocation.candidate.root,
+      'package.json'), 16 * 1024);
+    assert.equal(marker.name, '@temari/workspace',
+      'QA project profile differs from the candidate.');
+    guidance.projectVerifier = {
+      status: 'loaded-for-handoff', execution: 'not-observed',
+      id: 'temari-public-v1',
+      ...(await loadGuidance('qa/verify-temari-public-v1.md')),
+    };
+  }
   assert(
     Array.isArray(request.assignment.authority.allowedActions) &&
       request.assignment.authority.allowedActions.every((action) =>
@@ -872,6 +909,19 @@ async function startQa(request, requestSha256, policy) {
   assert.equal(route.route.owner, policy.qa.owner);
   assert.deepEqual(route.obligations, policy.qa.obligations);
   assert.deepEqual(route.plan.stages, policy.qa.stageMapping);
+  if (execution.executionSelection) {
+    const { runAdmittedQa } = await import(
+      pathToFileURL(join(root, 'host/qa.mjs')).href
+    );
+    const { result, code } = await runAdmittedQa({
+      ...execution, artifactRoot: root, request, requestSha256,
+      policy, route, guidance, verifyArtifact: verifyBundle,
+    });
+    finish(result, code);
+    return;
+  }
+  assert(!execution.trackingSelection,
+    'Procedural QA does not admit current-task execution tracking.');
   const { runQaEvaluator } = await import(
     pathToFileURL(join(root, 'bin/qa-evaluator.mjs')).href
   );
@@ -881,6 +931,9 @@ async function startQa(request, requestSha256, policy) {
       reviewRevision: request.review.reviewRevision,
       parentRevision: null,
       authorId: request.review.authorId,
+      ...(request.review.intentSources === undefined ? {} : {
+        intentSources: request.review.intentSources,
+      }),
       assignment: request.assignment,
       plan: request.review.plan,
       areaDecisions: request.review.areaDecisions,
@@ -898,6 +951,7 @@ async function startQa(request, requestSha256, policy) {
     schemaVersion: 1,
     route: route.route,
     plan: route.plan,
+    guidance,
     evaluator,
     qaDisposition: evaluator.qaDisposition,
     record: evaluator.record,
@@ -930,7 +984,7 @@ export async function run(entry, argv = process.argv.slice(2)) {
   const trusted =
     command === 'start' ||
     command === 'resume' ||
-    (entry === 'temari' && command === 'qa') ||
+    (entry === 'temari' && ['qa', 'qa-resume', 'qa-result'].includes(command)) ||
     command === 'run-workers' ||
     (entry === 'closeout' && command === 'verify');
   const policy = trusted
@@ -944,20 +998,42 @@ export async function run(entry, argv = process.argv.slice(2)) {
     finish(policyDescription(entry, policy));
     return;
   }
-  if (entry === 'temari' && command === 'qa') {
+  if (entry === 'temari' && ['qa', 'qa-resume', 'qa-result'].includes(command)) {
     if (flag !== '--request' || !isAbsolute(argument ?? '')) usage();
-    assert(
-      extra.length === 4 &&
-        digestIndex >= 0 &&
-        requestDigestIndex >= 0 &&
-        digestIndex % 2 === 0 &&
-        requestDigestIndex % 2 === 0 &&
-        digestIndex !== requestDigestIndex,
-      'Trusted QA request and artifact digests are required.',
-    );
+    const flags = new Map();
+    const allowed = ['--expected-request-sha256', '--expected-manifest-sha256',
+      '--qa-execution-selection', '--expected-qa-execution-selection-sha256',
+      '--task-tracking', '--expected-task-tracking-sha256'];
+    for (let index = 0; index < extra.length; index += 2) {
+      assert(allowed.includes(extra[index]) && extra[index + 1] &&
+        !flags.has(extra[index]), 'Invalid or duplicate QA selection flag.');
+      flags.set(extra[index], extra[index + 1]);
+    }
+    assert(flags.has('--expected-request-sha256') &&
+      flags.has('--expected-manifest-sha256'),
+      'Trusted QA request and artifact digests are required.');
+    const selected = flags.has('--qa-execution-selection');
+    assert(selected === flags.has('--expected-qa-execution-selection-sha256') &&
+      selected === flags.has('--task-tracking') &&
+      selected === flags.has('--expected-task-tracking-sha256') &&
+      (command === 'qa' || selected),
+      'Executed QA requires both host-profile and current-task tracking selections.');
     const bytes = await readBoundedFile(argument, REQUEST_BYTES);
     const request = trustedRequest(bytes, extra[requestDigestIndex + 1]);
-    await startQa(request, sha256(bytes), policy);
+    await startQa(request, sha256(bytes), policy, {
+      mode: command === 'qa-result' ? 'read-result' : command === 'qa-resume' ? 'resume' : 'start',
+      manifestSha256: flags.get('--expected-manifest-sha256'),
+      ...(selected ? {
+        executionSelection: {
+          path: flags.get('--qa-execution-selection'),
+          expectedSha256: flags.get('--expected-qa-execution-selection-sha256'),
+        },
+        trackingSelection: {
+          sidecarPath: flags.get('--task-tracking'),
+          expectedSha256: flags.get('--expected-task-tracking-sha256'),
+        },
+      } : {}),
+    });
     return;
   }
   if (command === 'run-workers' && entry !== 'closeout') {

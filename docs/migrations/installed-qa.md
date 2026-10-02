@@ -1,5 +1,13 @@
 # Installed QA route and host evidence
 
+## Current-main QA follow-up (2026-09-30)
+
+This follow-up started from `5af7b97` in an isolated worktree. The packaged QA route now has a separate local evaluator process, but that worker derives procedural evidence findings. This increment makes the boundary explicit: a procedurally clean round remains `BLOCKED` with `product-intent-assessment-unavailable`. Pinned `intentSources` can carry the assigned requirement revision and expected outcome into the frozen evaluator input; their presence is not an independent judgment of authority or assertion strength.
+
+The installed entry loads `ticket-acceptance-v1` and the QA evidence skill with SHA-256 identities. It loads the `temari-public-v1` verifier text only when that profile is requested and the candidate carries the matching workspace package marker. The result labels this as a handoff with `execution: not-observed`; loading guidance does not run a project verifier. The relocated synthetic journey remained `BlockedOrIncomplete`. A separate fresh-context plain-language attempt also stopped before `qa`: its supplied candidate contained only a text fixture, with no category-search behavior, governing requirement revision, or runnable control surface.
+
+Focused uncached Nx `temari-core` typecheck/test, `workflow-runtime:public-entry-test`, and `workflow-runtime:qa-installed-journey` are the verification scope for this change. The remaining admission work is a trusted independent semantic assessor that reviews pinned intent and assertion counterexamples, plus an actual project verifier and candidate-bound observations. This dirty-worktree artifact is development evidence and is not a clean release candidate.
+
 The installed temari qa command accepts a versioned full QA assignment and unexecuted review draft. It routes through the ./qa-review domain owner and the existing six-stage engine. On the selected experimental-local-host, the result is BlockedOrIncomplete because the host bridge cannot launch a separate evaluator context. The workflow receipt is independently BLOCKED with a capability-gap. No evaluator round, finding, or PASS is invented.
 
 ## Boundary
@@ -39,3 +47,61 @@ The first command passed eight affected targets, including 25 contract, 49 core,
 The relocated public-entry test refuses an actual source-checkout import with its ESM loader before running the installed QA entry. It rejects forged freshContext, evaluator ID, round, capability list, PASS disposition, execution, external write authority, and write receipt reference before a run directory exists. It also records a missing-environment block without a round. These are synthetic plumbing and refusal cases. PASS and REVISE from a genuinely separate evaluator have not been run on this host.
 
 Linux and Windows workflows now run the direct installed QA journey at the branch head. Draft PR #61 is open; its exact-head checks remain pending at this checkpoint. A separate read-only Codex review process was attempted, but the workspace approval boundary rejected it because it could transmit repository contents to another service. No workaround was attempted; independent code review remains pending. A future evaluator adapter must observe its own context ID and lifetime, constrain access to the frozen input allowlist, retain input and output digests and full findings, and derive the verdict from actual output. Caller-written freshContext or evaluator IDs cannot satisfy that gate. No installed plugin was replaced, and this result does not authorize cutover or merge.
+
+## Registered local Temari policy execution
+
+The `temari-public-policy-v1` profile adds a real, bounded product control and a
+separate finite semantic assessor. It checks three source-pinned advertised CLI
+policy outcomes: QA domain ownership, the read-only action contract, and refusal
+to treat caller-declared capabilities as proof. It does not prove a general
+application oracle, product authority outside this approved contract, a model's
+natural-language reasoning, or actual enforcement of every advertised rule.
+
+Executed QA requires an independently pinned host selection and explicit schema1
+task sidecar in addition to the existing request and artifact digest pins:
+
+```sh
+node /absolute/host-artifact/bin/temari.mjs qa \
+  --request /absolute/request.json \
+  --expected-request-sha256 REQUEST_SHA \
+  --expected-manifest-sha256 HOST_ARTIFACT_SHA \
+  --qa-execution-selection /absolute/selection.json \
+  --expected-qa-execution-selection-sha256 SELECTION_SHA \
+  --task-tracking /absolute/task.json \
+  --expected-task-tracking-sha256 TASK_SHA
+```
+
+The selection has exactly `schemaVersion:1`, `profileId`, `taskId`,
+`candidateManifestSha256` and `environmentRef`. The candidate is a complete,
+separately relocated product artifact, disjoint from the host artifact, run and
+task stores. Assign all three approved outcome references at their approved
+revision; author scenarios with no execution or result claims. The host captures
+the fixed product command, actual PID/status/logs, canonical evidence, exact
+semantic input, and the separately launched assessment. Missing outcomes, weak
+assertions and unavailable proof remain blocked. A supported product violation
+is Failed. Neither caller `proven` flags nor guidance loading supplies proof.
+
+The existing runtime owns receipt/checkpoint/evidence/manifest persistence. QA
+must leave the candidate unchanged in every stage, including build. Before
+runtime admission the host actually launches the fixed policy worker with the
+frozen NotRun draft and no product observations. Its complete unresolved
+assessment admits only `subagents` on `local-qa-policy-host`. The retained probe
+is capability evidence, separate from the later product attempt and semantic
+assessment; it establishes no general model, Codex, forge or parallel capability.
+Resume verifies this original capture and does not substitute a new probe.
+
+Use `qa-resume` with the same pinned domain inputs and a fresh eligible tracking
+key/current task version for a nonterminal checkpoint. Delivery retains the
+validated QA record and proof as canonical stage payloads before terminal
+receipt persistence. If local result publication was interrupted after a
+completed mechanical PASS, invoke `qa-result` with the same request, artifact,
+execution-selection and task-tracking flag pairs. It requires a fresh tracking
+key/current version, verifies all four stores, the original scoped probe,
+unchanged candidate and canonical deliver payloads, then materializes the exact
+result without launching product or semantic controls. An existing result must
+match; it is never overwritten. A non-PASS terminal receipt without canonical
+delivery, drift or orphaned state requires inspection and a new run. The result
+is retained before its QA-aware context handoff. Schema1 tracking
+cannot replace or complete an existing canonical TaskRun; use its established
+controls and trusted closeout. A mechanical PASS cannot close a failed or blocked
+QA obligation. Unconfigured product profiles remain unavailable.

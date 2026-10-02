@@ -49,3 +49,35 @@ the execution request. Feature tracking uses the original project scope while
 the host verifies the integration checkout. A handoff never establishes completion.
 
 For QA, pass a versioned full assignment, review draft, canonical evidence root, and canonical invocation to `bin/temari.mjs qa` with the same external request and artifact digest flags. The result retains a QA disposition and evaluator evidence. A caller-supplied evaluator ID, round, context claim, or capability list is rejected. The route never writes to external systems.
+
+The QA request may pin `review.intentSources` as requirement reference, revision, authority reference, and expected outcome. It may select `review.projectVerifierId: "temari-public-v1"` only for a matching Temari workspace candidate. The installed entry loads the ticket acceptance playbook, QA evidence skill, and selected verifier text into a digest-bound handoff; `guidance.execution: "not-observed"` means no verifier was run by that loading step. The bundled local worker checks procedural evidence but has no independent product-intent or assertion-adequacy assessor, so it cannot produce a full QA pass. Retain the `BlockedOrIncomplete` result until a trusted semantic evaluator and the applicable project control actually run.
+
+For the registered `temari-public-policy-v1` execution profile, select a separately
+relocated, manifest-pinned product artifact and an eligible current task. Add
+`--qa-execution-selection ABS_JSON --expected-qa-execution-selection-sha256 HEX`
+and the explicit task-tracking pair to `qa`. The selection fixes the named profile,
+task, product manifest and environment; it cannot supply commands, proof, expected
+values or evaluator identities. The host executes the actual CLI policy command
+and launches the finite policy assessor in a separate process. This verifies the
+advertised Temari QA owner, read-only contract and capability-admission contract;
+it does not verify other applications or arbitrary natural-language requirements.
+
+The canonical runtime executes and retains the six stages. Inspect both its
+mechanical receipt and the QA disposition: a completed evaluation can report
+`Failed` or `BlockedOrIncomplete` even when its workflow receipt is `PASS`.
+The task outcome retains the exact QA record/proof and receipt for independent
+review. Task tracking records context and does not complete a canonical TaskRun.
+The host first proves its fixed worker transport with the frozen NotRun draft;
+that unresolved capability probe admits only this QA host's `subagents`. It is
+separate from product proof and admits no general model, Codex, forge or parallel
+capability. Resume verifies the original retained probe.
+
+Use `qa-resume` for a nonterminal checkpoint with the same trusted inputs and a
+fresh task tracking key/current version. Delivery retains canonical QA record
+and proof before terminal persistence. Use `qa-result` with the same full pinned
+flag pairs and a fresh task key/current version to recover local result
+publication from a completed mechanical PASS. The reader verifies original
+capability capture, all four stores, unchanged candidate and delivered record;
+it launches no controls and never overwrites a different result. Non-deliver
+terminal outcomes, drift and orphan stages remain refused. Other product
+profiles retain the unavailable disposition.

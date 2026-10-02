@@ -82,6 +82,9 @@ assert.deepEqual(result.record.externalWriteReceipts, []);
 assert.equal(result.qaDisposition.disposition, 'BlockedOrIncomplete');
 assert.equal(result.delivery.requestSha256, requestDigest);
 assert.equal(result.delivery.evaluatorLaunch, 'packaged-local-process');
+assert.equal(result.guidance.playbookId, 'ticket-acceptance-v1');
+assert.equal(result.guidance.projectVerifier.status, 'missing-project-profile');
+assert.equal(result.guidance.execution, 'not-observed');
 assert.deepEqual(
   JSON.parse(await readFile(join(relocation, 'run/config/qa-result.json'))),
   result,
@@ -98,6 +101,13 @@ const evidence = {
   evaluatorVerdict: result.evaluator.decision.verdict,
   qaDisposition: result.qaDisposition.disposition,
   evaluatorRounds: result.record.evaluationRounds.length,
+  guidance: {
+    playbookId: result.guidance.playbookId,
+    playbookSha256: result.guidance.playbook.sha256,
+    evidenceSkillSha256: result.guidance.evidenceSkill.sha256,
+    projectVerifierStatus: result.guidance.projectVerifier.status,
+    execution: result.guidance.execution,
+  },
   evaluator: result.evaluator,
   retainedResult: join(relocation, 'run/config/qa-result.json'),
 };

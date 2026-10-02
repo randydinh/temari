@@ -18,6 +18,10 @@ function draft(reference, result = 'Passed') {
     reviewRevision: 'qa-review-r1',
     parentRevision: null,
     authorId: 'qa-author',
+    intentSources: [{
+      requirementRef: 'REQ-1', revision: 'requirement-r1',
+      authorityRef: 'synthetic-approved-rule', expectedOutcome: expectation,
+    }],
     assignment: {
       assignmentId: 'qa-assignment',
       requestKind: 'full',
@@ -60,7 +64,7 @@ function draft(reference, result = 'Passed') {
             kind: 'ManualProcedure',
             canonicalRef: 'procedure://category-filter',
             repositoryRevision: 'candidate-r1',
-            assertionSummary: expectation,
+            assertionSummary: 'the request returned HTTP 200',
             designState: 'Selected',
             implementationState: 'Existing',
             writeReceiptRef: null,
@@ -74,7 +78,7 @@ function draft(reference, result = 'Passed') {
             fixtureRefs: ['fixture-a1', 'fixture-b1'],
             correlationRef: 'QA-1',
             boundedObservation: 'Only fixture-a1 was returned for category-a.',
-            assertions: [expectation],
+            assertions: ['the request returned HTTP 200'],
             observations: ['fixture-a1 returned', 'fixture-b1 excluded'],
             evidenceRefs: [reference],
             state: 'Executed',
@@ -89,7 +93,7 @@ function draft(reference, result = 'Passed') {
   };
 }
 
-test('local evaluator launches a separate process and derives a passing full review', async (t) => {
+test('a fresh procedural evaluator cannot approve a weak product assertion', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'temari-qa-evaluator-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   const evidenceRoot = join(root, 'evidence');
@@ -118,8 +122,9 @@ test('local evaluator launches a separate process and derives a passing full rev
   const result = JSON.parse(stdout);
   assert.equal(result.evaluator.id, 'local-fresh-qa-evaluator-v1');
   assert.notEqual(result.evaluator.pid, process.pid);
-  assert.equal(result.decision.verdict, 'PASS');
-  assert.equal(result.qaDisposition.disposition, 'Passed');
+  assert.equal(result.decision.verdict, 'BLOCKED');
+  assert.equal(result.decision.reason, 'product-intent-assessment-unavailable');
+  assert.equal(result.qaDisposition.disposition, 'BlockedOrIncomplete');
   assert.equal(result.record.evaluationRounds.length, 1);
   assert.equal(result.record.evaluationAttempts, undefined);
   await evidence.loadPortable(
