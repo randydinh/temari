@@ -339,3 +339,33 @@ hosted call or key read. It does not prove browser rendering, visual meaning,
 continuous freshness, Windows behavior, graph recovery, answer quality, or
 production losslessness. All five broader finish predicates above remain
 open.
+
+## 10:05 UTC paired archive and root-graph recovery continuation
+
+GitHub reports [#176](https://github.com/randydinh/temari/pull/176) merged at
+`8652bff9c9e49a436017a552799d72a9979b2569` after independent exact-head
+review of clean commit `3acf1744126ad6a172da215ae35a3bf030387d55`.
+The reviewed and merged trees match. Final actual Registrar focused recovery
+passed 1/1, uncached Nx Knowledge integration 100/100, unit tests 43/43,
+typecheck, daemonless sync and scoped formatting passed. The exact-head
+public-entry package reported `dirty:false`; its manifest check and relocated
+stock Node graph reader passed. GitHub listed no branch checks. The local
+merge command encountered an occupied `main` worktree; remote state confirms
+the merge.
+
+The [paired recovery proof](graph-recovery-2026-10-02.md) exports one retained
+archive generation and one parent-null root graph as separate packages,
+imports them into a fresh pre-provisioned `local-only` Registrar workspace,
+and checks exact graph and RevisionSet IDs, three pinned records, derived
+projection, archived reads and byte-exact original recovery after live files
+change. Wrong-order, tampered-package and disabled-registration cases refuse.
+The synthetic packages are deleted in the fixture's `finally` cleanup. A
+daemonless Nx sync gate also exposed one missing generated workflow-runtime
+TypeScript reference; Nx sync added only that reference.
+
+This is a one-root, one-source deterministic replay proof, not an atomic
+backup or production recovery system. It does not restore registration
+policy, access grants, erasure state, child graph history, retractions or
+arbitrary derived views, and establishes no RPO/RTO, Windows support,
+semantic correctness or production losslessness. It used no Jev call or key
+read. All five broader finish predicates above remain open.
