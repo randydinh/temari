@@ -775,3 +775,13 @@ Codex router review found no must-fix in impact recomputation, source-aware
 retained anchor reads, candidate partitioning, failure propagation, bounds or
 privacy. The proposal leaves the graph unchanged and does not prove semantic
 correctness. Clean exact-head package, commit review and PR delivery remain.
+
+### 07:24 UTC multi-source anchor proposal delivery
+
+Independent exact-head read-only review accepted clean commit
+`b6da100ed802daaee214b11928e6f3ee44a7f7a7`. Canonical package/check
+reported that head with `dirty:false`, and its stock Node export loaded.
+GitHub reports [#166](https://github.com/randydinh/temari/pull/166) merged at
+`832b4f50149e0ea2baf0be45057b606caff65e05`; the reviewed and merged
+trees match. Keep the proposal-only receipt. Graph publication, semantic
+correctness, continuous freshness and production losslessness remain open.

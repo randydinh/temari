@@ -211,3 +211,24 @@ repins, and changed or added paths for discovery. It neither modifies a graph
 nor proves a relationship correct. The actual fixture used `local-only`
 sources and made no TypeSafe call. Automatic repair, continuous freshness and
 the five broader finish predicates above remain open.
+
+## 07:24 UTC multi-source anchor proposal continuation
+
+GitHub reports [#166](https://github.com/randydinh/temari/pull/166) merged at
+`832b4f50149e0ea2baf0be45057b606caff65e05` after independent exact-head
+review of clean commit `b6da100ed802daaee214b11928e6f3ee44a7f7a7`.
+The reviewed and merged trees match. Final actual-Registrar Knowledge
+integration passed 96/96, focused explicit `local-only` two-source fixture
+passed 1/1, unit tests 43/43, typecheck, Nx sync, formatting and diff checks
+passed. Canonical package/check reported the reviewed head with `dirty:false`,
+and a stock Node import of its public export succeeded. GitHub listed no
+branch checks. The local merge command hit the occupied `main` worktree during
+cleanup; the remote PR state confirms the merge.
+
+The [multi-source anchor proposal](multisource-anchor-proposal-2026-10-02.md)
+recomputes #164's pinned impact receipt and checks candidate A v2/B v1 anchors
+against retained Registrar text. It keeps only eligible records in a proposal
+and explicitly defers unsupported or dependent records. The actual fixture
+used `local-only` sources and made no TypeSafe call. This does not repin or
+publish an active graph, prove relationship meaning, or establish continuous
+freshness. The five broader finish predicates above remain open.
