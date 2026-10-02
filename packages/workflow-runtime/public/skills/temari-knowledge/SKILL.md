@@ -14,6 +14,10 @@ inside the verified artifact and the pinned, bundled Python Content Registrar.
 ## Set up the local provider
 
 Run `node bin/temari-knowledge.mjs status` to inspect the local installation.
+Status reports an uninitialized Registrar selection on a cold home without
+writing it. The first successful setup records the supported Registrar choice
+in `provider-selection.json` under that home. The selection survives setup
+repair and replacement of the installed plugin artifact.
 Run `node bin/temari-knowledge.mjs setup` to build a wheel from the bundled
 Registrar source and install it in a user-local Python 3.12 virtual environment.
 The default home is `~/.local/share/temari-knowledge`; use `--home ABS` to choose
@@ -52,6 +56,33 @@ the virtual environment, Registrar workspace, sources, and archives in place.
 Run `connect-codex` to reconnect after checking the local installation. Codex
 can change its entry between the final check and removal; a changed entry in
 that gap may still be removed because the CLI cannot make that operation atomic.
+
+To stop use through this Knowledge entry point, run
+`node bin/temari-knowledge.mjs disable`. Pass the same `--home ABS`,
+`--workspace ABS`, and optional `--codex CODEX` used for its Codex connection.
+The command first checks that any named Codex MCP entry is the exact selected
+Registrar entry, then records a local `disabling` gate before removal. It
+reports `disabled` only after checking that the entry is absent. If Codex
+inspection or removal is uncertain, it exits with a `partial` result and keeps
+the gate; retry `disable` after inspecting the connection. Complete that
+partial disconnect before running `enable`. A foreign or modified
+entry found in the initial check is left intact, and selection is unchanged.
+Commands that change the selection or Codex connection serialize within one
+home using a local Python 3 `fcntl` lock; a crashed command releases it.
+Different homes using the fixed MCP
+name and out-of-band Codex edits are outside that serialization.
+`status`, plain `setup`, `disconnect-codex`, and help remain available while
+disabled. Setup does not reset the gate. A previously started MCP process may
+continue running after the entry is removed. A Knowledge command that passed
+the gate before `disable` may also finish; this is launch gating rather than
+hard revocation of running work.
+
+Run `node bin/temari-knowledge.mjs enable` to select Registrar again after
+the installed capability is validated. This does not reconnect Codex; run
+`connect-codex` explicitly if needed. The local selection controls this
+launcher, not arbitrary direct Registrar or Python invocations. Delegated
+Knowledge commands can select a nondefault home with `--home ABS`; the
+launcher checks that home's selection before forwarding the command.
 
 ## Use source-backed context
 

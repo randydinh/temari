@@ -103,17 +103,30 @@ function expectedKnowledgeEntry(home, workspace) {
   };
 }
 
+function providerSelectionBytes(selection, phase) {
+  return `${JSON.stringify({
+    schemaVersion: 1,
+    kind: 'temari-knowledge-provider-selection',
+    selection,
+    phase,
+  })}\n`;
+}
+
 async function statefulFakeCodex(root, codex) {
   const entryPath = join(root, 'fake-codex-entry.json');
   const controlPath = join(root, 'fake-codex-control.json');
   const countPath = join(root, 'fake-codex-get-count.txt');
   const logPath = join(root, 'fake-codex-operations.jsonl');
+  const addStartPath = join(root, 'fake-codex-add-started');
+  const removeStartPath = join(root, 'fake-codex-remove-started');
   const script = `#!/usr/bin/env node
 const fs = require('node:fs');
 const entryPath = ${JSON.stringify(entryPath)};
 const controlPath = ${JSON.stringify(controlPath)};
 const countPath = ${JSON.stringify(countPath)};
 const logPath = ${JSON.stringify(logPath)};
+const addStartPath = ${JSON.stringify(addStartPath)};
+const removeStartPath = ${JSON.stringify(removeStartPath)};
 const args = process.argv.slice(2);
 const control = fs.existsSync(controlPath) ? JSON.parse(fs.readFileSync(controlPath, 'utf8')) : {};
 fs.appendFileSync(logPath, JSON.stringify(args) + '\\n');
@@ -136,11 +149,19 @@ if (args[1] === 'get') {
   process.exit(0);
 }
 if (args[1] === 'remove') {
+  if (control.removeDelayMs) {
+    fs.writeFileSync(removeStartPath, 'started');
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, control.removeDelayMs);
+  }
   if (control.removeMode === 'error') { console.error('TOP_SECRET removal error'); process.exit(2); }
   if (control.removeMode !== 'still-present') fs.rmSync(entryPath, { force: true });
   process.exit(0);
 }
 if (args[1] === 'add') {
+  if (control.addDelayMs) {
+    fs.writeFileSync(addStartPath, 'started');
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, control.addDelayMs);
+  }
   const separator = args.indexOf('--');
   if (separator < 0 || args[2] !== 'temari-content-registrar') process.exit(2);
   const command = args[separator + 1];
@@ -156,7 +177,21 @@ process.exit(2);
 `;
   await writeFile(codex, script);
   await chmod(codex, 0o755);
-  return { entryPath, controlPath, countPath, logPath };
+  return { entryPath, controlPath, countPath, logPath, addStartPath, removeStartPath };
+}
+
+async function waitForPath(path) {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    try {
+      await lstat(path);
+      return;
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(`Timed out waiting for ${path}`);
 }
 
 function request(entry, overrides = {}) {
@@ -226,6 +261,9 @@ test('relocated Knowledge cold install keeps state outside the artifact and conn
   await chmod(codex, 0o755);
   const cold = await child([launcher, 'status', '--home', home]);
   assert.equal(cold.installedVersion, null);
+  assert.deepEqual(cold.providerSelection, {
+    selection: 'registrar', phase: 'uninitialized', persisted: false,
+  });
   await assert.rejects(lstat(home), { code: 'ENOENT' });
   await assert.rejects(lstat(codexLog), { code: 'ENOENT' });
 
@@ -251,6 +289,12 @@ test('relocated Knowledge cold install keeps state outside the artifact and conn
   assert.equal(result.connection.status, 'connected');
   assert.equal(result.connection.workspace, join(home, 'workspace'));
   assert.equal(result.home, home);
+  assert.deepEqual(result.providerSelection, {
+    selection: 'registrar', phase: 'ready', persisted: true,
+  });
+  const providerStatePath = join(home, 'provider-selection.json');
+  assert.equal(await readFile(providerStatePath, 'utf8'),
+    providerSelectionBytes('registrar', 'ready'));
   assert.deepEqual(await readdir(join(home, 'workspace')), []);
   assert.deepEqual(
     await checkPublicEntryArtifact(artifact, manifestSha256(manifest)),
@@ -297,6 +341,11 @@ test('relocated Knowledge cold install keeps state outside the artifact and conn
   const repeated = await child([launcher, 'setup', '--home', home]);
   assert.equal(repeated.setup, 'already-installed');
   assert.equal(await readFile(marker, 'utf8'), 'recipient data\n');
+  const disabled = await child([launcher, 'disable', '--home', home, '--codex', codex]);
+  assert.equal(disabled.status, 'disabled');
+  assert.equal(await readFile(providerStatePath, 'utf8'),
+    providerSelectionBytes('disabled', 'disabled'));
+  await assert.rejects(lstat(stateful.entryPath), { code: 'ENOENT' });
   assert.equal((await readFile(codexLog, 'utf8')).trim().split('\n').length, args.length);
   assert.equal((await child([launcher, 'status', '--home', home])).installedVersion, '0.1.0');
 
@@ -316,6 +365,8 @@ test('relocated Knowledge cold install keeps state outside the artifact and conn
   const repaired = await child([launcher, 'setup', '--home', home]);
   assert.equal(repaired.setup, 'repaired');
   assert.equal(repaired.payloadInstalled, true);
+  assert.equal(await readFile(providerStatePath, 'utf8'),
+    providerSelectionBytes('disabled', 'disabled'));
   assert.deepEqual(await readFile(installedModule), originalModule);
   assert.equal(await readFile(marker, 'utf8'), 'recipient data\n');
   assert.equal(JSON.parse(await readFile(receiptPath)).registrarManifestSha256,
@@ -323,8 +374,77 @@ test('relocated Knowledge cold install keeps state outside the artifact and conn
   await writeFile(installedModule, 'damaged installed module\n');
   assert.equal((await child([launcher, 'status', '--home', home])).payloadInstalled, false);
   assert.equal((await child([launcher, 'setup', '--home', home])).setup, 'repaired');
+  assert.equal(await readFile(providerStatePath, 'utf8'),
+    providerSelectionBytes('disabled', 'disabled'));
   assert.deepEqual(await readFile(installedModule), originalModule);
   assert.equal(await readFile(marker, 'utf8'), 'recipient data\n');
+  await rm(artifact, { recursive: true });
+  await cp(output, artifact, { recursive: true });
+  assert.deepEqual((await child([launcher, 'status', '--home', home])).providerSelection, {
+    selection: 'disabled', phase: 'disabled', persisted: true,
+  });
+  const enabled = await child([launcher, 'enable', '--home', home]);
+  assert.equal(enabled.status, 'enabled');
+  assert.equal(await readFile(providerStatePath, 'utf8'),
+    providerSelectionBytes('registrar', 'ready'));
+  await assert.rejects(lstat(stateful.entryPath), { code: 'ENOENT' });
+  await writeFile(stateful.controlPath, JSON.stringify({ addDelayMs: 700 }));
+  const connecting = childResult([
+    launcher, 'connect-codex', '--home', home, '--codex', codex,
+  ]);
+  await waitForPath(stateful.addStartPath);
+  const disablingAfterConnect = childResult([
+    launcher, 'disable', '--home', home, '--codex', codex,
+  ]);
+  assert.equal(JSON.parse((await connecting).stdout).status, 'connected');
+  assert.equal(JSON.parse((await disablingAfterConnect).stdout).status, 'disabled');
+  await assert.rejects(lstat(stateful.entryPath), { code: 'ENOENT' });
+  assert.equal(await readFile(providerStatePath, 'utf8'),
+    providerSelectionBytes('disabled', 'disabled'));
+  await unlink(stateful.controlPath);
+  assert.equal((await child([launcher, 'enable', '--home', home])).status, 'enabled');
+  assert.equal((await child([launcher, 'connect-codex', '--home', home, '--codex', codex])).status,
+    'connected');
+
+  await writeFile(stateful.controlPath, JSON.stringify({ removeDelayMs: 700 }));
+  const disablingFirst = childResult([
+    launcher, 'disable', '--home', home, '--codex', codex,
+  ]);
+  await waitForPath(stateful.removeStartPath);
+  const lateConnect = childResult([
+    launcher, 'connect-codex', '--home', home, '--codex', codex,
+  ], 1);
+  const overlappingEnable = childResult([launcher, 'enable', '--home', home], 1);
+  assert.equal(JSON.parse((await disablingFirst).stdout).status, 'disabled');
+  assert.match((await lateConnect).stderr, /provider selection is disabled/);
+  assert.match((await overlappingEnable).stderr, /selection changed while enabling/);
+  assert.equal(await readFile(providerStatePath, 'utf8'),
+    providerSelectionBytes('disabled', 'disabled'));
+  await assert.rejects(lstat(stateful.entryPath), { code: 'ENOENT' });
+  await unlink(stateful.controlPath);
+  assert.equal((await child([launcher, 'enable', '--home', home])).status, 'enabled');
+  assert.equal((await child([launcher, 'connect-codex', '--home', home, '--codex', codex])).status,
+    'connected');
+
+  await unlink(stateful.removeStartPath);
+  await writeFile(stateful.controlPath, JSON.stringify({ removeDelayMs: 700, removeMode: 'error' }));
+  const failedDisable = childResult([
+    launcher, 'disable', '--home', home, '--codex', codex,
+  ], 1);
+  await waitForPath(stateful.removeStartPath);
+  const enableDuringFailure = childResult([launcher, 'enable', '--home', home], 1);
+  assert.equal(JSON.parse((await failedDisable).stdout).status, 'partial');
+  assert.match((await enableDuringFailure).stderr, /partial disable before enabling/);
+  assert.equal(await readFile(providerStatePath, 'utf8'),
+    providerSelectionBytes('disabled', 'disabling'));
+  assert.deepEqual(JSON.parse(await readFile(stateful.entryPath, 'utf8')),
+    expectedKnowledgeEntry(home, join(home, 'workspace')));
+  await unlink(stateful.controlPath);
+  assert.equal((await child([launcher, 'disable', '--home', home, '--codex', codex])).status,
+    'disabled');
+  assert.equal((await child([launcher, 'enable', '--home', home])).status, 'enabled');
+  assert.equal((await child([launcher, 'connect-codex', '--home', home, '--codex', codex])).status,
+    'connected');
 
   const sourcePath = join(artifact, 'registrar/src/knowledge_agent/cli.py');
   const sourceBytes = await readFile(sourcePath);
@@ -503,6 +623,140 @@ test('Knowledge disconnect removes only the exact selected Codex entry and retai
   }
   assert.equal(await readFile(data, 'utf8'), 'local source data\n');
   assert.equal(await readFile(python, 'utf8'), 'venv marker\n');
+});
+
+test('Knowledge provider selection gates delegation and records uncertain disconnects', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'temari knowledge-selection-'));
+  t.after(async () => rm(root, { recursive: true, force: true }));
+  const home = join(root, 'state');
+  const workspace = join(home, 'workspace');
+  const statePath = join(home, 'provider-selection.json');
+  const codex = join(root, 'fake-codex');
+  const launcher = join(output, 'bin/temari-knowledge.mjs');
+  await mkdir(workspace, { recursive: true });
+  const marker = join(workspace, 'retained.txt');
+  await writeFile(marker, 'source data\n');
+  const fake = await statefulFakeCodex(root, codex);
+  const entry = expectedKnowledgeEntry(home, workspace);
+  const command = (name, extra = []) => [launcher, name, '--home', home, ...extra];
+  await writeFile(fake.entryPath, JSON.stringify(entry));
+
+  const foreign = structuredClone(entry);
+  foreign.transport.env = { TOKEN: 'TOP_SECRET' };
+  await writeFile(fake.entryPath, JSON.stringify(foreign));
+  const preflightRefusal = await childResult(command('disable', ['--codex', codex]), 1);
+  assert.match(preflightRefusal.stderr, /provider selection was not changed/);
+  assert(!preflightRefusal.stderr.includes('TOP_SECRET'));
+  await assert.rejects(lstat(statePath), { code: 'ENOENT' });
+  assert.deepEqual(JSON.parse(await readFile(fake.entryPath, 'utf8')), foreign);
+
+  await writeFile(fake.entryPath, JSON.stringify(entry));
+  await writeFile(fake.controlPath, JSON.stringify({ getMode: 'changed-second' }));
+  await writeFile(fake.countPath, '0');
+  const changed = await childResult(command('disable', ['--codex', codex]), 1);
+  assert.equal(JSON.parse(changed.stdout).status, 'partial');
+  assert.equal(await readFile(statePath, 'utf8'),
+    providerSelectionBytes('disabled', 'disabling'));
+  assert.deepEqual(JSON.parse(await readFile(fake.entryPath, 'utf8')), entry);
+  assert.match((await childResult(command('journey-query', [
+    '--input', join(root, 'missing-plan.json'),
+  ]), 1)).stderr, /provider selection is disabling/);
+  assert.match((await childResult(command('connect-codex', [
+    '--codex', codex,
+  ]), 1)).stderr, /provider selection is disabling/);
+  assert.match((await childResult(command('setup', [
+    '--connect-codex', '--codex', codex,
+  ]), 1)).stderr, /provider selection is disabling/);
+  assert.deepEqual((await child(command('status'))).providerSelection, {
+    selection: 'disabled', phase: 'disabling', persisted: true,
+  });
+
+  await writeFile(fake.controlPath, JSON.stringify({ removeMode: 'error' }));
+  const failedRemove = await childResult(command('disable', ['--codex', codex]), 1);
+  assert.equal(JSON.parse(failedRemove.stdout).status, 'partial');
+  assert.equal(await readFile(statePath, 'utf8'),
+    providerSelectionBytes('disabled', 'disabling'));
+  assert.deepEqual(JSON.parse(await readFile(fake.entryPath, 'utf8')), entry);
+  await unlink(fake.controlPath);
+  const finished = await child(command('disable', ['--codex', codex]));
+  assert.equal(finished.status, 'disabled');
+  assert.equal(await readFile(statePath, 'utf8'),
+    providerSelectionBytes('disabled', 'disabled'));
+  await assert.rejects(lstat(fake.entryPath), { code: 'ENOENT' });
+  assert.equal(await readFile(marker, 'utf8'), 'source data\n');
+  assert.equal((await child(command('disable', ['--codex', codex]))).status,
+    'disabled');
+  await writeFile(fake.controlPath, JSON.stringify({ getMode: 'error' }));
+  const inspectionFailure = await childResult(command('disable', ['--codex', codex]), 1);
+  assert.equal(JSON.parse(inspectionFailure.stdout).reason, 'codex-inspection-failed');
+  assert.equal(await readFile(statePath, 'utf8'),
+    providerSelectionBytes('disabled', 'disabling'));
+  await unlink(fake.controlPath);
+  assert.equal((await child(command('disable', ['--codex', codex]))).status,
+    'disabled');
+  assert.match((await childResult(command('enable'), 1)).stderr,
+    /Run setup before enabling Knowledge/);
+
+  const holder = spawn('python3', ['-u', '-c', `
+import fcntl, os, sys, time
+fd = os.open(sys.argv[1], os.O_CREAT | os.O_RDWR, 0o600)
+fcntl.flock(fd, fcntl.LOCK_EX)
+print('held', flush=True)
+time.sleep(30)
+`, join(home, 'provider-selection.lock')], { stdio: ['ignore', 'pipe', 'pipe'] });
+  t.after(() => holder.kill('SIGKILL'));
+  await new Promise((resolve, reject) => {
+    holder.stdout.once('data', (chunk) => {
+      if (chunk.toString() === 'held\n') resolve();
+      else reject(new Error('External lock holder did not start.'));
+    });
+    holder.once('error', reject);
+    holder.once('close', () => reject(new Error('External lock holder exited early.')));
+  });
+  const busyStart = Date.now();
+  const busy = await childResult(command('disable', ['--codex', codex]), 1);
+  assert.match(busy.stderr, /Provider selection is busy/);
+  assert(Date.now() - busyStart < 8000);
+  assert.equal(await readFile(statePath, 'utf8'),
+    providerSelectionBytes('disabled', 'disabled'));
+  holder.kill('SIGKILL');
+  assert.equal((await child(command('disable', ['--codex', codex]))).status,
+    'disabled');
+  assert.equal(await readFile(statePath, 'utf8'),
+    providerSelectionBytes('disabled', 'disabled'));
+});
+
+test('Knowledge provider selection refuses malformed, unknown, and symlink state', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'temari knowledge-state-'));
+  t.after(async () => rm(root, { recursive: true, force: true }));
+  const home = join(root, 'state');
+  const statePath = join(home, 'provider-selection.json');
+  const launcher = join(output, 'bin/temari-knowledge.mjs');
+  await mkdir(home);
+  const commands = [
+    [launcher, 'status', '--home', home],
+    [launcher, 'setup', '--home', home],
+    [launcher, 'journey-query', '--input', join(root, 'missing-plan.json'), '--home', home],
+  ];
+  for (const badBytes of [
+    '{invalid',
+    `${JSON.stringify({ schemaVersion: 1, kind: 'temari-knowledge-provider-selection', selection: 'other', phase: 'ready' })}\n`,
+    providerSelectionBytes('registrar', 'ready').trimEnd(),
+  ]) {
+    await writeFile(statePath, badBytes);
+    for (const command of commands) {
+      const refused = await childResult(command, 1);
+      assert.match(refused.stderr, /Provider selection/);
+    }
+  }
+  const external = join(root, 'external-state.json');
+  await writeFile(external, providerSelectionBytes('registrar', 'ready'));
+  await unlink(statePath);
+  await symlink(external, statePath);
+  for (const command of commands)
+    assert.match((await childResult(command, 1)).stderr, /bounded regular file/);
+  assert.equal(await readFile(external, 'utf8'),
+    providerSelectionBytes('registrar', 'ready'));
 });
 
 test('relocated QA entry runs the packaged evaluator without source-checkout access', async () => {
