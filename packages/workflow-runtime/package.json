@@ -115,6 +115,10 @@
         "command": "node --test tools/knowledge-plugin.test.mjs",
         "cache": false
       },
+      "knowledge-release-test": {
+        "command": "node --test tools/knowledge-release.test.mjs",
+        "cache": false
+      },
       "nx06-safety-test": {
         "command": "node --test tools/nx06-safety.test.mjs",
         "cache": false
