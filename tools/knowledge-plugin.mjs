@@ -43,6 +43,21 @@ const sourceSkillPath =
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const jsonBytes = (value) => Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
 
+/** This release format admits stable numeric SemVer only. */
+export function parseStablePluginVersion(version) {
+  assert(
+    typeof version === 'string' &&
+      /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version),
+    `Invalid stable plugin version: ${version}`,
+  );
+  const parts = version.split('.').map(Number);
+  assert(
+    parts.every(Number.isSafeInteger),
+    `Invalid stable plugin version: ${version}`,
+  );
+  return parts;
+}
+
 function safePath(path) {
   assert(
     path &&
@@ -184,7 +199,7 @@ export async function checkKnowledgePlugin(root, expectedManifestSha256) {
     ).sha256,
   );
   assert.equal(plugin.name, 'content-registrar-knowledge');
-  assert.equal(plugin.version, '0.1.0');
+  parseStablePluginVersion(plugin.version);
   assert.equal(plugin.skills, './skills/');
   assert.match(
     files.get(skillPath).toString(),
