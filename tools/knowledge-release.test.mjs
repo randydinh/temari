@@ -122,7 +122,7 @@ test('two versioned private release builds are byte identical and digest checked
   assert.deepEqual(await readFile(archives[0]), await readFile(archives[1]));
   assert.equal(
     (await checkKnowledgeRelease(archives[0], release.archiveSha256)).version,
-    '0.1.0',
+    '0.1.1',
   );
   const existing = await readFile(archives[0]);
   await assert.rejects(
@@ -252,7 +252,7 @@ test('recipient checker rejects a digest-pinned dirty-source release', async () 
 });
 
 test('successor guard rejects changed source with unchanged or lower version', async () => {
-  const changed = await derivedRelease('changed-source.tar.gz', '0.1.0', true);
+  const changed = await derivedRelease('changed-source.tar.gz', '0.1.1', true);
   await checkKnowledgeRelease(changed.path, changed.sha256);
   await assert.rejects(
     checkKnowledgeReleaseSuccessor(
@@ -263,7 +263,7 @@ test('successor guard rejects changed source with unchanged or lower version', a
     ),
     /Changed release requires a higher plugin version/,
   );
-  const lower = await derivedRelease('lower-version.tar.gz', '0.0.9');
+  const lower = await derivedRelease('lower-version.tar.gz', '0.1.0');
   await checkKnowledgeRelease(lower.path, lower.sha256);
   await assert.rejects(
     checkKnowledgeReleaseSuccessor(

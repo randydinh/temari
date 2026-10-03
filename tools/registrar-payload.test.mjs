@@ -21,7 +21,7 @@ async function fixture(t) {
 test('reviewed payload exposes a stable packager file map', async () => {
   const result = await verifyRegistrarPayload();
   const files = await getRegistrarPayloadFileMap();
-  assert.equal(result.upstream.commit, '760926907669ae34bd1861732edbbf8f5afaf588');
+  assert.equal(result.upstream.commit, 'd73f626133b2543345c32805957e05b61e386bad');
   assert.equal(result.files, 33);
   assert.equal(files.length, REGISTRAR_PAYLOAD_FILES.length);
   assert(files.some(({ path, source }) => path === 'src/knowledge_agent/mcp_server.py' &&

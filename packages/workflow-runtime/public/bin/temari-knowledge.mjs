@@ -20,9 +20,9 @@ const serverName = 'temari-content-registrar';
 const providerSelectionKind = 'temari-knowledge-provider-selection';
 const providerSelectionMaxBytes = 256;
 const registrarVersion = '0.1.0';
-// Reviewed payload inventory, including recorded downstream changes, is a trust anchor.
-const registrarManifestSha256 = '4a7d33e24e849dfd89fa1259a86475e99a2668487562aaee7811fb610171c88e';
-const registrarCommit = '760926907669ae34bd1861732edbbf8f5afaf588';
+// The reviewed upstream payload inventory and commit pins are trust anchors.
+const registrarManifestSha256 = '5ecf0874189fcfe6d0a0ad317ef78877a3cc390171c0240823598ac7de3d6e83';
+const registrarCommit = 'd73f626133b2543345c32805957e05b61e386bad';
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
 async function verifyRegistrarPayload() {

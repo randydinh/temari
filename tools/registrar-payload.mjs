@@ -7,8 +7,8 @@ const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PAYLOAD_RELATIVE_ROOT = 'packages/workflow-runtime/registrar';
 export const REGISTRAR_PAYLOAD_ROOT = join(REPOSITORY_ROOT, PAYLOAD_RELATIVE_ROOT);
 
-const EXPECTED_COMMIT = '760926907669ae34bd1861732edbbf8f5afaf588';
-const EXPECTED_MANIFEST_SHA256 = '4a7d33e24e849dfd89fa1259a86475e99a2668487562aaee7811fb610171c88e';
+const EXPECTED_COMMIT = 'd73f626133b2543345c32805957e05b61e386bad';
+const EXPECTED_MANIFEST_SHA256 = '5ecf0874189fcfe6d0a0ad317ef78877a3cc390171c0240823598ac7de3d6e83';
 
 function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
