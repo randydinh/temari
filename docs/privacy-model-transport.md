@@ -13,6 +13,8 @@ The protected transport is the intended host path for private application data, 
 
 ## Disclosure settings and standing rules
 
+The host-facing explicit decision coordinator is documented in [privacy preference learning](privacy-learning.md#host-decision-flow). It persists approval memory and presents new group proposals locally; it does not change model egress behavior.
+
 The Nx privacy library now exposes a local `planPrivacySubmission` API with three levels. **Strict** applies automatic identity and field-name detection but honors exact values the user explicitly authorized, including saved rules. **Balanced** applies the same detection and also honors scoped, exact-value allow rules that cite a verified public source. **Permissive** requires an explicit standing acknowledgement and skips ordinary automatic identity detection; credential patterns and credential fields still mask. None of these settings changes the Codex runtime-isolation gate, provider egress review, or operator approval for live private use.
 
 A rule applies to one workspace and optionally one source. It either allows an exact value or replaces it with a deterministic local substitute, such as a service zone calculated from an address. Rules can last for one submission or be saved for later submissions in the same scope. An uncertain claim of public status does not create an allow rule: a verified-public rule needs a local evidence reference that the host has verified, while a user-authorized rule records the user's explicit disclosure choice. Application-declared privacy literals and field rules take precedence over either rule type, and a saved allow cannot restore a credential already removed in an earlier batch.
