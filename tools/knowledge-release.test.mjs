@@ -160,7 +160,17 @@ test('two versioned private release builds are byte identical and digest checked
   assert.deepEqual(await readFile(archives[0]), await readFile(archives[1]));
   assert.equal(
     (await checkKnowledgeRelease(archives[0], release.archiveSha256)).version,
-    '0.1.1',
+    '0.1.2',
+  );
+  const contents = parseArchive(await readFile(archives[0]));
+  assert.equal(
+    JSON.parse(contents.get('.agents/plugins/marketplace.json').toString())
+      .plugins[0].policy.installation,
+    'INSTALLED_BY_DEFAULT',
+  );
+  assert.match(
+    contents.get('README.md').toString(),
+    /Adding the marketplace alone did not auto-install the plugin in the tested macOS Codex CLI/,
   );
   const existing = await readFile(archives[0]);
   await assert.rejects(
@@ -290,7 +300,7 @@ test('recipient checker rejects a digest-pinned dirty-source release', async () 
 });
 
 test('successor guard rejects changed source with unchanged or lower version', async () => {
-  const changed = await derivedRelease('changed-source.tar.gz', '0.1.1', true);
+  const changed = await derivedRelease('changed-source.tar.gz', '0.1.2', true);
   await checkKnowledgeRelease(changed.path, changed.sha256);
   await assert.rejects(
     checkKnowledgeReleaseSuccessor(
@@ -301,7 +311,7 @@ test('successor guard rejects changed source with unchanged or lower version', a
     ),
     /Changed release requires a higher plugin version/,
   );
-  const lower = await derivedRelease('lower-version.tar.gz', '0.1.0');
+  const lower = await derivedRelease('lower-version.tar.gz', '0.1.1');
   await checkKnowledgeRelease(lower.path, lower.sha256);
   await assert.rejects(
     checkKnowledgeReleaseSuccessor(
@@ -382,10 +392,10 @@ test('package path enforces prior pin and removes refused candidate', async () =
   );
 });
 
-test('externally pinned historical 0.1.0 release admits current 0.1.1 successor', async (t) => {
+test('externally pinned historical 0.1.1 release admits current 0.1.2 successor', async (t) => {
   const prior =
     process.env.KNOWLEDGE_RELEASE_TEST_PRIOR_ARCHIVE ||
-    '/private/tmp/content-registrar-knowledge-0.1.0-pr-final-20261003.tar.gz';
+    '/private/tmp/content-registrar-knowledge-0.1.1-final-a-20261003.tar.gz';
   try {
     await stat(prior);
   } catch (error) {
@@ -393,12 +403,12 @@ test('externally pinned historical 0.1.0 release admits current 0.1.1 successor'
       return t.skip('Historical release fixture unavailable');
     throw error;
   }
-  assert.equal(release.version, '0.1.1');
+  assert.equal(release.version, '0.1.2');
   assert.equal(
     (
       await checkKnowledgeReleaseSuccessor(
         prior,
-        '8cf8a4598f719ddeba7f7e64a0cf92d2ac54edfa22cb4b86034757b39649a01a',
+        '6859336960a6eca0c608ad2fb3a276ba8ef0df4df58e48f995ea3081897081b6',
         archives[0],
         release.archiveSha256,
       )
@@ -413,7 +423,7 @@ test('externally pinned historical 0.1.0 release admits current 0.1.1 successor'
     {
       archive: prior,
       sha256:
-        '8cf8a4598f719ddeba7f7e64a0cf92d2ac54edfa22cb4b86034757b39649a01a',
+        '6859336960a6eca0c608ad2fb3a276ba8ef0df4df58e48f995ea3081897081b6',
     },
   );
   assert.equal(packaged.succession, 'advanced');
@@ -492,7 +502,7 @@ test('historical catalog admits a prior install policy but refuses changed ident
     'historical-policy-variant.tar.gz',
     '0.1.0',
     false,
-    { catalogInstallation: 'INSTALLED_BY_DEFAULT' },
+    { catalogInstallation: 'AVAILABLE' },
   );
   await assert.rejects(
     checkKnowledgeRelease(policyVariant.path, policyVariant.sha256),
