@@ -7,6 +7,7 @@ export * from './lib/openai-responses-driver.js';
 export * from './lib/ollama-model-driver.js';
 export * from './lib/qa-local-category-search.js';
 export * from './lib/git-reconciliation-observer.js';
+export * from './lib/privacy-decision-host.js';
 
 import {
   createCodexModelDriver,
