@@ -5,7 +5,10 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { checkKnowledgeRelease, packageKnowledgeRelease } from './knowledge-release.mjs';
+import {
+  checkKnowledgeRelease,
+  packageKnowledgeRelease,
+} from './knowledge-release.mjs';
 import { packageKnowledgePlugin } from './knowledge-plugin.mjs';
 
 let root;
@@ -30,17 +33,28 @@ before(async () => {
   await packageKnowledgeRelease(plugin, manifestSha256, archives[1]);
 });
 
-after(async () => { if (root) await rm(root, { recursive: true, force: true }); });
+after(async () => {
+  if (root) await rm(root, { recursive: true, force: true });
+});
 
 test('two versioned private release builds are byte identical and digest checked', async () => {
   assert.deepEqual(await readFile(archives[0]), await readFile(archives[1]));
-  assert.equal((await checkKnowledgeRelease(archives[0], release.archiveSha256)).version, '0.1.0');
-  await assert.rejects(packageKnowledgeRelease(plugin, manifestSha256, archives[0]), { code: 'EEXIST' });
+  assert.equal(
+    (await checkKnowledgeRelease(archives[0], release.archiveSha256)).version,
+    '0.1.0',
+  );
+  await assert.rejects(
+    packageKnowledgeRelease(plugin, manifestSha256, archives[0]),
+    { code: 'EEXIST' },
+  );
   const tampered = join(root, 'tampered.tar.gz');
   const bytes = await readFile(archives[0]);
   bytes[Math.floor(bytes.length / 2)] ^= 1;
   await writeFile(tampered, bytes);
-  await assert.rejects(checkKnowledgeRelease(tampered, release.archiveSha256), /digest mismatch/);
+  await assert.rejects(
+    checkKnowledgeRelease(tampered, release.archiveSha256),
+    /digest mismatch/,
+  );
 });
 
 test('archive extracts into isolated recipient root and launcher remains usable', async () => {
@@ -49,15 +63,30 @@ test('archive extracts into isolated recipient root and launcher remains usable'
   execFileSync('tar', ['-xzf', archives[0], '-C', recipient]);
   const installed = join(recipient, 'plugins/content-registrar-knowledge');
   const home = join(root, 'recipient-home');
-  const status = JSON.parse(execFileSync(process.execPath, [
-    join(installed, 'bin/temari-knowledge.mjs'), 'status', '--home', home,
-  ], {
-    encoding: 'utf8',
-    env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '', TYPESAFE_API_KEY: '' },
-    timeout: 30_000,
-  }));
+  const status = JSON.parse(
+    execFileSync(
+      process.execPath,
+      [join(installed, 'bin/temari-knowledge.mjs'), 'status', '--home', home],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          NODE_OPTIONS: '',
+          NODE_PATH: '',
+          TYPESAFE_API_KEY: '',
+        },
+        timeout: 30_000,
+      },
+    ),
+  );
   assert.deepEqual(status.providerSelection, {
-    selection: 'registrar', phase: 'uninitialized', persisted: false,
+    selection: 'registrar',
+    phase: 'uninitialized',
+    persisted: false,
   });
-  assert.equal(JSON.parse((await readFile(join(recipient, 'RELEASE.json'))).toString()).pluginManifestSha256, manifestSha256);
+  assert.equal(
+    JSON.parse((await readFile(join(recipient, 'RELEASE.json'))).toString())
+      .pluginManifestSha256,
+    manifestSha256,
+  );
 });
