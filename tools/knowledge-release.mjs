@@ -322,8 +322,10 @@ export async function checkKnowledgeReleaseSuccessor(
   const newParts = parseStablePluginVersion(candidate.version);
   const advanced = newParts.some((part, index) => {
     if (part === oldParts[index]) return false;
-    return part > oldParts[index] &&
-      newParts.slice(0, index).every((earlier, i) => earlier === oldParts[i]);
+    return (
+      part > oldParts[index] &&
+      newParts.slice(0, index).every((earlier, i) => earlier === oldParts[i])
+    );
   });
   assert(
     advanced,
@@ -455,11 +457,11 @@ if (
               values.archive,
               values['expected-sha256'],
             )
-        : (() => {
-            throw new Error(
-              'Usage: knowledge-release.mjs package --artifact ABS --expected-manifest-sha256 HEX --output ABS [--prior-archive ABS --prior-sha256 HEX] | check --archive ABS --expected-sha256 HEX | check-successor --prior-archive ABS --prior-sha256 HEX --archive ABS --expected-sha256 HEX',
-            );
-          })();
+          : (() => {
+              throw new Error(
+                'Usage: knowledge-release.mjs package --artifact ABS --expected-manifest-sha256 HEX --output ABS [--prior-archive ABS --prior-sha256 HEX] | check --archive ABS --expected-sha256 HEX | check-successor --prior-archive ABS --prior-sha256 HEX --archive ABS --expected-sha256 HEX',
+              );
+            })();
   process.stdout.write(
     `${JSON.stringify({ version: result.version, sourceRevision: result.sourceRevision, pluginManifestSha256: result.pluginManifestSha256, archiveSha256: result.archiveSha256, archiveBytes: result.archiveBytes }, null, 2)}\n`,
   );

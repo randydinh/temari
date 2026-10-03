@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
@@ -32,7 +39,10 @@ async function derivedRelease(name, version, changeSkill = false) {
   plugin.version = version;
   files.set(pluginPath, jsonBytes(plugin));
   if (changeSkill)
-    files.set(skillPath, Buffer.concat([files.get(skillPath), Buffer.from('\nUpdated.\n')]));
+    files.set(
+      skillPath,
+      Buffer.concat([files.get(skillPath), Buffer.from('\nUpdated.\n')]),
+    );
   const manifest = JSON.parse(files.get(manifestPath).toString());
   manifest.source.additionalFiles.find(
     (file) =>
@@ -62,14 +72,24 @@ async function derivedRelease(name, version, changeSkill = false) {
       files
         .get('README.md')
         .toString()
-        .replace(`private release ${release.version}`, `private release ${version}`)
-        .replace(release.pluginManifestSha256, releaseData.pluginManifestSha256),
+        .replace(
+          `private release ${release.version}`,
+          `private release ${version}`,
+        )
+        .replace(
+          release.pluginManifestSha256,
+          releaseData.pluginManifestSha256,
+        ),
     ),
   );
   releaseData.files = [...files]
     .filter(([path]) => path !== 'RELEASE.json')
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([path, bytes]) => ({ path, sha256: sha256(bytes), bytes: bytes.length }));
+    .map(([path, bytes]) => ({
+      path,
+      sha256: sha256(bytes),
+      bytes: bytes.length,
+    }));
   files.set('RELEASE.json', jsonBytes(releaseData));
   const bytes = archiveBytes(files);
   const path = join(root, name);
@@ -198,7 +218,10 @@ test('successor guard rejects changed source with unchanged or lower version', a
   await checkKnowledgeRelease(changed.path, changed.sha256);
   await assert.rejects(
     checkKnowledgeReleaseSuccessor(
-      archives[0], release.archiveSha256, changed.path, changed.sha256,
+      archives[0],
+      release.archiveSha256,
+      changed.path,
+      changed.sha256,
     ),
     /Changed release requires a higher plugin version/,
   );
@@ -206,7 +229,10 @@ test('successor guard rejects changed source with unchanged or lower version', a
   await checkKnowledgeRelease(lower.path, lower.sha256);
   await assert.rejects(
     checkKnowledgeReleaseSuccessor(
-      archives[0], release.archiveSha256, lower.path, lower.sha256,
+      archives[0],
+      release.archiveSha256,
+      lower.path,
+      lower.sha256,
     ),
     /Changed release requires a higher plugin version/,
   );
@@ -215,15 +241,25 @@ test('successor guard rejects changed source with unchanged or lower version', a
 test('successor guard accepts higher version and identical digest', async () => {
   const higher = await derivedRelease('higher-version.tar.gz', '0.2.0');
   assert.equal(
-    (await checkKnowledgeReleaseSuccessor(
-      archives[0], release.archiveSha256, higher.path, higher.sha256,
-    )).succession,
+    (
+      await checkKnowledgeReleaseSuccessor(
+        archives[0],
+        release.archiveSha256,
+        higher.path,
+        higher.sha256,
+      )
+    ).succession,
     'advanced',
   );
   assert.equal(
-    (await checkKnowledgeReleaseSuccessor(
-      archives[0], release.archiveSha256, archives[1], release.archiveSha256,
-    )).succession,
+    (
+      await checkKnowledgeReleaseSuccessor(
+        archives[0],
+        release.archiveSha256,
+        archives[1],
+        release.archiveSha256,
+      )
+    ).succession,
     'identical',
   );
 });
@@ -238,7 +274,10 @@ test('malformed versions and missing prior pin fail closed', async () => {
   }
   await assert.rejects(
     checkKnowledgeReleaseSuccessor(
-      archives[0], '0'.repeat(64), archives[1], release.archiveSha256,
+      archives[0],
+      '0'.repeat(64),
+      archives[1],
+      release.archiveSha256,
     ),
     /digest mismatch/,
   );
@@ -257,10 +296,12 @@ test('package path enforces prior pin and removes refused candidate', async () =
   await assert.rejects(stat(refused), { code: 'ENOENT' });
   const accepted = join(root, 'identical-successor.tar.gz');
   assert.equal(
-    (await packageKnowledgeRelease(plugin, manifestSha256, accepted, {
-      archive: archives[0],
-      sha256: release.archiveSha256,
-    })).succession,
+    (
+      await packageKnowledgeRelease(plugin, manifestSha256, accepted, {
+        archive: archives[0],
+        sha256: release.archiveSha256,
+      })
+    ).succession,
     'identical',
   );
 });
