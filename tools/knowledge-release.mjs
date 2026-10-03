@@ -111,7 +111,7 @@ function tarHeader(path, bytes, executable = false) {
   return header;
 }
 
-function archiveBytes(files) {
+export function archiveBytes(files) {
   const chunks = [];
   for (const [path, bytes] of [...files].sort(([a], [b]) =>
     a < b ? -1 : a > b ? 1 : 0,
@@ -137,7 +137,7 @@ function cString(block, offset, length) {
   return field.subarray(0, end < 0 ? field.length : end).toString('utf8');
 }
 
-function parseArchive(bytes) {
+export function parseArchive(bytes) {
   const tar = gunzipSync(bytes, { maxOutputLength: 128 * 1024 * 1024 });
   const files = new Map();
   let offset = 0;
@@ -277,6 +277,11 @@ export async function checkKnowledgeRelease(archive, expectedSha256) {
     const plugin = await checkKnowledgePlugin(
       join(staging, pluginPrefix),
       release.pluginManifestSha256,
+    );
+    assert.equal(
+      plugin.source.dirty,
+      false,
+      'Release requires a clean source commit',
     );
     assert.equal(plugin.source.revision, release.sourceRevision);
     assert.equal(

@@ -6,8 +6,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import {
+  archiveBytes,
   checkKnowledgeRelease,
   packageKnowledgeRelease,
+  parseArchive,
 } from './knowledge-release.mjs';
 import { packageKnowledgePlugin } from './knowledge-plugin.mjs';
 
@@ -88,5 +90,47 @@ test('archive extracts into isolated recipient root and launcher remains usable'
     JSON.parse((await readFile(join(recipient, 'RELEASE.json'))).toString())
       .pluginManifestSha256,
     manifestSha256,
+  );
+});
+
+test('recipient checker rejects a digest-pinned dirty-source release', async () => {
+  const files = parseArchive(await readFile(archives[0]));
+  const manifestPath =
+    'plugins/content-registrar-knowledge/knowledge-plugin-manifest.json';
+  const manifest = JSON.parse(files.get(manifestPath).toString());
+  manifest.source.dirty = true;
+  const manifestBytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
+  files.set(manifestPath, manifestBytes);
+  const previousHash = release.pluginManifestSha256;
+  const newHash = createHash('sha256').update(manifestBytes).digest('hex');
+  const releaseData = JSON.parse(files.get('RELEASE.json').toString());
+  releaseData.pluginManifestSha256 = newHash;
+  files.set(
+    'README.md',
+    Buffer.from(
+      files.get('README.md').toString().replace(previousHash, newHash),
+    ),
+  );
+  releaseData.files = [...files]
+    .filter(([path]) => path !== 'RELEASE.json')
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([path, bytes]) => ({
+      path,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+      bytes: bytes.length,
+    }));
+  files.set(
+    'RELEASE.json',
+    Buffer.from(`${JSON.stringify(releaseData, null, 2)}\n`),
+  );
+  const forged = archiveBytes(files);
+  const path = join(root, 'dirty-source.tar.gz');
+  await writeFile(path, forged);
+  await assert.rejects(
+    checkKnowledgeRelease(
+      path,
+      createHash('sha256').update(forged).digest('hex'),
+    ),
+    /Release requires a clean source commit/,
   );
 });
