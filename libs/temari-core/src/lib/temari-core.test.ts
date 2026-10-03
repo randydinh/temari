@@ -119,7 +119,7 @@ test('routes uncertain callers to a full playbook', () => {
   assert.equal(decision.playbook, null);
 });
 
-test('keeps a closed route table with one QA domain owner', () => {
+test('keeps a closed route table with QA and program owners', () => {
   validateTemariRouteTable();
   assert.deepEqual(
     TEMARI_ROUTE_TABLE.map(({ profileKind, route, owner }) => ({
@@ -135,7 +135,116 @@ test('keeps a closed route table with one QA domain owner', () => {
       },
       { profileKind: 'playbook', route: 'full-playbook', owner: 'poteto-mode' },
       { profileKind: 'domain', route: 'qa-review', owner: './qa-review' },
+      { profileKind: 'program', route: 'program', owner: 'temari' },
     ],
+  );
+});
+
+for (const programKind of [
+  'autonomous-run',
+  'orchestrate',
+  'autopilot-full',
+  'autopilot-stack',
+  'multi-phase-plan',
+] as const) {
+  test(`routes explicit ${programKind} intent to Temari for planning only`, () => {
+    const request = createRequestPlan({
+      workType: 'migration',
+      lightweight: LIGHTWEIGHT_EVIDENCE,
+      programKind,
+    });
+    assert.deepEqual(request.route, {
+      profileKind: 'program',
+      route: 'program',
+      owner: 'temari',
+      requestScope: 'full',
+      programKind,
+      admission: 'planning-only',
+    });
+    assert.equal(request.plan.workType, 'migration');
+    assert.equal(
+      classifyTemariRoute({
+        workType: 'migration',
+        lightweight: LIGHTWEIGHT_EVIDENCE,
+        programKind,
+        requestScope: 'explicitly-narrow',
+      }).requestScope,
+      'explicitly-narrow',
+    );
+  });
+}
+
+test('does not infer a program from migration size alone', () => {
+  const decision = classifyTemariRoute({
+    workType: 'migration',
+    lightweight: { ...LIGHTWEIGHT_EVIDENCE, isMigration: true },
+  });
+  assert.equal(decision.profileKind, 'playbook');
+  assert.equal(decision.route, 'full-playbook');
+});
+
+test('rejects a program mixed with QA or nested under a bounded subtask', () => {
+  assert.throws(
+    () =>
+      classifyTemariRoute({
+        workType: 'qa',
+        lightweight: LIGHTWEIGHT_EVIDENCE,
+        programKind: 'orchestrate',
+        qaResponsibility: 'ticket-coverage',
+      }),
+    /cannot also declare QA/,
+  );
+  assert.throws(
+    () =>
+      classifyTemariRoute({
+        workType: 'bug',
+        lightweight: LIGHTWEIGHT_EVIDENCE,
+        programKind: 'autonomous-run',
+        qaExclusion: 'known-defect-repair',
+      }),
+    /cannot also declare QA/,
+  );
+  assert.throws(
+    () =>
+      classifyTemariRoute({
+        workType: 'migration',
+        lightweight: LIGHTWEIGHT_EVIDENCE,
+        programKind: 'orchestrate',
+        requestScope: 'bounded-subtask',
+        parentReviewId: 'review-1',
+      }),
+    /bounded subtask cannot start/,
+  );
+  assert.throws(
+    () =>
+      classifyTemariRoute({
+        workType: 'migration',
+        lightweight: LIGHTWEIGHT_EVIDENCE,
+        programKind: 'multi-phase-plan',
+        parentReviewId: 'review-1',
+      }),
+    /parentReviewId is only valid/,
+  );
+});
+
+test('rejects a route table without its program owner', () => {
+  assert.throws(
+    () =>
+      validateTemariRouteTable(
+        TEMARI_ROUTE_TABLE.filter((entry) => entry.profileKind !== 'program'),
+      ),
+    /no program owner/,
+  );
+  assert.throws(
+    () =>
+      validateTemariRouteTable(
+        TEMARI_ROUTE_TABLE.map((entry) =>
+          entry.profileKind === 'program'
+            ? ({ ...entry, owner: '' } as never)
+            : entry,
+        ),
+      ),
+    /has no owner/,
   );
 });
 

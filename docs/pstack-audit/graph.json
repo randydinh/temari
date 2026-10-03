@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "scope": "Temari public entries and v4.1 bundled P-stack skills and playbooks, with adjacent ownership boundaries",
-  "reviewedAt": "2026-10-02",
+  "reviewedAt": "2026-10-03",
   "evidenceRule": "documented and source_reference edges describe checked source; review_recommendation edges are proposals, not current behavior",
   "nodes": [
     {
@@ -726,9 +726,9 @@
     {
       "from": "playbook:autonomous-run",
       "to": "owner:temari",
-      "relation": "program_or_lifecycle_candidate",
-      "basis": "review_recommendation",
-      "evidence": "docs/pstack-audit/index.md"
+      "relation": "program_policy",
+      "basis": "documented",
+      "evidence": "docs/decisions/2026-09-30-temari-program-ownership.md"
     },
     {
       "from": "playbook:autopilot-full",
@@ -740,9 +740,9 @@
     {
       "from": "playbook:autopilot-full",
       "to": "owner:temari",
-      "relation": "program_or_lifecycle_candidate",
-      "basis": "review_recommendation",
-      "evidence": "docs/pstack-audit/index.md"
+      "relation": "program_policy",
+      "basis": "documented",
+      "evidence": "docs/decisions/2026-09-30-temari-program-ownership.md"
     },
     {
       "from": "playbook:autopilot-full",
@@ -768,9 +768,9 @@
     {
       "from": "playbook:autopilot-stack",
       "to": "owner:temari",
-      "relation": "program_or_lifecycle_candidate",
-      "basis": "review_recommendation",
-      "evidence": "docs/pstack-audit/index.md"
+      "relation": "program_policy",
+      "basis": "documented",
+      "evidence": "docs/decisions/2026-09-30-temari-program-ownership.md"
     },
     {
       "from": "playbook:autopilot-stack",
@@ -866,9 +866,9 @@
     {
       "from": "playbook:multi-phase-plan",
       "to": "owner:temari",
-      "relation": "program_or_lifecycle_candidate",
-      "basis": "review_recommendation",
-      "evidence": "docs/pstack-audit/index.md"
+      "relation": "program_policy",
+      "basis": "documented",
+      "evidence": "docs/decisions/2026-09-30-temari-program-ownership.md"
     },
     {
       "from": "playbook:multi-phase-plan",
@@ -977,23 +977,23 @@
     },
     {
       "from": "playbook:orchestrate",
+      "to": "component:orch-store",
+      "relation": "legacy_resume_uses",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/orchestrate.md"
+    },
+    {
+      "from": "playbook:orchestrate",
       "to": "owner:temari",
-      "relation": "program_or_lifecycle_candidate",
-      "basis": "review_recommendation",
-      "evidence": "docs/pstack-audit/index.md"
+      "relation": "program_policy",
+      "basis": "documented",
+      "evidence": "docs/decisions/2026-09-30-temari-program-ownership.md"
     },
     {
       "from": "playbook:orchestrate",
       "to": "playbook:babysit",
       "relation": "references_playbook",
       "basis": "source_reference",
-      "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/orchestrate.md"
-    },
-    {
-      "from": "playbook:orchestrate",
-      "to": "component:orch-store",
-      "relation": "uses",
-      "basis": "documented",
       "evidence": "packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/orchestrate.md"
     },
     {
@@ -1006,9 +1006,9 @@
     {
       "from": "playbook:pause-safely",
       "to": "owner:temari",
-      "relation": "program_or_lifecycle_candidate",
-      "basis": "review_recommendation",
-      "evidence": "docs/pstack-audit/index.md"
+      "relation": "lifecycle_selection",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/temari/SKILL.md"
     },
     {
       "from": "playbook:perf-issue",
@@ -1125,9 +1125,9 @@
     {
       "from": "playbook:session-pickup",
       "to": "owner:temari",
-      "relation": "program_or_lifecycle_candidate",
-      "basis": "review_recommendation",
-      "evidence": "docs/pstack-audit/index.md"
+      "relation": "lifecycle_selection",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/temari/SKILL.md"
     },
     {
       "from": "playbook:shipping",
@@ -2086,6 +2086,13 @@
       "to": "owner:temari",
       "relation": "current_entry",
       "basis": "documented",
+      "evidence": "packages/workflow-runtime/assets/v4.1/skills/temari/SKILL.md"
+    },
+    {
+      "from": "skill:temari",
+      "to": "skill:closeout",
+      "relation": "references_skill",
+      "basis": "source_reference",
       "evidence": "packages/workflow-runtime/assets/v4.1/skills/temari/SKILL.md"
     },
     {

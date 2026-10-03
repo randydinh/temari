@@ -198,9 +198,9 @@
       "path": "docs/guide/02-poteto-mode.md",
       "lane": "portable",
       "sourceSha256": "9a3b60248468ade00760354473a7f9d8b23995ab5b7b4c7b03d81000f18b8dc2",
-      "artifactSha256": "e3a7e2b6bf977f4a088f1bb592755d52ae05512c87391ec16107e4958ac0aea3",
+      "artifactSha256": "9c43c47f337cef9a5efa541012b24f028c760c3cc19fcb2bc0e67ad1e5cb6333",
       "executable": false,
-      "transformation": "Keep directly referenced routing guide without omitted illustration or broader guide chapters."
+      "transformation": "Keep directly referenced routing guide without omitted illustration or broader guide chapters. Clarify Temari program/lifecycle selection and retain Poteto engineering methods."
     },
     {
       "path": "integrations/archon/.archon/workflows/temari-live-pilot.yaml",
@@ -686,9 +686,9 @@
       "path": "skills/poteto-mode/SKILL.md",
       "lane": "portable",
       "sourceSha256": "d6507c6b87d3a3c7c263b711e9152bb513ca1c8b0204aa8da4a1fefe4357f9b3",
-      "artifactSha256": "d6507c6b87d3a3c7c263b711e9152bb513ca1c8b0204aa8da4a1fefe4357f9b3",
+      "artifactSha256": "dcaad1aac05d925f0818dd20c7220f4129579846e367bc4be554e02b77366907",
       "executable": false,
-      "transformation": null
+      "transformation": "Return program/lifecycle intent to Temari; retain technical method and legacy catalog references."
     },
     {
       "path": "skills/poteto-mode/playbook-contracts/v1/feature.json",
@@ -806,9 +806,9 @@
       "path": "skills/poteto-mode/playbooks/multi-phase-plan.md",
       "lane": "portable",
       "sourceSha256": "b823e05b64bbef84ae5169717c5fab1d9ab5079625996271e3aa7abcdce7b8ad",
-      "artifactSha256": "b823e05b64bbef84ae5169717c5fab1d9ab5079625996271e3aa7abcdce7b8ad",
+      "artifactSha256": "91ed6bea7fc4831b539915cf6e68ab2024650432a3348b0e7c9b4253cd62a75b",
       "executable": false,
-      "transformation": null
+      "transformation": "Return new standing programs to Temari; retain Orchestrate as a legacy resume reference."
     },
     {
       "path": "skills/poteto-mode/playbooks/opening-a-pr.md",
@@ -822,9 +822,9 @@
       "path": "skills/poteto-mode/playbooks/orchestrate.md",
       "lane": "portable",
       "sourceSha256": "d42b4375f1bd4ce23da0b575a198571a2117df7eea10c3c9fc6d92ae1053f7be",
-      "artifactSha256": "d42b4375f1bd4ce23da0b575a198571a2117df7eea10c3c9fc6d92ae1053f7be",
+      "artifactSha256": "94890edcd860fda6cd60da69f3748427d69cecdd218b63d58f9c919c1325545c",
       "executable": false,
-      "transformation": null
+      "transformation": "Limit the retained plain-file Orchestrate store to recorded legacy programs; new typed programs remain planning-only."
     },
     {
       "path": "skills/poteto-mode/playbooks/pause-safely.md",
@@ -1470,9 +1470,9 @@
       "path": "skills/temari/SKILL.md",
       "lane": "portable",
       "sourceSha256": "4309ed9237767f9a25cea2ff8da1322ccc19abfd990e65074e86ad6e80a30206",
-      "artifactSha256": "4a73ec29a725a0f3c51959a21756f5bf7d06828d8b09d64308e9f69afd719cc7",
+      "artifactSha256": "0c00b12dc084706b220cca87b549cc93f0208ca9d3a20e7f1f69084b2c8b0de4",
       "executable": false,
-      "transformation": "Retain the previously accepted semantic skill-selection and invocation policy sentence assigning policy to Temari and translation to the host adapter; source revision removed it. Add the merge-reconciliation route while preserving the vendored policy."
+      "transformation": "Retain the previously accepted semantic skill-selection and invocation policy sentence assigning policy to Temari and translation to the host adapter; source revision removed it. Add the merge-reconciliation route while preserving the vendored policy. Add explicit program planning/lifecycle selection and bounded overnight contracts, retaining merge recovery and provider admission."
     },
     {
       "path": "skills/temari/references/credentials.md",
@@ -1726,9 +1726,9 @@
       "path": "verification/verify-temari/features/poteto-mode-playbooks.md",
       "lane": "portable",
       "sourceSha256": "3a39b6b5951a3e8445dc68bd61db7ed0c61d9a4fd839b4844e2cc88f353eb3c9",
-      "artifactSha256": "3a39b6b5951a3e8445dc68bd61db7ed0c61d9a4fd839b4844e2cc88f353eb3c9",
+      "artifactSha256": "54fd8d14640ea8db4ce6b58cb3cb20dd17195cafcb4776addcaf899817a3b976",
       "executable": false,
-      "transformation": null
+      "transformation": "Distinguish exact static catalog and legacy-store verification from live route admission."
     },
     {
       "path": "verification/verify-temari/features/routing-chain.md",

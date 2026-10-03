@@ -13,15 +13,14 @@ SKILLS = ROOT / "packages/workflow-runtime/assets/v4.1/skills"
 PLAYBOOKS = SKILLS / "poteto-mode/playbooks"
 
 TEMARI_ENTRY_SKILLS = {"temari", "closeout", "merge-reconciliation"}
-TEMARI_PLAYBOOK_CANDIDATES = {
+TEMARI_PROGRAM_POLICY_PLAYBOOKS = {
     "autonomous-run",
     "orchestrate",
     "autopilot-full",
     "autopilot-stack",
     "multi-phase-plan",
-    "session-pickup",
-    "pause-safely",
 }
+TEMARI_LIFECYCLE_SELECTION_PLAYBOOKS = {"session-pickup", "pause-safely"}
 OPTIONAL_SKILLS = {"make-bot-ui", "setup-pstack", "automate-me", "reflect", "bro"}
 
 
@@ -158,8 +157,10 @@ for path in playbook_files:
     node(f"playbook:{name}", "playbook", title, source=source)
     edge(f"skill:poteto-mode", f"playbook:{name}", "routes_to", "documented", relative(SKILLS / "poteto-mode/SKILL.md"))
     edge(f"playbook:{name}", "owner:poteto", "current_method_catalog", "documented", relative(SKILLS / "poteto-mode/SKILL.md"))
-    if name in TEMARI_PLAYBOOK_CANDIDATES:
-        edge(f"playbook:{name}", "owner:temari", "program_or_lifecycle_candidate", "review_recommendation", "docs/pstack-audit/index.md")
+    if name in TEMARI_PROGRAM_POLICY_PLAYBOOKS:
+        edge(f"playbook:{name}", "owner:temari", "program_policy", "documented", "docs/decisions/2026-09-30-temari-program-ownership.md")
+    if name in TEMARI_LIFECYCLE_SELECTION_PLAYBOOKS:
+        edge(f"playbook:{name}", "owner:temari", "lifecycle_selection", "documented", relative(SKILLS / "temari/SKILL.md"))
     if name in {"babysit", "shipping", "worktree-cleanup", "opening-a-pr"}:
         edge(f"playbook:{name}", "owner:host", "mechanical_execution", "review_recommendation", "docs/pstack-audit/index.md")
 
@@ -192,7 +193,7 @@ for path in all_paths:
 edge("owner:temari", "skill:poteto-mode", "routes_engineering_to", "documented", relative(SKILLS / "temari/SKILL.md"))
 edge("owner:runtime", "component:execution-harness", "selects", "documented", "docs/decisions/2026-09-22-archon-harness.md")
 edge("component:archon", "component:execution-harness", "implements", "documented", "docs/decisions/2026-09-22-archon-harness.md")
-edge("playbook:orchestrate", "component:orch-store", "uses", "documented", relative(PLAYBOOKS / "orchestrate.md"))
+edge("playbook:orchestrate", "component:orch-store", "legacy_resume_uses", "documented", relative(PLAYBOOKS / "orchestrate.md"))
 edge("component:orch-store", "owner:runtime", "overlaps", "review_recommendation", "docs/pstack-audit/index.md")
 edge("external:ralph-loop", "playbook:autonomous-run", "separate_loop_mechanism", "documented", "docs/pstack-audit/index.md")
 overnight_source = "https://github.com/cursor/plugins/blob/main/pstack/docs/guide/07-overnight.md"
@@ -231,7 +232,7 @@ for target in re.findall(r"\[[^\]]*\]\(([^)]+)\)", index.read_text()):
 graph = {
     "schemaVersion": 1,
     "scope": "Temari public entries and v4.1 bundled P-stack skills and playbooks, with adjacent ownership boundaries",
-    "reviewedAt": "2026-10-02",
+    "reviewedAt": "2026-10-03",
     "evidenceRule": "documented and source_reference edges describe checked source; review_recommendation edges are proposals, not current behavior",
     "nodes": sorted(nodes.values(), key=lambda item: item["id"]),
     "edges": sorted(edges.values(), key=lambda item: (item["from"], item["relation"], item["to"], item["basis"])),

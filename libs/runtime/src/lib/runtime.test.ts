@@ -121,6 +121,45 @@ test('executes a coordinator-produced serial request through the persisted engin
   }
 });
 
+for (const programKind of [
+  'autonomous-run',
+  'orchestrate',
+  'autopilot-full',
+  'autopilot-stack',
+  'multi-phase-plan',
+] as const) {
+  test(`refuses planning-only ${programKind} before execution or persistence`, async () => {
+    const root = await mkdtemp(join(tmpdir(), 'temari-runtime-'));
+    try {
+      const store = await FileWorkflowReceiptStore.create(join(root, 'receipts'));
+      const requestPlan = createRequestPlan({
+        workType: 'migration',
+        lightweight: LIGHTWEIGHT_EVIDENCE,
+        programKind,
+      });
+      let handlerCalls = 0;
+      await assert.rejects(
+        executeRequestPlanAndPersist({
+          runId: 'program-1',
+          revision: 'revision-program-1',
+          requestPlan,
+          capabilities: serialCapabilities(),
+          store,
+          handler: () => {
+            handlerCalls += 1;
+            return { status: 'PASS', summary: 'must not execute' };
+          },
+        }),
+        /planning-only/,
+      );
+      assert.equal(handlerCalls, 0);
+      assert.equal(await store.load('program-1'), null);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+}
+
 test('stops a coordinator-produced QA request before serial execution lacks review capability', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-runtime-'));
   try {
