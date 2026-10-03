@@ -2,6 +2,9 @@
 
 Design recommendation, 2026-09-29. This document proposes architecture and acceptance checks. It does not install a QA agent or admit a new runtime route. The user clarified that “workbooks” meant **playbooks**, organized like P-stack.
 
+For the user-confirmed meanings and high-level flows of sprint planning, QA
+Review, and QA Triage, use the [QA workflow reference](qa-workflow-reference.md).
+
 ## Recommended architecture
 
 Use one QA domain entry point that selects a task playbook. Each playbook loads reusable skills when its steps need them. Temari owns routing and the canonical run; Poteto owns engineering work. This follows P-stack's mode → playbook → situational skill structure.

@@ -1,0 +1,230 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "/root/m1_merge_review",
+  "reviewedAt": "2026-10-03T05:59:06.223750+00:00",
+  "verdict": "ACCEPT_EXACT_SAMPLED_TRIAL_EVIDENCE_WITH_RETAINED_QUALITY_GAPS",
+  "gateAccepted": "The required maintenance behavior-evidence activity has actual valid paired captures and an independent, criterion-complete assessment. This accepts those bytes as scoped development evidence; it does not certify every criterion met or select an overall winner.",
+  "captureSealSha256": "f5f1593daacb611fad65c22840d1706dbed21b650d0ca6d4183ed1b1229abe2f",
+  "fixtureSha256": "11b96d560255ae953df5ef037347e28cfac9e1b35c6969da26bfc3b31a70807d",
+  "rubricSha256": "851e1d5190bff4efa74cce22f47cc5c989bed55d12263599708261fe46f787d2",
+  "individualAssessmentsFrozenBeforeComparison": [
+    {
+      "variant": "variant-a",
+      "sealSha256": "20dfa17de0c00ca7f7d3d42cea0a876cfc05d1b4d886aba093b6dca3bdac44e6"
+    },
+    {
+      "variant": "variant-b",
+      "sealSha256": "3938b8a0e28bf2094ae391e963b1ad607b8b1a4dcfddda8d473c0cda491e8fe3"
+    }
+  ],
+  "independence": "Reviewer distinct from both response producers; prior source/version knowledge means not blind. Both individual records frozen before this comparison.",
+  "integrity": {
+    "all42CaptureRecordsRehashed": true,
+    "all8V3InputRecordsRehashed": true,
+    "exactSchemaOnlyCorrection": true,
+    "unchangedFixtureInstructionsRubricAndSettings": true,
+    "completeSelectedArtifactInventories": [
+      225,
+      227
+    ],
+    "elevenSelectedResourcePinsEachExact": true,
+    "allFourIndependentSchemaValidationsPass": true,
+    "rawFinalParsedMarkdownReceiptBindingsExact": true,
+    "explicitCommandReadOutputsMatchPinnedSourceRanges": true,
+    "noExplicitOutOfScopeReadWriteProductModelLifecycleCommandObserved": true,
+    "limitations": "Transcript command scope is observed, not OS read confinement; complete text read or unrecorded actions are not inferred."
+  },
+  "actualCapture": {
+    "runId": "qa-upper110-response-trial-20261002-v3",
+    "contextRevision": "b769d64c72eda533a7d2432321e2b45b5eae3425",
+    "pids": [
+      63713,
+      63712
+    ],
+    "exitCodes": [
+      0,
+      0
+    ],
+    "processIntervalOverlapSeconds": 61.229,
+    "independentLiveObservation": false,
+    "modelSelection": "gpt-5.6-terra via identical pinned wrapper, local codex-cli0.154.0, ignored user config/defaults",
+    "modelServerIdentityAndReasoningEffort": "Not independently exposed; actual argv reconstructed, not observed live.",
+    "sample": "One pair, six fictional-input cases in one shared context per variant."
+  },
+  "comparisons": [
+    {
+      "caseId": "case-01",
+      "outcome": "Both preserve attributed uninspected component evidence/local-draft/deployed gap. A explicitly records request-local label and a remaining authorized deployed-test next action; B omits restating the label and has no concrete next action.",
+      "evidence": [
+        {
+          "variant": "variant-a",
+          "lines": [
+            7,
+            23
+          ]
+        },
+        {
+          "variant": "variant-b",
+          "lines": [
+            7,
+            21
+          ]
+        }
+      ],
+      "classification": "quality-difference-no-material-authority-regression"
+    },
+    {
+      "caseId": "case-02",
+      "outcome": "Both retain full review open/blocked and missing environment/task/artifact/invocation without carrying case01 label. B explicitly names QA-DEMO-202; A gives explicit authorized owner/operator plus pass/fail handoff. B names inputs and expected checks but not a responsible supplier.",
+      "evidence": [
+        {
+          "variant": "variant-a",
+          "lines": [
+            27,
+            34
+          ]
+        },
+        {
+          "variant": "variant-b",
+          "lines": [
+            25,
+            32
+          ]
+        }
+      ],
+      "classification": "scope-preserved-with-handoff-specificity-gap"
+    },
+    {
+      "caseId": "case-03",
+      "outcome": "Both produce reusable local drafts rather than QA closeout or actual Testmo identity. B makes the result-ID assertions [A1]/[] explicit and uses compact field formatting. Both distinguish drafts from execution.",
+      "evidence": [
+        {
+          "variant": "variant-a",
+          "lines": [
+            38,
+            71
+          ]
+        },
+        {
+          "variant": "variant-b",
+          "lines": [
+            36,
+            62
+          ]
+        }
+      ],
+      "classification": "narrow-quality-difference"
+    },
+    {
+      "caseId": "case-04",
+      "outcome": "Both honor explicit workflow visibility, report full review unable to run and keep missing prerequisites. B names ticket-acceptance and clearly states blockage alone does not change the selected intent; A likewise ties any changed workflow to a changed deliverable. Neither claims evaluator execution or supported proposed families.",
+      "evidence": [
+        {
+          "variant": "variant-a",
+          "lines": [
+            75,
+            79
+          ]
+        },
+        {
+          "variant": "variant-b",
+          "lines": [
+            66,
+            68
+          ]
+        }
+      ],
+      "classification": "opt-in-behavior-observed-in-this-static-prompt"
+    },
+    {
+      "caseId": "case-05",
+      "outcome": "Both correctly attribute checkout failure/control against separate fictional intent, retain unknown severity scale/causal/freshness/persistence gaps and propose authorized independent reproduction. Neither fully separates all five requested judgment dimensions. B leaves user/business impact implicit and omits fix priority/priority-decision ownership; A explicitly leaves priority to product/delivery ownership but impact/severity are incomplete.",
+      "evidence": [
+        {
+          "variant": "variant-a",
+          "lines": [
+            87,
+            104
+          ]
+        },
+        {
+          "variant": "variant-b",
+          "lines": [
+            76,
+            91
+          ]
+        }
+      ],
+      "classification": "both-partial-proposed-specificity-regression"
+    },
+    {
+      "caseId": "case-06",
+      "outcome": "Both leave the low-harm control question unresolved without an approved expectation, name the product question, and do not accept defect/improvement/no-action decisions or fabricate a reproduction.",
+      "evidence": [
+        {
+          "variant": "variant-a",
+          "lines": [
+            108,
+            112
+          ]
+        },
+        {
+          "variant": "variant-b",
+          "lines": [
+            95,
+            97
+          ]
+        }
+      ],
+      "classification": "bounded-classification-preserved"
+    }
+  ],
+  "materialAuthorityOrAdmissionFailuresObserved": [],
+  "retainedQualityGaps": {
+    "variant-a": [
+      {
+        "caseId": "case-05",
+        "criterionId": "separate-dimensions",
+        "rationale": "Affected buyer/build/environment and ordinary-path reachability are explicit; severity-scale gap retained, priority left to product/delivery ownership. User/business impact and a separate qualitative severity assessment are not fully expressed."
+      }
+    ],
+    "variant-b": [
+      {
+        "caseId": "case-01",
+        "criterionId": "readability-next-action",
+        "rationale": "Outcome and deployed/raw-evidence gaps are clear, but no concrete handoff next action is stated."
+      },
+      {
+        "caseId": "case-02",
+        "criterionId": "executable-handoff",
+        "rationale": "Missing inputs and expected checks are explicit, but no authorized supplier/operator owner is assigned. Pass behavior is stated; failure is its converse."
+      },
+      {
+        "caseId": "case-05",
+        "criterionId": "separate-dimensions",
+        "rationale": "Candidate/persona/environment, ordinary-flow reachability and missing severity scale explicit. User/business impact is left implicit and fix priority/priority decision ownership is absent; reproduction owner is a different decision."
+      }
+    ]
+  },
+  "claimsWithheld": [
+    "Complete five-dimension failure judgment handling.",
+    "Overall superiority or universal improvement from one pair.",
+    "Cross-model/host portability, effective server identity, native subagents/forge/general QA capability.",
+    "Actual fictional product execution, canonical QA acceptance/task completion, current source preservation.",
+    "Independent V3 live argv/process observation; historical V2 live observations remain historical.",
+    "Final clean source/package/main compatibility or product smoke readiness."
+  ],
+  "coverageLimits": [
+    "No positive generic product QA control ran in these response trials. Finite-policy actual runtime proof remains separate.",
+    "Nearby-owner case covers reusable case authoring, not planning/triage execution or owner handoff runtime.",
+    "Opted-in/static no-visibility cases observed; no multi-turn live workflow switch was exercised.",
+    "Supplied request-local label remains fictional; no real tracker membership verification.",
+    "One shared context per variant; no per-case-fresh-model-context, repeatability or statistical claim."
+  ],
+  "requiredCarryForward": [
+    "Copy the individual assessments, gaps, raw capture pins and limits into the version-controlled trial record without relabeling partial criteria as met.",
+    "Preserve invalid V2 and its preparation conflict separately; do not incorporate it as a valid comparison or rewrite outputs.",
+    "Root must prove final clean selected-resource equivalence, account current main changes, package/source gates and separately scoped actual smoke before delivery."
+  ],
+  "sourceOrModelMutationsByReviewer": false
+}

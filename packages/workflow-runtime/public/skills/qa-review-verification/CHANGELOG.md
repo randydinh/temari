@@ -1,5 +1,37 @@
 # QA verification changes
 
+## Reconciliation notes — 2026-10-02
+
+- Retain the 0.7.1 and 0.7.2 workflow changes against the current QA execution
+  and task-tracking contracts. Missing prerequisites keep full-review intent
+  open; the selected execution profile must still admit its trusted inputs
+  before an evaluator can run.
+- Preserve the original trial records as historical source comparisons. They
+  do not establish model behavior, product execution, or acceptance of this
+  reconciled candidate.
+- Record the actual paired response comparison separately under
+  `evaluations/qa-review-verification/2026-10-02-paired-model-comparison/`.
+  Its sampled evidence preserves scope and authority but retains partial
+  failure-dimension coverage and two proposed-response handoff gaps; no overall
+  improvement or complete five-dimension behavior is established.
+
+## 0.7.2 — 2026-09-30
+
+- Record impact, severity, affected scope, reachability, and fix priority as
+  separate judgments for supported failures.
+- Preserve ambiguous product intent and potential user-experience improvements
+  without silently turning either into a confirmed defect.
+
+## 0.7.1 — 2026-09-30
+
+- Keep an explicit full QA Review request with the ticket acceptance playbook
+  when acceptance fixtures or decisions are missing; use the installed evaluator
+  only when the trusted assignment and selected execution route are admitted.
+- Keep an unadmitted route and its exact missing input visible; do not relabel a
+  full-review request as evidence-only drafting or imply an evaluator ran.
+- Derive ticket selection from each request without a standing reviewer filter;
+  distinguish sprint planning and defect triage from acceptance signoff.
+
 ## 0.7.0 — 2026-09-29
 
 - Package the local QA evaluator and its worker in the installed Temari artifact.

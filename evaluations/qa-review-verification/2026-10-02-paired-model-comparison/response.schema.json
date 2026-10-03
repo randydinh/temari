@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Actual captured version-worker response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "trialId",
+    "variantId",
+    "responses"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "trialId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "variantId": {
+      "enum": [
+        "variant-a",
+        "variant-b"
+      ]
+    },
+    "responses": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "caseId",
+          "responseText"
+        ],
+        "properties": {
+          "caseId": {
+            "enum": [
+              "case-01",
+              "case-02",
+              "case-03",
+              "case-04",
+              "case-05",
+              "case-06"
+            ]
+          },
+          "responseText": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20000
+          },
+          "declaredResourceRefs": {
+            "type": "array",
+            "maxItems": 20,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          }
+        }
+      }
+    },
+    "declaredResourceRefs": {
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512
+      }
+    }
+  }
+}

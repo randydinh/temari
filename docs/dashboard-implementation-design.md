@@ -50,7 +50,7 @@ The existing [write runner](../tools/run-codex-write-workers.mts) owns cloning,
 typed ownership, patch validation and integration mechanics. The
 [parallel runtime](../libs/runtime/src/lib/parallel-runtime.ts) supplies durable
 worker control. The [controller](../tools/dashboard-controller.mts) owns admission.
-The installed [worker guide](../packages/workflow-runtime/public/skills/poteto-mode/references/codex-parallel-workers.md)
+The installed [worker guide](../packages/workflow-runtime/public/adapters/codex/parallel-workers.md)
 describes the underlying standalone route; dashboard preparation adds the durable
 task and supervisor bindings.
 

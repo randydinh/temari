@@ -7,11 +7,88 @@ description: Use Temari as the current Nx conversational engineering entry point
 
 Temari is the conversational entry point for the current Nx workflow runtime.
 
+## Make the route visible when useful
+
+When the user has requested workflow transparency, including an established
+session preference, state the inferred request type, current work scope (including
+ticket selection for QA), and intended playbook in one brief intake update before
+substantial work. Say whether the playbook is installed or only proposed, and
+whether runtime admission is pending, blocked, confirmed, or unavailable. Keep
+an inference explicitly provisional until the scope and route inputs are checked.
+For example: "I read this as sprint test planning for all tickets in the named
+sprint. I will review requirements and proposed scenarios. The test-design
+playbook is only a design proposal, so this is not an executed QA disposition."
+Use plain action language for users who have not
+requested workflow detail. Naming QA Review or another workflow by itself does
+not establish a preference for internal routing detail; do not infer a person's
+expertise from tone or a single request.
+
+If investigation changes the request type, scope, or playbook, explain the changed
+action and reason before switching. Name the internal route only for users who
+opted into workflow visibility. Continue safe discovery through ambiguity;
+ask for a decision only when the ambiguity changes the authorized work. Do not
+claim a playbook, verifier, or evaluator ran from an intake announcement.
+
+## Select the QA task and scope
+
+Derive ticket scope from the current request. It may name ticket IDs, a team,
+column, sprint, label, release, or all tickets in the requested set. No reviewer,
+label, team, or column filter is permanent. Confirm the actual selection in the
+tracker before inspecting or reporting on tickets.
+
+A request to survey an upcoming sprint can ask for requirement understanding,
+test-plan review, and proposed scenarios before execution. Keep planning findings
+and unrun scenarios distinct from an executed QA disposition. QA Triage instead
+investigates a reported defect: classify and reproduce the symptom, establish
+actual versus expected behavior and exact reproduction steps, split conflated
+issues into distinct proposed reports, and identify a supported root cause or
+mark it unresolved. When applicable, check the upcoming release build for a
+production report and production for a release-build report. Preserve observed,
+reported, and inferred claims separately. Use a dedicated triage playbook only
+when that route is actually admitted; do not claim ticket acceptance or a QA
+evaluator result from triage notes alone.
+
+Across these workflows, derive expected behavior from the applicable product or
+business decision. Current code, prior behavior, and a developer's or Temari's
+interpretation are evidence or hypotheses, not product authority. Surface an
+unresolved expectation instead of assuming it is a defect or a pass. For a
+suspected defect, separate user impact, severity, affected scope, and how the
+failure is reached from the fix-priority decision. State uncertainty and the
+decision owner; a low-harm ambiguity may need no change, while a small
+user-experience improvement can merit exploration without becoming a defect.
+
+## Full QA Review intent gate
+
+When the user asks to **perform, complete, or sign off QA Review** for a ticket,
+column, or release, treat it as a full QA assignment. Select the bundled ticket
+acceptance QA playbook. Keep that intent when a fixture, product decision,
+deployed build identity, or project verifier is missing: record the required
+scenarios as blocked or not run. Use `bin/temari.mjs qa` for each selected ticket's
+versioned assignment only when its trusted inputs and selected execution route
+can be admitted; retain the independent evaluator's bounded disposition when it
+actually runs. The registered policy profile requires an exact environment,
+eligible current task, and pinned product artifact before launch. Preserve an
+early refusal as the exact admission gap and keep the review open; do not switch
+to the legacy structural route to imply that the selected product profile ran.
+Those gaps prevent a QA pass; they do not turn the user's full-review request into
+an evidence-only writing task. Do not substitute a Markdown report for the route
+or say the evaluator ran without its canonical result and review record.
+For a release-wide request without a ticket identity, use a supported full
+assignment if available; otherwise report that admission gap without inventing
+a ticket reference.
+
+Use evidence-only drafting when the user asks only for a draft note, historical
+evidence audit, or review of supplied results without a full QA disposition. If
+a legitimate full assignment or trusted invocation cannot be constructed, keep
+the full review open, record the exact missing input or rejected route, and hand
+back the useful partial evidence without claiming QA completion. Preserve any
+selection constraints from the current request before selecting tickets.
+
 When the requested output includes ticket verification notes, a QA evidence audit,
 or a release QA report, use the bundled
 [QA verification skill](../qa-review-verification/SKILL.md) for that deliverable.
-Carry the user's reviewer-label filter into evidence selection before opening ticket
-details. Reuse canonical QA records and preserve their scope and disposition.
+Carry the current request's ticket selection into evidence gathering before opening
+ticket details. Reuse canonical QA records and preserve their scope and disposition.
 Evidence-only drafting produces a local document; it does not admit a QA execution
 route or complete its review obligations. Test-case authoring alone and generic code
 review keep their existing routes.
@@ -36,7 +113,7 @@ read-only task.
 1. Read `policy.json` from the installed bundle root. The policy is the public admission contract; do not fall back to the legacy v4.1 implementation.
 2. Route engineering requests through the canonical Temari route table. Admit `lightweight-engineering-v1` only when every lightweight condition holds. A trusted `full-playbook`/`feature-v1` start requires the host to run a read-only architect, scoped builder, and independent reviewer, then prove forge access and bind their retained evidence to the selected invocation.
 3. Both admitted profiles map source requirements to all six canonical stages. Feature delivery must identify an open pull request in the selected repository whose head matches the verified integration commit. Publish still requires operator approval.
-4. For local Codex workers and the feature request shape, follow the bundled [parallel worker guide](../poteto-mode/references/codex-parallel-workers.md). The standalone `run-workers` command remains available for a builder and separate reviewer.
+4. For host-proven feature work, require independent architect, builder, and reviewer observations bound to the selected candidate. Use the selected host adapter for worker launch and proof collection; a worker bridge does not establish support for every host.
 5. Use `bin/temari.mjs qa` for a full QA assignment. The route fixes independent review, revision-bound evidence, a six-stage plan, and read-only actions. It freezes the evaluator input allowlist and launches the bundled evaluator in a separate local process. The invocation supplies an existing local `evidenceRoot`; a passed scenario must retain its canonical execution evidence there.
 6. The public entry does not own scheduling, receipts, checkpoints, evidence, or closeout. Those remain owned by the canonical runtime and existing store implementations.
 

@@ -1,7 +1,7 @@
-# Local Codex parallel workers
+# Codex host adapter: parallel workers
 
 For a full feature request launched through `temari.mjs` or `poteto-mode.mjs`,
-use [task tracking](../../temari/references/task-tracking.md) when a durable task
+use [task tracking](../../skills/temari/references/task-tracking.md) when a durable task
 has been selected. Its version-2 sidecar keeps the original project as the task
 scope and records preparation before workers launch. Standalone worker commands
 do not accept tracking flags.
