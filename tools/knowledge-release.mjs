@@ -17,7 +17,10 @@ import { basename, dirname, isAbsolute, join, posix, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { gunzipSync, gzipSync } from 'node:zlib';
-import { checkKnowledgePlugin } from './knowledge-plugin.mjs';
+import {
+  checkKnowledgePlugin,
+  parseStablePluginVersion,
+} from './knowledge-plugin.mjs';
 
 const toolPath = fileURLToPath(import.meta.url);
 const pluginPrefix = 'plugins/content-registrar-knowledge/';
@@ -223,7 +226,7 @@ function readme(release) {
 function validateReleaseFiles(files) {
   const release = JSON.parse(files.get(releasePath)?.toString() ?? 'null');
   assert.equal(release?.schemaVersion, 1);
-  assert.match(release.version, /^\d+\.\d+\.\d+$/);
+  parseStablePluginVersion(release.version);
   assert.match(release.sourceRevision, /^[a-f0-9]{40,64}$/);
   assert.match(release.pluginManifestSha256, /^[a-f0-9]{64}$/);
   assert.deepEqual(
@@ -300,13 +303,48 @@ export async function checkKnowledgeRelease(archive, expectedSha256) {
   };
 }
 
+/** Compare two independently pinned, fully verified private releases. */
+export async function checkKnowledgeReleaseSuccessor(
+  priorArchive,
+  priorSha256,
+  candidateArchive,
+  candidateSha256,
+) {
+  const prior = await checkKnowledgeRelease(priorArchive, priorSha256);
+  const candidate = await checkKnowledgeRelease(
+    candidateArchive,
+    candidateSha256,
+  );
+  if (priorSha256 === candidateSha256) {
+    return { ...candidate, succession: 'identical' };
+  }
+  const oldParts = parseStablePluginVersion(prior.version);
+  const newParts = parseStablePluginVersion(candidate.version);
+  const advanced = newParts.some((part, index) => {
+    if (part === oldParts[index]) return false;
+    return part > oldParts[index] &&
+      newParts.slice(0, index).every((earlier, i) => earlier === oldParts[i]);
+  });
+  assert(
+    advanced,
+    `Changed release requires a higher plugin version than ${prior.version}; candidate is ${candidate.version}`,
+  );
+  return { ...candidate, succession: 'advanced' };
+}
+
 export async function packageKnowledgeRelease(
   artifact,
   expectedManifestSha256,
   output,
+  priorRelease,
 ) {
   assert(isAbsolute(artifact) && isAbsolute(output));
   assert.match(expectedManifestSha256 ?? '', /^[a-f0-9]{64}$/);
+  if (priorRelease) {
+    assert(isAbsolute(priorRelease.archive));
+    assert.match(priorRelease.sha256 ?? '', /^[a-f0-9]{64}$/);
+    await checkKnowledgeRelease(priorRelease.archive, priorRelease.sha256);
+  }
   const plugin = await checkKnowledgePlugin(artifact, expectedManifestSha256);
   assert.equal(
     plugin.source.dirty,
@@ -320,7 +358,7 @@ export async function packageKnowledgeRelease(
   const version = JSON.parse(
     pluginFiles.get('.codex-plugin/plugin.json').toString(),
   ).version;
-  assert.match(version, /^\d+\.\d+\.\d+$/);
+  parseStablePluginVersion(version);
   files.set(marketplacePath, jsonBytes(marketplace()));
   const metadata = {
     schemaVersion: 1,
@@ -343,7 +381,15 @@ export async function packageKnowledgeRelease(
     await handle.close();
   }
   try {
-    return await checkKnowledgeRelease(output, sha256(bytes));
+    const candidate = await checkKnowledgeRelease(output, sha256(bytes));
+    return priorRelease
+      ? await checkKnowledgeReleaseSuccessor(
+          priorRelease.archive,
+          priorRelease.sha256,
+          output,
+          candidate.archiveSha256,
+        )
+      : candidate;
   } catch (error) {
     await rm(output, { force: true });
     throw error;
@@ -361,31 +407,57 @@ if (
       output: { type: 'string' },
       archive: { type: 'string' },
       'expected-sha256': { type: 'string' },
+      'prior-archive': { type: 'string' },
+      'prior-sha256': { type: 'string' },
     },
     allowPositionals: true,
   });
   const [command] = positionals;
   assert.equal(positionals.length, 1);
+  assert.equal(
+    Boolean(values['prior-archive']),
+    Boolean(values['prior-sha256']),
+    'Prior release requires both --prior-archive and --prior-sha256',
+  );
   const result =
     command === 'package' &&
     values.artifact &&
     values['expected-manifest-sha256'] &&
     values.output &&
-    !values.archive
+    !values.archive &&
+    !values['expected-sha256']
       ? await packageKnowledgeRelease(
           values.artifact,
           values['expected-manifest-sha256'],
           values.output,
+          values['prior-archive'] && {
+            archive: values['prior-archive'],
+            sha256: values['prior-sha256'],
+          },
         )
       : command === 'check' &&
           values.archive &&
           values['expected-sha256'] &&
           !values.output &&
-          !values.artifact
+          !values.artifact &&
+          !values['prior-archive']
         ? await checkKnowledgeRelease(values.archive, values['expected-sha256'])
+        : command === 'check-successor' &&
+            values['prior-archive'] &&
+            values['prior-sha256'] &&
+            values.archive &&
+            values['expected-sha256'] &&
+            !values.output &&
+            !values.artifact
+          ? await checkKnowledgeReleaseSuccessor(
+              values['prior-archive'],
+              values['prior-sha256'],
+              values.archive,
+              values['expected-sha256'],
+            )
         : (() => {
             throw new Error(
-              'Usage: knowledge-release.mjs package --artifact ABS --expected-manifest-sha256 HEX --output ABS | check --archive ABS --expected-sha256 HEX',
+              'Usage: knowledge-release.mjs package --artifact ABS --expected-manifest-sha256 HEX --output ABS [--prior-archive ABS --prior-sha256 HEX] | check --archive ABS --expected-sha256 HEX | check-successor --prior-archive ABS --prior-sha256 HEX --archive ABS --expected-sha256 HEX',
             );
           })();
   process.stdout.write(
