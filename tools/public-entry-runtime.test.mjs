@@ -845,6 +845,52 @@ test('relocated QA entry runs the packaged evaluator without source-checkout acc
       qaOutput,
     );
 
+    // This legacy structural fixture checks honest missing-environment routing,
+    // not the current-task-bound policy profile or actual product execution.
+    const blockedAssignment = {
+      ...base.assignment,
+      missingEnvironmentBlocker: 'No owned nonproduction fixture is available',
+    };
+    delete blockedAssignment.environmentRef;
+    const blocked = {
+      ...base,
+      assignment: blockedAssignment,
+      invocation: {
+        ...base.invocation,
+        runId: 'synthetic-qa-environment-blocked',
+        runDirectory: join(root, 'blocked-run'),
+        evidenceRoot: join(root, 'blocked-run/evidence'),
+      },
+    };
+    await mkdir(blocked.invocation.evidenceRoot, { recursive: true });
+    const blockedRun = await invoke(blocked, 'blocked-environment');
+    const blockedOutput = JSON.parse(
+      blockedRun.stdout.trim().split('\n').at(-1),
+    );
+    assert.equal(blockedOutput.guidance.playbookId, 'ticket-acceptance-v1');
+    assert.match(
+      blockedOutput.guidance.playbook.text,
+      /request to perform QA Review remains in this playbook/i,
+    );
+    assert.match(
+      blockedOutput.guidance.evidenceSkill.text,
+      /Missing\s+fixtures[\s\S]*do \*\*not\*\* make the\s+request evidence-only/,
+    );
+    assert.equal(blockedOutput.guidance.execution, 'not-observed');
+    assert.equal(blockedOutput.record.evaluationRounds.length, 1);
+    assert.equal(
+      blockedOutput.record.evaluationRounds[0].evaluatorId,
+      'local-fresh-qa-evaluator-v1',
+    );
+    assert.equal(
+      blockedOutput.qaDisposition.disposition,
+      'BlockedOrIncomplete',
+    );
+    assert.equal(
+      blockedOutput.record.assignment.missingEnvironmentBlocker,
+      'No owned nonproduction fixture is available',
+    );
+
     await writeFile(
       join(candidate, 'package.json'),
       '{"name":"@temari/workspace"}\n',
@@ -2431,7 +2477,7 @@ test('public engineering admission refuses unsupported routes and blocks unprove
   assert(lightweight.reasons.includes('profile-not-admitted'));
 });
 
-test('installed Temari and Poteto skills expose the bundled worker guide', async () => {
+test('installed skills keep worker contract host-neutral and bundle the Codex adapter separately', async () => {
   const temariSkill = await readFile(
     join(output, 'skills/temari/SKILL.md'),
     'utf8',
@@ -2441,16 +2487,24 @@ test('installed Temari and Poteto skills expose the bundled worker guide', async
     'utf8',
   );
   const guide = await readFile(
-    join(output, 'skills/poteto-mode/references/codex-parallel-workers.md'),
+    join(output, 'adapters/codex/parallel-workers.md'),
     'utf8',
   );
-  assert.match(
-    temariSkill,
-    /parallel worker guide.*codex-parallel-workers\.md/,
+  assert.match(temariSkill, /selected host adapter/);
+  assert.match(potetoSkill, /selected host adapter/);
+  assert.doesNotMatch(temariSkill, /codex-parallel-workers|local Codex/i);
+  assert.doesNotMatch(potetoSkill, /codex-parallel-workers|local Codex/i);
+  assert.match(guide, /^# Codex host adapter:/);
+  assert.match(guide, /version-2 sidecar/);
+  const trackingLink = guide.match(/\[task tracking\]\(([^)]+)\)/);
+  assert(trackingLink, 'the moved guide retains the modern tracking reference');
+  assert.equal(
+    await readFile(join(output, 'adapters/codex', trackingLink[1]), 'utf8'),
+    await readFile(join(output, 'skills/temari/references/task-tracking.md'), 'utf8'),
   );
-  assert.match(
-    potetoSkill,
-    /parallel worker guide.*codex-parallel-workers\.md/,
+  await assert.rejects(
+    lstat(join(output, 'skills/poteto-mode/references/codex-parallel-workers.md')),
+    { code: 'ENOENT' },
   );
   assert.match(guide, /bin\/codex-parallel\.mjs/);
   assert((await lstat(join(output, 'bin/codex-parallel.mjs'))).isFile());

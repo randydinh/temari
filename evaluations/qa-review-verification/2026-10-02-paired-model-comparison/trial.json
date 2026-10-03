@@ -1,0 +1,289 @@
+{
+  "schemaVersion": 1,
+  "trialId": "qa-upper110-current-host-20261002-v1",
+  "attemptId": "qa-upper110-response-trial-20261002-v3",
+  "fixtureSha256": "11b96d560255ae953df5ef037347e28cfac9e1b35c6969da26bfc3b31a70807d",
+  "requestSha256": "51c8b5fbab610f69b996b1fe768d4633fffde64100d55be74c29a60e14e1f6df",
+  "authorization": "Direct user authorization for eleven selected Temari policy, skill and template texts per version plus six fictional scenarios, solely for PR110 baseline/proposed comparison. No employer tickets, customer data or credentials.",
+  "variants": [
+    {
+      "variant": "variant-a",
+      "instructionVersion": "QA writer 0.6.0",
+      "artifactSourceRevision": "319a84a428ad360c1c3c5ddf96c07c7f35e8ebad",
+      "artifactSourceDirty": false,
+      "artifactManifestSha256": "dbf6ef68c4f2ee385ad23c4e22230b829b20f2a4faa862881bcd969baa425607",
+      "selectedResources": [
+        {
+          "path": "policy.json",
+          "sha256": "044e8b52172f7aac82fa0686d6d791afdcdf233489d8ca18e0ac5fbade439f76",
+          "bytes": 3691
+        },
+        {
+          "path": "skills/temari/SKILL.md",
+          "sha256": "f063188f0d1ed185fbb03c8f96d4b8c5e8fd44f6c13fc91546bc3da0f09f6342",
+          "bytes": 7535
+        },
+        {
+          "path": "skills/temari/references/task-tracking.md",
+          "sha256": "cd03f9c664e6d5687469dfdc5cdf65b3b1faf29f4822d7017494ceff437a8cab",
+          "bytes": 4918
+        },
+        {
+          "path": "skills/poteto-mode/SKILL.md",
+          "sha256": "de9947c791e19f5314a60970f2bfbfa5ee46eafdef9514efe62e0e9f6ba31bbf",
+          "bytes": 2960
+        },
+        {
+          "path": "skills/qa-review-verification/SKILL.md",
+          "sha256": "b1ed8e8b8f5574d1b5411a1d2c7f302a995eb5b14a1900c43b6dae3cc66be95d",
+          "bytes": 24838
+        },
+        {
+          "path": "skills/qa-review-verification/references/maintenance.md",
+          "sha256": "a9ca53e787eb857ad257c9690cd6e6589fe2228a0ebcf3d33cc66d42d631e496",
+          "bytes": 2090
+        },
+        {
+          "path": "skills/qa-review-verification/assets/ticket-comment.md",
+          "sha256": "902eb371f190c74a72588ec0e8bc26193e47effd229e0156a1fa6e45f5c631df",
+          "bytes": 2294
+        },
+        {
+          "path": "skills/qa-review-verification/assets/ticket-verification.md",
+          "sha256": "cff1e38640fed7f3a11ca12114630e8546475fde742855182a197a7ce4ff7c94",
+          "bytes": 7628
+        },
+        {
+          "path": "skills/qa-review-verification/assets/release-qa-report.md",
+          "sha256": "a4d424818fdd84c7045542dbb80ea2234f1b3416ade1cf6b1cea0d6e6b879bdd",
+          "bytes": 3854
+        },
+        {
+          "path": "qa/ticket-acceptance-v1.md",
+          "sha256": "1152fbb98fe0f9dc3616f2b40e4253b7e2dd24d184268c404a460e6404037e0c",
+          "bytes": 1638
+        },
+        {
+          "path": "skills/poteto-mode/references/codex-parallel-workers.md",
+          "sha256": "3b0b73297061cf434a9ee306e63782204d5e39f06b39400b4324d105be108e3a",
+          "bytes": 6039
+        }
+      ]
+    },
+    {
+      "variant": "variant-b",
+      "instructionVersion": "QA writer 0.7.2",
+      "artifactSourceRevision": "c776b468f65ce2727ef3421deb46d3dc5e196bab",
+      "artifactSourceDirty": true,
+      "artifactManifestSha256": "c0f4465ab6bd7729ce518a8630d97c9f07040138d5f827db156badb1042d211e",
+      "selectedResources": [
+        {
+          "path": "policy.json",
+          "sha256": "044e8b52172f7aac82fa0686d6d791afdcdf233489d8ca18e0ac5fbade439f76",
+          "bytes": 3691
+        },
+        {
+          "path": "skills/temari/SKILL.md",
+          "sha256": "8bdd3213a60d77b404f1b7db56d972c89af0627d98b9f5232a1dbaab85823c16",
+          "bytes": 12503
+        },
+        {
+          "path": "skills/temari/references/task-tracking.md",
+          "sha256": "cd03f9c664e6d5687469dfdc5cdf65b3b1faf29f4822d7017494ceff437a8cab",
+          "bytes": 4918
+        },
+        {
+          "path": "skills/poteto-mode/SKILL.md",
+          "sha256": "7d2c2165014b41fd79ca0a9d98f8a39b256941f8bcac1f72dd012501e7f9ff5d",
+          "bytes": 3070
+        },
+        {
+          "path": "skills/qa-review-verification/SKILL.md",
+          "sha256": "c9db81a40bd501bfd9110482c6f1cb8e1bdf290dd9977d7c6bfb6d521e74f56c",
+          "bytes": 26358
+        },
+        {
+          "path": "skills/qa-review-verification/references/maintenance.md",
+          "sha256": "a9ca53e787eb857ad257c9690cd6e6589fe2228a0ebcf3d33cc66d42d631e496",
+          "bytes": 2090
+        },
+        {
+          "path": "skills/qa-review-verification/assets/ticket-comment.md",
+          "sha256": "902eb371f190c74a72588ec0e8bc26193e47effd229e0156a1fa6e45f5c631df",
+          "bytes": 2294
+        },
+        {
+          "path": "skills/qa-review-verification/assets/ticket-verification.md",
+          "sha256": "cff1e38640fed7f3a11ca12114630e8546475fde742855182a197a7ce4ff7c94",
+          "bytes": 7628
+        },
+        {
+          "path": "skills/qa-review-verification/assets/release-qa-report.md",
+          "sha256": "a4d424818fdd84c7045542dbb80ea2234f1b3416ade1cf6b1cea0d6e6b879bdd",
+          "bytes": 3854
+        },
+        {
+          "path": "qa/ticket-acceptance-v1.md",
+          "sha256": "bcbf04b07d88f63e6c6cab67fe89b005a38b274db1cdffe9ef533f431e507364",
+          "bytes": 2829
+        },
+        {
+          "path": "adapters/codex/parallel-workers.md",
+          "sha256": "b6dd1105d75757526c48afcdc1bed1277561822a17dbf0f89a1bf34d32e536e6",
+          "bytes": 6054
+        }
+      ]
+    }
+  ],
+  "host": {
+    "selectedHost": "local Codex CLI",
+    "selectedModel": "gpt-5.6-terra",
+    "selectionSource": "Existing user model key in config.toml; no global config mutation.",
+    "adapterIgnoresUserConfig": true,
+    "wrapperSha256": "078fd62435ca556bb663020852d0b172a66cd3af4a01145823ad1f06b444e41b",
+    "cliSha256": "4f85982624b3898c8991cb80c0981b2aa71070e3537046c9a95950318a95afcc",
+    "cliVersion": "codex-cli 0.154.0",
+    "effectiveServerImplementation": "not exposed; report explicit CLI selection, not inferred server identity",
+    "workerSandbox": "read-only",
+    "ephemeral": true,
+    "contextRevision": "b769d64c72eda533a7d2432321e2b45b5eae3425"
+  },
+  "capture": {
+    "schema": 1,
+    "at": "2026-10-03T05:53:33.905766+00:00",
+    "status": "CAPTURED_PENDING_INDEPENDENT_ASSESSMENT",
+    "variants": [
+      {
+        "variant": "variant-a",
+        "pid": 63713,
+        "durationSeconds": 61.229,
+        "responseChars": 8579,
+        "explicitReadCommands": 2,
+        "caseCount": 6
+      },
+      {
+        "variant": "variant-b",
+        "pid": 63712,
+        "durationSeconds": 66.981,
+        "responseChars": 6665,
+        "explicitReadCommands": 2,
+        "caseCount": 6
+      }
+    ],
+    "actualProcessIntervalOverlapSeconds": 61.229,
+    "liveProcessObservation": "No independent V3 live process observation was performed; interval overlap comes from actual retained process records only.",
+    "scope": "Actual paired response trial only; transport PASS does not accept product/source/business or native task parallelism."
+  },
+  "captureSealSha256": "f5f1593daacb611fad65c22840d1706dbed21b650d0ca6d4183ed1b1229abe2f",
+  "independentReviewSealSha256": "8a8fce866eb53a453fc6316370bc79b4f81f54ca09645142cf09661e76f90f32",
+  "invalidPreviousAttempt": {
+    "attemptId": "qa-upper110-response-trial-20261002-v2",
+    "captureSealSha256": "cc91a6c26156785377dbe36b33dda52543a57156d3a74c1c5504385116c7bf96",
+    "reason": "Worker instructions permitted an optional root declaredResourceRefs list, but the response schema rejected it. A used it and B did not. No comparative acceptance for V2.",
+    "correction": "V3 adds the identical item-level optional list constraints to the root. Both workers reran with unchanged fixture, instructions, rubric, resource texts and settings. Historical responses and schema remain retained."
+  },
+  "publicEvidence": [
+    {
+      "file": "fixture.json",
+      "sha256": "11b96d560255ae953df5ef037347e28cfac9e1b35c6969da26bfc3b31a70807d",
+      "bytes": 10856,
+      "derivation": "byte-identical"
+    },
+    {
+      "file": "fixture.schema.json",
+      "sha256": "04bcbf117d4f984a286e76de1f537db83be3f39db672ca347faca9c455d273e3",
+      "bytes": 2738,
+      "derivation": "byte-identical"
+    },
+    {
+      "file": "assessment-rubric.json",
+      "sha256": "851e1d5190bff4efa74cce22f47cc5c989bed55d12263599708261fe46f787d2",
+      "bytes": 8447,
+      "derivation": "byte-identical"
+    },
+    {
+      "file": "response.schema.json",
+      "sha256": "576e41c98db5a213e9b8a8e7be7b0358030bd4a3feeeef8cb444fe2b900e87c1",
+      "bytes": 1610,
+      "derivation": "byte-identical"
+    },
+    {
+      "file": "capture.schema.json",
+      "sha256": "7edc9a4c4bc6c85bd8498c98b5f438fd8be65e9c4afa694b1558f55b24693406",
+      "bytes": 15821,
+      "derivation": "byte-identical"
+    },
+    {
+      "file": "worker-instructions.md",
+      "sha256": "ea50793768cfc3af3aa254a6da5947528d32fb0350a7a363b103c23b27014b13",
+      "bytes": 2290,
+      "derivation": "byte-identical"
+    },
+    {
+      "file": "comparison-review.md",
+      "sha256": "32e633943176efdaecbde6e63daa2457580a82a8fa51686ddae1c2f5cc77b1a1",
+      "bytes": 4780,
+      "derivation": "byte-identical"
+    },
+    {
+      "file": "comparison-review.json",
+      "sha256": "60bae1ad550256a13891860daa2bc7a3df2a9da7172b42fa694693b2c64fa8f7",
+      "bytes": 9692,
+      "derivation": "byte-identical"
+    },
+    {
+      "file": "variant-a.json",
+      "sha256": "3d5003f5eb776d2220f0bc74dc71eaec42191873f1840cc476f20ac292b4b80a",
+      "bytes": 9780,
+      "derivation": "byte-identical"
+    },
+    {
+      "file": "variant-a.md",
+      "sha256": "4bc052f3182b232c061ce1fde1f539b357f62e9bae8622b33e68f412d5d4501b",
+      "bytes": 8668,
+      "derivation": "byte-identical"
+    },
+    {
+      "file": "variant-a-raw-final.json",
+      "sha256": "0744f0278ceb8da371d30e819bfcc0916944caa913aed0f987d5148a3ed0b56e",
+      "bytes": 9726,
+      "derivation": "byte-identical"
+    },
+    {
+      "file": "variant-a-individual-assessment.json",
+      "sha256": "6c60c1d45cc46016b571fc6ec8d74b327e2b61f543846f5607821fa0fc113741",
+      "bytes": 74964,
+      "derivation": "Only each evidence.file was changed to its repository-relative response filename. Judgments, excerpts, spans and response hashes are unchanged.",
+      "originalSha256": "ed627c7c4aebb4c67e8faac060ebb743f1fc6cc5e47beba789252b31f68f89d4"
+    },
+    {
+      "file": "variant-b.json",
+      "sha256": "8e0e83d3e8f162b5cd7699e3fb9377fd498058bb78ef568a2202493b8f16b6cc",
+      "bytes": 7820,
+      "derivation": "byte-identical"
+    },
+    {
+      "file": "variant-b.md",
+      "sha256": "626d00b30fc38b30d6b2ad510430367afcabf5f76726a1ab809c24eac11e9637",
+      "bytes": 6750,
+      "derivation": "byte-identical"
+    },
+    {
+      "file": "variant-b-raw-final.json",
+      "sha256": "2ca16dcb41e680378511c2fce0b0caca68fe223f1da507825ec6cf968f831320",
+      "bytes": 7757,
+      "derivation": "byte-identical"
+    },
+    {
+      "file": "variant-b-individual-assessment.json",
+      "sha256": "712fbd1c98e4c3f2a24915fe39dfa84ee1bd37aca3673fc85867ba87b54d83c5",
+      "bytes": 69307,
+      "derivation": "Only each evidence.file was changed to its repository-relative response filename. Judgments, excerpts, spans and response hashes are unchanged.",
+      "originalSha256": "31b765855171181be7a73265a68b8dd000ed9b118d591fe0cc762faa82c9725e"
+    }
+  ],
+  "privatePreservation": "Complete raw transcripts, process/receipt records, inventories, authorizations, helper failures, rejected approvals and invalid V2 are retained locally under the Temari reconciliation case. Only fictional inputs, actual final responses, protocol, assessment and digests are versioned here.",
+  "finalIntegrationRequirement": "Before accepting the final current-main candidate, prove all eleven variant-b selected texts byte-identical to these pins and verify a fresh clean package and actual scoped policy journey. The development artifact is not final source/runtime acceptance.",
+  "assessmentStatus": "ACCEPT_EXACT_SAMPLED_EVIDENCE_WITH_RETAINED_QUALITY_GAPS",
+  "captureSummaryStatusBoundary": "The capture summary retains the original pre-assessment status. The independent assessment status above and comparison-review.json are current; source/package/runtime gates are separate."
+}

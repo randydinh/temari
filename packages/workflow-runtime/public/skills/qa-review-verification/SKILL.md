@@ -2,7 +2,7 @@
 name: qa-review-verification
 description: Draft or review per-ticket QA verification notes and release QA reports from requirements, source reviews, and actual execution evidence. Use for QA Review closeout, verification handoffs, and evidence audits; not for authoring reusable test cases alone or generic code review.
 metadata:
-  version: '0.6.0'
+  version: '0.7.2'
 ---
 
 # QA Review verification
@@ -17,6 +17,18 @@ Use this supporting skill when the requested deliverable includes a ticket verif
 note, QA evidence audit, or release QA report. Test-case authoring alone, code review,
 implementation and defect repair stay with their existing owners.
 
+If the user requested full QA Review, enter Temari's ticket acceptance QA playbook
+and canonical `qa-review-v1` route before treating a note as the deliverable. Missing
+fixtures, unresolved product rules, absent deployed build evidence, or unavailable
+project verification keep required scenarios incomplete; they do **not** make the
+request evidence-only. Submit the honest blocked review to the installed evaluator
+when the trusted full assignment and selected execution route can be admitted,
+then write the note from its revision-bound disposition. A selected product
+profile may require an exact environment, eligible current task, and pinned
+artifact before any evaluator launch. If admission itself fails, preserve the
+exact route error and blocked obligations; do not imply that an evaluator ran or
+substitute the legacy structural route for the selected product profile.
+
 When a canonical QA review record exists, derive the prose from its assignment, candidate,
 scenario results, execution evidence and disposition. Preserve its revision/digest and link
 the record; never replace it with a Markdown document. Preserve Failed, BlockedOrIncomplete
@@ -27,8 +39,8 @@ evidence. Drafting does not admit a runtime route, create PASS receipts, change 
 disposition, or satisfy an independent-evaluator requirement. Full QA execution remains
 subject to the installed policy, a full versioned assignment, and canonical local evidence.
 The installed Temari route launches its packaged evaluator in a separate process and denies
-external writes. Report a blocked route as blocked
-even when a useful draft can be produced.
+external writes. Report a blocked route as blocked even when a useful draft can be
+produced.
 When the user requested full QA Review, do not present the resulting evidence-only note
 as completed verification; identify the exact unexecuted acceptance work and the route
 or prerequisite needed to finish it.
@@ -112,13 +124,14 @@ does not establish the observed behavior.
 
 ## Establish scope and candidate
 
-Apply the user's ticket-selection constraints before opening ticket details. For a
-reviewer-label restriction, confirm the exact label in the tracker and use a filtered
-list to verify membership. Record the filter, capture time, qualifying IDs and sampling
-limits. Ownership, comment authorship and a linked ticket do not establish label
-membership. Inspect linked tickets only when they also qualify. If recent sprints have
-no matches, report that gap and sample earlier qualifying sprints within the requested
-history. Attribute each note to its actual author even when a ticket has multiple reviewers.
+Apply the current request's ticket-selection constraints before opening ticket
+details. Selection may be by ticket, team, column, sprint, label, release, or the
+whole requested set; do not carry a filter forward from a previous assignment.
+Verify membership against the tracker, record the selection and capture time,
+and disclose any sampling limits. When a label is requested, verify the exact
+label rather than inferring membership from ownership, comment authorship, or
+linked tickets. Inspect linked tickets only when they fall within the requested
+scope. Attribute each note to its actual author.
 
 Read acceptance criteria, relevant comments, linked requirements and available results.
 Identify the original failure, expected behavior, relevant variants, fixture/persona and
@@ -221,6 +234,14 @@ a product failure. For state changes or cross-service effects, choose the smalle
 integration or deployed test that distinguishes a product defect from a bad oracle;
 retain candidate, fixture ownership, independent readback and cleanup. Repeating an
 unchanged fake does not increase confidence in its realism.
+For each supported failure, record the affected user or business outcome, severity
+under the selected project's scale, affected personas/builds/environments, known
+frequency and workaround, and how it is reached: happy path, ordinary user flow,
+unusual but user-reachable state, constructed input or direct call only, or
+unproven. Keep the fix-priority recommendation separate from severity and note
+the decision owner. Do not invent thresholds, affected-user counts, or product
+rules. An ambiguous low-harm behavior may need a product decision or no action;
+a modest user-experience improvement can be explored without calling it a defect.
 Prefer a functional user-facing flow when it can observe the promised outcome. Use a
 service, persistence, queue, simulator, or controlled failure check when the user flow
 cannot expose the material risk. A suitable nonproduction environment can establish

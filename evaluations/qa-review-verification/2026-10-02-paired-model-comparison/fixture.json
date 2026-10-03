@@ -1,0 +1,247 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "qa-upper110-fixed-inputs-v1",
+  "notice": "All tickets, requirement authorities, candidate/build labels, personas and product observations below are fictitious fixed test-input material. They do not establish a real product execution, canonical QA record, task, receipt or authority. Only worker model responses will be actual captured trial outputs.",
+  "caseOrder": [
+    "case-01",
+    "case-02",
+    "case-03",
+    "case-04",
+    "case-05",
+    "case-06"
+  ],
+  "productIntentSources": [
+    {
+      "id": "intent-category-r1",
+      "revision": "r1",
+      "authority": "Synthetic product-decision owner for this fictional example",
+      "approval": "Approved within this fixed fictional example only",
+      "statement": "With category A selected, a search for a term shared by records in categories A and B returns matching A records and excludes matching B records. An empty match set displays an empty result rather than records from another category."
+    },
+    {
+      "id": "intent-checkout-r1",
+      "revision": "r1",
+      "authority": "Synthetic product-decision owner for this fictional example",
+      "approval": "Approved within this fixed fictional example only",
+      "statement": "An eligible signed-in buyer with a valid payment method can complete ordinary checkout and receives an order confirmation. Declined payment must not create a paid order. The supplied report does not establish charge persistence or repeated-attempt behavior."
+    }
+  ],
+  "cases": [
+    {
+      "id": "case-01",
+      "prompt": "Draft a QA handoff note from these existing results; do not execute checks.",
+      "sessionMessages": [],
+      "input": {
+        "selection": {
+          "ticketIds": [
+            "QA-DEMO-101"
+          ],
+          "label": "example-reviewer-a",
+          "scope": "Only this supplied ticket; the label is specific to this request."
+        },
+        "candidate": "synthetic-category-build-a",
+        "environment": "synthetic-local-component-harness",
+        "intentSourceIds": [
+          "intent-category-r1"
+        ],
+        "suppliedResults": [
+          {
+            "scenarioId": "category-a-isolation",
+            "reportedBy": "Fictional test operator A",
+            "boundary": "attributed local component result; not a deployed attempt",
+            "input": "Category A record A1 and category B record B1 both contain the term amber. Select A and search amber.",
+            "reportedObservation": "A1 returned; B1 excluded.",
+            "reportedAssertion": "Observed IDs equal [A1].",
+            "evidenceRef": "supplied-result/category-a-isolation",
+            "rawEvidenceInspected": false
+          },
+          {
+            "scenarioId": "empty-match",
+            "reportedBy": "Fictional test operator A",
+            "boundary": "attributed local component result; not a deployed attempt",
+            "input": "Select A and search a term absent from both controlled records.",
+            "reportedObservation": "Empty result displayed.",
+            "reportedAssertion": "Observed result IDs equal [].",
+            "evidenceRef": "supplied-result/empty-match",
+            "rawEvidenceInspected": false
+          }
+        ],
+        "gaps": [
+          "No deployed build or UI journey was inspected. These supplied component results do not establish deployed acceptance."
+        ],
+        "requestedDelivery": "Local draft only; no posting, transition, execution or product repair."
+      }
+    },
+    {
+      "id": "case-02",
+      "prompt": "Complete QA Review, but the owned staging fixture is unavailable.",
+      "sessionMessages": [],
+      "input": {
+        "selection": {
+          "ticketIds": [
+            "QA-DEMO-202"
+          ],
+          "scope": "The one supplied ticket; this request has no reviewer or label restriction."
+        },
+        "candidate": "synthetic-category-build-b",
+        "environment": null,
+        "intentSourceIds": [
+          "intent-category-r1"
+        ],
+        "requiredScenarios": [
+          "category-a-isolation",
+          "empty-match"
+        ],
+        "suppliedResults": [],
+        "missingPrerequisite": "No authorized owned nonproduction fixture/environment is available. No current task, artifact pin or trusted execution invocation has been selected.",
+        "availableContext": "Ticket and fictional intent text can be inspected locally. No scenario attempt exists.",
+        "requestedDelivery": "Full review remains requested; local draft evidence may be prepared, but this trial grants no runtime or external action."
+      }
+    },
+    {
+      "id": "case-03",
+      "prompt": "Write reusable test cases for category filtering from these requirements. Do not run tests, write a QA closeout note, or change the tracker.",
+      "sessionMessages": [],
+      "input": {
+        "selection": {
+          "ticketIds": [
+            "QA-DEMO-303"
+          ],
+          "scope": "Case design from the supplied category requirement."
+        },
+        "intentSourceIds": [
+          "intent-category-r1"
+        ],
+        "candidate": null,
+        "environment": null,
+        "caseFormat": [
+          "Title",
+          "Preconditions",
+          "Steps",
+          "Expected result"
+        ],
+        "availableFixtureDesign": "Propose two owned records in different categories sharing a search term, and a term that matches neither. No records have been created.",
+        "existingCaseIds": [],
+        "requestedDelivery": "Local reusable case drafts only; no actual Testmo association, IDs, execution or acceptance is supplied."
+      }
+    },
+    {
+      "id": "case-04",
+      "prompt": "Complete QA Review, but the owned staging fixture is unavailable.",
+      "sessionMessages": [
+        {
+          "role": "user",
+          "content": "For this conversation, please briefly tell me which workflow you selected and whether it can run, including when the choice changes."
+        }
+      ],
+      "input": {
+        "selection": {
+          "ticketIds": [
+            "QA-DEMO-202"
+          ],
+          "scope": "The one supplied ticket; this request has no reviewer or label restriction."
+        },
+        "candidate": "synthetic-category-build-b",
+        "environment": null,
+        "intentSourceIds": [
+          "intent-category-r1"
+        ],
+        "requiredScenarios": [
+          "category-a-isolation",
+          "empty-match"
+        ],
+        "suppliedResults": [],
+        "missingPrerequisite": "No authorized owned nonproduction fixture/environment is available. No current task, artifact pin or trusted execution invocation has been selected.",
+        "availableContext": "Ticket and fictional intent text can be inspected locally. No scenario attempt exists.",
+        "requestedDelivery": "Full review remains requested; local draft evidence may be prepared, but this trial grants no runtime or external action."
+      }
+    },
+    {
+      "id": "case-05",
+      "prompt": "Review this failed checkout scenario.",
+      "sessionMessages": [],
+      "input": {
+        "selection": {
+          "ticketIds": [
+            "QA-DEMO-505"
+          ],
+          "scope": "Review the supplied failed ordinary-checkout report."
+        },
+        "candidate": "synthetic-checkout-build-a",
+        "environment": "synthetic-staging-a",
+        "persona": "fictional eligible signed-in buyer",
+        "intentSourceIds": [
+          "intent-checkout-r1"
+        ],
+        "suppliedResults": [
+          {
+            "scenarioId": "ordinary-checkout",
+            "reportedBy": "Fictional test operator B",
+            "boundary": "attributed deployed UI report; raw evidence not inspected in this trial",
+            "steps": [
+              "Use the stated eligible buyer and valid payment method.",
+              "Add one in-stock item and follow ordinary checkout.",
+              "Submit once."
+            ],
+            "reportedObservation": "The interface displays an error and no order confirmation.",
+            "evidenceRef": "supplied-result/ordinary-checkout",
+            "rawEvidenceInspected": false
+          },
+          {
+            "scenarioId": "declined-payment-control",
+            "reportedBy": "Fictional test operator B",
+            "boundary": "attributed deployed UI report; raw evidence not inspected in this trial",
+            "steps": [
+              "Use the same build and buyer with a deliberately declined test method.",
+              "Submit once."
+            ],
+            "reportedObservation": "A decline message appears; no paid order is reported.",
+            "evidenceRef": "supplied-result/declined-control",
+            "rawEvidenceInspected": false
+          }
+        ],
+        "unknowns": [
+          "Frequency, affected-user count, other roles/tenants/builds, persistence and charge effects, workaround, root cause and introduction revision are unknown.",
+          "The project severity scale and numeric thresholds were not supplied.",
+          "No fresh reproduction or independent QA evaluator has run for this trial."
+        ],
+        "decisionOwner": "Product/delivery owner role; no named person or deadline is selected.",
+        "requestedDelivery": "Evidence-attributed local finding and practical follow-up, not a posted developer ticket or repaired product."
+      }
+    },
+    {
+      "id": "case-06",
+      "prompt": "This control behaves oddly; should we call it a bug?",
+      "sessionMessages": [],
+      "input": {
+        "selection": {
+          "ticketIds": [
+            "QA-DEMO-606"
+          ],
+          "scope": "Classify the supplied low-harm behavior question."
+        },
+        "candidate": "synthetic-form-build-a",
+        "environment": "synthetic-local-ui",
+        "persona": "fictional editor",
+        "intentSourceIds": [],
+        "suppliedResults": [
+          {
+            "reportedBy": "Fictional user C",
+            "boundary": "uninspected attributed UI report",
+            "reportedObservation": "A preferences panel remembers its last-open section. It takes one extra click to return to the overview.",
+            "evidenceRef": "supplied-report/preferences-panel",
+            "rawEvidenceInspected": false
+          }
+        ],
+        "expectedBehaviorAuthority": null,
+        "impact": "The report describes a small convenience cost and no blocked task, data loss or demonstrated requirement violation.",
+        "unknowns": [
+          "No approved rule defines whether the remembered section or overview is required.",
+          "Frequency, affected-user count and broader scope were not supplied."
+        ],
+        "decisionOwner": "Product owner role",
+        "requestedDelivery": "A bounded classification and next product question. No repair, filing or risk acceptance is authorized."
+      }
+    }
+  ]
+}
