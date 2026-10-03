@@ -185,7 +185,7 @@ export function parseArchive(bytes) {
   throw new Error('Missing tar end blocks');
 }
 
-function marketplace(installation = 'AVAILABLE') {
+function marketplace(installation = 'INSTALLED_BY_DEFAULT') {
   return {
     name: 'temari-knowledge',
     interface: { displayName: 'Temari Knowledge' },
@@ -213,6 +213,10 @@ function readme(release) {
       'Extract only when the printed digest matches the pinned value. From the extracted root:\n\n' +
       '```sh\ncodex plugin marketplace add .\ncodex plugin add content-registrar-knowledge@temari-knowledge\n' +
       'node plugins/content-registrar-knowledge/bin/temari-knowledge.mjs setup\n```\n\n' +
+      'Adding the marketplace alone did not auto-install the plugin in the tested macOS Codex CLI.\n' +
+      'Run the explicit `codex plugin add` step there. The catalog requests default installation\n' +
+      'for desktop marketplace consumers, but desktop installation has not been verified.\n' +
+      'Python setup remains an explicit step after the plugin is installed.\n\n' +
       'Open a new Codex chat after installation. Python 3.12 and Python package download access are\n' +
       'required for cold setup. Local-only sources need no TypeSafe key or hosted Jev call.\n' +
       'The macOS CLI path is tested; native Windows and desktop Plugins Directory installation are not.\n' +
