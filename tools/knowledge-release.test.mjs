@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   mkdir,
@@ -12,6 +12,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   archiveBytes,
   checkKnowledgeRelease,
@@ -123,10 +124,12 @@ test('two versioned private release builds are byte identical and digest checked
     (await checkKnowledgeRelease(archives[0], release.archiveSha256)).version,
     '0.1.0',
   );
+  const existing = await readFile(archives[0]);
   await assert.rejects(
     packageKnowledgeRelease(plugin, manifestSha256, archives[0]),
     { code: 'EEXIST' },
   );
+  assert.deepEqual(await readFile(archives[0]), existing);
   const tampered = join(root, 'tampered.tar.gz');
   const bytes = await readFile(archives[0]);
   bytes[Math.floor(bytes.length / 2)] ^= 1;
@@ -135,6 +138,37 @@ test('two versioned private release builds are byte identical and digest checked
     checkKnowledgeRelease(tampered, release.archiveSha256),
     /digest mismatch/,
   );
+});
+
+test('file-size write failure never publishes a partial archive', {
+  skip: process.platform === 'win32',
+}, async () => {
+  const output = join(root, 'write-failure.tar.gz');
+  const command = spawnSync(
+    'bash',
+    [
+      '-c',
+      'ulimit -f 1; exec "$@"',
+      '--',
+      process.execPath,
+      fileURLToPath(new URL('./knowledge-release.mjs', import.meta.url)),
+      'package',
+      '--artifact',
+      plugin,
+      '--expected-manifest-sha256',
+      manifestSha256,
+      '--output',
+      output,
+    ],
+    { encoding: 'utf8', timeout: 30_000 },
+  );
+  assert.notEqual(command.status, 0);
+  assert(
+    command.signal === 'SIGXFSZ' ||
+      /EFBIG|file size limit/i.test(command.stderr),
+    `Expected a file-size write failure, got: ${command.stderr}`,
+  );
+  await assert.rejects(stat(output), { code: 'ENOENT' });
 });
 
 test('archive extracts into isolated recipient root and launcher remains usable', async () => {

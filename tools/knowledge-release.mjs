@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { constants } from 'node:fs';
 import {
   chmod,
+  link,
   lstat,
   mkdtemp,
   mkdir,
@@ -372,29 +372,33 @@ export async function packageKnowledgeRelease(
   files.set(releasePath, jsonBytes({ ...metadata, files: records(files) }));
   const bytes = archiveBytes(files);
   await mkdir(dirname(output), { recursive: true });
-  const handle = await open(
-    output,
-    constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL,
-    0o600,
+  // Keep an incomplete archive private to staging. Linking within the same
+  // directory publishes the checked bytes atomically without replacing output.
+  const staging = await mkdtemp(
+    join(dirname(output), `.${basename(output)}.staging-`),
   );
+  const stagedArchive = join(staging, basename(output));
   try {
-    await handle.writeFile(bytes);
-  } finally {
-    await handle.close();
-  }
-  try {
-    const candidate = await checkKnowledgeRelease(output, sha256(bytes));
-    return priorRelease
+    const handle = await open(stagedArchive, 'wx', 0o600);
+    try {
+      await handle.writeFile(bytes);
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    const candidate = await checkKnowledgeRelease(stagedArchive, sha256(bytes));
+    const result = priorRelease
       ? await checkKnowledgeReleaseSuccessor(
           priorRelease.archive,
           priorRelease.sha256,
-          output,
+          stagedArchive,
           candidate.archiveSha256,
         )
       : candidate;
-  } catch (error) {
-    await rm(output, { force: true });
-    throw error;
+    await link(stagedArchive, output);
+    return result;
+  } finally {
+    await rm(staging, { recursive: true, force: true });
   }
 }
 
