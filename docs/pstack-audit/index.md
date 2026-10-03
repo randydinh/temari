@@ -1,6 +1,6 @@
 # P-stack capability index and ownership review
 
-Reviewed 2026-10-02 against this checkout's bundled Temari v4.1 assets and
+Reviewed 2026-10-03 against this checkout's bundled Temari v4.1 assets and
 public bundle source. This is a source and scenario review, not evidence that
 every route ran against a live application, PR, or external service. The v4.1
 tree has 53 skill entry files, including 23 principles and
@@ -17,9 +17,10 @@ when present, is an ignored local code graph, not this catalog's durable source.
 Graph edges distinguish `documented` or `source_reference` facts from
 `review_recommendation` proposals. For example,
 `jq '.edges[] | select(.from == "playbook:orchestrate")' docs/pstack-audit/graph.json`
-shows the Orchestrate method, a proposed Temari program-policy owner,
-and the legacy store relationship. Proposed mechanical changes
-remain labeled as recommendations.
+shows the Poteto method, Temari semantic program policy, and the retained
+legacy resume-store relationship. Program policy and lifecycle selection are
+source-supported guidance; standing-program execution and proposed mechanical
+changes remain gated or labeled as recommendations.
 
 ## Canonical public entries
 
@@ -57,8 +58,15 @@ public Temari policy admits only its explicit routes and host capabilities.
 
 The public policy currently admits lightweight engineering, host-proven full
 feature work, and versioned QA. It has no standing-program execution entry.
-It has no typed `programKind` route. The legacy v4.1 skills remain source and
-compatibility material.
+The source [Temari core](../../libs/temari-core/src/lib/temari-core.ts) now
+classifies explicit `programKind`: `autonomous-run`, `orchestrate`,
+`autopilot-full`, `autopilot-stack`, or `multi-phase-plan`. This route is
+**planning-only**. [The serial runtime](../../libs/runtime/src/lib/runtime.ts)
+refuses it before invoking a stage or writing a receipt. Size or duration alone
+does not select a program; QA responsibility or exclusion, bounded QA callbacks,
+and invalid parent-review relationships fail closed. No public policy entry,
+TaskRun or execution admission is added. The legacy v4.1 skills remain source
+and compatibility material. See the [program ownership decision](../decisions/2026-09-30-temari-program-ownership.md).
 
 ## Ownership model
 
@@ -74,9 +82,12 @@ Temari submits engineering work to Poteto for method selection. Archon cannot
 decide what a request means, choose acceptance criteria, approve a merge, or
 turn a native status into a Temari completion receipt. The Nx Archon port is
 currently optional. A model-free source-workspace conformance journey now
-produces a canonical receipt; installed and live-model parity remain promotion
-gates. Those are current boundaries. Assigning program policy or lifecycle
-playbooks to Temari below is a proposal, not an implemented route transfer.
+produces a canonical receipt; installed and live-model Archon/program parity
+remain promotion gates. Those gaps do not describe independently admitted
+bounded engineering or finite-policy QA paths. Temari now selects program
+intent and task lifecycle in the source guidance; Poteto keeps the technical
+methods. Typed program classification is planning-only, not a transfer of
+mechanical execution or an admission claim.
 
 ```mermaid
 flowchart LR
@@ -97,9 +108,10 @@ flowchart LR
 Each row names the kind of observable output a representative scenario would
 need. A source review can check the route and its contract; it cannot supply a
 real PR, UI repro, trace, model comparison, or long-running outcome. `Poteto`
-means engineering method ownership. `Temari candidate` identifies a proposed
-semantic owner for multi-run work; Archon and runtime would execute mechanical
-portions only after conformance.
+means engineering method ownership. `Temari policy` identifies semantic
+program intent or lifecycle selection. It does not prove model routing quality
+or standing-program execution; Archon and runtime mechanics need their own
+scoped admission and conformance.
 
 | Playbook                                                                                                                       | Scenario and required observable output                                 | Principle that changes the result                              | Ownership assessment                                                    |
 | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------- |
@@ -118,13 +130,13 @@ portions only after conformance.
 | [Eval](../../packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/eval.md)                                       | Prompt or skill variant; blinded rubric, outputs, judge and own review  | Test Behavior, Not Implementation checks actual agent behavior | Poteto toolmaking, keep                                                 |
 | [Babysit](../../packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/babysit.md)                                 | PR status; blocker class, fixes, pending gate                           | Prove It Works requires forge state, not green-check inference | Keep quality policy in Poteto; move polling to host/runtime             |
 | [Shipping](../../packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/shipping.md)                               | Stack landing; independent verdict for each current head                | Sequence Verifiable Units limits the landing ceiling           | Keep quality policy; move queue mechanics to runtime                    |
-| [Autonomous run](../../packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/autonomous-run.md)                   | One predicate; iteration trail and final check                          | Make Operations Idempotent shapes retries                      | Poteto method; Temari run-policy transfer proposed                      |
-| [Orchestrate](../../packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/orchestrate.md)                         | Multi-day program; units, ledger, frontier, gates, status               | Separate Before Serializing Shared State assigns writers       | Poteto method and legacy store; Temari program-policy transfer proposed |
-| [Autopilot-full](../../packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/autopilot-full.md)                   | Independent PR queue; owner and independent verifier per head           | Prove It Works gates every merge                               | Poteto method; Temari program-policy transfer proposed                  |
-| [Autopilot-stack](../../packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/autopilot-stack.md)                 | One reviewable base-branch chain; exact head verdicts                   | Sequence Verifiable Units orders the stack                     | Poteto method; Temari program-policy transfer proposed                  |
-| [Session pickup](../../packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/session-pickup.md)                   | Prior work; inherited state and safe resume point                       | Guard the Context Window avoids replaying whole history        | Poteto playbook; Temari lifecycle transfer proposed                     |
-| [Pause safely](../../packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/pause-safely.md)                       | Interrupted work; durable resume note and first next action             | Make Operations Idempotent protects resume                     | Poteto playbook; Temari lifecycle transfer proposed                     |
-| [Multi-phase plan](../../packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/multi-phase-plan.md)               | Dependent phases/PRs; plan, gates, proof gaps                           | Sequence Verifiable Units shapes the plan                      | Poteto method; Temari program-plan transfer proposed                    |
+| [Autonomous run](../../packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/autonomous-run.md)                   | One predicate; iteration trail and final check                          | Make Operations Idempotent shapes retries                      | Temari program intent; Poteto method; execution gated                      |
+| [Orchestrate](../../packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/orchestrate.md)                         | Multi-day program; units, ledger, frontier, gates, status               | Separate Before Serializing Shared State assigns writers       | Temari program policy; Poteto method; legacy resume only |
+| [Autopilot-full](../../packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/autopilot-full.md)                   | Independent PR queue; owner and independent verifier per head           | Prove It Works gates every merge                               | Temari program policy; Poteto method; execution gated                  |
+| [Autopilot-stack](../../packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/autopilot-stack.md)                 | One reviewable base-branch chain; exact head verdicts                   | Sequence Verifiable Units orders the stack                     | Temari program policy; Poteto method; execution gated                  |
+| [Session pickup](../../packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/session-pickup.md)                   | Prior work; inherited state and safe resume point                       | Guard the Context Window avoids replaying whole history        | Temari lifecycle selection; Poteto mechanics                     |
+| [Pause safely](../../packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/pause-safely.md)                       | Interrupted work; durable resume note and first next action             | Make Operations Idempotent protects resume                     | Temari lifecycle selection; Poteto mechanics                     |
+| [Multi-phase plan](../../packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/multi-phase-plan.md)               | Dependent phases/PRs; plan, gates, proof gaps                           | Sequence Verifiable Units shapes the plan                      | Temari program planning; Poteto method                    |
 | [Worktree cleanup](../../packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/worktree-cleanup.md)               | Disk cleanup; before/after space and held worktrees                     | Prove It Works checks actual reclamation                       | Host operation, optional route                                          |
 | [Opening a PR](../../packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbooks/opening-a-pr.md)                       | Required PR; ordered commits and reviewable description                 | Minimize Reader Load improves delivery                         | Poteto delivery policy, host forge action                               |
 
@@ -201,26 +213,27 @@ it to a live task.
 
 ## Move, keep, and retire
 
-**Orchestrate is the main proposed ownership change.** Its bundled playbook
-still runs a program store (`units.tsv`, `ledger.tsv`, `frontier.json`,
-`gates.md`) through `orch`. The current public Temari policy has no standing
-program route. The Nx runtime has revision-bound receipts, a child-task store,
-leases, and evidence; Archon owns native run control. Orchestrate's program
-framing, briefs, pilot, queue discipline, verification ledger, and failure
-reconciliation could inform a future Temari program policy. Keep `orch` for
-recorded legacy programs while its packaged verifier uses it. Retiring that
-store would require an admitted program route, installed and live-model
-execution parity, and a migration journey preserving units, current-head
-verdicts, restart state, and closeout.
+**Orchestrate now supplies a legacy method reference.** Temari owns new
+standing-program intent and its explicit typed route stops at planning. The
+bundled playbook and `orch` retain their plain-file store (`units.tsv`,
+`ledger.tsv`, `frontier.json`, `gates.md`) for already-recorded legacy programs.
+Do not initialize a second store for a new Temari program. The Nx runtime has
+revision-bound receipts, a child-task store, leases and evidence; Archon owns
+native run control. Orchestrate's briefs, pilot, queue discipline, verification
+ledger and failure reconciliation remain useful method references. Retiring
+`orch` still requires admitted program execution, installed and live-model
+program parity, and a migration journey preserving units, current-head verdicts,
+restart state and closeout. Its packaged verifier and store remain intact.
 
-**Other lifecycle proposals.** The bundled Temari skill routes engineering to
-Poteto; its `closeout` skill is a public entry. Moving `pause-safely` and
-`session-pickup` from Poteto's playbook catalog into Temari lifecycle policy
-remains a recommendation. The same applies to program-policy ownership for
-`autopilot-full`, `autopilot-stack`, and `multi-phase-plan`. Their engineering
-quality gates remain useful while host/runtime mechanics await admission.
-Moving Babysit polling and Shipping queue mechanics behind host/runtime
-adapters is likewise a recommendation, not a completed migration.
+**Lifecycle selection and remaining proposals.** The bundled Temari skill
+selects pause, pickup and closeout; Poteto's `pause-safely` and `session-pickup`
+remain reusable engineering mechanics. `closeout` remains a public entry.
+Temari selects explicit `autopilot-full`, `autopilot-stack` and
+`multi-phase-plan` intent for planning; their method files and quality gates
+remain in Poteto. This source change does not move persistence, scheduling,
+recovery or host actions. Moving Babysit polling and Shipping queue mechanics
+behind host/runtime adapters remains a recommendation. Recall ownership,
+source freshness and global scheduling/recovery are not promoted by this unit.
 
 **Optional material.** `make-bot-ui` is a specific webhook product recipe;
 `setup-pstack` is host configuration; `automate-me` and `reflect` change
@@ -238,5 +251,9 @@ bundled Temari and Poteto routes, merge-reconciliation, the Orchestrate store,
 and the source paths referenced by the generated graph. The playbook scenario
 table remains a source review, not a live run of each method. No multi-day
 program, external integration, UI, PR merge, or model-panel evaluation was
-performed for this audit. Such a run needs a concrete target, host capability,
-and its own evidence; a scenario walkthrough cannot substitute for it.
+performed for this audit. Source tests can prove explicit classification and
+zero-stage/null-receipt refusal; package and graph checks prove their bounded
+contracts. They do not prove a model follows the new method guidance. The
+separate program model-guidance comparison remains an unproved activation gate,
+outside this source composition. A live program needs a concrete target, host
+capability and its own evidence; a scenario walkthrough cannot substitute for it.

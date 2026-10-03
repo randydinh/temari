@@ -91,6 +91,13 @@ export interface PotetoRouteDecision {
 export type TemariRequestScope =
   'full' | 'explicitly-narrow' | 'bounded-subtask';
 
+export type TemariProgramKind =
+  | 'autonomous-run'
+  | 'orchestrate'
+  | 'autopilot-full'
+  | 'autopilot-stack'
+  | 'multi-phase-plan';
+
 export type QaResponsibility =
   | 'ticket-coverage'
   | 'test-plan-review'
@@ -107,6 +114,8 @@ export type QaRouteExclusion =
 export interface TemariRouteInput extends PotetoRouteInput {
   /** Structured intent; route selection never infers QA from keywords. */
   readonly qaResponsibility?: QaResponsibility;
+  /** Program intent is explicit; a large work type alone does not infer it. */
+  readonly programKind?: TemariProgramKind;
   /** An explicit exclusion keeps a superficially similar request on a playbook. */
   readonly qaExclusion?: QaRouteExclusion;
   readonly requestScope?: TemariRequestScope;
@@ -129,8 +138,16 @@ export interface TemariDomainRouteEntry {
   readonly owner: './qa-review';
 }
 
+export interface TemariProgramRouteEntry {
+  readonly profileKind: 'program';
+  readonly route: 'program';
+  readonly owner: 'temari';
+}
+
 export type TemariRouteEntry =
-  TemariPlaybookRouteEntry | TemariDomainRouteEntry;
+  | TemariPlaybookRouteEntry
+  | TemariDomainRouteEntry
+  | TemariProgramRouteEntry;
 
 /**
  * The first closed route table. It is deliberately data, not a plugin registry:
@@ -144,6 +161,7 @@ export const TEMARI_ROUTE_TABLE: readonly TemariRouteEntry[] = Object.freeze([
   },
   { profileKind: 'playbook', route: 'full-playbook', owner: 'poteto-mode' },
   { profileKind: 'domain', route: 'qa-review', owner: './qa-review' },
+  { profileKind: 'program', route: 'program', owner: 'temari' },
 ]);
 
 export interface TemariPlaybookRouteDecision {
@@ -164,8 +182,17 @@ export interface TemariQaRouteDecision {
   readonly responsibility: QaResponsibility;
 }
 
+export interface TemariProgramRouteDecision extends TemariProgramRouteEntry {
+  readonly requestScope: Exclude<TemariRequestScope, 'bounded-subtask'>;
+  readonly programKind: TemariProgramKind;
+  /** The current serial engine cannot certify a standing program. */
+  readonly admission: 'planning-only';
+}
+
 export type TemariRouteDecision =
-  TemariPlaybookRouteDecision | TemariQaRouteDecision;
+  | TemariPlaybookRouteDecision
+  | TemariQaRouteDecision
+  | TemariProgramRouteDecision;
 
 export interface TemariPlanRequest extends TemariRouteInput {
   /** Optional policy refinements supplied by the coordinator, never by a host. */
@@ -222,7 +249,7 @@ function routeEntry<T extends TemariRouteEntry>(
 
 /**
  * Validate the closed table at the package boundary. This keeps a missing QA
- * owner or duplicate route from silently degrading to a generic playbook.
+ * or program owner, or a duplicate route, from degrading to a playbook.
  */
 export function validateTemariRouteTable(
   entries: readonly TemariRouteEntry[] = TEMARI_ROUTE_TABLE,
@@ -245,6 +272,13 @@ export function validateTemariRouteTable(
   );
   if (!qa?.owner) {
     throw new Error('Temari route table has no qa-review domain owner.');
+  }
+  const program = entries.find(
+    (entry): entry is TemariProgramRouteEntry =>
+      entry.profileKind === 'program' && entry.route === 'program',
+  );
+  if (!program?.owner) {
+    throw new Error('Temari route table has no program owner.');
   }
 }
 
@@ -297,6 +331,16 @@ export function classifyTemariRoute(
 ): TemariRouteDecision {
   const requestScope = input.requestScope ?? 'full';
 
+  if (input.programKind && (input.qaResponsibility || input.qaExclusion)) {
+    throw new Error(
+      'A Temari program route cannot also declare QA responsibility or exclusion.',
+    );
+  }
+
+  if (input.programKind && requestScope === 'bounded-subtask') {
+    throw new Error('A bounded subtask cannot start a Temari program.');
+  }
+
   if (input.qaResponsibility && input.qaExclusion) {
     throw new Error(
       'A Temari route cannot declare both QA responsibility and a QA exclusion.',
@@ -313,6 +357,20 @@ export function classifyTemariRoute(
     throw new Error(
       'parentReviewId is only valid for a bounded-subtask request.',
     );
+  }
+
+  if (input.programKind) {
+    const programRoute = routeEntry<TemariProgramRouteEntry>(
+      'program',
+      'program',
+    );
+    return {
+      ...programRoute,
+      requestScope:
+        requestScope === 'explicitly-narrow' ? 'explicitly-narrow' : 'full',
+      programKind: input.programKind,
+      admission: 'planning-only',
+    };
   }
 
   if (input.qaResponsibility && requestScope !== 'bounded-subtask') {
