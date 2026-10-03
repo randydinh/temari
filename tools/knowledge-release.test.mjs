@@ -140,36 +140,40 @@ test('two versioned private release builds are byte identical and digest checked
   );
 });
 
-test('file-size write failure never publishes a partial archive', {
-  skip: process.platform === 'win32',
-}, async () => {
-  const output = join(root, 'write-failure.tar.gz');
-  const command = spawnSync(
-    'bash',
-    [
-      '-c',
-      'ulimit -f 1; exec "$@"',
-      '--',
-      process.execPath,
-      fileURLToPath(new URL('./knowledge-release.mjs', import.meta.url)),
-      'package',
-      '--artifact',
-      plugin,
-      '--expected-manifest-sha256',
-      manifestSha256,
-      '--output',
-      output,
-    ],
-    { encoding: 'utf8', timeout: 30_000 },
-  );
-  assert.notEqual(command.status, 0);
-  assert(
-    command.signal === 'SIGXFSZ' ||
-      /EFBIG|file size limit/i.test(command.stderr),
-    `Expected a file-size write failure, got: ${command.stderr}`,
-  );
-  await assert.rejects(stat(output), { code: 'ENOENT' });
-});
+test(
+  'file-size write failure never publishes a partial archive',
+  {
+    skip: process.platform === 'win32',
+  },
+  async () => {
+    const output = join(root, 'write-failure.tar.gz');
+    const command = spawnSync(
+      'bash',
+      [
+        '-c',
+        'ulimit -f 1; exec "$@"',
+        '--',
+        process.execPath,
+        fileURLToPath(new URL('./knowledge-release.mjs', import.meta.url)),
+        'package',
+        '--artifact',
+        plugin,
+        '--expected-manifest-sha256',
+        manifestSha256,
+        '--output',
+        output,
+      ],
+      { encoding: 'utf8', timeout: 30_000 },
+    );
+    assert.notEqual(command.status, 0);
+    assert(
+      command.signal === 'SIGXFSZ' ||
+        /EFBIG|file size limit/i.test(command.stderr),
+      `Expected a file-size write failure, got: ${command.stderr}`,
+    );
+    await assert.rejects(stat(output), { code: 'ENOENT' });
+  },
+);
 
 test('archive extracts into isolated recipient root and launcher remains usable', async () => {
   const recipient = join(root, 'recipient');
