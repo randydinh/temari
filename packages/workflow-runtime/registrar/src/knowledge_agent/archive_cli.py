@@ -116,7 +116,7 @@ def main(argv=None):
         prior_term = None
         if command == 'capture':
             # Let Python unwind archive/tempfile/guest-job finally blocks during
-            # Temari's graceful cancellation interval.
+            # the caller's graceful cancellation interval.
             def cancel_capture(_signal, _frame):
                 raise SystemExit(143)
             prior_term = signal.signal(signal.SIGTERM, cancel_capture)

@@ -30,7 +30,12 @@ let release;
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const jsonBytes = (value) => Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
 
-async function derivedRelease(name, version, changeSkill = false) {
+async function derivedRelease(
+  name,
+  version,
+  changeSkill = false,
+  historicalRegistrar = undefined,
+) {
   const files = parseArchive(await readFile(archives[0]));
   const prefix = 'plugins/content-registrar-knowledge/';
   const pluginPath = `${prefix}.codex-plugin/plugin.json`;
@@ -44,7 +49,29 @@ async function derivedRelease(name, version, changeSkill = false) {
       skillPath,
       Buffer.concat([files.get(skillPath), Buffer.from('\nUpdated.\n')]),
     );
+  if (historicalRegistrar) {
+    const upstreamPath = `${prefix}registrar/UPSTREAM.json`;
+    const upstream = JSON.parse(files.get(upstreamPath).toString());
+    upstream.upstream.commit = '760926907669ae34bd1861732edbbf8f5afaf588';
+    if (historicalRegistrar.invalidInnerHash)
+      upstream.files[0].sha256 = '0'.repeat(64);
+    files.set(upstreamPath, jsonBytes(upstream));
+    if (
+      historicalRegistrar.catalogInstallation ||
+      historicalRegistrar.catalogSourcePath
+    ) {
+      const catalogPath = '.agents/plugins/marketplace.json';
+      const catalog = JSON.parse(files.get(catalogPath).toString());
+      if (historicalRegistrar.catalogInstallation)
+        catalog.plugins[0].policy.installation =
+          historicalRegistrar.catalogInstallation;
+      if (historicalRegistrar.catalogSourcePath)
+        catalog.plugins[0].source.path = historicalRegistrar.catalogSourcePath;
+      files.set(catalogPath, jsonBytes(catalog));
+    }
+  }
   const manifest = JSON.parse(files.get(manifestPath).toString());
+  if (historicalRegistrar?.dirtySource) manifest.source.dirty = true;
   manifest.source.additionalFiles.find(
     (file) =>
       file.path ===
@@ -83,6 +110,17 @@ async function derivedRelease(name, version, changeSkill = false) {
         ),
     ),
   );
+  if (historicalRegistrar?.readmeVariant)
+    files.set(
+      'README.md',
+      Buffer.concat([
+        files.get('README.md'),
+        Buffer.from('\nPrior installation instructions differ.\n'),
+      ]),
+    );
+  if (historicalRegistrar?.readmeMalformed)
+    files.set('README.md', Buffer.from('unrelated notes\n'));
+  if (historicalRegistrar?.readmeMissing) files.delete('README.md');
   releaseData.files = [...files]
     .filter(([path]) => path !== 'RELEASE.json')
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
@@ -122,7 +160,7 @@ test('two versioned private release builds are byte identical and digest checked
   assert.deepEqual(await readFile(archives[0]), await readFile(archives[1]));
   assert.equal(
     (await checkKnowledgeRelease(archives[0], release.archiveSha256)).version,
-    '0.1.0',
+    '0.1.1',
   );
   const existing = await readFile(archives[0]);
   await assert.rejects(
@@ -252,7 +290,7 @@ test('recipient checker rejects a digest-pinned dirty-source release', async () 
 });
 
 test('successor guard rejects changed source with unchanged or lower version', async () => {
-  const changed = await derivedRelease('changed-source.tar.gz', '0.1.0', true);
+  const changed = await derivedRelease('changed-source.tar.gz', '0.1.1', true);
   await checkKnowledgeRelease(changed.path, changed.sha256);
   await assert.rejects(
     checkKnowledgeReleaseSuccessor(
@@ -263,7 +301,7 @@ test('successor guard rejects changed source with unchanged or lower version', a
     ),
     /Changed release requires a higher plugin version/,
   );
-  const lower = await derivedRelease('lower-version.tar.gz', '0.0.9');
+  const lower = await derivedRelease('lower-version.tar.gz', '0.1.0');
   await checkKnowledgeRelease(lower.path, lower.sha256);
   await assert.rejects(
     checkKnowledgeReleaseSuccessor(
@@ -341,5 +379,218 @@ test('package path enforces prior pin and removes refused candidate', async () =
       })
     ).succession,
     'identical',
+  );
+});
+
+test('externally pinned historical 0.1.0 release admits current 0.1.1 successor', async (t) => {
+  const prior =
+    process.env.KNOWLEDGE_RELEASE_TEST_PRIOR_ARCHIVE ||
+    '/private/tmp/content-registrar-knowledge-0.1.0-pr-final-20261003.tar.gz';
+  try {
+    await stat(prior);
+  } catch (error) {
+    if (error.code === 'ENOENT')
+      return t.skip('Historical release fixture unavailable');
+    throw error;
+  }
+  assert.equal(release.version, '0.1.1');
+  assert.equal(
+    (
+      await checkKnowledgeReleaseSuccessor(
+        prior,
+        '8cf8a4598f719ddeba7f7e64a0cf92d2ac54edfa22cb4b86034757b39649a01a',
+        archives[0],
+        release.archiveSha256,
+      )
+    ).succession,
+    'advanced',
+  );
+  const output = join(root, 'historical-successor.tar.gz');
+  const packaged = await packageKnowledgeRelease(
+    plugin,
+    manifestSha256,
+    output,
+    {
+      archive: prior,
+      sha256:
+        '8cf8a4598f719ddeba7f7e64a0cf92d2ac54edfa22cb4b86034757b39649a01a',
+    },
+  );
+  assert.equal(packaged.succession, 'advanced');
+  assert.equal(packaged.archiveSha256, release.archiveSha256);
+});
+
+test('historical pin is scoped to prior and still checks inner Registrar hashes', async () => {
+  const prior = await derivedRelease(
+    'synthetic-historical-prior.tar.gz',
+    '0.1.0',
+    false,
+    {},
+  );
+  await assert.rejects(
+    checkKnowledgeRelease(prior.path, prior.sha256),
+    /differs from reviewed upstream inventory/,
+  );
+  assert.equal(
+    (
+      await checkKnowledgeReleaseSuccessor(
+        prior.path,
+        prior.sha256,
+        archives[0],
+        release.archiveSha256,
+      )
+    ).succession,
+    'advanced',
+  );
+  const badInner = await derivedRelease(
+    'bad-historical-inner-hash.tar.gz',
+    '0.1.0',
+    false,
+    { invalidInnerHash: true },
+  );
+  await assert.rejects(
+    checkKnowledgeReleaseSuccessor(
+      badInner.path,
+      badInner.sha256,
+      archives[0],
+      release.archiveSha256,
+    ),
+    /Registrar payload hash drift/,
+  );
+  const dirty = await derivedRelease(
+    'dirty-historical-prior.tar.gz',
+    '0.1.0',
+    false,
+    { dirtySource: true },
+  );
+  await assert.rejects(
+    checkKnowledgeReleaseSuccessor(
+      dirty.path,
+      dirty.sha256,
+      archives[0],
+      release.archiveSha256,
+    ),
+    /Release requires a clean source commit/,
+  );
+  const tampered = join(root, 'tampered-historical.tar.gz');
+  const bytes = await readFile(prior.path);
+  bytes[Math.floor(bytes.length / 2)] ^= 1;
+  await writeFile(tampered, bytes);
+  await assert.rejects(
+    checkKnowledgeReleaseSuccessor(
+      tampered,
+      prior.sha256,
+      archives[0],
+      release.archiveSha256,
+    ),
+    /digest mismatch/,
+  );
+});
+
+test('historical catalog admits a prior install policy but refuses changed identity', async () => {
+  const policyVariant = await derivedRelease(
+    'historical-policy-variant.tar.gz',
+    '0.1.0',
+    false,
+    { catalogInstallation: 'INSTALLED_BY_DEFAULT' },
+  );
+  await assert.rejects(
+    checkKnowledgeRelease(policyVariant.path, policyVariant.sha256),
+    /Expected values to be strictly deep-equal/,
+  );
+  assert.equal(
+    (
+      await checkKnowledgeReleaseSuccessor(
+        policyVariant.path,
+        policyVariant.sha256,
+        archives[0],
+        release.archiveSha256,
+      )
+    ).succession,
+    'advanced',
+  );
+  const malformed = await derivedRelease(
+    'malformed-historical-catalog.tar.gz',
+    '0.1.0',
+    false,
+    { catalogSourcePath: '../wrong-plugin' },
+  );
+  await assert.rejects(
+    checkKnowledgeReleaseSuccessor(
+      malformed.path,
+      malformed.sha256,
+      archives[0],
+      release.archiveSha256,
+    ),
+    /Expected values to be strictly deep-equal/,
+  );
+  const forbiddenPolicy = await derivedRelease(
+    'forbidden-historical-policy.tar.gz',
+    '0.1.0',
+    false,
+    { catalogInstallation: 'SILENT_AUTO_INSTALL' },
+  );
+  await assert.rejects(
+    checkKnowledgeReleaseSuccessor(
+      forbiddenPolicy.path,
+      forbiddenPolicy.sha256,
+      archives[0],
+      release.archiveSha256,
+    ),
+    /Historical marketplace installation policy is invalid/,
+  );
+});
+
+test('historical README may evolve but must remain bounded and identify its release', async () => {
+  const prior = await derivedRelease(
+    'historical-readme-variant.tar.gz',
+    '0.1.0',
+    false,
+    { readmeVariant: true },
+  );
+  await assert.rejects(
+    checkKnowledgeRelease(prior.path, prior.sha256),
+    /Expected values to be strictly deep-equal/,
+  );
+  assert.equal(
+    (
+      await checkKnowledgeReleaseSuccessor(
+        prior.path,
+        prior.sha256,
+        archives[0],
+        release.archiveSha256,
+      )
+    ).succession,
+    'advanced',
+  );
+  const malformed = await derivedRelease(
+    'historical-readme-malformed.tar.gz',
+    '0.1.0',
+    false,
+    { readmeMalformed: true },
+  );
+  await assert.rejects(
+    checkKnowledgeReleaseSuccessor(
+      malformed.path,
+      malformed.sha256,
+      archives[0],
+      release.archiveSha256,
+    ),
+    /Historical README metadata does not match its release/,
+  );
+  const missing = await derivedRelease(
+    'historical-readme-missing.tar.gz',
+    '0.1.0',
+    false,
+    { readmeMissing: true },
+  );
+  await assert.rejects(
+    checkKnowledgeReleaseSuccessor(
+      missing.path,
+      missing.sha256,
+      archives[0],
+      release.archiveSha256,
+    ),
+    /Historical README is missing or unreasonably large/,
   );
 });

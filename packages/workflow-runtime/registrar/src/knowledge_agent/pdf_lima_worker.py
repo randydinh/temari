@@ -12,6 +12,7 @@ import resource
 import signal
 import stat
 import subprocess
+import sys
 import tempfile
 import time
 import uuid
@@ -20,6 +21,7 @@ PACKAGE = Path(__file__).parent
 FILES = ('__init__.py', 'archive_worker.py', 'knowledge.py', 'knowledge_cache.py', 'structure.py')
 MAX_PROFILE = 4096
 MAX_PDF = 8 * 1024 * 1024
+MAX_LIMACTL = 256 * 1024 * 1024
 BACKEND = 'lima-cgroup-v2-v1'
 
 
@@ -29,6 +31,34 @@ class _BusyJob(ValueError):
 
 def _hash(raw):
     return hashlib.sha256(raw).hexdigest()
+
+
+def _hash_regular_file(path, max_bytes, deadline):
+    """Hash a pinned local binary without following links or unbounded reads."""
+    if time.monotonic() >= deadline:
+        raise TimeoutError('PDF worker outer deadline')
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > max_bytes:
+            raise ValueError('PDF worker binary is not a bounded regular file')
+        state = hashlib.sha256()
+        total = 0
+        while True:
+            if time.monotonic() >= deadline:
+                raise TimeoutError('PDF worker outer deadline')
+            block = os.read(fd, 65536)
+            if not block:
+                break
+            total += len(block)
+            if total > max_bytes:
+                raise ValueError('PDF worker binary exceeds byte limit')
+            state.update(block)
+        if total != info.st_size or os.fstat(fd).st_size != info.st_size:
+            raise ValueError('PDF worker binary changed during hash')
+        return state.hexdigest()
+    finally:
+        os.close(fd)
 
 
 def _canonical(value):
@@ -41,13 +71,13 @@ def _limited(reason):
 
 
 class LimaPdfWorker:
-    def __init__(self, profile):
+    def __init__(self, profile, *, profile_sha256):
         self.profile = profile
         self.file_hashes = {name: _hash((PACKAGE / name).read_bytes()) for name in FILES}
         self.helper_hash = _hash((PACKAGE / 'pdf_lima_guest.py').read_bytes())
         self.identity = {
             'backend': BACKEND,
-            'profile_sha256': _hash(_canonical(profile)),
+            'profile_sha256': profile_sha256,
             'limactl_sha256': profile['limactl_sha256'],
             'guest_python_sha256': profile['guest_python_sha256'],
             'image_digest': profile['image_digest'],
@@ -68,7 +98,7 @@ class LimaPdfWorker:
         try:
             # Open once and cap the read itself. A path check followed by
             # read_bytes() can race a symlink swap or a growing file.
-            with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC), 'rb') as stream:
+            with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK), 'rb') as stream:
                 info = os.fstat(stream.fileno())
                 if not stat.S_ISREG(info.st_mode) or info.st_size > MAX_PROFILE:
                     raise ValueError('invalid local PDF worker profile path or size')
@@ -102,7 +132,7 @@ class LimaPdfWorker:
                 raise ValueError('invalid local PDF worker ' + key)
         if Path(profile['limactl']).name != 'limactl':
             raise ValueError('invalid local PDF worker binary path')
-        return cls(profile)
+        return cls(profile, profile_sha256=_hash(raw))
 
     def _command(self, parts, deadline, *, output=False, output_limit=1024 * 1024, input_bytes=None):
         remaining = deadline - time.monotonic()
@@ -121,8 +151,16 @@ class LimaPdfWorker:
             try:
                 child.communicate(input=input_bytes, timeout=remaining)
             except BaseException:
-                os.killpg(child.pid, signal.SIGKILL)
-                child.wait(timeout=2)
+                try:
+                    os.killpg(child.pid, signal.SIGKILL)
+                except OSError:
+                    # A cancelled command may already have exited; retain the
+                    # original cancellation rather than converting it to a gap.
+                    pass
+                try:
+                    child.wait(timeout=2)
+                except (OSError, subprocess.TimeoutExpired):
+                    pass
                 raise
             if child.returncode:
                 raise ValueError('PDF worker Lima command failed')
@@ -220,7 +258,7 @@ class LimaPdfWorker:
 
     def _extract(self, raw, relative, text_limit):
         deadline = time.monotonic() + 30
-        if _hash(Path(self.profile['limactl']).read_bytes()) != self.profile['limactl_sha256']:
+        if _hash_regular_file(self.profile['limactl'], MAX_LIMACTL, deadline) != self.profile['limactl_sha256']:
             raise ValueError('PDF worker Lima binary changed')
         if not Path(self.profile['lima_home']).is_dir():
             raise ValueError('PDF worker Lima home unavailable')
@@ -230,8 +268,8 @@ class LimaPdfWorker:
             raise ValueError('PDF worker guest Python identity mismatch')
         job_id = uuid.uuid4().hex
         guest = '/dev/shm/temari-pdf-jobs/' + job_id
-        created = False
-        self._shell(['/usr/bin/sudo', '-n', '/usr/bin/python3', '-c',
+        try:
+            self._shell(['/usr/bin/sudo', '-n', '/usr/bin/python3', '-c',
                      'import os,pathlib,sys; j=sys.argv[1]; p=pathlib.Path("/dev/shm/temari-pdf-jobs"); '
                      'p.mkdir(mode=0o711,exist_ok=True); '
                      'assert not any(p.iterdir()), "another or stale PDF job exists"; '
@@ -243,8 +281,6 @@ class LimaPdfWorker:
                      'os.mkdir(j+"/src",0o700); os.chown(j+"/src",u,g); '
                      'os.mkdir(j+"/src/knowledge_agent",0o700); os.chown(j+"/src/knowledge_agent",u,g)',
                      guest], deadline)
-        created = True
-        try:
             helper = guest + '/pdf_lima_guest.py'
             self._command(['copy', '--backend=scp', str(PACKAGE / 'pdf_lima_guest.py'),
                            self.profile['instance'] + ':' + guest + '/'], deadline)
@@ -284,19 +320,25 @@ class LimaPdfWorker:
                 raise ValueError('PDF worker result digest mismatch')
             return self._validate(output, text_limit)
         finally:
-            if created:
-                # The detached guest watchdog cleans even after host SIGKILL.
-                cleanup = ('import os,pathlib,shutil,signal,sys; '
-                           'j=sys.argv[1]; '
-                           'assert len(j)==32 and all(c in "0123456789abcdef" for c in j); '
-                           'p=pathlib.Path("/dev/shm/temari-pdf-jobs")/j; '
-                           'g=pathlib.Path("/sys/fs/cgroup")/("temari-pdf-"+j); '
-                           '[(os.kill(int(n),signal.SIGKILL)) for n in '
-                           '((g/"cgroup.procs").read_text().splitlines() if g.exists() else [])]; '
-                           'g.rmdir() if g.exists() else None; '
-                           'shutil.rmtree(p) if p.exists() else None; '
-                           'a=pathlib.Path("/dev/shm/temari-pdf-active"); '
-                           'm=a/"job-id"; '
-                           '(m.unlink(),a.rmdir()) if m.is_file() and m.read_text()==j else None')
+            pending = sys.exc_info()[1]
+            # The detached guest watchdog cleans even after host SIGKILL.
+            cleanup = ('import os,pathlib,shutil,signal,sys; '
+                       'j=sys.argv[1]; '
+                       'assert len(j)==32 and all(c in "0123456789abcdef" for c in j); '
+                       'p=pathlib.Path("/dev/shm/temari-pdf-jobs")/j; '
+                       'g=pathlib.Path("/sys/fs/cgroup")/("temari-pdf-"+j); '
+                       '[(os.kill(int(n),signal.SIGKILL)) for n in '
+                       '((g/"cgroup.procs").read_text().splitlines() if g.exists() else [])]; '
+                       'g.rmdir() if g.exists() else None; '
+                       'shutil.rmtree(p) if p.exists() else None; '
+                       'a=pathlib.Path("/dev/shm/temari-pdf-active"); '
+                       'm=a/"job-id"; '
+                       '(m.unlink(),a.rmdir()) if m.is_file() and m.read_text()==j else None')
+            try:
                 self._shell(['/usr/bin/sudo', '-n', '/usr/bin/python3', '-c', cleanup, job_id],
                             time.monotonic() + 10)
+            except BaseException:
+                # Preserve the original failure, especially SystemExit from
+                # SIGTERM, while a later preflight still refuses a stale job.
+                if pending is None:
+                    raise

@@ -2,25 +2,11 @@
   "schemaVersion": 1,
   "upstream": {
     "repository": "randydinh/content-registrar",
-    "commit": "760926907669ae34bd1861732edbbf8f5afaf588"
+    "commit": "d73f626133b2543345c32805957e05b61e386bad"
   },
   "downstream": {
     "repository": "randydinh/temari",
-    "sourceCommit": "8dc6fd9ebf4ccd4e652bc89cf16b3fbc1a0ffb5c",
-    "modifications": [
-      {
-        "commit": "261fcb2ae757ea0794f4c024887d597fc8fd8a2e",
-        "description": "Local-source currentness audit and source-archive tests"
-      },
-      {
-        "commit": "ceee15d7f89404ca003121d083a64b487085fe2c",
-        "description": "Bounded audit snapshots and paging with audit-snapshot tests"
-      },
-      {
-        "commit": "59e156c5037331489ccf29b0ab24df8c84b2167c",
-        "description": "Opt-in bounded local PDF capture and tests"
-      }
-    ]
+    "modifications": []
   },
   "files": [
     {
@@ -37,7 +23,7 @@
     },
     {
       "path": "src/knowledge_agent/archive_cli.py",
-      "sha256": "c879b0890e0099edfd6804155c024fcc6da8b64730d50489b3b9c0555c2f2449"
+      "sha256": "58504f3f9fc3e14e83c3019fff4d824a6ff50bbda0233463e6efb20ee4bc1225"
     },
     {
       "path": "src/knowledge_agent/archive_worker.py",
@@ -97,7 +83,7 @@
     },
     {
       "path": "src/knowledge_agent/pdf_lima_worker.py",
-      "sha256": "6b5c54a2f08ba95da5e461c656c7a8a91114aa2c8e69c3815de45226a0e0dc8a"
+      "sha256": "5e7e3a10aaab6122fa9e997a9d2b14f60b69d57b820e365d7e383800439d1882"
     },
     {
       "path": "src/knowledge_agent/provider_worker.py",
@@ -125,11 +111,11 @@
     },
     {
       "path": "src/knowledge_agent/source_archive.py",
-      "sha256": "93f2eb545747056aaa778924acf51e40c1dae19be26fdf93cf4bf19b609f120b"
+      "sha256": "02261293cd88018fd931e7987bf80c41e869193dac63cd97f3da2e3e2a53fe29"
     },
     {
       "path": "src/knowledge_agent/source_registry.py",
-      "sha256": "560333ba45c4e8816aefe586e51d40d81ec8bcfe919c10164d674bb382628ec2"
+      "sha256": "86a0855c3165f81481720a9855a799527ba972341d347879dbb9ab8917f0ab78"
     },
     {
       "path": "src/knowledge_agent/structure.py",
@@ -141,15 +127,15 @@
     },
     {
       "path": "tests/test_audit_snapshots.py",
-      "sha256": "c3e21f30a6d792840fc354c8255b51aff6e09bc6fbf80fe34900834355db3155"
+      "sha256": "f912e13cc380d944c7a93981f66cc109480ae8bdd0a8a8431b99e98a2def9e64"
     },
     {
       "path": "tests/test_pdf_lima_worker.py",
-      "sha256": "1bc750cbd0cd3a3dfe65f939c25d3bc58eab14f6ab5c3eb6610dff834a52d434"
+      "sha256": "a9776c9e1e5bceb268f0c7038c04b060ceaa2280e50f7d1c490b291aeccfda9a"
     },
     {
       "path": "tests/test_source_archive.py",
-      "sha256": "811125e3cd10bdf18fe3136e3a0d5a1a1d546667ec4908a1fc1d2ef9aac9ab10"
+      "sha256": "44739259d57fbcff63056d7534fc6bc2a57302fa21f2c51136d3d3adf10c3cd4"
     },
     {
       "path": "uv.lock",
