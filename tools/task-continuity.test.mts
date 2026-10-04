@@ -314,6 +314,29 @@ test('Talk CLI rejects in-source storage before creating task or conversation da
   await assert.rejects(readdir(join(root, 'conversations')), { code: 'ENOENT' });
 });
 
+test('multiworkspace Talk CLI validates every selected source before creating either store', async (t) => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'temari-talk-registry-cli-admission-')));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const workspaces = [join(root, 'source-a'), join(root, 'source-b')];
+  for (const workspace of workspaces) {
+    await mkdir(workspace);
+    await writeFile(join(workspace, 'sentinel.txt'), 'Existing source remains intact.');
+  }
+  const tasks = join(root, 'tasks'), conversations = join(root, 'registry'), configPath = join(root, 'talk.json');
+  const config = { schema: 2, root: conversations, registryId: 'fixture-registry', hostId: 'fixture-host', taskStoreId: 'fixture-tasks',
+    workspaces: workspaces.map((workspaceRoot, index) => ({ key: 'w' + index, workspaceId: 'workspace-' + index, label: 'Workspace ' + index, workspaceRoot })) };
+  await writeFile(configPath, JSON.stringify({ ...config, root: join(workspaces[1]!, 'registry') }));
+  await assert.rejects(runTaskCommand(['serve', '--root', tasks, '--talk-config', configPath, '--port', '0']), /outside|disjoint/);
+  await assert.rejects(readdir(tasks), { code: 'ENOENT' });
+  await writeFile(configPath, JSON.stringify(config));
+  await assert.rejects(runTaskCommand(['serve', '--root', join(workspaces[1]!, 'tasks'), '--talk-config', configPath, '--port', '0']), /outside|disjoint/);
+  await assert.rejects(readdir(conversations), { code: 'ENOENT' });
+  for (const workspace of workspaces) {
+    assert.deepEqual(await readdir(workspace), ['sentinel.txt']);
+    assert.equal(await readFile(join(workspace, 'sentinel.txt'), 'utf8'), 'Existing source remains intact.');
+  }
+});
+
 test('Talk CLI refuses symlink-parent storage traversal before any source write', async (t) => {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'temari-talk-symlink-parent-')));
   t.after(() => rm(root, { recursive: true, force: true }));

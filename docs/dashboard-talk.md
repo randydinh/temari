@@ -8,9 +8,12 @@ inbox instead of entering the conversation you are reading.
 
 ## User flow
 
-1. Create or select a topic in the left column.
+1. Create or select a topic in the left column. When the host has selected
+   multiple workspaces, choose one when creating the topic. Its workspace stays
+   fixed and is shown beside the topic.
 2. Ask Temari a question or work through a goal in the center conversation.
-3. Link an existing task to include its current runtime status in that topic.
+3. Link an existing task from that topic's workspace to include its current
+   runtime status. Other workspaces have their own topics in the same surface.
 4. When Temari offers a task, review its title and goal and choose **Accept**.
    This creates one durable, open task and links it to the topic.
 5. Open a linked task to use the existing planning, investigation, implementation
@@ -58,6 +61,55 @@ initialize Archon or read model credentials. Add `--control-config` and the
 native options from [the dashboard guide](task-dashboard.md) to enable the
 existing execution controls in the same service.
 
+### Several workspaces in one surface
+
+Use a schema2 registry in a **new external directory**. Each selected workspace
+keeps its own conversation store and immutable scope. The dashboard combines
+topic lists and attention; conversation context contains only the selected
+topic and its explicitly linked tasks. For example:
+
+```json
+{
+  "schema": 2,
+  "root": "/absolute/dashboard-state/talk-registry",
+  "registryId": "temari-workspaces",
+  "hostId": "local-desktop",
+  "taskStoreId": "main-tasks",
+  "workspaces": [
+    {
+      "key": "engineering",
+      "workspaceId": "engineering-workspace",
+      "label": "Engineering",
+      "workspaceRoot": "/absolute/engineering-checkout"
+    },
+    {
+      "key": "research",
+      "workspaceId": "research-workspace",
+      "label": "Research",
+      "workspaceRoot": "/absolute/research-checkout"
+    }
+  ]
+}
+```
+
+Use the same `--talk-config` launch flag and actual task store. Workspace keys
+are host-selected identifiers, not paths or execution permissions. A topic
+cannot be moved to another workspace. Foreign-workspace links are refused;
+opening a task still uses the existing execution controller's admission.
+
+Keep a registry's roster, source roots and actual task-store selection fixed.
+Changing them requires a separately reviewed new registry root; existing
+conversations are neither adopted nor migrated automatically. Schema1 stores
+and their bindings remain supported. Aggregated status is observed across
+stores in sequence, with a reported time window; it is not an atomic snapshot.
+
+The registry admits at most eight workspaces and 128 topics in total. Its
+attention list shows the latest 50 items and reports the retained total and
+omissions. If a selected source directory disappears or is replaced while the
+service is running, its retained topic history remains readable and mutations
+for that workspace stop. Restart requires every original selected directory
+and storage binding to be available; it refuses an incomplete or changed roster.
+
 A host can add one of these `transport` objects to `talk.json`:
 
 ```json
@@ -102,7 +154,8 @@ its supported executable and isolation admission.
   older work.
 - Missing or corrupt retained files and a held store lock refuse access. Startup
   does not replace the ledger, adopt different roots or take over the lock.
-- This release binds one host, workspace and task store. Cross-host delegation,
+- Each conversation store binds one host, workspace and task store. A schema2
+  registry combines those fixed workspace scopes on one host. Cross-host delegation,
   automatic engineering dispatch and general standing-program execution remain
   separate capabilities.
 

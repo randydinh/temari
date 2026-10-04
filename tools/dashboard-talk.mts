@@ -42,6 +42,9 @@ export interface DashboardTalkOptions {
   /** Trusted host injection for focused tests; never supplied by HTTP/config JSON. */
   readonly transport?:ModelTransport;
   readonly transportIdentity?:{ readonly adapter:string; readonly model:string };
+  /** Internal host registry binding; never accepted from config or HTTP. */
+  readonly proposalIdentityNamespace?:string;
+  readonly validateHostSelection?:()=>Promise<void>;
 }
 export interface TalkMutationInput { readonly requestId:string; readonly expectedVersion:number }
 export interface TalkTurnInput extends TalkMutationInput { readonly text:string }
@@ -272,6 +275,7 @@ export class DashboardTalkService {
   }
   private async refresh(topicId:string):Promise<void> {
     await this.serial(topicId,async()=>{
+      if(this.options.validateHostSelection)await this.options.validateHostSelection();
       let topic=await this.requireTopic(topicId);
       for(const card of await this.cards(topic)) {
         if(card.version===null)continue;
@@ -279,7 +283,7 @@ export class DashboardTalkService {
         const kind=card.status==='BLOCKED'||card.status==='UNKNOWN'?'blocked':card.status==='NEEDS_REVIEW'?'needs-review':'update';
         if(topic.attention.some((item)=>item.taskId===card.taskId&&item.taskVersion===card.version&&item.runId===card.currentRunId&&item.kind===kind&&item.observationSha256===digest))continue;
         const observation=conversationDigest({topicId,taskId:card.taskId,version:card.version,runId:card.currentRunId,kind,digest}).slice(0,40);
-        try {topic=(await this.store.observeAttention({...this.cmd(topic,'observe-'+observation),attentionId:'attention-'+observation,taskId:card.taskId,taskVersion:card.version,runId:card.currentRunId,kind,summary:`${short(card.title,512)}: ${card.status}`,observationSha256:digest})).topic;}catch(error){client(error);}
+        try {if(this.options.validateHostSelection)await this.options.validateHostSelection();topic=(await this.store.observeAttention({...this.cmd(topic,'observe-'+observation),attentionId:'attention-'+observation,taskId:card.taskId,taskVersion:card.version,runId:card.currentRunId,kind,summary:`${short(card.title,512)}: ${card.status}`,observationSha256:digest})).topic;}catch(error){client(error);}
       }
     });
   }
@@ -298,7 +302,7 @@ export class DashboardTalkService {
   async create(input:{requestId:string;title:string}) {
     input=structuredClone(input);exact(input,['requestId','title']);id(input.requestId,64);text(input.title,256);
     const topicId='topic-'+input.requestId;
-    return this.serial(topicId,async()=>{try{if(!await this.store.load(topicId))check((await this.allTopics()).length<CONVERSATION_LIMITS.topics,'Talk topic limit reached.',409);return {topic:(await this.store.createTopic({topicId,title:input.title,actor,idempotencyKey:'create-'+input.requestId,expectedVersion:0})).topic};}catch(error){client(error);}});
+    return this.serial(topicId,async()=>{try{if(this.options.validateHostSelection)await this.options.validateHostSelection();if(!await this.store.load(topicId))check((await this.allTopics()).length<CONVERSATION_LIMITS.topics,'Talk topic limit reached.',409);return {topic:(await this.store.createTopic({topicId,title:input.title,actor,idempotencyKey:'create-'+input.requestId,expectedVersion:0})).topic};}catch(error){client(error);}});
   }
   private packetPath(turnId:string):string {id(turnId);return join(this.store.root,'turn-context',turnId+'.json');}
   private async retainedPacket(turnId:string):Promise<ContextPacket|null> {
@@ -321,6 +325,7 @@ export class DashboardTalkService {
     input=structuredClone(input);id(topicId);mutation(input,['text']);text(input.text,CONVERSATION_LIMITS.userMessageBytes);
     check(this.transport,'Talk model transport is not configured.',503);
     return this.serial(topicId,async()=>{
+      if(this.options.validateHostSelection)await this.options.validateHostSelection();
       const topic=await this.requireTopic(topicId),turnId='turn-'+input.requestId;
       let packet=await this.retainedPacket(turnId);
       if(packet) {
@@ -343,10 +348,12 @@ export class DashboardTalkService {
         while(Buffer.byteLength(JSON.stringify(packet))>limits.contextBytes&&turns.length>0) {
           turns.shift();packet={...packet,history:{turns,page:{...packet.history.page,offset:topic.turns.length-turns.length,omittedBefore:topic.turns.length-turns.length}}};
         }
+        if(this.options.validateHostSelection)await this.options.validateHostSelection();
         await this.savePacket(packet);
       }
       const context:ConversationContext={topicId,topicVersion:packet.topicVersion,revision:'context-'+turnId,sha256:conversationDigest(packet),taskVersions:packet.taskVersions};
       try {
+        if(this.options.validateHostSelection)await this.options.validateHostSelection();
         const mutation=await this.store.enqueueTurn({topicId,actor,idempotencyKey:'enqueue-'+input.requestId,expectedVersion:input.expectedVersion,turnId,userMessage:input.text,context});
         if(mutation.applied)this.schedule(topicId,turnId,packet);
         const retained=mutation.topic.turns.find((turn)=>turn.turnId===turnId)!;
@@ -363,12 +370,14 @@ export class DashboardTalkService {
     let claimed=false;
     try {
       claimed=await this.serial(topicId,async()=>{
+        if(this.options.validateHostSelection)await this.options.validateHostSelection();
         const current=await this.requireTopic(topicId),turn=current.turns.find((item)=>item.turnId===turnId);
         if(turn?.state!=='queued')return false;
         check(turn.context.sha256===conversationDigest(packet),'Turn context differs from frozen packet.',409);
         return (await this.store.beginTurn({...this.cmd(current,'begin-'+packet.requestId),turnId})).applied;
       });
       if(!claimed)return;
+      if(this.options.validateHostSelection)await this.options.validateHostSelection();
       const signal=AbortSignal.timeout(limits.turnTimeoutMs);
       const request:ModelRequest={prompt,context:[{kind:'json',value:packet as unknown as JsonValue}],outputSchema};
       const pending=this.transport!.complete(request,signal);
@@ -378,6 +387,7 @@ export class DashboardTalkService {
       try {
         const output=this.reply(reply);
         await this.serial(topicId,async()=>{
+          if(this.options.validateHostSelection)await this.options.validateHostSelection();
           const current=await this.requireTopic(topicId),turn=current.turns.find((item)=>item.turnId===turnId);
           if(turn?.state!=='running'||turn.context.sha256!==conversationDigest(packet))return;
           await this.store.finishTurn({...this.cmd(current,'finish-'+packet.requestId),turnId,state:'responded',assistantMessage:output.text,reason:null,proposedTask:output.proposedTask===null?null:{proposalId:'proposal-'+packet.requestId,...output.proposedTask,state:'offered',taskId:null}});
@@ -386,6 +396,7 @@ export class DashboardTalkService {
     } catch {
       if(!claimed)return;
       await this.serial(topicId,async()=>{
+        if(this.options.validateHostSelection)await this.options.validateHostSelection();
         const current=await this.requireTopic(topicId),turn=current.turns.find((item)=>item.turnId===turnId);
         if(turn?.state!=='running')return;
         await this.store.finishTurn({...this.cmd(current,'failed-'+packet.requestId),turnId,state:'blocked',assistantMessage:null,reason:'The assistant reply could not be completed or validated. No task was created.'});
@@ -403,30 +414,36 @@ export class DashboardTalkService {
   async link(topicId:string,input:TalkMutationInput&{taskId:string}) {
     input=structuredClone(input);id(topicId);mutation(input,['taskId']);id(input.taskId);
     await this.serial(topicId,async()=>{
+      if(this.options.validateHostSelection)await this.options.validateHostSelection();
       await this.requireTopic(topicId);const task=await this.options.taskStore.load(input.taskId);check(task,'Task not found.',404);check(await this.matchesWorkspace(task.workspaceRoot),'Task workspace is different or unavailable.',409);
-      try{return (await this.store.linkTask({topicId,actor,idempotencyKey:'link-'+input.requestId,expectedVersion:input.expectedVersion,task:{taskId:input.taskId,workspaceId:this.options.config.workspaceId,taskStoreId:this.options.config.taskStoreId}})).topic;}catch(error){client(error);}
+      try{if(this.options.validateHostSelection)await this.options.validateHostSelection();return (await this.store.linkTask({topicId,actor,idempotencyKey:'link-'+input.requestId,expectedVersion:input.expectedVersion,task:{taskId:input.taskId,workspaceId:this.options.config.workspaceId,taskStoreId:this.options.config.taskStoreId}})).topic;}catch(error){client(error);}
     });
     return this.topic(topicId);
   }
   async ack(topicId:string,attentionId:string,input:TalkMutationInput) {
     input=structuredClone(input);id(topicId);id(attentionId);mutation(input);
-    return this.serial(topicId,async()=>{try{const result=await this.store.acknowledgeAttention({topicId,actor,idempotencyKey:'ack-'+input.requestId,expectedVersion:input.expectedVersion,attentionId});return {topicId,attentionId,topicVersion:result.topic.version};}catch(error){client(error);}});
+    return this.serial(topicId,async()=>{try{if(this.options.validateHostSelection)await this.options.validateHostSelection();const result=await this.store.acknowledgeAttention({topicId,actor,idempotencyKey:'ack-'+input.requestId,expectedVersion:input.expectedVersion,attentionId});return {topicId,attentionId,topicVersion:result.topic.version};}catch(error){client(error);}});
   }
   async accept(topicId:string,turnId:string,input:TalkMutationInput) {
     input=structuredClone(input);id(topicId);id(turnId);mutation(input);
     await this.serial(topicId,async()=>{
+      if(this.options.validateHostSelection)await this.options.validateHostSelection();
       let topic=await this.requireTopic(topicId);const turn=topic.turns.find((item)=>item.turnId===turnId);check(turn,'Turn not found in this topic.',404);const proposal=turn.proposedTask;check(proposal,'Turn has no task proposal.',409);
       if(proposal.state==='offered'||proposal.state==='uncertain')check(!topic.turns.some((item)=>item.state==='queued'||item.state==='running'),'Wait for the pending topic turn before accepting a proposal.',409);
-      const taskId='task-talk-'+proposal.proposalId;
+      const identity=this.options.proposalIdentityNamespace===undefined?proposal.proposalId:conversationDigest({namespace:this.options.proposalIdentityNamespace,proposalId:proposal.proposalId});
+      const taskId=this.options.proposalIdentityNamespace===undefined?'task-talk-'+identity:(proposal.taskId??('task-talk-'+identity));
       try {
         const claim=await this.store.beginTaskProposal({topicId,actor,idempotencyKey:'accept-'+input.requestId,expectedVersion:input.expectedVersion,turnId,taskId});
         if(!claim.applied)return claim.topic;
         topic=claim.topic;
-        await this.options.taskStore.createTask({taskId,actor,idempotencyKey:'talk-create-'+proposal.proposalId,title:proposal.title,goal:proposal.goal,workspaceRoot:this.options.config.workspaceRoot});
+        if(this.options.validateHostSelection)await this.options.validateHostSelection();
+        await this.options.taskStore.createTask({taskId,actor,idempotencyKey:'talk-create-'+identity,title:proposal.title,goal:proposal.goal,workspaceRoot:this.options.config.workspaceRoot});
         const actual=await this.options.taskStore.load(taskId);check(actual&&await this.matchesWorkspace(actual.workspaceRoot),'Created task could not be verified in the selected workspace.',409);
+        if(this.options.validateHostSelection)await this.options.validateHostSelection();
         const current=await this.requireTopic(topicId);
         return (await this.store.finishTaskProposal({...this.cmd(current,'linked-'+input.requestId),turnId,taskId})).topic;
       } catch(error) {
+        if(this.options.validateHostSelection)await this.options.validateHostSelection();
         const current=await this.requireTopic(topicId);
         if(current.turns.find((item)=>item.turnId===turnId)?.proposedTask?.state==='linking')await this.store.recoverTopic({...this.cmd(current,'intake-uncertain-'+input.requestId)});
         client(error);
@@ -438,6 +455,7 @@ export class DashboardTalkService {
   async recover() {
     let turns=0,proposals=0,topics=0;
     for(const selected of await this.allTopics())await this.serial(selected.topicId,async()=>{
+      if(this.options.validateHostSelection)await this.options.validateHostSelection();
       const topic=await this.requireTopic(selected.topicId),pending=topic.turns.filter((turn)=>turn.state==='queued'||turn.state==='running'),linking=topic.turns.filter((turn)=>turn.proposedTask?.state==='linking');
       if(!pending.length&&!linking.length)return;
       await this.store.recoverTopic({...this.cmd(topic,'recover-'+conversationDigest({topicId:topic.topicId,version:topic.version}).slice(0,40))});
@@ -448,6 +466,8 @@ export class DashboardTalkService {
 }
 export async function createDashboardTalk(options:DashboardTalkOptions):Promise<DashboardTalkService> {
   const config=structuredClone(options.config);configShape(config);
+  if(options.proposalIdentityNamespace!==undefined)check(typeof options.proposalIdentityNamespace==='string'&&/^[a-f0-9]{64}$/.test(options.proposalIdentityNamespace),'Invalid internal Talk proposal namespace.');
+  if(options.validateHostSelection!==undefined)check(typeof options.validateHostSelection==='function','Invalid internal Talk host-selection validator.');
   const {workspaceRoot,conversationRoot,taskStoreRoot}=await validateDashboardTalkRoots(config,options.taskStore.root);
   assert((await lstat(taskStoreRoot)).isDirectory(),'Selected Talk task store is not a directory.');
   const scope={hostId:config.hostId,workspaceId:config.workspaceId,taskStoreId:config.taskStoreId};

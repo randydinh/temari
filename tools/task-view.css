@@ -1386,6 +1386,12 @@ dialog textarea[readonly] {
 .talk-topic:hover { background: #edf0e9; }
 .talk-topic[aria-current='true'] { background: #fff; border-color: #cdd9c6; }
 .talk-topic-title { display: block; font-size: 13px; font-weight: 650; overflow-wrap: anywhere; }
+.talk-workspace-selector { display: grid; gap: 8px; margin: 16px 0; }
+.talk-workspace-selector[hidden] { display: none; }
+.talk-workspace-selector select { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 7px; background: white; }
+.talk-topic-workspace, .talk-topic-binding { color: var(--muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.talk-topic-workspace { display: block; margin-top: 5px; }
+.talk-topic-binding { border-bottom: 1px solid var(--border); padding: 0 0 12px; margin: 0 0 16px; }
 .talk-topic-meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; color: var(--muted); margin-top: 9px; font-size: 11px; }
 .talk-conversation { display: flex; flex-direction: column; min-width: 0; padding: 28px; }
 .talk-conversation-heading { display: flex; justify-content: space-between; align-items: start; gap: 14px; }

@@ -25,7 +25,8 @@ export interface OpenWorkManifest {
   };
   chats: {
     id: string;
-    title: string;
+    // Null retains identity when the captured source title is unavailable or inadmissible.
+    title: string | null;
     kind: 'codex' | 'chatgpt';
     hostId: string | null;
     cwd: string | null;
@@ -168,7 +169,8 @@ export function validateOpenWorkManifest(value: unknown): OpenWorkManifest {
     requireValue(matches(c.id, ID) && !chatIds.has(c.id));
     chatIds.add(c.id);
     requireValue(
-      string(c.title) && ['codex', 'chatgpt'].includes(c.kind as string),
+      nullable(c.title, (v) => string(v)) &&
+        ['codex', 'chatgpt'].includes(c.kind as string),
     );
     requireValue(nullable(c.hostId, (v) => string(v)) && nullable(c.cwd, path));
     requireValue(

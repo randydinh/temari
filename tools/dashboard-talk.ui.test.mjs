@@ -290,6 +290,7 @@ test('create accepts the retained {topic:record} DTO then reads fresh detail', a
   const ui = await harness(async ({ path, method, body }) => {
     if (method === 'POST') {
       assert.equal(path, '/api/topics'); assert.equal(body.title, 'A new topic');
+      assert.deepEqual(Object.keys(body).sort(), ['requestId', 'title']);
       created = true;
       return response({ topic: { topicId: 'topic-new', title: body.title, version: 1, linkedTasks: [], turns: [], attention: [] } });
     }
@@ -297,6 +298,9 @@ test('create accepts the retained {topic:record} DTO then reads fresh detail', a
     return response(detail('topic-new', [], { topic: { topicId: 'topic-new', title: 'A new topic', version: 1 } }));
   });
   ui.click(ui.get('talk-new-topic')); ui.get('talk-topic-name').value = 'A new topic';
+  assert.equal(ui.get('talk-topic-workspace-field').hidden, true);
+  assert.equal(ui.get('talk-topic-workspace').disabled, true);
+  assert.equal(ui.get('talk-topic-workspace').required, false);
   ui.get('talk-topic-form').dispatchEvent(new UiEvent('submit', { cancelable: true })); await flush();
   assert.equal(ui.get('talk-topic-dialog').open, false);
   assert.equal(ui.get('talk-topic-title').textContent, 'A new topic');
@@ -352,4 +356,222 @@ test('linked cards expose goal, unavailable reason and shortening; missing trans
   assert.match(ui.get('talk-linked-tasks').textContent, /Workspace could not be verified/);
   assert.match(ui.get('talk-linked-tasks').textContent, /Shortened fields: goal/);
   assert.equal(ui.get('talk-send').disabled, true);
+});
+
+const registryCapabilities = { ...capabilities, canAcknowledge: true, canAcceptProposal: true, canStartTask: false };
+const registryWorkspaces = [
+  { workspaceKey: 'alpha', workspaceId: 'workspace-alpha', label: '<b>Alpha & planning</b>', available: true, reason: null, topicCount: 1 },
+  { workspaceKey: 'beta', workspaceId: 'workspace-beta', label: 'Beta work', available: true, reason: null, topicCount: 1 },
+];
+function binding(key, extra = {}) {
+  return { workspaceKey: key, workspaceId: `workspace-${key}`, taskStoreId: 'fixture-task-store', available: true, reason: null, ...extra };
+}
+function registrySummary(id, key, extra = {}) { return summary(id, { binding: binding(key), ...extra }); }
+function registryDetail(id, key, turns = [], extra = {}) {
+  return detail(id, turns, { topic: { topicId: id, title: 'Shared topic name', version: 1, binding: binding(key) },
+    capabilities: registryCapabilities, ...extra });
+}
+function registryListing(topics, extra = {}) {
+  return listing(topics, [], { scopeMode: 'workspace-registry', workspaces: registryWorkspaces,
+    capabilities: registryCapabilities,
+    page: { total: topics.length, offset: 0, limit: 128, omittedBefore: 0, omittedAfter: 0, hasMore: false },
+    observationWindow: { beganAt: '2026-10-03T21:00:00.000Z', endedAt: '2026-10-03T21:00:01.000Z', atomicAcrossStores: false },
+    ...extra });
+}
+function chooseWorkspace(ui, key) {
+  ui.get('talk-topic-workspace').value = key;
+  ui.get('talk-topic-workspace').dispatchEvent(new UiEvent('change'));
+}
+function createTopic(ui) {
+  ui.get('talk-topic-form').dispatchEvent(new UiEvent('submit', { cancelable: true }));
+}
+const posts = (ui) => ui.requests.filter((request) => request.method === 'POST');
+
+test('registry topic creation requires an explicit choice even with one workspace and displays its fixed binding', async () => {
+  let created = false;
+  const noModel = { ...registryCapabilities, canSendTurn: false };
+  const ui = await harness(async ({ path, method, body }) => {
+    if (method === 'POST') {
+      assert.equal(path, '/api/topics');
+      assert.deepEqual(Object.keys(body).sort(), ['requestId', 'title', 'workspaceKey']);
+      assert.equal(body.workspaceKey, 'alpha'); assert.equal(body.title, 'A planned topic');
+      created = true;
+      return response({ topic: { topicId: 'mw.alpha.topic-new', title: body.title, version: 1, binding: binding('alpha') } });
+    }
+    if (path === '/api/topics') return response(registryListing(created ? [registrySummary('mw.alpha.topic-new', 'alpha')] : [], {
+      workspaces: [registryWorkspaces[0]], capabilities: noModel, setupReason: 'No conversational model is configured.',
+    }));
+    assert.equal(path, '/api/topics/mw.alpha.topic-new?offset=0&limit=40');
+    return response(registryDetail('mw.alpha.topic-new', 'alpha', [], { capabilities: noModel }));
+  });
+  ui.click(ui.get('talk-new-topic')); ui.get('talk-topic-name').value = 'A planned topic';
+  assert.equal(ui.get('talk-topic-workspace-field').hidden, false);
+  assert.equal(ui.get('talk-topic-workspace').required, true);
+  assert.equal(ui.get('talk-topic-workspace').value, '');
+  assert.equal(ui.get('talk-create-topic').disabled, true);
+  createTopic(ui); await flush(); assert.equal(posts(ui).length, 0);
+  assert.match(ui.get('talk-topic-error').textContent, /Choose an available host-provided workspace/);
+  chooseWorkspace(ui, 'alpha'); assert.equal(ui.get('talk-create-topic').disabled, false);
+  createTopic(ui); await flush();
+  assert.equal(posts(ui).length, 1);
+  assert.equal(ui.get('talk-topic-dialog').open, false);
+  assert.match(ui.topicButton('mw.alpha.topic-new').textContent, /Workspace: <b>Alpha & planning<\/b> · fixed for this topic/);
+  assert.match(ui.get('talk-transcript').textContent, /Workspace: <b>Alpha & planning<\/b> · fixed for this topic/);
+  assert.match(ui.get('talk-setup').textContent, /No conversational model/);
+  ui.input('A local draft'); assert.equal(ui.get('talk-send').disabled, true);
+  ui.click(ui.get('talk-new-topic')); assert.equal(ui.get('talk-topic-workspace').value, '');
+  assert.equal(ui.get('talk-create-topic').disabled, true, 'A new topic requires another deliberate choice.');
+});
+
+test('unavailable host workspace stays visible but cannot create, send, link or retarget an existing topic', async () => {
+  const unavailable = { ...registryWorkspaces[1], available: false, reason: 'Host workspace is missing.' };
+  const unavailableBinding = binding('beta', { available: false, reason: unavailable.reason });
+  const denied = Object.fromEntries(Object.keys(registryCapabilities).map((key) => [key, false]));
+  const ui = await harness(async ({ path, method }) => {
+    assert.equal(method, 'GET');
+    if (path === '/api/topics') return response(registryListing([
+      registrySummary('mw.beta.topic-old', 'beta', { binding: unavailableBinding }),
+    ], { workspaces: [registryWorkspaces[0], unavailable] }));
+    return response(registryDetail('mw.beta.topic-old', 'beta', [], {
+      topic: { topicId: 'mw.beta.topic-old', title: 'Unavailable topic', version: 1, binding: unavailableBinding }, capabilities: denied,
+    }));
+  });
+  await ui.activate(); ui.input('Keep this workspace draft');
+  assert.match(ui.get('talk-transcript').textContent, /fixed for this topic · unavailable: Host workspace is missing/);
+  assert.equal(ui.get('talk-send').disabled, true); assert.equal(ui.get('talk-link-task').disabled, true);
+  ui.submit(); await flush(); assert.equal(posts(ui).length, 0);
+  ui.click(ui.get('talk-new-topic')); ui.get('talk-topic-name').value = 'A new topic';
+  assert.equal(ui.get('talk-topic-workspace').options.find((option) => option.value === 'beta').disabled, true);
+  chooseWorkspace(ui, 'beta');
+  assert.equal(ui.get('talk-create-topic').disabled, true);
+  assert.match(ui.get('talk-topic-workspace-help').textContent, /Host workspace is missing/);
+  createTopic(ui); await flush(); assert.equal(posts(ui).length, 0);
+  chooseWorkspace(ui, 'alpha');
+  assert.equal(ui.get('talk-message').value, 'Keep this workspace draft');
+  assert.match(ui.get('talk-transcript').textContent, /Unavailable topic|Workspace: Beta work/);
+});
+
+test('a changed binding for the same opaque topic identity is refused while original history and draft stay separate', async () => {
+  let retarget = false;
+  const id = 'mw.alpha.same-local-id';
+  const ui = await harness(async ({ path, method }) => {
+    assert.equal(method, 'GET');
+    if (path === '/api/topics') return response(registryListing([registrySummary(id, 'alpha')]));
+    return response(registryDetail(id, retarget ? 'beta' : 'alpha', [turn('mw.alpha.turn-one', 'Original Alpha history')]));
+  });
+  await ui.activate(); ui.input('Keep original Alpha draft');
+  retarget = true; ui.click(ui.get('talk-refresh-topic')); await flush();
+  assert.match(ui.get('talk-error').textContent, /workspace binding changed.*cannot be retargeted/);
+  assert.match(ui.get('talk-transcript').textContent, /Workspace: <b>Alpha & planning<\/b>/);
+  assert.match(ui.get('talk-transcript').textContent, /Original Alpha history/);
+  assert.equal(ui.get('talk-message').value, 'Keep original Alpha draft');
+  assert.equal(ui.get('talk-send').disabled, true);
+  assert.equal(posts(ui).length, 0);
+});
+
+test('qualified topics with identical local suffixes retain separate drafts and workspace-label search', async () => {
+  const alpha = 'mw.alpha.same-local-id', beta = 'mw.beta.same-local-id';
+  const ui = await harness(async ({ path, method }) => {
+    assert.equal(method, 'GET');
+    if (path === '/api/topics') return response(registryListing([
+      registrySummary(alpha, 'alpha', { title: 'Same topic' }), registrySummary(beta, 'beta', { title: 'Same topic' }),
+    ], { page: { total: 5, offset: 0, limit: 128, omittedBefore: 0, omittedAfter: 3, hasMore: true } }));
+    return response(path.includes(`/${alpha}?`) ? registryDetail(alpha, 'alpha', [turn('mw.alpha.turn-one', 'Alpha history')]) :
+      registryDetail(beta, 'beta', [turn('mw.beta.turn-one', 'Beta history')]));
+  });
+  ui.click(ui.topicButton(alpha)); await flush(); ui.input('Alpha draft');
+  ui.click(ui.topicButton(beta)); await flush(); ui.input('Beta draft');
+  ui.click(ui.topicButton(alpha)); await flush();
+  assert.equal(ui.get('talk-message').value, 'Alpha draft');
+  assert.match(ui.get('talk-transcript').textContent, /Alpha history/); assert.doesNotMatch(ui.get('talk-transcript').textContent, /Beta history/);
+  ui.click(ui.get('talk-new-topic')); chooseWorkspace(ui, 'beta');
+  assert.equal(ui.get('talk-message').value, 'Alpha draft');
+  assert.match(ui.get('talk-transcript').textContent, /Workspace: <b>Alpha & planning<\/b>/);
+  ui.get('talk-topic-search').value = 'beta WORK'; ui.get('talk-topic-search').dispatchEvent(new UiEvent('input'));
+  assert.equal(ui.topicButton(alpha), undefined); assert(ui.topicButton(beta));
+  ui.click(ui.topicButton(beta)); await flush(); assert.equal(ui.get('talk-message').value, 'Beta draft');
+  assert.match(ui.get('talk-list-status').textContent, /2 of 5 topics · 3 outside this bounded list/);
+  assert.equal(posts(ui).length, 0);
+});
+
+test('lost registry creation ACK keeps the exact workspace and request body for explicit retry only', async () => {
+  let attempts = 0, created = false;
+  const ui = await harness(async ({ path, method, body }) => {
+    if (method === 'POST') {
+      assert.equal(path, '/api/topics'); assert.equal(body.workspaceKey, 'alpha');
+      if (++attempts === 1) throw new Error('Fixture response lost after host-side save.');
+      created = true;
+      return response({ topic: { topicId: 'mw.alpha.topic-created', title: body.title, version: 1, binding: binding('alpha') } });
+    }
+    if (path === '/api/topics') return response(registryListing(created ? [registrySummary('mw.alpha.topic-created', 'alpha')] : []));
+    return response(registryDetail('mw.alpha.topic-created', 'alpha'));
+  });
+  ui.click(ui.get('talk-new-topic')); ui.get('talk-topic-name').value = 'Original topic'; chooseWorkspace(ui, 'alpha');
+  createTopic(ui); await flush();
+  assert.equal(attempts, 1); assert.equal(ui.get('talk-topic-workspace').disabled, true);
+  assert.equal(ui.get('talk-topic-name').readOnly, true);
+  assert.match(ui.get('talk-topic-error').textContent, /identical workspace, title and request ID/);
+  await ui.poll(); assert.equal(attempts, 1, 'Polling must not replay creation.');
+  ui.get('talk-topic-workspace').value = 'beta'; ui.get('talk-topic-name').value = 'Different topic';
+  createTopic(ui); await flush();
+  assert.deepEqual(posts(ui)[1].body, posts(ui)[0].body);
+  assert.equal(posts(ui)[1].body.workspaceKey, 'alpha');
+  assert.equal(posts(ui)[1].body.title, 'Original topic');
+  assert.equal(ui.get('talk-topic-dialog').open, false);
+});
+
+test('a created-topic binding mismatch is an uncertain acknowledgment and never an accepted retarget', async () => {
+  const ui = await harness(async ({ path, method }) => {
+    if (method === 'POST') return response({ topic: { topicId: 'mw.beta.wrong-topic', title: 'Wrong result', version: 1, binding: binding('beta') } });
+    assert.equal(path, '/api/topics'); return response(registryListing([]));
+  });
+  ui.click(ui.get('talk-new-topic')); ui.get('talk-topic-name').value = 'Alpha topic'; chooseWorkspace(ui, 'alpha');
+  createTopic(ui); await flush();
+  assert.equal(ui.get('talk-topic-dialog').open, true);
+  assert.equal(ui.get('talk-topic-workspace').value, 'alpha');
+  assert.equal(ui.get('talk-topic-workspace').disabled, true);
+  assert.match(ui.get('talk-topic-error').textContent, /created topic workspace could not be confirmed/);
+  await ui.poll(); assert.equal(posts(ui).length, 1);
+  assert.equal(ui.topicButton('mw.beta.wrong-topic'), undefined);
+});
+
+test('registry turn requests preserve opaque identity and lost202 matching without a workspace retarget field', async () => {
+  const id = 'mw.alpha.same-local-id'; let saved = null;
+  const ui = await harness(async ({ path, method, body }) => {
+    if (path === '/api/topics') return response(registryListing([registrySummary(id, 'alpha', { turnState: saved ? 'queued' : null })]));
+    if (method === 'POST') {
+      assert.equal(path, `/api/topics/${id}/turns`);
+      assert.deepEqual(Object.keys(body).sort(), ['expectedVersion', 'requestId', 'text']);
+      saved = turn('mw.alpha.retained-turn', body.text, { requestId: body.requestId, state: 'queued' });
+      throw new Error('Fixture lost202 after retaining qualified turn.');
+    }
+    return response(registryDetail(id, 'alpha', saved ? [saved] : []));
+  });
+  await ui.activate(); ui.input('Message to this topic'); ui.submit(); await flush();
+  assert.equal(ui.get('talk-message').value, '');
+  assert.equal(ui.get('talk-retry').hidden, true);
+  assert.match(ui.get('talk-transcript').textContent, /Reply queued/);
+  await ui.poll(); assert.equal(posts(ui).length, 1);
+});
+
+test('binding-scoped server capabilities govern send, link, proposal and attention even when global capabilities are true', async () => {
+  const id = 'mw.alpha.topic-one';
+  const attention = { attentionId: 'mw.alpha.attention-one', topicId: id, taskId: 'actual-task', kind: 'update',
+    summary: 'Task update', taskVersion: 1, runId: null, acknowledgedAt: null };
+  const proposal = turn('mw.alpha.turn-one', 'Consider a goal', {
+    proposedTask: { proposalId: 'mw.alpha.proposal-one', title: 'Proposed goal', goal: 'A retained goal', state: 'offered', taskId: null },
+  });
+  const denied = { ...registryCapabilities, canSendTurn: false, canLinkTask: false, canAcceptProposal: false, canAcknowledge: false };
+  const ui = await harness(async ({ path, method }) => {
+    assert.equal(method, 'GET');
+    if (path === '/api/topics') return response(registryListing([registrySummary(id, 'alpha')], { attention: [attention],
+      attentionPage: { total: 1, offset: 0, limit: 50, omittedBefore: 0, omittedAfter: 0, hasMore: false } }));
+    return response(registryDetail(id, 'alpha', [proposal], { capabilities: denied, attention: [attention] }));
+  });
+  await ui.activate(); ui.input('Keep a draft');
+  assert.equal(ui.get('talk-send').disabled, true); assert.equal(ui.get('talk-link-task').disabled, true);
+  assert.equal(descendants(ui.get('talk-transcript')).find((element) => element.dataset.acceptProposal).disabled, true);
+  assert.equal(descendants(ui.get('talk-attention-list')).find((element) => element.tagName === 'BUTTON' && element.textContent === 'Mark seen').disabled, true);
+  ui.submit(); await flush(); assert.equal(posts(ui).length, 0);
+  assert.equal(ui.get('talk-new-topic').disabled, false, 'A host-admitted new-topic choice is independent of this child capability refusal.');
 });
