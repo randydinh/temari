@@ -1343,6 +1343,39 @@ dialog textarea[readonly] {
   color: var(--muted);
   font-size: 13px;
 }
+/* Retained reconciliation intent is separate from the saved host capture. */
+.reconciliation-panel { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border); }
+.reconciliation-panel h2 { margin: 0; font-size: 19px; }
+.reconciliation-panel h3 { margin: 0; font-size: 16px; overflow-wrap: anywhere; }
+.reconciliation-panel h4 { font-size: 13px; margin: 20px 0 9px; }
+.reconciliation-notice { border: 1px solid var(--border); background: #f4f6f1; padding: 12px 14px; border-radius: 8px; font-size: 12px; line-height: 1.7; }
+.reconciliation-lookup { display: flex; gap: 12px; align-items: end; margin: 19px 0; }
+.reconciliation-lookup label { display: grid; gap: 7px; flex: 1; max-width: 440px; font-size: 12px; }
+.reconciliation-lookup input { min-width: 0; width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 7px; font: inherit; background: #fff; }
+.reconciliation-layout { display: grid; grid-template-columns: minmax(190px, 270px) minmax(0, 1fr); gap: 22px; align-items: start; }
+.reconciliation-attempt-list { display: grid; gap: 8px; max-height: 560px; overflow-y: auto; }
+.reconciliation-attempt { display: grid; gap: 7px; width: 100%; padding: 13px; text-align: left; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: #28382e; font-size: 12px; overflow-wrap: anywhere; }
+.reconciliation-attempt[aria-current='true'] { background: #f0f5ee; border-color: #aabb9d; }
+.reconciliation-detail { min-width: 0; border: 1px solid var(--border); border-radius: 9px; padding: 18px; background: #fff; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.reconciliation-detail .section-heading { gap: 12px; align-items: start; }
+.reconciliation-detail .section-heading .quiet { flex-shrink: 0; }
+.reconciliation-metadata { padding: 13px; margin: 17px 0; background: #f8f9f5; border: 1px solid var(--border); border-radius: 7px; }
+.reconciliation-metadata > summary { cursor: pointer; font-weight: 600; }
+.reconciliation-fields { display: grid; gap: 9px; font-size: 12px; }
+.reconciliation-field { display: grid; grid-template-columns: minmax(110px, 150px) minmax(0, 1fr); gap: 12px; }
+.reconciliation-field dt { color: var(--muted); }
+.reconciliation-field dd { margin: 0; font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+.reconciliation-path { border-top: 1px solid var(--border); padding: 9px 0; font-size: 12px; }
+.reconciliation-path > summary { cursor: pointer; }
+.reconciliation-evidence { font-size: 12px; }
+.reconciliation-evidence p { overflow-wrap: anywhere; }
+.reconciliation-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 18px; }
+@media (max-width: 850px) {
+  .reconciliation-layout { grid-template-columns: 1fr; }
+  .reconciliation-attempt-list { max-height: 240px; }
+  .reconciliation-lookup { flex-wrap: wrap; }
+  .reconciliation-field { grid-template-columns: 1fr; gap: 3px; }
+}
 /* Talk keeps the selected conversation separate from background work. */
 .talk-page { display: grid; grid-template-columns: 250px minmax(320px, 1fr) 300px; min-height: calc(100vh - 66px); }
 .talk-topics { padding: 28px 16px; border-right: 1px solid var(--border); background: #f4f6f1; }

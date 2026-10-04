@@ -43,7 +43,10 @@ async function selectDashboardView(view, updateUrl = true) {
   }
   window.dispatchEvent(new CustomEvent('dashboard-view-changed', { detail: { view: pages.view } }));
   if (pages.view === 'talk') await window.TemariTalkUI?.activate();
-  if (pages.view === 'open-work') await loadOpenWork();
+  if (pages.view === 'open-work') {
+    await loadOpenWork();
+    await window.TemariReconciliationUI?.activate();
+  }
   if (pages.view === 'knowledge') await loadKnowledge();
   if (pages.view === 'schedules') await loadSchedules();
 }
@@ -1009,6 +1012,7 @@ byId('schedule-form').addEventListener('submit', async (event) => {
 });
 byId('refresh').addEventListener('click', () => {
   if (pages.view === 'open-work') loadOpenWork();
+  if (pages.view === 'open-work') window.TemariReconciliationUI?.activate();
   if (pages.view === 'knowledge') loadKnowledge();
   if (pages.view === 'schedules') loadSchedules();
 });

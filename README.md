@@ -27,6 +27,9 @@ and their recovery boundaries.
 The [open-work review guide](docs/open-work-review.md) covers the read-only saved
 inventory of chats/worktrees, local filters, coverage/freshness, independent
 capture verification and preservation gaps before reconciliation.
+The [reconciliation panel guide](docs/dashboard-reconciliation.md) covers complete
+retained metadata review, current-binding checks, local interaction evidence and
+recovery. Recorded intent does not merge, preserve, archive or accept work.
 The [task continuity guide](docs/task-continuity.md) covers agent pickup, chat links,
 handoffs, evidence, and exact-run Archon controls. Successful agent findings need
 coordinator review; only eligible canonical evidence plus explicit acceptance can
@@ -38,7 +41,8 @@ The [planning, scheduling and map verification record](evaluations/task-continui
 records live goal planning, schedule dispatch and recovery, Registrar provenance,
 browser journeys, and the remaining configuration limits.
 
-Temari owns routing, plans, evidence, and closeout. The host (Cursor,
+Temari owns user intent and route obligations. Poteto owns the engineering method;
+the workflow runtime owns durable control and completion. The host (Cursor,
 Codex, Claude, Hermes, or serial fallback) owns tools, models, and
 credentials. Personal and OpConnect material is an overlay, not this
 tree — [docs/overlays.md](docs/overlays.md).

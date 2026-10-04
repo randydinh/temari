@@ -20,6 +20,8 @@ import { startTaskViewServer } from './task-view.mjs';
 import {
   DashboardController,
   loadDashboardConfig,
+  createDashboardReconciliationInteractionWriter,
+  validateDashboardReconciliationRoots,
 } from './dashboard-controller.mjs';
 import {
   MergeReconciliationDashboard,
@@ -86,6 +88,9 @@ console URL for that same installation. --control-config ABSOLUTE_JSON enables
 goal intake and configured local verification controls; it requires --archon-home.
 The trusted config fixes the workspace, preparation directory, and verification
 recipes. Browser requests cannot supply executable commands or evidence paths.
+reconciliation.browserReview.selectedAttempts optionally pins at most128 exact
+retained review hashes. Recording is local interaction intent only; it cannot
+approve source operations, archive work or accept a task.
 --talk-config ABSOLUTE_JSON optionally enables topic conversations and links.
 Talk without --control-config does not install or launch Archon; task controls
 remain read-only. The host selects its bounded conversational transport.
@@ -128,8 +133,12 @@ export async function createTaskContinuityReconciliationDashboard(
 ): Promise<MergeReconciliationDashboard | undefined> {
   const reconciliation = config.reconciliation;
   if (!reconciliation) return undefined;
+  const roots = await validateDashboardReconciliationRoots(config);
+  const interactionWriter = reconciliation.browserReview
+    ? await createDashboardReconciliationInteractionWriter(config)
+    : undefined;
   return new MergeReconciliationDashboard(
-    await FileMergeReconciliationStore.create(reconciliation.storeRoot),
+    await FileMergeReconciliationStore.create(roots.storeRoot),
     createObservedGitReconciliationBindingReader({
       repositoryRoot: reconciliation.sourceRoot,
       snapshotReader: {
@@ -164,6 +173,10 @@ export async function createTaskContinuityReconciliationDashboard(
         },
       },
     }),
+    {
+      ...(reconciliation.browserReview ? { browserReview: reconciliation.browserReview } : {}),
+      ...(interactionWriter ? { interactionWriter } : {}),
+    },
   );
 }
 
@@ -257,6 +270,8 @@ export async function runTaskCommand(
     '--root',
   );
   if (talkConfig) root = (await validateDashboardTalkRoots(talkConfig, root)).taskStoreRoot;
+  if (dashboardConfig?.reconciliation)
+    root = (await validateDashboardReconciliationRoots(dashboardConfig, root)).taskStoreRoot!;
   const store =
     command === 'create' ||
     command === 'enter' ||

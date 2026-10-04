@@ -11,6 +11,7 @@ import {
   unlink,
 } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { constants } from 'node:fs';
 import { promisify } from 'node:util';
 import {
   assertMergeObservation,
@@ -19,6 +20,7 @@ import {
   type HarnessRunRef,
   type ReconciliationScope,
   type WorkerAssignment,
+  type ImmutableEvidenceReference,
 } from '../libs/contracts/src/index.js';
 import {
   FileTaskStore,
@@ -68,6 +70,10 @@ import type { ScheduledTaskInspection } from './dashboard-scheduler.mjs';
 import {
   MergeReconciliationDashboard,
   type ReconciliationConfirmationIntent,
+  type BrowserReviewSelection,
+  type ReconciliationInteractionEvent,
+  type ReconciliationInteractionWriter,
+  reconciliationInteractionIdentity,
 } from './merge-reconciliation-dashboard.mjs';
 
 const runFile = promisify(execFile);
@@ -136,6 +142,8 @@ export interface DashboardConfig {
     resolutionIntent: ReconciliationScope['resolutionIntent'];
     requiredChecks: ReconciliationScope['requiredChecks'];
     expectedComparison: ReconciliationScope['expectedComparison'];
+    /** Independently selected immutable reviews; browser requests cannot add pins. */
+    browserReview?: BrowserReviewSelection;
   };
 }
 type Candidate = { head: string; fingerprint: string };
@@ -287,6 +295,135 @@ async function publish(path: string, content: string): Promise<void> {
     await unlink(temporary);
   }
 }
+/** Resolve existing ancestors before creating host storage; never normalize parent traversal. */
+async function reconciliationStorageRoot(path: string): Promise<string> {
+  assert(isAbsolute(path), 'Reconciliation storage requires an absolute path.');
+  assert(!path.split(sep).some((segment) => segment === '.' || segment === '..'), 'Reconciliation storage must use canonical segments.');
+  let ancestor = path;
+  const suffix: string[] = [];
+  for (;;) {
+    try {
+      const info = await lstat(ancestor);
+      assert(info.isDirectory() || info.isSymbolicLink(), 'Reconciliation storage ancestor must be a directory.');
+      const canonical = await realpath(ancestor);
+      assert((await lstat(canonical)).isDirectory(), 'Reconciliation storage ancestor must resolve to a directory.');
+      return join(canonical, ...suffix);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      const parent = dirname(ancestor);
+      assert(parent !== ancestor, 'Reconciliation storage ancestor is unavailable.');
+      suffix.unshift(ancestor.slice(parent.length + (parent.endsWith(sep) ? 0 : 1)));
+      ancestor = parent;
+    }
+  }
+}
+
+/** Pure host-path admission, including a future task-store root before create(). */
+export async function validateDashboardReconciliationRoots(
+  config: DashboardConfig,
+  taskRoot?: string,
+): Promise<{ storeRoot: string; taskStoreRoot?: string }> {
+  assert(config.reconciliation, 'Merge reconciliation is not configured.');
+  const source = await realpath(config.reconciliation.sourceRoot);
+  const workspace = await realpath(config.workspaceRoot);
+  const preparation = await realpath(config.preparationRoot);
+  const storeRoot = await reconciliationStorageRoot(config.reconciliation.storeRoot);
+  for (const protectedRoot of [source, workspace]) {
+    assert(!within(protectedRoot, preparation) && !within(preparation, protectedRoot), 'Reconciliation preparations must be disjoint from source.');
+    assert(!within(protectedRoot, storeRoot) && !within(storeRoot, protectedRoot), 'Reconciliation storage must be disjoint from source.');
+  }
+  const interactions = join(preparation, 'reconciliation-browser-interactions');
+  assert(!within(storeRoot, interactions) && !within(interactions, storeRoot), 'Reconciliation ledger and interaction stores must be disjoint.');
+  if (taskRoot === undefined) return { storeRoot };
+  const taskStoreRoot = await reconciliationStorageRoot(taskRoot);
+  for (const protectedRoot of [source, workspace])
+    assert(!within(protectedRoot, taskStoreRoot) && !within(taskStoreRoot, protectedRoot), 'Reconciliation task storage must be disjoint from source.');
+  assert(!within(storeRoot, taskStoreRoot) && !within(taskStoreRoot, storeRoot), 'Task and reconciliation stores must be disjoint.');
+  assert(!within(interactions, taskStoreRoot) && !within(taskStoreRoot, interactions), 'Task and reconciliation interaction stores must be disjoint.');
+  return { storeRoot, taskStoreRoot };
+}
+
+/** Host-owned local interaction evidence, never a caller-selected file or URI. */
+export async function createDashboardReconciliationInteractionWriter(
+  config: DashboardConfig,
+): Promise<ReconciliationInteractionWriter> {
+  await validateDashboardReconciliationRoots(config);
+  const preparationRoot = await realpath(config.preparationRoot);
+  const preparationIdentity = await lstat(preparationRoot);
+  const eventRoot = join(preparationRoot, 'reconciliation-browser-interactions');
+  let eventIdentity: { dev: number; ino: number } | null = null;
+  try {
+    const info = await lstat(eventRoot);
+    assert(info.isDirectory() && !info.isSymbolicLink(), 'Reconciliation interaction storage must be a regular directory.');
+    eventIdentity = { dev: info.dev, ino: info.ino };
+  } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+  const limit = 16 * 1024;
+  const eventId = (value: string): void => {
+    assert(/^reconciliation-interaction-[a-f0-9]{64}$/.test(value), 'Invalid retained reconciliation interaction identity.');
+  };
+  const root = async (create: boolean): Promise<boolean> => {
+    assert.equal(await realpath(config.preparationRoot), preparationRoot, 'Reconciliation preparation root changed.');
+    const preparation = await lstat(preparationRoot);
+    assert(preparation.isDirectory() && !preparation.isSymbolicLink() && preparation.dev === preparationIdentity.dev && preparation.ino === preparationIdentity.ino, 'Reconciliation preparation root changed.');
+    if (create && eventIdentity === null) {
+      try { await mkdir(eventRoot, { mode: 0o700 }); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error; }
+    }
+    try {
+      const info = await lstat(eventRoot);
+      assert(info.isDirectory() && !info.isSymbolicLink(), 'Reconciliation interaction storage must be a regular directory.');
+      assert.equal(await realpath(eventRoot), eventRoot, 'Reconciliation interaction storage changed.');
+      if (!eventIdentity && create) eventIdentity = { dev: info.dev, ino: info.ino };
+      assert(eventIdentity && info.dev === eventIdentity.dev && info.ino === eventIdentity.ino, 'Reconciliation interaction storage changed.');
+      return true;
+    } catch (error) {
+      if (!create && (error as NodeJS.ErrnoException).code === 'ENOENT' && eventIdentity === null) return false;
+      throw error;
+    }
+  };
+  const read = async (identity: string): Promise<{ bytes: Uint8Array; evidence: ImmutableEvidenceReference } | null> => {
+    eventId(identity);
+    if (!await root(false)) return null;
+    let file;
+    try { file = await open(join(eventRoot, `${identity}.json`), constants.O_RDONLY | constants.O_NOFOLLOW); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null; throw error; }
+    try {
+      const info = await file.stat();
+      assert(info.isFile() && info.size <= limit, 'Reconciliation interaction must be a bounded regular file.');
+      const buffer = Buffer.alloc(limit + 1);
+      let length = 0;
+      while (length < buffer.length) {
+        const result = await file.read(buffer, length, buffer.length - length, length);
+        if (!result.bytesRead) break;
+        length += result.bytesRead;
+      }
+      assert(length <= limit, 'Reconciliation interaction exceeds its read bound.');
+      assert.equal((await file.stat()).size, length, 'Reconciliation interaction changed while being read.');
+      const content = buffer.subarray(0, length);
+      return { bytes: content, evidence: { schema: 1, id: identity, sha256: sha(content), bytes: content.length, mediaType: 'application/json' } };
+    } finally { await file.close(); }
+  };
+  return {
+    async read({ attemptId, requestId }) {
+      reconciliationAttemptId(attemptId); reconciliationAttemptId(requestId);
+      return read(reconciliationInteractionIdentity(attemptId, requestId).eventId);
+    },
+    async readRecorded({ attemptId, evidenceId }) {
+      reconciliationAttemptId(attemptId);
+      return read(evidenceId);
+    },
+    async publish(event: ReconciliationInteractionEvent) {
+      reconciliationAttemptId(event.attemptId); reconciliationAttemptId(event.requestId);
+      assert.equal(event.schema, 1); assert.equal(event.kind, 'temari-reconciliation-dashboard-interaction');
+      assert.equal(event.actorKind, 'local-dashboard-interaction');
+      const content = JSON.stringify(event) + '\n';
+      assert(Buffer.byteLength(content) <= limit, 'Reconciliation interaction exceeds its publication bound.');
+      await root(true);
+      await publish(join(eventRoot, `${reconciliationInteractionIdentity(event.attemptId, event.requestId).eventId}.json`), content);
+    },
+  };
+}
+
 async function cleanCandidate(root: string): Promise<Candidate> {
   const { stdout: top } = await runFile(
     'git',
@@ -575,14 +712,28 @@ export async function validateDashboardConfig(
     fields(reconciliation, [
       'storeRoot', 'sourceRoot', 'candidate', 'resolutionIntent',
       'requiredChecks', 'expectedComparison',
-    ]);
+    ], ['browserReview']);
     for (const key of ['storeRoot', 'sourceRoot']) {
       text(reconciliation[key]);
       assert(isAbsolute(reconciliation[key]), `reconciliation.${key} must be absolute.`);
     }
     assert((await lstat(reconciliation.sourceRoot)).isDirectory(), 'Reconciliation sourceRoot must be a directory.');
     reconciliation.sourceRoot = await realpath(reconciliation.sourceRoot);
-    reconciliation.storeRoot = resolve(reconciliation.storeRoot);
+    reconciliation.storeRoot = (await validateDashboardReconciliationRoots({ ...config, workspaceRoot, preparationRoot } as DashboardConfig)).storeRoot;
+    if (reconciliation.browserReview !== undefined) {
+      const browserReview = object(reconciliation.browserReview);
+      fields(browserReview, ['selectedAttempts']);
+      assert(Array.isArray(browserReview.selectedAttempts) && browserReview.selectedAttempts.length <= 128, 'Select at most128 reconciliation reviews.');
+      const selected = new Set<string>();
+      for (const raw of browserReview.selectedAttempts) {
+        const item = object(raw);
+        fields(item, ['attemptId', 'reviewSha256']);
+        reconciliationAttemptId(item.attemptId);
+        assert(typeof item.reviewSha256 === 'string' && /^[a-f0-9]{64}$/.test(item.reviewSha256), 'Select an exact reconciliation review digest.');
+        assert(!selected.has(item.attemptId), 'Duplicate reconciliation review selection.');
+        selected.add(item.attemptId);
+      }
+    }
     // Reuse the contract validator so candidate/root/check/comparison values
     // remain portable immutable identities rather than executable input.
     assertMergeObservation({
@@ -744,6 +895,31 @@ export class DashboardController implements TaskViewController {
     return task;
   }
 
+  async reconciliationList(): Promise<unknown> {
+    if (!this.options.reconciliation) return {
+      configured: false, setupReason: 'Merge reconciliation is not configured.', attempts: [],
+      page: { total: 0, limit: 50, omitted: 0 },
+      capabilities: { canCheckCurrentBinding: false, canRecordConfirmationIntent: false },
+    };
+    return this.options.reconciliation.list();
+  }
+
+  async reconciliationReview(attemptId: string): Promise<unknown> {
+    reconciliationAttemptId(attemptId);
+    assert(this.options.reconciliation, 'Merge reconciliation is not configured.');
+    return this.options.reconciliation.review(attemptId);
+  }
+
+  async reconciliationConfirmReviewed(attemptId: string, input: unknown): Promise<unknown> {
+    reconciliationAttemptId(attemptId);
+    const request = object(input);
+    fields(request, ['requestId', 'reviewSha256']);
+    reconciliationAttemptId(request.requestId);
+    assert(typeof request.reviewSha256 === 'string' && /^[a-f0-9]{64}$/.test(request.reviewSha256), 'Select an exact reconciliation review digest.');
+    assert(this.options.reconciliation, 'Merge reconciliation is not configured.');
+    return this.options.reconciliation.confirmReviewed(attemptId, { requestId: request.requestId, reviewSha256: request.reviewSha256 });
+  }
+
   async reconciliationView(attemptId: string): Promise<unknown> {
     return this.checked(async () => {
       reconciliationAttemptId(attemptId);
@@ -765,18 +941,24 @@ export class DashboardController implements TaskViewController {
     });
   }
 
+  async reconciliationCheckCurrentBinding(attemptId: string, input: unknown): Promise<unknown> {
+    await this.checked(async () => {
+      reconciliationAttemptId(attemptId);
+      fields(object(input), []);
+      assert(this.options.reconciliation, 'Merge reconciliation is not configured.');
+    });
+    return this.options.reconciliation!.checkCurrentBinding(attemptId);
+  }
+
   async reconciliationInvalidate(
     attemptId: string,
     input: unknown,
   ): Promise<unknown> {
     return this.checked(async () => {
       reconciliationAttemptId(attemptId);
-      const request = object(input);
-      fields(request, []);
+      fields(object(input), []);
       assert(this.options.reconciliation, 'Merge reconciliation is not configured.');
-      return this.options.reconciliation.invalidateIntent({
-        attemptId,
-      });
+      return this.options.reconciliation.invalidateIntent({ attemptId });
     });
   }
 

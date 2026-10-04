@@ -40,6 +40,11 @@ capture; preservation and closure remain unverified. See the
 [open-work review guide](open-work-review.md) for capture publication, independent
 verification and discrepancy handling.
 
+The [reconciliation panel](dashboard-reconciliation.md) on the same page reviews
+host-selected retained plans, checks current bindings and records local
+confirmation interaction evidence. It preserves blocked/history states and exact
+request recovery; source operations and task acceptance remain separate workflows.
+
 ## Before you begin
 
 - Use the repository's supported Node/Bun environment and pnpm **11.25.0**.

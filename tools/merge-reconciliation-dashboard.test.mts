@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, open, readFile, rm, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { type TestContext } from 'node:test';
@@ -21,6 +22,11 @@ import {
   createObservedGitReconciliationBindingReader,
   observedGitReconciliationScope,
   type CurrentReconciliationBindingReader,
+  projectRetainedReconciliationReview,
+  reconciliationInteractionIdentity,
+  ReconciliationBrowserRequestError,
+  type ReconciliationInteractionWriter,
+  type ReconciliationInteractionEvent,
 } from './merge-reconciliation-dashboard.mjs';
 
 const SHA = 'a'.repeat(64);
@@ -460,4 +466,164 @@ test('delegated idempotency replay is stable and changed request identity confli
     }),
     /changed request digest/,
   );
+});
+
+async function interactionWriter(root:string) {
+  await mkdir(root,{recursive:true});let writes=0,reads=0;
+  const filename=(id:string)=>join(root,id+'.json');
+  const writer:ReconciliationInteractionWriter={
+    async publish(event) {
+      writes++;const identity=reconciliationInteractionIdentity(event.attemptId,event.requestId),bytes=Buffer.from(JSON.stringify(event)+'\n');
+      const file=await open(filename(identity.eventId),'wx',0o600);try{await file.writeFile(bytes);await file.sync();}finally{await file.close();}
+    },
+    async read({attemptId,requestId}) {return writer.readRecorded({attemptId,evidenceId:reconciliationInteractionIdentity(attemptId,requestId).eventId});},
+    async readRecorded({evidenceId}) {
+      reads++;let bytes:Buffer;try{bytes=await readFile(filename(evidenceId));}catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')return null;throw error;}
+      return {bytes,evidence:{schema:1,id:evidenceId,sha256:createHash('sha256').update(bytes).digest('hex'),bytes:bytes.length,mediaType:'application/json'}};
+    },
+  };
+  return {writer,filename,get writes(){return writes;},get reads(){return reads;}};
+}
+async function browserFixture(t:TestContext,reader:CurrentReconciliationBindingReader=echoBindingReader(),selectedPlan?:ReconciliationPlan) {
+  const f=await fixture(t,reader),selected=observation(),p=selectedPlan??plan(selected);
+  const attempt=await f.store.createAttempt({idempotencyKey:p.request.idempotencyKey,observation:selected,plan:p});
+  const projected=projectRetainedReconciliationReview(attempt);assert(projected.complete&&projected.sha256);
+  const adapter=await interactionWriter(join(f.store.root,'..','interactions'));let tick=0;
+  const options={browserReview:{selectedAttempts:[{attemptId:attempt.id,reviewSha256:projected.sha256}]},interactionWriter:adapter.writer,now:()=>new Date(Date.parse(now)+(tick++))};
+  const dashboard=new MergeReconciliationDashboard(f.store,reader,options);
+  return {...f,attempt,dashboard,adapter,options,request:{requestId:'local-request:1',reviewSha256:projected.sha256}};
+}
+
+test('browser retained list reads one bounded snapshot and exposes free text only for an exact host pin',async(t)=>{
+  const f=await browserFixture(t);
+  const snapshot=Array.from({length:53},(_,i)=>({...f.attempt,id:'attempt:row-'+String(i).padStart(2,'0'),plan:{...f.attempt.plan,summary:i===52?'s'.repeat(600):f.attempt.plan.summary},updatedAt:new Date(Date.parse(now)+i).toISOString()}));
+  let lists=0;
+  const store={...f.store,list:async()=>{assert.equal(++lists,1);return snapshot;},get:async()=>{throw new Error('List must not reread an attempt.');},createAttempt:f.store.createAttempt.bind(f.store),invalidateStaleBinding:f.store.invalidateStaleBinding.bind(f.store),confirm:f.store.confirm.bind(f.store)};
+  const selected=snapshot[52]!,pin=projectRetainedReconciliationReview(selected).sha256!;
+  const list=await new MergeReconciliationDashboard(store,echoBindingReader(),{browserReview:{selectedAttempts:[{attemptId:selected.id,reviewSha256:pin}]}}).list();
+  assert.equal(lists,1);assert.deepEqual(list.page,{total:53,limit:50,omitted:3});assert.equal(list.attempts.length,50);assert.equal(list.attempts[0]!.attemptId,selected.id);
+  assert.equal(list.attempts[0]!.summary,'s'.repeat(512));assert.equal(list.attempts[0]!.summaryTruncated,true);assert(list.attempts.slice(1).every((row)=>row.summary===null&&!row.hostSelectedForReview));
+  assert(list.attempts.every((row)=>row.candidate.readiness==='not-ready'&&row.terminal===false));
+  const unselected=await new MergeReconciliationDashboard(f.store,echoBindingReader()).review(f.attempt.id);
+  assert.equal(unselected!.review.payload,null);assert.equal(unselected!.review.sha256,null);assert.equal(unselected!.admission.reasonCode,'host-selection-required');
+  assert.equal(unselected!.capabilities.canRecordConfirmationIntent,false);assert.equal(unselected!.currentBinding.state,'not-checked');
+});
+
+test('complete review digest binds declared metadata and oversized/unknown projections cannot become approvable',async(t)=>{
+  const f=await browserFixture(t),original=projectRetainedReconciliationReview(f.attempt);assert(original.complete&&original.payload);
+  assert.equal(original.sha256,reconciliationStoreDigest(original.payload));
+  for(const change of ['summary','observation-time','scope-path','check-definition','comparison-evidence','action','request'] as const) {
+    const candidate=structuredClone(f.attempt) as any;
+    if(change==='summary')candidate.plan.summary+=' Ordinary https://documentation.example.invalid/link `quoted` plan data.';
+    if(change==='observation-time')candidate.observation.observedAt='2026-10-01T12:00:01.000Z';
+    if(change==='scope-path')candidate.observation.scope.affectedPaths[0].diffSha256='7'.repeat(64);
+    if(change==='check-definition')candidate.observation.scope.requiredChecks[0].definitionSha256='7'.repeat(64);
+    if(change==='comparison-evidence')candidate.observation.scope.expectedComparison.verificationEvidence.sha256='7'.repeat(64);
+    if(change==='action')candidate.plan.actions[0].targetId='different-target';
+    if(change==='request'){candidate.canonicalRequestDigest='7'.repeat(64);candidate.plan.request.canonicalRequestSha256=candidate.canonicalRequestDigest;}
+    candidate.plan.scope=structuredClone(candidate.observation.scope);candidate.binding=reconciliationAttemptBinding(candidate.observation);
+    const projected=projectRetainedReconciliationReview(candidate);assert.equal(projected.complete,true,change);assert.notEqual(projected.sha256,original.sha256,change);
+  }
+  const oversized=structuredClone(f.attempt) as any;oversized.plan.summary='x'.repeat(64*1024);
+  assert.deepEqual(projectRetainedReconciliationReview(oversized),{complete:false,sha256:null,payload:null,reasonCode:'review-too-large'});
+  const manyPaths=structuredClone(f.attempt) as any;manyPaths.observation.scope.affectedPaths=Array.from({length:129},(_,i)=>({...manyPaths.observation.scope.affectedPaths[0],path:'path-'+String(i).padStart(3,'0')}));manyPaths.plan.scope=manyPaths.observation.scope;manyPaths.binding=reconciliationAttemptBinding(manyPaths.observation);
+  assert.equal(projectRetainedReconciliationReview(manyPaths).reasonCode,'review-too-large');
+  const raw=structuredClone(f.attempt) as any;raw.observation.scope.sourceRoot.path='/private/should-not-appear';raw.plan.scope=raw.observation.scope;raw.binding=reconciliationAttemptBinding(raw.observation);
+  const incomplete=projectRetainedReconciliationReview(raw);assert.equal(incomplete.complete,false);assert.equal(incomplete.payload,null);
+});
+
+test('browser confirmation requires exact host/body pins, a gated plan and actually configured readers/writers',async(t)=>{
+  const f=await browserFixture(t);
+  const unselected=new MergeReconciliationDashboard(f.store,echoBindingReader(),{interactionWriter:f.adapter.writer});
+  assert.equal((await unselected.confirmReviewed(f.attempt.id,f.request)).reasonCode,'host-selection-required');
+  const wrongSelection=new MergeReconciliationDashboard(f.store,echoBindingReader(),{...f.options,browserReview:{selectedAttempts:[{attemptId:f.attempt.id,reviewSha256:'9'.repeat(64)}]}});
+  assert.equal((await wrongSelection.confirmReviewed(f.attempt.id,f.request)).reasonCode,'host-selection-mismatch');
+  assert.equal((await f.dashboard.confirmReviewed(f.attempt.id,{...f.request,reviewSha256:'9'.repeat(64)})).reasonCode,'review-digest-mismatch');
+  await assert.rejects(f.dashboard.confirmReviewed(f.attempt.id,{...f.request,confirmedBy:'browser-caller'} as any),(error)=>error instanceof ReconciliationBrowserRequestError&&error.status===400);
+  const noReader=new MergeReconciliationDashboard(f.store,undefined,f.options);
+  assert.equal((await noReader.confirmReviewed(f.attempt.id,f.request)).reasonCode,'current-binding-reader-unavailable');
+  const unavailable=new MergeReconciliationDashboard(f.store,{async readCurrentBinding(){throw new Error('Private unavailable source /secret/root');}},f.options);
+  const refused=await unavailable.confirmReviewed(f.attempt.id,f.request);assert.equal(refused.outcome,'refused');assert.equal(refused.review.currentBinding.state,'unavailable');assert.doesNotMatch(JSON.stringify(refused),/secret\/root/);
+  const noWriter=new MergeReconciliationDashboard(f.store,echoBindingReader(),{browserReview:f.options.browserReview});assert.equal((await noWriter.confirmReviewed(f.attempt.id,f.request)).reasonCode,'interaction-writer-unavailable');
+  assert.equal(f.adapter.writes,0);assert.equal((await f.store.get(f.attempt.id))!.confirmation,null);
+  const automatic=await browserFixture(t,echoBindingReader(),plan(observation(),'observed','automatic'));
+  assert.equal((await automatic.dashboard.confirmReviewed(automatic.attempt.id,automatic.request)).reasonCode,'plan-not-confirmation-gated');
+  const manual=await browserFixture(t,echoBindingReader(),{...plan(observation(),'blocked','manual'),classification:'manual-review',blockedReason:'manual-intervention-required'});
+  assert.equal((await manual.dashboard.confirmReviewed(manual.attempt.id,manual.request)).outcome,'blocked');assert.equal(manual.adapter.writes,0);
+});
+
+test('actual immutable interaction bytes bind the confirmation; exact concurrent retry preserves one event and time',async(t)=>{
+  let checks=0;const reader:CurrentReconciliationBindingReader={async readCurrentBinding({expected}){checks++;return expected;}};
+  const f=await browserFixture(t,reader);
+  const outcomes=await Promise.all([f.dashboard.confirmReviewed(f.attempt.id,f.request),f.dashboard.confirmReviewed(f.attempt.id,f.request)]);
+  assert.deepEqual(outcomes.map((result)=>result.outcome),['recorded','replayed']);assert.equal(f.adapter.writes,1);assert.equal(checks,4);
+  const identity=reconciliationInteractionIdentity(f.attempt.id,f.request.requestId),bytes=await readFile(f.adapter.filename(identity.eventId));
+  const event:ReconciliationInteractionEvent=JSON.parse(bytes.toString()),retained=(await f.store.get(f.attempt.id))!;
+  assert.equal(retained.confirmation!.confirmedAt,event.receivedAt);assert.equal(retained.confirmation!.confirmedBy,'local-dashboard-interaction');assert.equal(retained.confirmation!.evidence[0]!.sha256,createHash('sha256').update(bytes).digest('hex'));assert.equal(retained.confirmation!.evidence[0]!.bytes,bytes.length);
+  const review=await f.dashboard.review(f.attempt.id);assert.equal(review!.confirmation!.requestId,f.request.requestId);assert.equal(review!.confirmation!.actorKind,'local-dashboard-interaction');assert.equal(review!.currentBinding.state,'not-checked');assert.equal(review!.attempt.confirmationRecorded,true);assert.equal(review!.attempt.candidate.readiness,'not-ready');assert.equal(review!.capabilities.canRecordConfirmationIntent,false);assert.deepEqual(review!.effects,{mode:'recorded-intent-only',sourceOperations:'none',taskAcceptance:'none',archiveOperations:'none',terminal:false});
+  assert.equal((await f.dashboard.confirmReviewed(f.attempt.id,{...f.request,requestId:'replacement-key'})).reasonCode,'confirmation-already-recorded');assert.equal(f.adapter.writes,1);assert.deepEqual(await readFile(f.adapter.filename(identity.eventId)),bytes);
+});
+
+test('interrupted event publication retains a pending interaction; only explicit same-body retry may finish it',async(t)=>{
+  const f=await browserFixture(t),original=f.adapter.writer.publish.bind(f.adapter.writer);let lose=true;
+  f.adapter.writer.publish=async(event)=>{await original(event);if(lose){lose=false;throw new Error('Fixture lost acknowledgment after actual write');}};
+  const interrupted=await f.dashboard.confirmReviewed(f.attempt.id,f.request);assert.equal(interrupted.outcome,'refused');assert.equal((await f.store.get(f.attempt.id))!.confirmation,null);
+  const identity=reconciliationInteractionIdentity(f.attempt.id,f.request.requestId),before=await readFile(f.adapter.filename(identity.eventId));
+  const reopened=new MergeReconciliationDashboard(await FileMergeReconciliationStore.openExisting(f.store.root),echoBindingReader(),f.options);
+  const pending=await reopened.review(f.attempt.id);assert.equal(pending!.attempt.confirmationRecorded,false);assert.equal(f.adapter.writes,1);
+  const recorded=await reopened.confirmReviewed(f.attempt.id,f.request);assert.equal(recorded.outcome,'recorded');assert.deepEqual(await readFile(f.adapter.filename(identity.eventId)),before);assert.equal(f.adapter.writes,1);assert.equal(recorded.review.confirmation!.confirmedAt,JSON.parse(before.toString()).receivedAt);
+});
+
+test('binding drift after immutable event readback blocks confirmation permanently without erasing the event',async(t)=>{
+  let count=0;const reader:CurrentReconciliationBindingReader={async readCurrentBinding({expected}){return ++count===1?expected:{...expected,revision:'changed-after-event'};}};
+  const f=await browserFixture(t,reader),blocked=await f.dashboard.confirmReviewed(f.attempt.id,f.request);
+  assert.equal(blocked.outcome,'blocked');assert.equal(blocked.review.currentBinding.state,'drift');assert.deepEqual(blocked.review.currentBinding.changedFields,['revision']);assert.equal(blocked.review.attempt.retainedStatus,'BLOCKED');assert.equal(blocked.review.confirmation,null);assert.equal(f.adapter.writes,1);
+  const identity=reconciliationInteractionIdentity(f.attempt.id,f.request.requestId),bytes=await readFile(f.adapter.filename(identity.eventId));
+  const matched=new MergeReconciliationDashboard(f.store,echoBindingReader(),f.options);
+  assert.equal((await matched.checkCurrentBinding(f.attempt.id)).currentBinding.state,'matched');assert.equal((await matched.confirmReviewed(f.attempt.id,f.request)).outcome,'blocked');assert.equal((await f.store.get(f.attempt.id))!.confirmation,null);assert.deepEqual(await readFile(f.adapter.filename(identity.eventId)),bytes);
+});
+
+test('invalid or missing immutable readback never substitutes fabricated evidence or records confirmation',async(t)=>{
+  const f=await browserFixture(t),original=f.adapter.writer.read.bind(f.adapter.writer);
+  f.adapter.writer.read=async(input)=>{const retained=await original(input);return retained?{...retained,bytes:Buffer.from('{}')}:null;};
+  const refused=await f.dashboard.confirmReviewed(f.attempt.id,f.request);assert.equal(refused.outcome,'refused');assert.equal(refused.reasonCode,'interaction-evidence-unavailable');assert.equal((await f.store.get(f.attempt.id))!.confirmation,null);
+  f.adapter.writer.read=async()=>null;
+  const missing=await new MergeReconciliationDashboard(f.store,echoBindingReader(),{...f.options,interactionWriter:{...f.adapter.writer,publish:async()=>undefined}}).confirmReviewed(f.attempt.id,{...f.request,requestId:'missing-readback'});
+  assert.equal(missing.outcome,'refused');assert.equal((await f.store.get(f.attempt.id))!.confirmation,null);
+});
+
+test('confirmed history survives later invalidation and legacy external confirmation has no invented request identity',async(t)=>{
+  const f=await browserFixture(t);assert.equal((await f.dashboard.confirmReviewed(f.attempt.id,f.request)).outcome,'recorded');
+  const before=(await f.store.get(f.attempt.id))!.confirmation;
+  const changed=new MergeReconciliationDashboard(f.store,{async readCurrentBinding({expected}){return {...expected,taskVersion:'new-version'};}},f.options);
+  const blocked=await changed.checkCurrentBinding(f.attempt.id);assert.equal(blocked.attempt.retainedStatus,'BLOCKED');assert.equal(blocked.attempt.confirmationRecorded,true);assert.equal(blocked.confirmation!.requestId,f.request.requestId);assert.deepEqual((await f.store.get(f.attempt.id))!.confirmation,before);
+  const external=await browserFixture(t);await external.dashboard.confirmIntent({attemptId:external.attempt.id,confirmation:confirmation(external.attempt.plan)});
+  const review=await external.dashboard.review(external.attempt.id);assert.equal(review!.confirmation!.requestId,null);assert.equal(review!.confirmation!.actorKind,'retained-external-record');assert.equal(external.adapter.writes,0);
+});
+
+test('legacy reserved actor text cannot claim local dashboard provenance without an actual retained event',async(t)=>{
+  const f=await browserFixture(t);
+  const reserved={...confirmation(f.attempt.plan),confirmedBy:'local-dashboard-interaction'};
+  await f.dashboard.confirmIntent({attemptId:f.attempt.id,confirmation:reserved});
+  const review=(await f.dashboard.review(f.attempt.id))!;
+  assert.equal(review.attempt.confirmationRecorded,true);assert.equal(review.confirmation!.requestId,null);
+  assert.equal(review.confirmation!.actorKind,'retained-external-record');assert.equal(f.adapter.writes,0);
+  assert.deepEqual((await f.store.get(f.attempt.id))!.confirmation,reserved);
+});
+
+test('missing or corrupt retained event removes local provenance without erasing historic confirmation',async(t)=>{
+  const f=await browserFixture(t),recorded=await f.dashboard.confirmReviewed(f.attempt.id,f.request);
+  assert.equal(recorded.outcome,'recorded');assert.equal(recorded.review.confirmation!.actorKind,'local-dashboard-interaction');
+  const original=(await f.store.get(f.attempt.id))!.confirmation;
+  const identity=reconciliationInteractionIdentity(f.attempt.id,f.request.requestId),path=f.adapter.filename(identity.eventId),bytes=await readFile(path);
+  await unlink(path);
+  const missing=(await f.dashboard.review(f.attempt.id))!;
+  assert.equal(missing.confirmation!.requestId,null);assert.equal(missing.confirmation!.actorKind,'retained-external-record');assert.equal(missing.attempt.confirmationRecorded,true);
+  await writeFile(path,'{}\n');
+  const corrupt=(await f.dashboard.review(f.attempt.id))!;
+  assert.equal(corrupt.confirmation!.requestId,null);assert.equal(corrupt.confirmation!.actorKind,'retained-external-record');assert.equal(corrupt.attempt.confirmationRecorded,true);
+  assert.deepEqual((await f.store.get(f.attempt.id))!.confirmation,original);assert.equal(f.adapter.writes,1);
+  await writeFile(path,bytes);
+  const restored=(await f.dashboard.review(f.attempt.id))!;
+  assert.equal(restored.confirmation!.requestId,f.request.requestId);assert.equal(restored.confirmation!.actorKind,'local-dashboard-interaction');assert.equal(f.adapter.writes,1);
 });

@@ -989,3 +989,59 @@ test('actual scheduler HTTP validation/conflicts stay client refusals and ledger
   assert.deepEqual(await corrupted.json(), { error: 'Schedule ledger is corrupt.' });
   assert.equal(dispatches, 0);
 });
+
+
+test('reconciliation browser routes decode portable IDs and refuse query, method and caller evidence before dispatch', async (t) => {
+  const calls: unknown[] = []; const attemptId = 'attempt:portable';
+  const review = { schema: 1, attempt: { attemptId, state: 'awaiting-confirmation', candidate: { readiness: 'not-ready' }, terminal: false }, currentBinding: { state: 'not-checked' }, effects: { terminal: false } };
+  const { base, headers } = await writableServer(t, {
+    describe: () => ({}), create: async () => ({}), action: async () => ({}),
+    reconciliationList: async () => { calls.push(['list']); return { configured: true, attempts: [review.attempt], page: { total: 1, limit: 50, omitted: 0 } }; },
+    reconciliationReview: async (id) => { calls.push(['review', id]); return id === attemptId ? review : null; },
+    reconciliationCheckCurrentBinding: async (id, input) => { calls.push(['check', id, input]); return { ...review, attempt: { ...review.attempt, state: 'blocked' }, currentBinding: { state: 'drift' } }; },
+    reconciliationConfirmReviewed: async (id, input) => { calls.push(['confirm-reviewed', id, input]); return { schema: 1, outcome: 'blocked', requestId: 'request:one', review }; },
+  });
+  const encoded = encodeURIComponent(attemptId); const route = `${base}/api/reconciliation/${encoded}`;
+  assert.equal((await fetch(base + '/api/reconciliation')).status, 200);
+  assert.deepEqual(await (await fetch(route + '/review')).json(), review);
+  assert.equal((await fetch(base + '/api/reconciliation/missing/review')).status, 404);
+  const beforeDenials = calls.length;
+  for (const url of [base + '/api/reconciliation?', base + '/api/reconciliation?limit=1', route + '/review?', route + '/review?evidence=caller', route + '/check-current-binding?'])
+    assert.equal((await fetch(url)).status, 400);
+  for (const path of ['/%2Fsource/review', '/bad%ZZ/review', '/a%2Fb/review'])
+    assert.equal((await fetch(base + '/api/reconciliation' + path)).status, 400);
+  assert.equal((await fetch(route + '/review/extra')).status, 404);
+  assert.equal((await fetch(route + '/confirm-reviewed')).status, 405);
+  assert.equal((await fetch(route + '/confirm-reviewed', { method: 'PUT', headers, body: '{}' })).status, 405);
+  assert.equal((await fetch(route + '/review', { method: 'POST', headers, body: '{}' })).status, 405);
+  const post = (action: string, input: unknown, selectedHeaders: Record<string, string> = headers) => fetch(route + '/' + action, { method: 'POST', headers: selectedHeaders, body: JSON.stringify(input) });
+  const request = { requestId: 'request:one', reviewSha256: 'a'.repeat(64) };
+  for (const input of [{ ...request, evidence: [] }, { ...request, confirmedAt: 'browser-time' }, { ...request, confirmedBy: 'browser-operator' }, { ...request, current: {} }, { ...request, requestId: 'bad/id' }, { ...request, reviewSha256: 'A'.repeat(64) }, { requestId: 'missing-digest' }])
+    assert.equal((await post('confirm-reviewed', input)).status, 400);
+  assert.equal((await post('check-current-binding', { current: {} })).status, 400);
+  assert.equal((await post('confirm-reviewed', request, { ...headers, origin: 'http://untrusted.invalid' })).status, 403);
+  assert.equal((await post('confirm-reviewed', request, { ...headers, 'x-temari-token': 'wrong-token' })).status, 403);
+  assert.equal((await post('confirm-reviewed', request, { ...headers, 'content-type': 'text/plain' })).status, 415);
+  assert.equal(calls.length, beforeDenials);
+  const check = await post('check-current-binding', {}); assert.equal(check.status, 200); assert.equal((await check.json()).currentBinding.state, 'drift');
+  const result = await post('confirm-reviewed', request); assert.equal(result.status, 200); assert.equal((await result.json()).outcome, 'blocked');
+  assert.deepEqual(calls.slice(beforeDenials), [['check', attemptId, {}], ['confirm-reviewed', attemptId, request]]);
+});
+
+test('unconfigured and Talk-only reconciliation stays read-only and raw host errors are not projected', async (t) => {
+  const server = await startTaskViewServer({ runtime: emptyReader, archonBaseUrl: 'http://127.0.0.1:3091', port: 0 });
+  t.after(() => closeServer(server)); const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  const list = await (await fetch(base + '/api/reconciliation')).json(); assert.equal(list.configured, false); assert.deepEqual(list.attempts, []); assert.equal(list.capabilities.canRecordConfirmationIntent, false);
+  assert.equal((await fetch(base + '/api/reconciliation/a/confirm-reviewed', { method: 'POST', body: '{}' })).status, 405);
+  const talkOnly = await talkServer(t, talkFixture([]));
+  assert.equal(talkOnly.dashboard.talkAvailable, true);
+  assert.equal((await (await fetch(talkOnly.base + '/api/reconciliation')).json()).configured, false);
+  assert.equal((await fetch(talkOnly.base + '/api/reconciliation/a/confirm-reviewed', { method: 'POST', headers: talkOnly.headers, body: JSON.stringify({ requestId: 'r', reviewSha256: 'a'.repeat(64) }) })).status, 405);
+  const broken = await writableServer(t, {
+    describe: () => ({}), create: async () => ({}), action: async () => ({}),
+    reconciliationList: async () => { throw new Error('Unsealed source /private/unselected/root\nprivate native command output'); },
+    reconciliationReview: async () => { const error = new Error('\u001b[31mprivate root /not/for/browser\u001b[0m') as Error & { status: number }; error.name = 'ReconciliationBrowserRequestError'; error.status = 409; throw error; },
+  });
+  const failure = await fetch(broken.base + '/api/reconciliation'); assert.equal(failure.status, 500); assert.deepEqual(await failure.json(), { error: 'Reconciliation state could not be read or retained.' });
+  const conflict = await fetch(broken.base + '/api/reconciliation/a/review'); assert.equal(conflict.status, 409); assert.deepEqual(await conflict.json(), { error: 'Reconciliation request refused.' });
+});

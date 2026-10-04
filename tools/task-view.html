@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/task-view.css" />
     <script src="/task-view.js" defer></script>
     <script src="/dashboard-talk.js" defer></script>
+    <script src="/dashboard-reconciliation.js" defer></script>
     <script src="/dashboard-pages.js" defer></script>
   </head>
   <body>
@@ -237,6 +238,41 @@
       </div>
       <p id="open-work-status" class="open-work-status" role="status" aria-live="polite"></p>
       <section id="open-work-gaps" class="open-work-notice" aria-label="Capture coverage and gaps"></section>
+      <section id="reconciliation-panel" class="reconciliation-panel" aria-labelledby="reconciliation-heading">
+        <div class="section-heading">
+          <div><h2 id="reconciliation-heading">Reconciliation attempts</h2><p class="event-detail">Review retained plans and record confirmation intent.</p></div>
+          <button id="refresh-reconciliation" class="quiet" type="button">Reload attempts</button>
+        </div>
+        <p class="reconciliation-notice">Recording intent does not merge, establish source preservation, archive work or accept a task. Candidates remain not ready.</p>
+        <p id="reconciliation-status" class="event-detail" role="status" aria-live="polite"></p>
+        <p id="reconciliation-coverage" class="reconciliation-notice" hidden></p>
+        <form id="reconciliation-lookup-form" class="reconciliation-lookup">
+          <label>Exact retained attempt ID<input id="reconciliation-attempt-id" maxlength="128" autocomplete="off" placeholder="Review an older retained attempt" /></label>
+          <button id="reconciliation-lookup-button" class="quiet" type="submit" disabled>Review attempt</button>
+        </form>
+        <p id="reconciliation-lookup-error" class="blocker" role="alert" hidden></p>
+        <div class="reconciliation-layout">
+          <div id="reconciliation-attempt-list" class="reconciliation-attempt-list" aria-label="Retained reconciliation attempts"></div>
+          <section id="reconciliation-detail" class="reconciliation-detail" aria-labelledby="reconciliation-selected-title" hidden>
+            <div class="section-heading"><h3 id="reconciliation-selected-title">Select a retained attempt</h3><button id="reconciliation-reload-review" class="quiet" type="button">Reload review</button></div>
+            <p id="reconciliation-review-status" class="event-detail" role="status" aria-live="polite"></p>
+            <p id="reconciliation-task-link"></p>
+            <p id="reconciliation-binding-status" class="event-detail"></p>
+            <div id="reconciliation-confirmation-status" aria-live="polite"></div>
+            <details id="reconciliation-metadata" class="reconciliation-metadata" hidden>
+              <summary>Complete host-selected metadata review</summary>
+              <div id="reconciliation-metadata-body"></div>
+            </details>
+            <p id="reconciliation-review-error" class="blocker" role="alert" hidden></p>
+            <p id="reconciliation-mutation-status" class="event-detail" role="status" aria-live="polite"></p>
+            <div class="reconciliation-actions">
+              <button id="reconciliation-check" class="quiet" type="button" disabled>Check current binding</button>
+              <button id="reconciliation-confirm" class="primary" type="button" disabled>Record confirmation intent</button>
+              <button id="reconciliation-retry" class="quiet" type="button" hidden>Retry the same confirmation request</button>
+            </div>
+          </section>
+        </div>
+      </section>
       <div class="map-tools open-work-tools">
         <label>Find captured work<input id="open-work-search" type="search" placeholder="Title, host, branch or root…" /></label>
         <label>Show<select id="open-work-kind">
