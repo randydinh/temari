@@ -6,6 +6,10 @@ for the person configuring the workspace and reviewing its results. The
 
 ## Choose the right journey
 
+For a conversational starting point, configure [Talk to Temari](dashboard-talk.md).
+It keeps topic histories separate, shows linked task updates and saves explicitly
+accepted task proposals. The task journeys below provide execution and review.
+
 | Type of work                         | User flow                                                                                                                                      | Result                                                                                                                       |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | **New goal for Temari**              | Enter a title and goal → **Save goal** → **Continue in a chat**.                                                                               | A durable goal awaiting a plan. Saving it does not start an agent.                                                           |

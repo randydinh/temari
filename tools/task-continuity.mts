@@ -35,6 +35,7 @@ import {
   selectKnowledgeMapNode,
   expandKnowledgeMap,
 } from './dashboard-knowledge.mjs';
+import { createDashboardTalk, loadDashboardTalkConfig, validateDashboardTalkRoots } from './dashboard-talk.mjs';
 
 export const taskHelp = `Temari tasks — keep a goal and its evidence across runs
 
@@ -60,7 +61,7 @@ Commands:
   cancel      Request cancellation of the exact bound native run
   verify      Verify the bound canonical receipt and stage evidence
   accept      Record explicit coordinator acceptance of eligible local work
-  serve       Open the local task dashboard (read-only without --control-config)
+  serve       Open the local dashboard (task controls require --control-config)
 
 Mutation commands require --input ABSOLUTE_JSON with taskId, actor and
 idempotencyKey. All except create also require expectedVersion from show.
@@ -85,6 +86,9 @@ console URL for that same installation. --control-config ABSOLUTE_JSON enables
 goal intake and configured local verification controls; it requires --archon-home.
 The trusted config fixes the workspace, preparation directory, and verification
 recipes. Browser requests cannot supply executable commands or evidence paths.
+--talk-config ABSOLUTE_JSON optionally enables topic conversations and links.
+Talk without --control-config does not install or launch Archon; task controls
+remain read-only. The host selects its bounded conversational transport.
 Reconciliation controls are unavailable unless that config also supplies its
 explicit reconciliation store, source, candidate, check, and comparison inputs.
 serve also accepts paired --open-work-manifest ABSOLUTE_JSON --open-work-sha256 HEX
@@ -184,6 +188,7 @@ export async function runTaskCommand(
       'archon-url': { type: 'string' },
       port: { type: 'string' },
       'control-config': { type: 'string' },
+      'talk-config': { type: 'string' },
       'open-work-manifest': { type: 'string' },
       'open-work-sha256': { type: 'string' },
       help: { type: 'boolean', short: 'h' },
@@ -214,6 +219,8 @@ export async function runTaskCommand(
     throw new Error('Unknown task command. Use --help.');
   if (values['control-config'] && command !== 'serve')
     throw new Error('--control-config is only supported by serve.');
+  if (values['talk-config'] !== undefined && command !== 'serve')
+    throw new Error('--talk-config is only supported by serve.');
   const hasOpenWork =
     values['open-work-manifest'] !== undefined ||
     values['open-work-sha256'] !== undefined;
@@ -240,16 +247,20 @@ export async function runTaskCommand(
         absolute(values['control-config'], '--control-config'),
       )
     : null;
-  const root = absolute(
+  const talkConfig = values['talk-config'] !== undefined
+    ? await loadDashboardTalkConfig(absolute(values['talk-config'], '--talk-config'))
+    : null;
+  let root = absolute(
     values.root ??
       process.env.TEMARI_TASK_ROOT ??
       resolve(platformInfo().dataDirectory, 'tasks'),
     '--root',
   );
+  if (talkConfig) root = (await validateDashboardTalkRoots(talkConfig, root)).taskStoreRoot;
   const store =
     command === 'create' ||
     command === 'enter' ||
-    (command === 'serve' && dashboardConfig !== null)
+    (command === 'serve' && (dashboardConfig !== null || talkConfig !== null))
       ? await FileTaskStore.create(root)
       : await FileTaskStore.openExisting(root);
   let selection: HarnessSelection | undefined;
@@ -347,6 +358,10 @@ export async function runTaskCommand(
           },
         })
       : undefined;
+    const talk = talkConfig
+      ? await createDashboardTalk({ config: talkConfig, taskStore: store, runtime, ...(controller ? { controller } : {}) })
+      : undefined;
+    if (talk) await talk.recover();
     const scheduler =
       controller && dashboardConfig?.scheduling
         ? createDashboardScheduler({
@@ -384,6 +399,7 @@ export async function runTaskCommand(
     let clock: ReturnType<typeof setInterval> | null = null;
     const server = await startTaskViewServer({
       openWork,
+      ...(talk ? { talk } : {}),
       runtime,
       ...(controller ? { controller } : {}),
       ...(scheduler

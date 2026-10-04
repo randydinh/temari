@@ -1,6 +1,7 @@
 // Additional workspace views use only server-admitted identities.
 const pages = {
   view: 'tasks',
+  explicitView: new URL(location.href).searchParams.has('view') || new URL(location.href).searchParams.has('task'),
   knowledge: null,
   openWork: null,
   openWorkRequest: 0,
@@ -24,7 +25,7 @@ function pageError(error) {
   byId('error').hidden = false;
 }
 async function selectDashboardView(view, updateUrl = true) {
-  pages.view = ['tasks', 'schedules', 'knowledge', 'open-work'].includes(view)
+  pages.view = ['talk', 'tasks', 'schedules', 'knowledge', 'open-work'].includes(view)
     ? view
     : 'tasks';
   for (const button of document.querySelectorAll('[data-view]'))
@@ -32,17 +33,27 @@ async function selectDashboardView(view, updateUrl = true) {
       'aria-pressed',
       String(button.dataset.view === pages.view),
     );
-  for (const key of ['tasks', 'schedules', 'knowledge', 'open-work'])
+  for (const key of ['talk', 'tasks', 'schedules', 'knowledge', 'open-work'])
     byId(`${key}-page`).hidden = key !== pages.view;
   if (updateUrl) {
+    pages.explicitView = true;
     const url = new URL(location.href);
     url.searchParams.set('view', pages.view);
     history.replaceState(null, '', url);
   }
+  window.dispatchEvent(new CustomEvent('dashboard-view-changed', { detail: { view: pages.view } }));
+  if (pages.view === 'talk') await window.TemariTalkUI?.activate();
   if (pages.view === 'open-work') await loadOpenWork();
   if (pages.view === 'knowledge') await loadKnowledge();
   if (pages.view === 'schedules') await loadSchedules();
 }
+window.addEventListener('temari-talk-configured', (event) => {
+  if (event.detail?.configured && !pages.explicitView && pages.view !== 'talk')
+    selectDashboardView('talk', false).catch(pageError);
+});
+window.addEventListener('temari-talk-open', () =>
+  selectDashboardView('talk').catch(pageError),
+);
 for (const button of document.querySelectorAll('[data-view]'))
   button.addEventListener('click', () =>
     selectDashboardView(button.dataset.view).catch(pageError),

@@ -16,6 +16,9 @@ implementation and retained evidence.
 plan bounded parallel implementation from a natural goal, launch investigation
 agents, run coding agents in isolated clones, or execute verification checks. It covers setup, the UI flow,
 cancellation, retained results, and recovery. The
+[Talk to Temari guide](docs/dashboard-talk.md) describes a topic-separated
+conversation front door, linked task status, attention and explicit task intake,
+including transport setup and recovery. The
 [implementation design and example](docs/dashboard-implementation-design.md)
 explain ownership scopes, integration, independent review, and verification gates.
 The [planning, scheduling and knowledge-map guide](docs/dashboard-autonomy.md)
@@ -43,6 +46,8 @@ tree — [docs/overlays.md](docs/overlays.md).
 ## Agent starting points
 
 - **Operate the dashboard:** [setup and supported journeys](docs/task-dashboard.md).
+  Configure [Talk to Temari](docs/dashboard-talk.md) for separate topic histories,
+  a shared composer and linked task observations.
   Choose a saved goal, verification recipe, investigation swarm, configured
   implementation plan, or validated natural-goal proposal. Use Schedules for
   fixed recurring checks, Knowledge map for pinned Registrar paths/anchors, and

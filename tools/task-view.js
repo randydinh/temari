@@ -599,7 +599,7 @@ async function refresh() {
         state.tasks[0].taskId;
     byId('archon-home').href = `${data.archonBaseUrl}/console`;
     byId('connection').textContent =
-      `${dashboard.mode === 'writable' ? 'Local controls' : 'Read-only'} · refreshed`;
+      `${dashboard.mode === 'writable' ? 'Local controls' : dashboard.talkAvailable ? 'Task controls read-only' : 'Read-only'} · refreshed`;
     byId('new-goal').hidden = dashboard.mode !== 'writable';
     byId('error').hidden = true;
     renderList();
@@ -1420,6 +1420,41 @@ for (const button of document.querySelectorAll('[data-filter]'))
       item.setAttribute('aria-pressed', String(item === button));
     renderList();
   });
+window.addEventListener('temari-open-task', (event) => {
+  const taskId = event.detail?.taskId;
+  if (
+    !event.cancelable ||
+    typeof taskId !== 'string' ||
+    !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(taskId) ||
+    typeof selectDashboardView !== 'function'
+  ) return;
+  event.preventDefault();
+  // Keep the existing Talk document and composer alive, including when a
+  // newly linked task has not reached the periodic task refresh yet.
+  (async () => {
+    if (!state.tasks.some((task) => task.taskId === taskId)) {
+      const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`, { cache: 'no-store' });
+      const data = await response.json();
+      if (!response.ok || data.task?.taskId !== taskId)
+        throw new Error(data.error ?? 'The linked task could not be read.');
+      state.tasks.push(data.task);
+    }
+    state.selected = taskId;
+    state.filter = 'all';
+    byId('search').value = '';
+    for (const button of document.querySelectorAll('[data-filter]'))
+      button.setAttribute('aria-pressed', String(button.dataset.filter === 'all'));
+    const url = new URL(location.href);
+    url.searchParams.set('task', taskId);
+    history.replaceState(null, '', url);
+    renderList();
+    renderDetail();
+    await selectDashboardView('tasks');
+  })().catch((error) => {
+    byId('error').textContent = error.message;
+    byId('error').hidden = false;
+  });
+});
 window.addEventListener('popstate', () => {
   state.selected = new URL(location.href).searchParams.get('task');
   renderList();

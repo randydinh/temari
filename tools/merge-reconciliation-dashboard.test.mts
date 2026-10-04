@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { type TestContext } from 'node:test';
@@ -12,13 +13,15 @@ import type {
 import {
   FileMergeReconciliationStore,
   reconciliationAttemptBinding,
+  reconciliationStoreDigest,
 } from '../libs/runtime/src/index.js';
+import { observeGitReconciliation } from '../libs/host-adapters/src/lib/git-reconciliation-observer.js';
 import {
   MergeReconciliationDashboard,
   createObservedGitReconciliationBindingReader,
   observedGitReconciliationScope,
   type CurrentReconciliationBindingReader,
-} from './merge-reconciliation-dashboard.mts';
+} from './merge-reconciliation-dashboard.mjs';
 
 const SHA = 'a'.repeat(64);
 const DIGEST = 'b'.repeat(64);
@@ -114,6 +117,53 @@ function echoBindingReader(): CurrentReconciliationBindingReader {
       return expected;
     },
   };
+}
+
+function trustedSnapshot(seed: MergeObservation) {
+  return {
+    taskId: seed.taskId,
+    taskVersion: seed.taskVersion,
+    runId: seed.runId,
+    revision: seed.revision,
+    observationId: seed.observationId,
+    candidateId: seed.candidate.id,
+    candidateSha256: seed.candidate.sha256,
+    candidateRoot: seed.scope.candidateRoot,
+    resolutionIntent: seed.scope.resolutionIntent,
+    requiredChecks: seed.scope.requiredChecks,
+    expectedComparison: seed.scope.expectedComparison,
+  };
+}
+
+function temporaryGit(root: string, args: readonly string[]): string {
+  return execFileSync('git', [
+    '-C', root, '-c', 'core.fsmonitor=false', '-c', 'core.hooksPath=/dev/null', ...args,
+  ], {
+    encoding: 'utf8',
+    timeout: 10_000,
+    maxBuffer: 16 * 1024 * 1024,
+    windowsHide: true,
+    env: {
+      ...process.env,
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_CONFIG_GLOBAL: '/dev/null',
+      GIT_OPTIONAL_LOCKS: '0',
+      GIT_AUTHOR_NAME: 'Reconciliation test',
+      GIT_AUTHOR_EMAIL: 'reconciliation-test@example.invalid',
+      GIT_COMMITTER_NAME: 'Reconciliation test',
+      GIT_COMMITTER_EMAIL: 'reconciliation-test@example.invalid',
+    },
+  });
+}
+
+async function repositoryFixture(t: TestContext) {
+  const root = await mkdtemp(join(tmpdir(), 'temari-reconciliation-git-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  temporaryGit(root, ['init', '--quiet', '--initial-branch=main', '--object-format=sha1']);
+  await writeFile(join(root, 'tracked.txt'), 'committed source\n');
+  temporaryGit(root, ['add', '--', 'tracked.txt']);
+  temporaryGit(root, ['commit', '--quiet', '-m', 'initial source']);
+  return root;
 }
 
 async function fixture(t: TestContext, reader: CurrentReconciliationBindingReader | null = echoBindingReader()) {
@@ -212,27 +262,17 @@ test('reader-returned drift blocks confirmation without accepting request-suppli
 
 test('portable observed Git scope matches a stored attempt and reader drift blocks it', async (t) => {
   const seed = observation();
+  const gitObjectId = 'a'.repeat(40);
   const git = {
     schema: 1 as const,
-    source: { repositoryRoot: '/trusted/source-root', commonGitDirectory: '/trusted/.git', headObjectId: SHA, headReference: 'main' },
+    source: { repositoryRoot: '/trusted/source-root', commonGitDirectory: '/trusted/.git', headObjectId: gitObjectId, headReference: 'main' },
     operation: 'merge' as const, porcelainV2: 'u UU N... 100644 100644 100644 100644 a b c file.ts\0', porcelainSha256: DIGEST,
-    unmerged: [{ path: 'file.ts', stages: [{ stage: 1 as const, mode: '100644', objectId: SHA }] }],
+    unmerged: [{ path: 'file.ts', stages: [{ stage: 1 as const, mode: '100644', objectId: gitObjectId }] }],
     untrackedPaths: [], paths: [{ path: 'file.ts', pathSha256: SHA, indexBlobs: [], worktreeKind: 'file' as const, worktreeSha256: SHA, diffSha256: DIGEST }],
   };
-  const snapshot = {
-    taskId: seed.taskId,
-    taskVersion: seed.taskVersion,
-    runId: seed.runId,
-    revision: seed.revision,
-    observationId: seed.observationId,
-    candidateId: seed.candidate.id,
-    candidateSha256: seed.candidate.sha256,
-    candidateRoot: seed.scope.candidateRoot,
-    resolutionIntent: seed.scope.resolutionIntent,
-    requiredChecks: seed.scope.requiredChecks,
-    expectedComparison: seed.scope.expectedComparison,
-  };
+  const snapshot = trustedSnapshot(seed);
   const selected = { ...seed, scope: observedGitReconciliationScope(git, snapshot) };
+  assert.equal(selected.scope.baseHead.sha256, reconciliationStoreDigest({ headObjectId: gitObjectId }));
   assert.match(selected.scope.sourceRoot.id, /^[A-Za-z0-9][A-Za-z0-9._:-]*$/);
   assert.equal(selected.scope.sourceRoot.id.includes('/'), false);
   const reader = createObservedGitReconciliationBindingReader({
@@ -274,6 +314,135 @@ test('portable observed Git scope matches a stored attempt and reader drift bloc
     (await new MergeReconciliationDashboard(f.store, driftReader).confirmIntent({ attemptId: created.attemptId, confirmation: confirmation(selectedPlan) })).state,
     'blocked',
   );
+});
+
+test('real SHA-1 Git HEAD is canonically digested and confirmation records intent only', async (t) => {
+  const root = await repositoryFixture(t);
+  await writeFile(join(root, 'tracked.txt'), 'retained local work\n');
+  const before = {
+    head: temporaryGit(root, ['rev-parse', 'HEAD']).trim(),
+    status: temporaryGit(root, ['status', '--porcelain=v2', '-z', '--untracked-files=all']),
+    content: await readFile(join(root, 'tracked.txt'), 'utf8'),
+  };
+  assert.match(before.head, /^[0-9a-f]{40}$/);
+  const git = await observeGitReconciliation(root);
+  const seed = observation('real-head');
+  const snapshot = trustedSnapshot(seed);
+  const selected = { ...seed, scope: observedGitReconciliationScope(git, snapshot) };
+  assert.equal(git.source.headObjectId, before.head);
+  assert.equal(selected.scope.baseHead.sha256, reconciliationStoreDigest({ headObjectId: before.head }));
+  assert.notEqual(selected.scope.baseHead.sha256, before.head);
+  assert.deepEqual(selected.scope.affectedPaths.map((path) => path.path), ['tracked.txt']);
+  assert.match(selected.scope.affectedPaths[0]!.indexBlobs[0]!.objectId, /^[0-9a-f]{40}$/);
+  const reader = createObservedGitReconciliationBindingReader({
+    repositoryRoot: root,
+    snapshotReader: { async readCurrentSnapshot() { return snapshot; } },
+  });
+  const f = await fixture(t, reader);
+  const selectedPlan = plan(selected, 'awaiting-confirmation', 'real-head-intent');
+  const created = await f.dashboard.submitIntent({
+    idempotencyKey: 'real-head-intent', observation: selected, plan: selectedPlan,
+  });
+  const stored = (await f.store.get(created.attemptId))!;
+  assert.deepEqual(await reader.readCurrentBinding({ attemptId: created.attemptId, expected: stored.binding }), stored.binding);
+  const confirmed = await f.dashboard.confirmIntent({
+    attemptId: created.attemptId, confirmation: confirmation(selectedPlan),
+  });
+  assert.deepEqual({ state: confirmed.state, readiness: confirmed.candidate.readiness, terminal: confirmed.terminal }, {
+    state: 'observed', readiness: 'not-ready', terminal: false,
+  });
+  assert.deepEqual((await f.store.get(created.attemptId))!.confirmation, confirmation(selectedPlan));
+  assert.deepEqual({
+    head: temporaryGit(root, ['rev-parse', 'HEAD']).trim(),
+    status: temporaryGit(root, ['status', '--porcelain=v2', '-z', '--untracked-files=all']),
+    content: await readFile(join(root, 'tracked.txt'), 'utf8'),
+  }, before);
+});
+
+test('a changed real Git HEAD blocks confirmation even when affected content and status are unchanged', async (t) => {
+  const root = await repositoryFixture(t);
+  await writeFile(join(root, 'tracked.txt'), 'retained local work\n');
+  const initial = await observeGitReconciliation(root);
+  const seed = observation('head-drift');
+  const snapshot = trustedSnapshot(seed);
+  const selected = { ...seed, scope: observedGitReconciliationScope(initial, snapshot) };
+  const reader = createObservedGitReconciliationBindingReader({
+    repositoryRoot: root,
+    snapshotReader: { async readCurrentSnapshot() { return snapshot; } },
+  });
+  const f = await fixture(t, reader);
+  const selectedPlan = plan(selected, 'awaiting-confirmation', 'head-drift-intent');
+  const created = await f.dashboard.submitIntent({
+    idempotencyKey: 'head-drift-intent', observation: selected, plan: selectedPlan,
+  });
+  temporaryGit(root, ['commit', '--quiet', '--allow-empty', '-m', 'new source head']);
+  const changed = await observeGitReconciliation(root);
+  assert.match(changed.source.headObjectId!, /^[0-9a-f]{40}$/);
+  assert.notEqual(changed.source.headObjectId, initial.source.headObjectId);
+  assert.equal(changed.porcelainV2, initial.porcelainV2);
+  assert.deepEqual(changed.paths, initial.paths);
+  const blocked = await f.dashboard.confirmIntent({
+    attemptId: created.attemptId, confirmation: confirmation(selectedPlan),
+  });
+  assert.equal(blocked.state, 'blocked');
+  const retained = (await f.store.get(created.attemptId))!;
+  assert.equal(retained.confirmation, null);
+  assert.deepEqual(retained.observation.scope, selected.scope);
+  assert.equal(retained.observation.scope.baseHead.sha256, reconciliationStoreDigest({ headObjectId: initial.source.headObjectId }));
+});
+
+test('a clean real repository refuses scope preparation without inventing an affected path', async (t) => {
+  const root = await repositoryFixture(t);
+  const clean = await observeGitReconciliation(root);
+  assert.match(clean.source.headObjectId!, /^[0-9a-f]{40}$/);
+  assert.deepEqual(clean.paths, []);
+  const seed = observation('clean');
+  assert.throws(
+    () => observedGitReconciliationScope(clean, trustedSnapshot(seed)),
+    /^Error: No affected Git paths; no reconciliation attempt prepared\.$/,
+  );
+  const f = await fixture(t);
+  // Even a caller bypassing preparation cannot admit an empty portable scope.
+  const invalid = { ...seed, scope: { ...seed.scope, affectedPaths: [] } };
+  await assert.rejects(f.dashboard.submitIntent({
+    idempotencyKey: 'clean-intent', observation: invalid,
+    plan: plan(invalid, 'awaiting-confirmation', 'clean-intent'),
+  }), /affectedPaths must declare at least one affected path/);
+  assert.deepEqual(await f.store.list(), []);
+  assert.equal(temporaryGit(root, ['status', '--porcelain=v2', '-z', '--untracked-files=all']), '');
+});
+
+test('a retained dirty attempt is invalidated when its real live source becomes clean', async (t) => {
+  const root = await repositoryFixture(t);
+  await writeFile(join(root, 'tracked.txt'), 'retained local work\n');
+  const initial = await observeGitReconciliation(root);
+  const seed = observation('clean-drift');
+  const snapshot = trustedSnapshot(seed);
+  const selected = { ...seed, scope: observedGitReconciliationScope(initial, snapshot) };
+  const reader = createObservedGitReconciliationBindingReader({
+    repositoryRoot: root,
+    snapshotReader: { async readCurrentSnapshot() { return snapshot; } },
+  });
+  const f = await fixture(t, reader);
+  const selectedPlan = plan(selected, 'awaiting-confirmation', 'clean-drift-intent');
+  const created = await f.dashboard.submitIntent({
+    idempotencyKey: 'clean-drift-intent', observation: selected, plan: selectedPlan,
+  });
+  await writeFile(join(root, 'tracked.txt'), 'committed source\n');
+  const clean = await observeGitReconciliation(root);
+  assert.deepEqual(clean.paths, []);
+  assert.equal(clean.source.headObjectId, initial.source.headObjectId);
+  assert.throws(() => observedGitReconciliationScope(clean, snapshot), /no reconciliation attempt prepared/);
+  const blocked = await f.dashboard.invalidateIntent({ attemptId: created.attemptId });
+  assert.equal(blocked.state, 'blocked');
+  assert.equal(blocked.canConfirm, false);
+  const retained = (await f.store.get(created.attemptId))!;
+  assert.deepEqual(retained.observation.scope, selected.scope);
+  assert.equal(retained.confirmation, null);
+  assert.equal((await f.dashboard.confirmIntent({
+    attemptId: created.attemptId, confirmation: confirmation(selectedPlan),
+  })).state, 'blocked');
+  assert.equal((await f.store.get(created.attemptId))!.confirmation, null);
 });
 
 test('delegated idempotency replay is stable and changed request identity conflicts', async (t) => {

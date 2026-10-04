@@ -6,6 +6,7 @@
     <title>Temari · Tasks</title>
     <link rel="stylesheet" href="/task-view.css" />
     <script src="/task-view.js" defer></script>
+    <script src="/dashboard-talk.js" defer></script>
     <script src="/dashboard-pages.js" defer></script>
   </head>
   <body>
@@ -14,6 +15,7 @@
         ><span class="brand-mark">T</span> Temari</a
       >
       <nav class="page-nav" aria-label="Workspace views">
+        <button data-view="talk" aria-pressed="false">Talk <span id="talk-nav-count" class="count" hidden>0</span></button>
         <button data-view="tasks" aria-pressed="true">Tasks</button>
         <button data-view="schedules" aria-pressed="false">Schedules</button>
         <button data-view="knowledge" aria-pressed="false">
@@ -29,6 +31,59 @@
         >
       </div>
     </header>
+    <section id="talk-page" class="talk-page" aria-label="Talk to Temari" hidden>
+      <aside class="talk-topics" aria-label="Topics">
+        <div class="talk-panel-heading">
+          <span class="eyebrow">TALK TO TEMARI</span>
+          <h1>Topics</h1>
+          <p>One conversation at a time. Work keeps its own history.</p>
+          <button id="talk-new-topic" class="primary" disabled>New topic</button>
+        </div>
+        <label class="search"><span class="sr-only">Find a topic</span><input id="talk-topic-search" type="search" placeholder="Find a topic…" autocomplete="off" /></label>
+        <p id="talk-list-status" class="event-detail" role="status">Checking Talk setup…</p>
+        <div id="talk-topic-list" class="talk-topic-list"></div>
+      </aside>
+      <section class="talk-conversation" aria-labelledby="talk-topic-title">
+        <header class="talk-conversation-heading">
+          <div><span class="eyebrow">YOUR CONVERSATION</span><h2 id="talk-topic-title">Talk to Temari</h2></div>
+          <button id="talk-refresh-topic" class="quiet" disabled>Reload topic</button>
+        </header>
+        <div id="talk-setup" class="talk-notice" role="status">Checking the selected conversational setup.</div>
+        <p id="talk-error" class="blocker" role="alert" hidden></p>
+        <div id="talk-transcript" class="talk-transcript" role="log" aria-label="Selected topic conversation" aria-live="off">
+          <div class="talk-empty"><h3>Select a topic</h3><p>Talk here while your linked tasks continue. Other topics stay separate.</p></div>
+        </div>
+        <nav id="talk-pagination" class="talk-pagination" aria-label="Conversation pages" hidden>
+          <button id="talk-earlier" class="quiet">Earlier messages</button>
+          <span id="talk-page-status" class="event-detail"></span>
+          <button id="talk-later" class="quiet">Later messages</button>
+          <button id="talk-latest" class="quiet">Latest messages</button>
+        </nav>
+        <p id="talk-turn-status" class="talk-turn-status" role="status" aria-live="polite"></p>
+        <form id="talk-composer" class="talk-composer">
+          <label for="talk-message" id="talk-composer-label">Message to Temari</label>
+          <textarea id="talk-message" rows="3" maxlength="8192" placeholder="What would you like to work through?" disabled></textarea>
+          <div class="talk-composer-actions">
+            <span id="talk-composer-help" class="event-detail">Choose a topic to start. Ctrl/⌘ + Enter sends.</span>
+            <button id="talk-retry" class="quiet" type="button" hidden>Retry the same request</button>
+            <button id="talk-send" class="primary" type="submit" disabled>Send</button>
+          </div>
+        </form>
+      </section>
+      <aside class="talk-work" aria-label="Linked work and attention">
+        <section aria-labelledby="talk-linked-heading">
+          <div class="section-heading"><h2 id="talk-linked-heading">Linked work</h2><button id="talk-link-task" class="quiet" disabled>Link a task</button></div>
+          <p class="event-detail">Task details retain runs, logs and evidence.</p>
+          <div id="talk-linked-tasks"></div>
+        </section>
+        <section class="talk-attention" aria-labelledby="talk-attention-heading">
+          <h2 id="talk-attention-heading">Needs your attention <span id="talk-attention-count" class="count">0</span></h2>
+          <p class="event-detail">Marking an item seen does not accept or close its task.</p>
+          <p id="talk-attention-coverage" class="event-detail" role="status" hidden></p>
+          <div id="talk-attention-list"></div>
+        </section>
+      </aside>
+    </section>
     <main class="workspace" id="tasks-page">
       <aside class="inbox" aria-label="Task inbox">
         <div class="inbox-heading">
@@ -208,6 +263,23 @@
       </details>
     </section>
     <div id="error" class="error-banner" role="alert" hidden></div>
+    <dialog id="talk-topic-dialog" aria-labelledby="talk-topic-dialog-title">
+      <form id="talk-topic-form">
+        <div class="section-heading"><h2 id="talk-topic-dialog-title">Start a topic</h2><button id="talk-close-topic" class="quiet" type="button">Close</button></div>
+        <label>Topic name<input id="talk-topic-name" required maxlength="256" autocomplete="off" placeholder="What are we working through?" /></label>
+        <p id="talk-topic-error" class="blocker" role="alert" hidden></p>
+        <button id="talk-create-topic" class="primary" type="submit">Create topic</button>
+      </form>
+    </dialog>
+    <dialog id="talk-link-dialog" aria-labelledby="talk-link-dialog-title">
+      <form id="talk-link-form">
+        <div class="section-heading"><h2 id="talk-link-dialog-title">Link existing work</h2><button id="talk-close-link" class="quiet" type="button">Close</button></div>
+        <p id="talk-link-topic" class="event-detail"></p>
+        <label>Task<select id="talk-task-choice" required></select></label>
+        <p id="talk-link-error" class="blocker" role="alert" hidden></p>
+        <button id="talk-save-link" class="primary" type="submit" disabled>Link task</button>
+      </form>
+    </dialog>
     <dialog id="goal-dialog" aria-labelledby="goal-dialog-title">
       <form id="goal-form">
         <div class="section-heading">

@@ -14,6 +14,7 @@ export interface TaskViewReader {
 export interface TaskViewOptions {
   readonly runtime: TaskViewReader;
   readonly openWork?: { describe(): Promise<unknown> };
+  readonly talk?: TaskViewTalk;
   readonly archonBaseUrl: string;
   readonly controller?: TaskViewController;
   readonly knowledge?: {
@@ -26,6 +27,17 @@ export interface TaskViewOptions {
     create(input: unknown): Promise<unknown>;
     update(id: string, input: unknown): Promise<unknown>;
   };
+}
+
+/** Topic writes are independent of task execution admission. */
+export interface TaskViewTalk {
+  describe(): unknown | Promise<unknown>;
+  topic(id: string, page: { offset?: number; limit?: number }): Promise<unknown>;
+  create(input: unknown): Promise<unknown>;
+  turn(topicId: string, input: unknown): Promise<unknown>;
+  link(topicId: string, input: unknown): Promise<unknown>;
+  ack(topicId: string, attentionId: string, input: unknown): Promise<unknown>;
+  accept(topicId: string, turnId: string, input: unknown): Promise<unknown>;
 }
 
 /** The service owns admission, idempotency, runtime control, and acceptance. */
@@ -63,6 +75,70 @@ class RequestError extends Error {
 
 const BODY_LIMIT = 64 * 1024;
 const BODY_TIMEOUT_MS = 5_000;
+const TOPIC_ID = '[A-Za-z0-9][A-Za-z0-9._-]{0,127}';
+
+function topicPage(url: URL): { offset?: number; limit?: number } {
+  const result: { offset?: number; limit?: number } = {};
+  for (const key of url.searchParams.keys()) {
+    if (
+      (key !== 'offset' && key !== 'limit') ||
+      url.searchParams.getAll(key).length !== 1
+    )
+      throw new RequestError(400, 'Select only one offset and limit.');
+    const raw = url.searchParams.get(key)!;
+    const value = Number(raw);
+    if (
+      !/^(0|[1-9]\d*)$/.test(raw) ||
+      !Number.isSafeInteger(value) ||
+      (key === 'limit' && (value < 1 || value > 50))
+    )
+      throw new RequestError(400, 'Topic page requires offset >= 0 and limit 1..50.');
+    result[key] = value;
+  }
+  return result;
+}
+
+function topicInput(value: unknown, keys: readonly string[]): unknown {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    Object.keys(value).length !== keys.length ||
+    !Object.keys(value).every((key) => keys.includes(key))
+  )
+    throw new RequestError(400, 'Unexpected or missing topic request field.');
+  const input = value as Record<string, unknown>;
+  if (
+    typeof input.requestId !== 'string' ||
+    !new RegExp(`^${TOPIC_ID}$`).test(input.requestId) ||
+    (keys.includes('expectedVersion') &&
+      (!Number.isSafeInteger(input.expectedVersion) ||
+        (input.expectedVersion as number) < 1))
+  )
+    throw new RequestError(400, 'Topic request identity and current version are required.');
+  for (const key of ['title', 'text']) {
+    const field = input[key];
+    if (keys.includes(key) && (typeof field !== 'string' || !field.trim()))
+      throw new RequestError(400, `Topic ${key} is required.`);
+  }
+  if (
+    keys.includes('taskId') &&
+    (typeof input.taskId !== 'string' || !new RegExp(`^${TOPIC_ID}$`).test(input.taskId))
+  )
+    throw new RequestError(400, 'Select one task identity.');
+  return value;
+}
+
+function plainError(error: unknown): string {
+  const value = error instanceof Error ? error.message : 'Task state could not be read.';
+  return value
+    .replace(/\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)/g, '')
+    .replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '')
+    .split(/[\r\n]/, 1)[0]!
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, '')
+    .trim()
+    .slice(0, 1024) || 'Dashboard request failed.';
+}
 
 function headerCount(request: IncomingMessage, name: string): number {
   let count = 0;
@@ -71,14 +147,14 @@ function headerCount(request: IncomingMessage, name: string): number {
   return count;
 }
 
-function validateMutation(request: IncomingMessage, csrfToken: string): void {
+function validateMutation(request: IncomingMessage, csrfToken: string, subject = 'Task'): void {
   if (
     headerCount(request, 'origin') !== 1 ||
     request.headers.origin !== `http://${request.headers.host}`
   )
     throw new RequestError(
       403,
-      'Task changes require the exact local dashboard origin.',
+      `${subject} changes require the exact local dashboard origin.`,
     );
   const token = request.headers['x-temari-token'];
   if (
@@ -89,7 +165,7 @@ function validateMutation(request: IncomingMessage, csrfToken: string): void {
   )
     throw new RequestError(
       403,
-      'Task changes require this dashboard session token. Reload the dashboard.',
+      `${subject} changes require this dashboard session token. Reload the dashboard.`,
     );
   const contentType = request.headers['content-type'];
   if (
@@ -99,7 +175,7 @@ function validateMutation(request: IncomingMessage, csrfToken: string): void {
   )
     throw new RequestError(
       415,
-      'Task changes require application/json encoded as UTF-8.',
+      `${subject} changes require application/json encoded as UTF-8.`,
     );
 }
 
@@ -186,6 +262,7 @@ const assets = new Map([
     '/dashboard-pages.js',
     ['dashboard-pages.js', 'text/javascript; charset=utf-8'],
   ],
+  ['/dashboard-talk.js', ['dashboard-talk.js', 'text/javascript; charset=utf-8']],
 ] as const);
 
 /** Local task projection with optional mutations delegated to the controller. */
@@ -223,6 +300,63 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
         return;
       }
       const url = new URL(request.url ?? '/', `http://${request.headers.host}`);
+      if (url.pathname === '/api/topics' || url.pathname.startsWith('/api/topics/')) {
+        const topicMatch = new RegExp(`^/api/topics/(${TOPIC_ID})$`).exec(url.pathname);
+        const topicAction = new RegExp(
+          `^/api/topics/(${TOPIC_ID})/(turns|links|attention/(${TOPIC_ID})/ack|proposals/(${TOPIC_ID})/accept)$`,
+        ).exec(url.pathname);
+        const list = url.pathname === '/api/topics';
+        if (request.method === 'GET' || request.method === 'HEAD') {
+          if (topicAction) {
+            response.setHeader('Allow', 'POST');
+            send(405, { error: 'Topic actions require POST.' });
+          } else if (list) {
+            if ((request.url ?? '').includes('?'))
+              throw new RequestError(400, 'Unexpected topic list query.');
+            send(200, options.talk ? await options.talk.describe() : {
+              configured: false,
+              setupReason: 'Talk is not configured.',
+              topics: [],
+              attention: [],
+              capabilities: { canCreateTopic: false, canSendTurn: false, canLinkTask: false },
+            });
+          } else if (topicMatch) {
+            const page = topicPage(url);
+            if (!options.talk) throw new RequestError(404, 'Topic not found; Talk is not configured.');
+            const topic = await options.talk.topic(topicMatch[1]!, page);
+            send(topic == null ? 404 : 200, topic ?? { error: 'Topic not found.' });
+          } else send(404, { error: 'Not found.' });
+          return;
+        }
+        if ((!list && !topicAction) || (request.url ?? '').includes('?')) {
+          send(404, { error: 'Not found.' });
+          return;
+        }
+        if (!options.talk || request.method !== 'POST') {
+          response.setHeader('Allow', options.talk ? 'POST' : 'GET, HEAD');
+          send(405, { error: options.talk ? 'Topic changes require POST.' : 'Talk is not configured.' });
+          return;
+        }
+        if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? ''))
+          throw new RequestError(403, 'Topic changes require a local connection.');
+        validateMutation(request, csrfToken, 'Topic');
+        const action = topicAction?.[2];
+        const input = topicInput(await readJsonBody(request), list
+          ? ['requestId', 'title']
+          : action === 'turns'
+            ? ['requestId', 'expectedVersion', 'text']
+            : action === 'links'
+              ? ['requestId', 'expectedVersion', 'taskId']
+              : ['requestId', 'expectedVersion']);
+        const topicId = topicAction?.[1];
+        const result = list ? await options.talk.create(input)
+          : action === 'turns' ? await options.talk.turn(topicId!, input)
+            : action === 'links' ? await options.talk.link(topicId!, input)
+              : topicAction?.[3] ? await options.talk.ack(topicId!, topicAction[3], input)
+                : await options.talk.accept(topicId!, topicAction![4]!, input);
+        send(action === 'turns' ? 202 : 200, result);
+        return;
+      }
       if (url.pathname === '/api/open-work') {
         if (request.method !== 'GET' && request.method !== 'HEAD') {
           response.setHeader('Allow', 'GET, HEAD');
@@ -337,7 +471,7 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
       if (url.pathname === '/api/dashboard') {
         send(200, {
           mode: options.controller ? 'writable' : 'read-only',
-          csrfToken: options.controller ? csrfToken : null,
+          csrfToken: options.controller || options.talk ? csrfToken : null,
           config: options.controller
             ? await options.controller.describe()
             : null,
@@ -345,6 +479,7 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
           openWorkAvailable: Boolean(options.openWork),
           knowledgeAvailable: Boolean(options.knowledge),
           schedulingAvailable: Boolean(options.schedules),
+          talkAvailable: Boolean(options.talk),
         });
         return;
       }
@@ -471,10 +606,18 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
         error && typeof error === 'object' && 'status' in error
           ? error.status
           : undefined;
+      const topicRequest = /^\/api\/topics(?:\/|\?|$)/.test(request.url ?? '');
+      const scheduleRequest = /^\/api\/schedules(?:\/|\?|$)/.test(request.url ?? '');
+      const serviceError = error instanceof Error && (
+        (options.talk && topicRequest && error.name === 'TalkRequestError') ||
+        (options.schedules && scheduleRequest && error.name === 'DashboardScheduleRequestError')
+      );
       const status =
         error instanceof RequestError
           ? error.status
-          : options.controller &&
+          : serviceError && (controllerStatus === 400 || controllerStatus === 404 || controllerStatus === 409 || controllerStatus === 503)
+            ? controllerStatus
+          : options.controller && !topicRequest && !scheduleRequest &&
               (controllerStatus === 400 ||
                 controllerStatus === 404 ||
                 controllerStatus === 409)
@@ -484,11 +627,11 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
         response.setHeader('Connection', 'close');
         request.resume();
       }
+      // The host can retain the full diagnostic in its selected local stderr;
+      // the HTTP projection contains only a plain first-line message.
+      if (status >= 500 || (serviceError && error instanceof Error && error.cause !== undefined)) console.error(error);
       send(status, {
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Task state could not be read.',
+        error: plainError(error),
       });
     }
   });
