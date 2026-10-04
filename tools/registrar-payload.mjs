@@ -7,25 +7,33 @@ const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PAYLOAD_RELATIVE_ROOT = 'packages/workflow-runtime/registrar';
 export const REGISTRAR_PAYLOAD_ROOT = join(REPOSITORY_ROOT, PAYLOAD_RELATIVE_ROOT);
 
-const EXPECTED_COMMIT = '760926907669ae34bd1861732edbbf8f5afaf588';
-const EXPECTED_MANIFEST_SHA256 = '4a7d33e24e849dfd89fa1259a86475e99a2668487562aaee7811fb610171c88e';
+const EXPECTED_COMMIT = 'd73f626133b2543345c32805957e05b61e386bad';
+const EXPECTED_MANIFEST_SHA256 = '5ecf0874189fcfe6d0a0ad317ef78877a3cc390171c0240823598ac7de3d6e83';
+const CURRENT_PROVENANCE = {
+  commit: EXPECTED_COMMIT,
+  manifestSha256: EXPECTED_MANIFEST_SHA256,
+};
 
 function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
-async function readManifest(root) {
+async function readManifest(root, expected) {
+  if (!/^[a-f0-9]{40}$/.test(expected.commit) ||
+      !/^[a-f0-9]{64}$/.test(expected.manifestSha256)) {
+    throw new Error('Registrar provenance pin is invalid');
+  }
   const manifestPath = join(root, 'UPSTREAM.json');
   const stat = await lstat(manifestPath);
   if (!stat.isFile() || stat.isSymbolicLink()) {
     throw new Error('Registrar payload manifest must be a regular file');
   }
   const bytes = await readFile(manifestPath);
-  if (sha256(bytes) !== EXPECTED_MANIFEST_SHA256) {
+  if (sha256(bytes) !== expected.manifestSha256) {
     throw new Error('Registrar payload manifest differs from reviewed upstream inventory');
   }
   const manifest = JSON.parse(bytes.toString('utf8'));
-  if (manifest.schemaVersion !== 1 || manifest.upstream?.commit !== EXPECTED_COMMIT || !Array.isArray(manifest.files)) {
+  if (manifest.schemaVersion !== 1 || manifest.upstream?.commit !== expected.commit || !Array.isArray(manifest.files)) {
     throw new Error('Registrar payload manifest has invalid provenance');
   }
   return manifest;
@@ -47,12 +55,12 @@ async function inventory(root) {
   return found.sort();
 }
 
-export async function verifyRegistrarPayload(root = REGISTRAR_PAYLOAD_ROOT) {
+async function verifyRegistrarPayloadAtPin(root, provenancePin) {
   const stat = await lstat(root);
   if (!stat.isDirectory() || stat.isSymbolicLink()) {
     throw new Error('Registrar payload root must be a real directory');
   }
-  const manifest = await readManifest(root);
+  const manifest = await readManifest(root, provenancePin);
   const expected = manifest.files.map(({ path }) => path);
   if (expected.some((path) => typeof path !== 'string' || path.startsWith('/') || path.split('/').includes('..')) ||
       expected.join('\n') !== [...new Set(expected)].sort().join('\n')) {
@@ -69,7 +77,18 @@ export async function verifyRegistrarPayload(root = REGISTRAR_PAYLOAD_ROOT) {
   return { upstream: manifest.upstream, files: manifest.files.length };
 }
 
-const canonicalManifest = await readManifest(REGISTRAR_PAYLOAD_ROOT);
+/** Current payload checks always use the pin reviewed in this checkout. */
+export async function verifyRegistrarPayload(root = REGISTRAR_PAYLOAD_ROOT) {
+  return verifyRegistrarPayloadAtPin(root, CURRENT_PROVENANCE);
+}
+
+/** For a prior release only, after its whole archive digest is independently pinned. */
+export async function verifyHistoricalRegistrarPayload(root, provenancePin) {
+  if (!provenancePin) throw new Error('Historical Registrar provenance pin is required');
+  return verifyRegistrarPayloadAtPin(root, provenancePin);
+}
+
+const canonicalManifest = await readManifest(REGISTRAR_PAYLOAD_ROOT, CURRENT_PROVENANCE);
 export const REGISTRAR_PAYLOAD_FILES = Object.freeze([
   'UPSTREAM.json',
   ...canonicalManifest.files.map(({ path }) => path),

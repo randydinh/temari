@@ -42,6 +42,10 @@ class AuditSnapshotTests(unittest.TestCase):
             full = source_archive._scan_current_source(
                 registry, source_id, publication['generation'], publication['manifest_sha256'])
             self.assertGreater(len(source_archive.canonical(full)), source_archive.MAX_RESPONSE)
+            with self.assertRaisesRegex(ValueError, 'response exceeds byte budget'):
+                registry.audit_current_source(
+                    source_id, publication['generation'],
+                    manifest_sha256=publication['manifest_sha256'])
             start = registry.audit_start(source_id, publication['generation'],
                                          manifest_sha256=publication['manifest_sha256'])
             self.assertEqual(994, start['total'])

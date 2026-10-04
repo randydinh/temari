@@ -27,7 +27,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { checkCanonicalArtifact } from './canonical-runtime.mjs';
 import { packagePublicEntries } from './public-entry-runtime.mjs';
-import { verifyRegistrarPayload } from './registrar-payload.mjs';
+import {
+  verifyHistoricalRegistrarPayload,
+  verifyRegistrarPayload,
+} from './registrar-payload.mjs';
 
 const toolPath = fileURLToPath(import.meta.url);
 const workspace = resolve(dirname(toolPath), '..');
@@ -156,7 +159,11 @@ async function writeExclusive(root, path, bytes, executable = false) {
   if (executable) await chmod(destination, 0o755);
 }
 
-export async function checkKnowledgePlugin(root, expectedManifestSha256) {
+async function checkKnowledgePluginAtPin(
+  root,
+  expectedManifestSha256,
+  historicalRegistrarProvenance,
+) {
   assert(isAbsolute(root));
   assert.match(expectedManifestSha256 ?? '', /^[a-f0-9]{64}$/);
   const files = await filesAt(root);
@@ -208,7 +215,12 @@ export async function checkKnowledgePlugin(root, expectedManifestSha256) {
   assert(
     files.get(launcherPath).includes('temari-knowledge-provider-selection'),
   );
-  await verifyRegistrarPayload(join(root, 'registrar'));
+  if (historicalRegistrarProvenance)
+    await verifyHistoricalRegistrarPayload(
+      join(root, 'registrar'),
+      historicalRegistrarProvenance,
+    );
+  else await verifyRegistrarPayload(join(root, 'registrar'));
   const runtime = await checkCanonicalArtifact(join(root, 'runtime'));
   assert.equal(
     sha256(await readFile(join(root, 'runtime/canonical-manifest.json'))),
@@ -218,6 +230,25 @@ export async function checkKnowledgePlugin(root, expectedManifestSha256) {
   if (process.platform !== 'win32')
     assert((await lstat(join(root, launcherPath))).mode & 0o111);
   return manifest;
+}
+
+/** Public current-candidate check never accepts a caller-provided Registrar pin. */
+export async function checkKnowledgePlugin(root, expectedManifestSha256) {
+  return checkKnowledgePluginAtPin(root, expectedManifestSha256);
+}
+
+/** Used only for a release whose entire archive has an external digest pin. */
+export async function checkHistoricalKnowledgePlugin(
+  root,
+  expectedManifestSha256,
+  historicalRegistrarProvenance,
+) {
+  assert(historicalRegistrarProvenance, 'Historical Registrar pin is required');
+  return checkKnowledgePluginAtPin(
+    root,
+    expectedManifestSha256,
+    historicalRegistrarProvenance,
+  );
 }
 
 /** Projects the reviewed Knowledge payload from a verified Temari package. */

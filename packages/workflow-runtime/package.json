@@ -123,6 +123,10 @@
         "command": "node tools/knowledge-release.mjs package",
         "cache": false
       },
+      "knowledge-private-install-test": {
+        "command": "node --test tools/knowledge-private-install.test.mjs",
+        "cache": false
+      },
       "nx06-safety-test": {
         "command": "node --test tools/nx06-safety.test.mjs",
         "cache": false

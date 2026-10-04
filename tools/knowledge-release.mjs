@@ -18,6 +18,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import {
+  checkHistoricalKnowledgePlugin,
   checkKnowledgePlugin,
   parseStablePluginVersion,
 } from './knowledge-plugin.mjs';
@@ -184,7 +185,7 @@ export function parseArchive(bytes) {
   throw new Error('Missing tar end blocks');
 }
 
-function marketplace() {
+function marketplace(installation = 'INSTALLED_BY_DEFAULT') {
   return {
     name: 'temari-knowledge',
     interface: { displayName: 'Temari Knowledge' },
@@ -195,7 +196,7 @@ function marketplace() {
           source: 'local',
           path: './plugins/content-registrar-knowledge',
         },
-        policy: { installation: 'AVAILABLE', authentication: 'ON_INSTALL' },
+        policy: { installation, authentication: 'ON_INSTALL' },
         category: 'Productivity',
       },
     ],
@@ -212,6 +213,10 @@ function readme(release) {
       'Extract only when the printed digest matches the pinned value. From the extracted root:\n\n' +
       '```sh\ncodex plugin marketplace add .\ncodex plugin add content-registrar-knowledge@temari-knowledge\n' +
       'node plugins/content-registrar-knowledge/bin/temari-knowledge.mjs setup\n```\n\n' +
+      'Adding the marketplace alone did not auto-install the plugin in the tested macOS Codex CLI.\n' +
+      'Run the explicit `codex plugin add` step there. The catalog requests default installation\n' +
+      'for desktop marketplace consumers, but desktop installation has not been verified.\n' +
+      'Python setup remains an explicit step after the plugin is installed.\n\n' +
       'Open a new Codex chat after installation. Python 3.12 and Python package download access are\n' +
       'required for cold setup. Local-only sources need no TypeSafe key or hosted Jev call.\n' +
       'The macOS CLI path is tested; native Windows and desktop Plugins Directory installation are not.\n' +
@@ -223,17 +228,45 @@ function readme(release) {
   );
 }
 
-function validateReleaseFiles(files) {
+function validateHistoricalReadme(bytes, release) {
+  assert(
+    Buffer.isBuffer(bytes) && bytes.length > 0 && bytes.length <= 32 * 1024,
+    'Historical README is missing or unreasonably large',
+  );
+  const content = bytes.toString('utf8');
+  assert(
+    Buffer.from(content).equals(bytes) && !content.includes('\0'),
+    'Historical README must be readable UTF-8 text',
+  );
+  assert(
+    content.startsWith(
+      `# Content Registrar Knowledge private release ${release.version}\n`,
+    ) &&
+      content.includes(`\`${release.sourceRevision}\``) &&
+      content.includes(`\`${release.pluginManifestSha256}\``),
+    'Historical README metadata does not match its release',
+  );
+}
+
+function validateReleaseFiles(files, historicalPrior = false) {
   const release = JSON.parse(files.get(releasePath)?.toString() ?? 'null');
   assert.equal(release?.schemaVersion, 1);
   parseStablePluginVersion(release.version);
   assert.match(release.sourceRevision, /^[a-f0-9]{40,64}$/);
   assert.match(release.pluginManifestSha256, /^[a-f0-9]{64}$/);
-  assert.deepEqual(
-    JSON.parse(files.get(marketplacePath)?.toString() ?? 'null'),
-    marketplace(),
-  );
-  assert.deepEqual(files.get(readmePath), readme(release));
+  const catalog = JSON.parse(files.get(marketplacePath)?.toString() ?? 'null');
+  if (historicalPrior) {
+    const installation = catalog?.plugins?.[0]?.policy?.installation;
+    assert(
+      installation === 'AVAILABLE' || installation === 'INSTALLED_BY_DEFAULT',
+      'Historical marketplace installation policy is invalid',
+    );
+    // The external digest authenticates the old policy value. All other
+    // marketplace identity, local source, auth and category fields stay fixed.
+    assert.deepEqual(catalog, marketplace(installation));
+  } else assert.deepEqual(catalog, marketplace());
+  if (historicalPrior) validateHistoricalReadme(files.get(readmePath), release);
+  else assert.deepEqual(files.get(readmePath), readme(release));
   const payload = new Map(files);
   payload.delete(releasePath);
   assert.deepEqual(release.files, records(payload));
@@ -251,7 +284,11 @@ function validateReleaseFiles(files) {
   return release;
 }
 
-export async function checkKnowledgeRelease(archive, expectedSha256) {
+async function checkKnowledgeReleaseInternal(
+  archive,
+  expectedSha256,
+  historicalPrior = false,
+) {
   assert(isAbsolute(archive));
   assert.match(expectedSha256 ?? '', /^[a-f0-9]{64}$/);
   const bytes = await readFile(archive);
@@ -267,7 +304,19 @@ export async function checkKnowledgeRelease(archive, expectedSha256) {
     archiveBytes(files),
     'Release archive is not canonical',
   );
-  const release = validateReleaseFiles(files);
+  const release = validateReleaseFiles(files, historicalPrior);
+  let historicalRegistrarProvenance;
+  if (historicalPrior) {
+    // The external archive digest is the historical trust root. Derive the
+    // vintage Registrar pin only after checking that digest and full inventory.
+    const upstreamBytes = files.get(`${pluginPrefix}registrar/UPSTREAM.json`);
+    assert(upstreamBytes, 'Historical Registrar UPSTREAM.json is missing');
+    const upstream = JSON.parse(upstreamBytes.toString());
+    historicalRegistrarProvenance = {
+      commit: upstream.upstream?.commit,
+      manifestSha256: sha256(upstreamBytes),
+    };
+  }
   const staging = await mkdtemp(join(tmpdir(), 'knowledge-release-check-'));
   try {
     for (const [path, data] of files) {
@@ -277,10 +326,16 @@ export async function checkKnowledgeRelease(archive, expectedSha256) {
       if (path === `${pluginPrefix}bin/temari-knowledge.mjs`)
         await chmod(target, 0o755);
     }
-    const plugin = await checkKnowledgePlugin(
-      join(staging, pluginPrefix),
-      release.pluginManifestSha256,
-    );
+    const plugin = historicalPrior
+      ? await checkHistoricalKnowledgePlugin(
+          join(staging, pluginPrefix),
+          release.pluginManifestSha256,
+          historicalRegistrarProvenance,
+        )
+      : await checkKnowledgePlugin(
+          join(staging, pluginPrefix),
+          release.pluginManifestSha256,
+        );
     assert.equal(
       plugin.source.dirty,
       false,
@@ -303,6 +358,11 @@ export async function checkKnowledgeRelease(archive, expectedSha256) {
   };
 }
 
+/** A current candidate must always match this checkout's reviewed Registrar pin. */
+export async function checkKnowledgeRelease(archive, expectedSha256) {
+  return checkKnowledgeReleaseInternal(archive, expectedSha256);
+}
+
 /** Compare two independently pinned, fully verified private releases. */
 export async function checkKnowledgeReleaseSuccessor(
   priorArchive,
@@ -310,7 +370,11 @@ export async function checkKnowledgeReleaseSuccessor(
   candidateArchive,
   candidateSha256,
 ) {
-  const prior = await checkKnowledgeRelease(priorArchive, priorSha256);
+  const prior = await checkKnowledgeReleaseInternal(
+    priorArchive,
+    priorSha256,
+    true,
+  );
   const candidate = await checkKnowledgeRelease(
     candidateArchive,
     candidateSha256,
@@ -345,7 +409,11 @@ export async function packageKnowledgeRelease(
   if (priorRelease) {
     assert(isAbsolute(priorRelease.archive));
     assert.match(priorRelease.sha256 ?? '', /^[a-f0-9]{64}$/);
-    await checkKnowledgeRelease(priorRelease.archive, priorRelease.sha256);
+    await checkKnowledgeReleaseInternal(
+      priorRelease.archive,
+      priorRelease.sha256,
+      true,
+    );
   }
   const plugin = await checkKnowledgePlugin(artifact, expectedManifestSha256);
   assert.equal(

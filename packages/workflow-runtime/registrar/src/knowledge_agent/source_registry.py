@@ -66,7 +66,10 @@ class SourceRegistry:
             audit_ready = db.execute(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='archive_audits'"
             ).fetchone()
-            if version == 5 and audit_ready and not self._sharing_migration_needed(db):
+            graph_ready = db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='graph_retractions'"
+            ).fetchone()
+            if version == 5 and audit_ready and graph_ready and not self._sharing_migration_needed(db):
                 return
         with self._writer(), self._db() as db:
             migrate(db)
