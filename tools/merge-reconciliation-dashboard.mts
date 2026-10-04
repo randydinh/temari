@@ -110,9 +110,25 @@ export function observedGitReconciliationScope(
   git: GitReconciliationObservation,
   snapshot: TrustedReconciliationScopeSnapshot,
 ): ReconciliationScope {
+  if (git.paths.length === 0) {
+    throw new Error('No affected Git paths; no reconciliation attempt prepared.');
+  }
+  return observedGitReconciliationScopeIdentity(git, snapshot);
+}
+
+/**
+ * The same canonical projection is used for preparation and live comparison.
+ * An empty live projection can invalidate a retained attempt, but is never
+ * admitted by observedGitReconciliationScope as a new reconciliation scope.
+ * Raw Git object IDs remain unchanged in the observer evidence.
+ */
+function observedGitReconciliationScopeIdentity(
+  git: GitReconciliationObservation,
+  snapshot: TrustedReconciliationScopeSnapshot,
+): ReconciliationScope {
   const unmerged = new Map(git.unmerged.map((entry) => [entry.path, entry.stages]));
   const untracked = new Set(git.untrackedPaths);
-  const head = git.source.headObjectId ?? reconciliationStoreDigest({ head: 'unborn' });
+  const head = reconciliationStoreDigest({ headObjectId: git.source.headObjectId });
   return {
     schema: 1,
     sourceRoot: {
@@ -175,7 +191,7 @@ export function createObservedGitReconciliationBindingReader(options: {
         observationId: snapshot.observationId,
         candidateId: snapshot.candidateId,
         candidateSha256: snapshot.candidateSha256,
-        scopeSha256: reconciliationStoreDigest(observedGitReconciliationScope(git, snapshot)),
+        scopeSha256: reconciliationStoreDigest(observedGitReconciliationScopeIdentity(git, snapshot)),
       };
     },
   };

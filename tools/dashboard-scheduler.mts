@@ -48,18 +48,51 @@ function fields(value: unknown, allowed: string[]): asserts value is Record<stri
   assert(value && typeof value === 'object' && !Array.isArray(value), 'Expected schedule request.');
   assert(Object.keys(value).every((key) => allowed.includes(key)), 'Unexpected schedule request field.');
 }
+export class DashboardScheduleRequestError extends Error {
+  constructor(readonly status: 400 | 404 | 409, message: string, cause?: unknown) {
+    super(message, { cause });
+    this.name = 'DashboardScheduleRequestError';
+  }
+}
+function requestValue<T>(parse: () => T): T {
+  try { return parse(); } catch (error) {
+    if (error instanceof assert.AssertionError)
+      throw new DashboardScheduleRequestError(400, error.message, error);
+    throw error;
+  }
+}
+/** Only assertions from the store's explicit operator refusals are projected
+ * as client errors. Ledger validation, dispatcher faults and I/O remain errors. */
+function storeRefusal(error: unknown): never {
+  const line = error instanceof Error ? (error.message.split('\n', 1)[0] ?? '') : '';
+  const conflicts = [
+    'Schedule creation idempotency conflict.',
+    'Schedule command idempotency conflict.',
+    'Schedule version conflict; refresh before changing its controls.',
+    'Cancelled schedules cannot be resumed; create a new schedule.',
+    'Schedule already has the requested status.',
+    'Schedule store limit reached; preserve/archive its history before creating another schedule.',
+  ];
+  if (error instanceof assert.AssertionError && (line === 'Schedule does not exist.' || conflicts.includes(line)))
+    throw new DashboardScheduleRequestError(line === 'Schedule does not exist.' ? 404 : 409, line, error);
+  throw error;
+}
 export function parseDashboardScheduleCreate(value: unknown): DashboardScheduleCreate {
-  fields(value, ['requestId', 'targetId', 'cadence']);
-  assertScheduleRequestId(value.requestId);
-  assertScheduleId(value.targetId);
-  return { requestId: value.requestId, targetId: value.targetId, cadence: parseScheduleCadence(value.cadence) };
+  return requestValue(() => {
+    fields(value, ['requestId', 'targetId', 'cadence']);
+    assertScheduleRequestId(value.requestId);
+    assertScheduleId(value.targetId);
+    return { requestId: value.requestId, targetId: value.targetId, cadence: parseScheduleCadence(value.cadence) };
+  });
 }
 export function parseDashboardScheduleUpdate(value: unknown): UpdateScheduleRequest {
-  fields(value, ['requestId', 'expectedVersion', 'action']);
-  assertScheduleRequestId(value.requestId);
-  assert(Number.isSafeInteger(value.expectedVersion) && (value.expectedVersion as number) >= 1, 'Expected schedule version is required.');
-  assert(['pause', 'resume', 'cancel'].includes(String(value.action)), 'Unknown schedule action.');
-  return { requestId: value.requestId, expectedVersion: value.expectedVersion as number, action: value.action as UpdateScheduleRequest['action'] };
+  return requestValue(() => {
+    fields(value, ['requestId', 'expectedVersion', 'action']);
+    assertScheduleRequestId(value.requestId);
+    assert(Number.isSafeInteger(value.expectedVersion) && (value.expectedVersion as number) >= 1, 'Expected schedule version is required.');
+    assert(['pause', 'resume', 'cancel'].includes(String(value.action)), 'Unknown schedule action.');
+    return { requestId: value.requestId, expectedVersion: value.expectedVersion as number, action: value.action as UpdateScheduleRequest['action'] };
+  });
 }
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error)).replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, 4096) || 'Unknown scheduling failure.';
 const terminalStates = new Set(['TERMINAL', 'SKIPPED_OVERLAP', 'CANCELLED']);
@@ -104,12 +137,18 @@ export class DashboardScheduler {
     const request = parseDashboardScheduleCreate(input);
     const targets = await this.targets();
     const target = targets.find((item) => item.id === request.targetId);
-    assert(target, 'Unknown scheduled verification recipe.');
-    return this.options.store.createSchedule({ requestId: request.requestId, target, cadence: request.cadence }, this.now());
+    if (!target) throw new DashboardScheduleRequestError(400, 'Unknown scheduled verification recipe.');
+    try { return await this.options.store.createSchedule({ requestId: request.requestId, target, cadence: request.cadence }, this.now()); }
+    catch (error) { return storeRefusal(error); }
   }
   async list(): Promise<readonly ScheduleRecord[]> { return this.options.store.list(); }
   async get(id: string): Promise<ScheduleRecord | null> { return this.options.store.get(id); }
-  async update(id: string, input: unknown): Promise<ScheduleRecord> { return this.options.store.update(id, parseDashboardScheduleUpdate(input), this.now()); }
+  async update(id: string, input: unknown): Promise<ScheduleRecord> {
+    requestValue(() => assertScheduleId(id));
+    const request = parseDashboardScheduleUpdate(input);
+    try { return await this.options.store.update(id, request, this.now()); }
+    catch (error) { return storeRefusal(error); }
+  }
   async describe(): Promise<unknown> {
     const now = this.now();
     const schedules = (await this.list()).map((record) => ({

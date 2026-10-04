@@ -26,3 +26,4 @@ export * from './lib/task-pickup.js';
 export * from './lib/schedule-store.js';
 export * from './lib/merge-reconciliation-store.js';
 export * from './lib/source-head-store.js';
+export * from './lib/conversation-store.js';
