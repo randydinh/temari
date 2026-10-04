@@ -917,6 +917,30 @@ test('Talk rejects foreign/missing origin and token, unknown DTO fields, path ID
   assert.equal((await fetch(`${base}/api/topics/missing`)).status, 404);
 });
 
+test('registry Talk HTTP requires an opaque creation workspace and routes qualified topic identities without execution authority', async (t) => {
+  const calls: unknown[] = [];
+  const port = { ...talkFixture(calls), topicCreationScope: 'workspace-registry' as const };
+  const { base, headers } = await talkServer(t, port);
+  const post = (body: unknown) => fetch(`${base}/api/topics`, { method: 'POST', headers, body: JSON.stringify(body) });
+  for (const body of [
+    { requestId: 'registry-create', title: 'Scope review' },
+    { requestId: 'registry-create', title: 'Scope review', workspaceKey: '../roles' },
+    { requestId: 'registry-create', title: 'Scope review', workspaceKey: '' },
+    { requestId: 'registry-create', title: 'Scope review', workspaceKey: 'roles', workspaceRoot: '/caller/source' },
+  ]) assert.equal((await post(body)).status, 400);
+  assert.deepEqual(calls, []);
+  const input = { requestId: 'registry-create', title: 'Scope review', workspaceKey: 'roles' };
+  assert.equal((await post(input)).status, 200);
+  assert.deepEqual(calls, [['create', input]]);
+  const topicId = 'mw.roles.topic-one';
+  assert.equal((await fetch(`${base}/api/topics/${topicId}`)).status, 200);
+  assert.deepEqual(calls[1], ['topic', topicId, {}]);
+  assert.equal((await fetch(`${base}/api/topics/${topicId}/links`, { method: 'POST', headers, body: JSON.stringify({ requestId: 'retarget', expectedVersion: 3, taskId: 'task-one', workspaceKey: 'other' }) })).status, 400);
+  assert.equal((await fetch(`${base}/api/tasks/task-one/actions`, { method: 'POST', headers, body: '{}' })).status, 405);
+  assert.equal((await fetch(`${base}/api/topics`, { method: 'POST', headers: { ...headers, origin: 'http://other.invalid' }, body: JSON.stringify(input) })).status, 403);
+  assert.equal(calls.length, 2);
+});
+
 test('unconfigured Talk is explicit and typed availability/conflict errors are plain while I/O failures stay500', async (t) => {
   const server = await startTaskViewServer({ runtime: emptyReader, archonBaseUrl: 'http://127.0.0.1:3091', port: 0 });
   t.after(() => closeServer(server));

@@ -40,6 +40,9 @@ retains actual agent overlap, integration checks, independent review, and restar
 The [planning, scheduling and map verification record](evaluations/task-continuity/dashboard-autonomy-2026-10-01.md)
 records live goal planning, schedule dispatch and recovery, Registrar provenance,
 browser journeys, and the remaining configuration limits.
+The [workspace dashboard verification record](docs/evidence/2026-10-03-dashboard-workspaces-verification.md)
+covers fixed workspace topics in one surface, unavailable captured titles, and
+Knowledge refresh recovery. Source verification and activation are separate steps.
 
 Temari owns user intent and route obligations. Poteto owns the engineering method;
 the workflow runtime owns durable control and completion. The host (Cursor,
@@ -51,7 +54,8 @@ tree — [docs/overlays.md](docs/overlays.md).
 
 - **Operate the dashboard:** [setup and supported journeys](docs/task-dashboard.md).
   Configure [Talk to Temari](docs/dashboard-talk.md) for separate topic histories,
-  a shared composer and linked task observations.
+  a shared composer and linked task observations. A host-selected workspace
+  registry keeps each topic and its task links bound to the chosen workspace.
   Choose a saved goal, verification recipe, investigation swarm, configured
   implementation plan, or validated natural-goal proposal. Use Schedules for
   fixed recurring checks, Knowledge map for pinned Registrar paths/anchors, and

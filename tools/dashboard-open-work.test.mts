@@ -55,6 +55,14 @@ function fixture() {
 const digest = (data: string | Buffer) =>
   createHash('sha256').update(data).digest('hex');
 
+function unavailableTitleFixture() {
+  const value = fixture();
+  return {
+    ...value,
+    chats: value.chats.map((chat) => ({ ...chat, title: null })),
+  };
+}
+
 test('strict admission retains unknown observations and verbatim titles without creating links', () => {
   const value = validateOpenWorkManifest(fixture());
   assert.equal(value.chats[0]!.title, '<script>verbatim</script>');
@@ -63,6 +71,57 @@ test('strict admission retains unknown observations and verbatim titles without 
   const missing = fixture();
   missing.worktrees[0]!.exists = false;
   assert.doesNotThrow(() => validateOpenWorkManifest(missing));
+});
+
+test('explicit null retains exact chat identity and metadata; existing bounded titles remain verbatim', () => {
+  const unknown = unavailableTitleFixture();
+  const admitted = validateOpenWorkManifest(unknown);
+  assert.equal(admitted, unknown);
+  assert.equal(admitted.chats[0]!.title, null);
+  assert.deepEqual(admitted.chats[0], {
+    ...fixture().chats[0],
+    title: null,
+  });
+  assert.deepEqual(admitted.coverage, fixture().coverage);
+  assert.deepEqual(admitted.sourceRefs, fixture().sourceRefs);
+  assert.equal(admitted.worktrees[0]!.preservation, 'unverified');
+
+  const titled = fixture();
+  titled.chats[0]!.title = 'x'.repeat(512);
+  assert.equal(validateOpenWorkManifest(titled), titled);
+  assert.equal(titled.chats[0]!.title, 'x'.repeat(512));
+});
+
+test('null titles must be explicit; missing, invalid and oversized titles remain inadmissible', () => {
+  const missing: any = unavailableTitleFixture();
+  delete missing.chats[0].title;
+  assert.throws(() => validateOpenWorkManifest(missing));
+  for (const title of [undefined, 1, true, {}, [], 'x'.repeat(513), 'bad\0title']) {
+    const value: any = unavailableTitleFixture();
+    value.chats[0].title = title;
+    assert.throws(() => validateOpenWorkManifest(value));
+  }
+});
+
+test('null titles do not relax identity, local association, coverage or preservation guards', () => {
+  const mutations: ((m: any) => void)[] = [
+    (m) => (m.chats[0].id = '../escape'),
+    (m) => m.chats.push({ ...m.chats[0] }),
+    (m) => (m.chats[0].kind = 'browser'),
+    (m) => (m.chats[0].status = 'done'),
+    (m) => (m.chats[0].titleReason = 'caller metadata'),
+    (m) => (m.chats[0].worktreeId = 'missing'),
+    (m) => (m.chats[0].hostId = 'remote'),
+    (m) => (m.chats[0].cwd = '/different-root'),
+    (m) => (m.worktrees[0].preservation = 'verified'),
+    (m) => (m.coverage.allChats = true),
+    (m) => (m.sourceRefs[0].path = '/secret'),
+  ];
+  for (const mutate of mutations) {
+    const value = unavailableTitleFixture();
+    mutate(value);
+    assert.throws(() => validateOpenWorkManifest(value), Error, mutate.toString());
+  }
 });
 
 test('rejects unknown fields, malformed values, unsafe links, duplicates and dangling associations', () => {
@@ -148,6 +207,37 @@ test('configuration rejects relative paths and malformed digests before reading'
   assert.throws(() =>
     createOpenWorkReader({ manifestPath: '/capture', sha256: 'bad' }),
   );
+});
+
+test('a pinned null-title capture projects the exact ID and null without granting live or preservation claims', async (t) => {
+  const root = await mkdtemp(join(process.cwd(), '.open-work-test-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const manifest = unavailableTitleFixture();
+  const bytes = JSON.stringify(manifest);
+  const manifestPath = join(root, 'capture.json');
+  await writeFile(manifestPath, bytes);
+  const reader = createOpenWorkReader({
+    manifestPath,
+    sha256: digest(bytes),
+    now: () => Date.parse(manifest.capturedAt),
+  });
+  const result = await reader.describe();
+  assert.equal(result.state, 'available');
+  assert.deepEqual(result.chats, manifest.chats);
+  assert.equal(result.chats[0]!.id, 'thread-1');
+  assert.equal(result.chats[0]!.title, null);
+  assert.equal(result.chats[0]!.worktreeId, 'tree-1');
+  assert.deepEqual(result.sourceRefs, manifest.sourceRefs);
+  assert.deepEqual(result.coverage, manifest.coverage);
+  assert.equal(result.worktrees[0]!.preservation, 'unverified');
+  assert.equal(result.readOnly, true);
+  assert.equal(result.currentWriterState, 'not-checked');
+  assert.equal(result.closureEligibility, 'not-assessed');
+
+  await writeFile(manifestPath, bytes + '\n');
+  const changed = await reader.describe();
+  assert.equal(changed.state, 'unavailable');
+  assert.deepEqual(changed.chats, []);
 });
 
 test('rereads exact bytes, assesses capture age, clears rows after change, corruption or removal', async (t) => {

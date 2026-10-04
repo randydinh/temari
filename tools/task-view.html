@@ -303,6 +303,11 @@
       <form id="talk-topic-form">
         <div class="section-heading"><h2 id="talk-topic-dialog-title">Start a topic</h2><button id="talk-close-topic" class="quiet" type="button">Close</button></div>
         <label>Topic name<input id="talk-topic-name" required maxlength="256" autocomplete="off" placeholder="What are we working through?" /></label>
+        <div id="talk-topic-workspace-field" class="talk-workspace-selector" hidden>
+          <label for="talk-topic-workspace">Workspace for this new topic</label>
+          <select id="talk-topic-workspace" aria-describedby="talk-topic-workspace-help" disabled><option value="">Choose a workspace</option></select>
+          <p id="talk-topic-workspace-help" class="event-detail">Choose explicitly. The topic keeps its workspace.</p>
+        </div>
         <p id="talk-topic-error" class="blocker" role="alert" hidden></p>
         <button id="talk-create-topic" class="primary" type="submit">Create topic</button>
       </form>

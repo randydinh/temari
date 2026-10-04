@@ -191,6 +191,10 @@ expanded IDs may expire. Revoked details clear cached anchors, edges and metadat
 
 If no publications are configured, the map says so. A synthetic verification
 archive is evidence for the adapter journey, not your production content.
+An unsuccessful refresh or expansion clears previously displayed records,
+relationships and selected details. Responses from an older map request or node
+selection cannot restore them after a newer refresh. If a selected record is no
+longer in the returned view, its details are cleared.
 
 ## Verification and ownership
 

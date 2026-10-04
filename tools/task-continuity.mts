@@ -37,7 +37,8 @@ import {
   selectKnowledgeMapNode,
   expandKnowledgeMap,
 } from './dashboard-knowledge.mjs';
-import { createDashboardTalk, loadDashboardTalkConfig, validateDashboardTalkRoots } from './dashboard-talk.mjs';
+import { createDashboardTalk, validateDashboardTalkRoots } from './dashboard-talk.mjs';
+import { createDashboardTalkRegistry, loadDashboardTalkConfiguration, validateDashboardTalkRegistryRoots } from './dashboard-talk-registry.mjs';
 
 export const taskHelp = `Temari tasks — keep a goal and its evidence across runs
 
@@ -92,6 +93,7 @@ reconciliation.browserReview.selectedAttempts optionally pins at most128 exact
 retained review hashes. Recording is local interaction intent only; it cannot
 approve source operations, archive work or accept a task.
 --talk-config ABSOLUTE_JSON optionally enables topic conversations and links.
+Schema1 selects one workspace; schema2 selects a pinned workspace registry.
 Talk without --control-config does not install or launch Archon; task controls
 remain read-only. The host selects its bounded conversational transport.
 Reconciliation controls are unavailable unless that config also supplies its
@@ -261,7 +263,7 @@ export async function runTaskCommand(
       )
     : null;
   const talkConfig = values['talk-config'] !== undefined
-    ? await loadDashboardTalkConfig(absolute(values['talk-config'], '--talk-config'))
+    ? await loadDashboardTalkConfiguration(absolute(values['talk-config'], '--talk-config'))
     : null;
   let root = absolute(
     values.root ??
@@ -269,7 +271,9 @@ export async function runTaskCommand(
       resolve(platformInfo().dataDirectory, 'tasks'),
     '--root',
   );
-  if (talkConfig) root = (await validateDashboardTalkRoots(talkConfig, root)).taskStoreRoot;
+  if (talkConfig) root = (talkConfig.schema === 2
+    ? await validateDashboardTalkRegistryRoots(talkConfig, root)
+    : await validateDashboardTalkRoots(talkConfig, root)).taskStoreRoot;
   if (dashboardConfig?.reconciliation)
     root = (await validateDashboardReconciliationRoots(dashboardConfig, root)).taskStoreRoot!;
   const store =
@@ -374,7 +378,9 @@ export async function runTaskCommand(
         })
       : undefined;
     const talk = talkConfig
-      ? await createDashboardTalk({ config: talkConfig, taskStore: store, runtime, ...(controller ? { controller } : {}) })
+      ? talkConfig.schema === 2
+        ? await createDashboardTalkRegistry({ config: talkConfig, taskStore: store, runtime, ...(controller ? { controller } : {}) })
+        : await createDashboardTalk({ config: talkConfig, taskStore: store, runtime, ...(controller ? { controller } : {}) })
       : undefined;
     if (talk) await talk.recover();
     const scheduler =

@@ -31,6 +31,7 @@ export interface TaskViewOptions {
 
 /** Topic writes are independent of task execution admission. */
 export interface TaskViewTalk {
+  readonly topicCreationScope?: 'workspace-registry';
   describe(): unknown | Promise<unknown>;
   topic(id: string, page: { offset?: number; limit?: number }): Promise<unknown>;
   create(input: unknown): Promise<unknown>;
@@ -112,6 +113,9 @@ function topicInput(value: unknown, keys: readonly string[]): unknown {
   )
     throw new RequestError(400, 'Unexpected or missing topic request field.');
   const input = value as Record<string, unknown>;
+  if (keys.includes('workspaceKey') &&
+      (typeof input.workspaceKey !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/.test(input.workspaceKey)))
+    throw new RequestError(400, 'Select a host-configured topic workspace.');
   if (
     typeof input.requestId !== 'string' ||
     !new RegExp(`^${TOPIC_ID}$`).test(input.requestId) ||
@@ -347,7 +351,9 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
         validateMutation(request, csrfToken, 'Topic');
         const action = topicAction?.[2];
         const input = topicInput(await readJsonBody(request), list
-          ? ['requestId', 'title']
+          ? options.talk.topicCreationScope === 'workspace-registry'
+            ? ['requestId', 'title', 'workspaceKey']
+            : ['requestId', 'title']
           : action === 'turns'
             ? ['requestId', 'expectedVersion', 'text']
             : action === 'links'

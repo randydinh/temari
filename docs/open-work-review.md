@@ -19,7 +19,11 @@ Open the dashboard and choose **Review open work**, or use
    **Active at capture**, **Idle at capture** and **Writer state unknown**.
    Unloaded chats have unknown writer state. Idle does not mean done.
 3. Open a Codex chat by its captured title. Titles are displayed verbatim as
-   text. ChatGPT entries have no Codex link. **Show worktree** selects its
+   text. When the current host title is unavailable or exceeds the capture
+   bound, record `title: null`: the row shows its exact chat ID and an explicit
+   unavailable-title note. Do not invent a name or truncate the source title.
+   The ID remains searchable and can retain an exact workspace association.
+   ChatGPT entries have no Codex link. **Show worktree** selects its
    captured worktree association; no association means the capture did not map
    that chat to a listed worktree.
 4. Check conflicted paths, untracked paths and commits outside the main baseline.
@@ -94,7 +98,7 @@ the configured regular file on each API request; symlinks are rejected.
 | --- | --- |
 | `schema`, `id`, `capturedAt`, `baseline` | `1`, a safe capture identifier, ISO UTC timestamp ending in `Z`, and a full 40-hex main revision. |
 | `coverage` | `chatScope`, `chatLimit` (1–50), `allChats: false`, `worktreeScope`, and string arrays `unavailableHosts`, `unavailableSources`, `gaps`. |
-| `chats` | At most 1,000 rows with `id`, `title`, `kind` (`codex` or `chatgpt`), nullable `hostId`/absolute `cwd`, `status` (`active`, `idle`, `notLoaded`, `unknown`), nullable Unix-seconds `updatedAt`, and nullable listed `worktreeId`. |
+| `chats` | At most 1,000 rows with `id`, required `title` (verbatim bounded string or explicit `null`), `kind` (`codex` or `chatgpt`), nullable `hostId`/absolute `cwd`, `status` (`active`, `idle`, `notLoaded`, `unknown`), nullable Unix-seconds `updatedAt`, and nullable listed `worktreeId`. |
 | `worktrees` | At most 200 rows with `id`, absolute `root`, boolean `exists`, nullable 40-hex `head`/`branch`/boolean `clean`, nullable nonnegative counts `unresolvedPathCount`, `untrackedPathCount`, `commitsNotInMain`, and `preservation: "unverified"`. Missing worktrees must have null observation counts. |
 | `sourceRefs` | At most 32 `{kind, sha256}` rows identifying retained source evidence, with full 64-hex digests. No evidence paths or URLs. |
 

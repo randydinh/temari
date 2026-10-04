@@ -3,6 +3,8 @@ const pages = {
   view: 'tasks',
   explicitView: new URL(location.href).searchParams.has('view') || new URL(location.href).searchParams.has('task'),
   knowledge: null,
+  knowledgeRequest: 0,
+  knowledgeSelectionRequest: 0,
   openWork: null,
   openWorkRequest: 0,
   openWorkLoading: false,
@@ -360,16 +362,19 @@ function renderOpenWork() {
     const card = el('article', 'open-work-card');
     card.dataset.openWorkChatId = chat.id;
     const heading = el('h3');
+    const label = chat.title === null ? chat.id : chat.title;
     if (chat.kind === 'codex' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(chat.id)) {
-      const link = el('a', '', chat.title);
+      const link = el('a', '', label);
       link.href = `codex://threads/${encodeURIComponent(chat.id)}`;
       heading.append(link);
-    } else heading.textContent = chat.title;
+    } else heading.textContent = label;
     const worktree = byWorktree.get(chat.worktreeId);
     card.append(
       heading,
       el('p', `open-work-badge${chat.status === 'active' ? ' open-work-warning' : ''}`, `${chat.kind === 'codex' ? 'Codex' : 'ChatGPT'} · ${openWorkState(chat.status)}`),
       openWorkMetadata([
+        ['Chat ID', chat.id],
+        ...(chat.title === null ? [['Title', 'Unavailable in current capture']] : []),
         ['Host', chat.hostId ?? 'Not recorded'],
         ['Worktree', worktree?.root ?? 'No captured worktree association'],
         ['Chat workspace', chat.cwd ?? 'Not recorded'],
@@ -411,7 +416,7 @@ function renderOpenWork() {
       ['Observed revision', worktree.head ?? 'Not observed'],
     ]));
     const list = el('ul');
-    for (const chat of associated) list.append(el('li', '', `${chat.title} · ${openWorkState(chat.status)}`));
+    for (const chat of associated) list.append(el('li', '', `${chat.title ?? chat.id}${chat.title === null ? ' · title unavailable' : ''} · ${openWorkState(chat.status)}`));
     detail.append(associated.length ? list : el('p', 'event-detail', 'No associated chats in this bounded capture.'));
     card.append(detail);
     worktrees.append(card);
@@ -447,10 +452,13 @@ setInterval(() => {
     updateOpenWorkAge();
 }, 60000);
 async function loadKnowledge() {
+  const request = ++pages.knowledgeRequest;
   byId('knowledge-status').textContent =
     'Checking configured Registrar publications…';
   try {
-    pages.knowledge = await readDashboardJson('/api/knowledge');
+    const map = await readDashboardJson('/api/knowledge');
+    if (request !== pages.knowledgeRequest) return;
+    pages.knowledge = map;
     const kinds = [
       ...new Set(pages.knowledge.nodes.map((node) => node.kind)),
     ].sort();
@@ -463,6 +471,10 @@ async function loadKnowledge() {
       byId('map-kind').append(option);
     }
     byId('map-kind').value = kinds.includes(selected) ? selected : '';
+    if (pages.selectedNode && !pages.knowledge.nodes.some((node) => node.id === pages.selectedNode)) {
+      pages.selectedNode = null;
+      byId('knowledge-detail').replaceChildren();
+    }
     renderKnowledge();
     if (
       pages.selectedNode &&
@@ -470,9 +482,17 @@ async function loadKnowledge() {
     )
       await selectKnowledgeNode(pages.selectedNode);
   } catch (error) {
-    byId('knowledge-status').textContent = 'Map unavailable';
-    pageError(error);
+    if (request === pages.knowledgeRequest) clearUnavailableKnowledge(error);
   }
+}
+function clearUnavailableKnowledge(error) {
+  ++pages.knowledgeSelectionRequest;
+  pages.knowledge = { state: 'unavailable', nodes: [], edges: [], coverage: null, gaps: [] };
+  pages.selectedNode = null;
+  pages.selectedSource = null;
+  byId('knowledge-detail').replaceChildren();
+  renderKnowledge();
+  pageError(error);
 }
 function renderKnowledge() {
   const map = pages.knowledge;
@@ -730,9 +750,16 @@ function renderKnowledge() {
   }
 }
 async function selectKnowledgeNode(nodeId, edgeId = null) {
-  const detail = await readDashboardJson(
-    `/api/knowledge/node?node=${encodeURIComponent(nodeId)}`,
-  );
+  const request = ++pages.knowledgeSelectionRequest;
+  const generation = pages.knowledgeRequest;
+  const map = pages.knowledge;
+  const stale = () => request !== pages.knowledgeSelectionRequest || generation !== pages.knowledgeRequest || map !== pages.knowledge;
+  byId('knowledge-detail').replaceChildren();
+  let detail;
+  try {
+    detail = await readDashboardJson(`/api/knowledge/node?node=${encodeURIComponent(nodeId)}`);
+  } catch (error) { if (stale()) return; throw error; }
+  if (stale()) return;
   pages.selectedNode = nodeId;
   renderKnowledge();
   const panel = byId('knowledge-detail');
@@ -746,13 +773,20 @@ async function selectKnowledgeNode(nodeId, edgeId = null) {
   const expand = el('button', 'quiet', 'Expand connected records');
   expand.addEventListener('click', async () => {
     expand.disabled = true;
+    const request = ++pages.knowledgeRequest;
     try {
-      pages.knowledge = await readDashboardJson(
+      const map = await readDashboardJson(
         `/api/knowledge/expand?node=${encodeURIComponent(nodeId)}`,
       );
+      if (request !== pages.knowledgeRequest) return;
+      pages.knowledge = map;
+      if (pages.selectedNode && !map.nodes.some((node) => node.id === pages.selectedNode)) {
+        pages.selectedNode = null;
+        byId('knowledge-detail').replaceChildren();
+      }
       renderKnowledge();
     } catch (error) {
-      pageError(error);
+      if (request === pages.knowledgeRequest) clearUnavailableKnowledge(error);
     } finally {
       expand.disabled = false;
     }

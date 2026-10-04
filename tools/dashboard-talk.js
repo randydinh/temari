@@ -6,11 +6,13 @@
   const drafts = new Map();
   const pending = new Map();
   const mutationErrors = new Map();
+  const bindings = new Map();
   const state = {
     configured: null, capabilities: {}, topics: [], attention: [], attentionPage: null, selected: null,
     detail: null, fresh: false, active: false, token: null, offset: null,
     detailRequest: 0, listLoading: null, fingerprint: null, timer: null,
     create: null, linkTopic: null, listError: '', notice: '',
+    scopeMode: null, workspaces: [], topicPage: null,
   };
   const validId = (value) => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(value);
   const version = (value) => Number.isSafeInteger(value) && value >= 0;
@@ -18,6 +20,51 @@
   const human = (value) => text(value).replaceAll('_', ' ').replaceAll('-', ' ');
   const activeTurn = (value) => ['queued', 'running'].includes(text(value).toLowerCase());
   const count = (value) => Number.isSafeInteger(value) && value >= 0 ? value : value === true ? 1 : 0;
+  const registry = () => state.scopeMode === 'workspace-registry';
+  const workspaceKey = (value) => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/u.test(value);
+  const opaqueIdentity = (value) => typeof value === 'string' && value.length > 0 && value.length <= 256 && !value.includes('\0');
+  const bindingPin = (binding) => JSON.stringify([binding.workspaceKey, binding.workspaceId, binding.taskStoreId]);
+  function admitBinding(topic) {
+    const binding = topic?.binding;
+    if (!workspaceKey(binding?.workspaceKey) || !opaqueIdentity(binding.workspaceId) || !opaqueIdentity(binding.taskStoreId) ||
+      typeof binding.available !== 'boolean' || !(binding.reason === null || typeof binding.reason === 'string'))
+      throw failed('This topic workspace binding is unavailable. Reload before making changes.');
+    if (bindings.has(topic.topicId) && bindings.get(topic.topicId) !== bindingPin(binding))
+      throw failed('This topic workspace binding changed. Existing topics cannot be retargeted; your draft has been kept.');
+    return binding;
+  }
+  const selectedBinding = () => state.detail?.topic.binding ?? state.topics.find((topic) => topic.topicId === state.selected)?.binding;
+  const workspaceFor = (binding) => state.workspaces.find((entry) => entry.workspaceKey === binding?.workspaceKey && entry.workspaceId === binding?.workspaceId);
+  const topicCapabilities = () => registry() ? state.detail?.capabilities ?? {} : state.capabilities;
+  const bindingAvailable = (binding) => binding?.available === true && workspaceFor(binding)?.available === true;
+  function bindingDescription(binding) {
+    const workspace = workspaceFor(binding);
+    return `Workspace: ${text(workspace?.label) || 'Label unavailable'} · fixed for this topic${bindingAvailable(binding) ? '' : ` · unavailable: ${text(binding?.reason) || text(workspace?.reason) || 'The host could not verify this workspace.'}`}`;
+  }
+  function renderWorkspaceSelector() {
+    const field = node('talk-topic-workspace-field'), select = node('talk-topic-workspace');
+    field.hidden = !registry();
+    select.required = registry();
+    const selected = state.create?.body.workspaceKey ?? select.value;
+    const placeholder = make('option', '', 'Choose a workspace');
+    placeholder.value = '';
+    select.replaceChildren(placeholder);
+    if (registry()) for (const workspace of state.workspaces) {
+      const option = make('option', '', `${workspace.label} · ${workspace.topicCount} topic${workspace.topicCount === 1 ? '' : 's'}${workspace.available ? '' : ' · unavailable'}`);
+      option.value = workspace.workspaceKey;
+      option.disabled = !workspace.available;
+      select.append(option);
+    }
+    select.value = state.workspaces.some((entry) => entry.workspaceKey === selected) ? selected : '';
+    select.disabled = !registry() || Boolean(state.create);
+    const workspace = state.workspaces.find((entry) => entry.workspaceKey === selected);
+    node('talk-topic-workspace-help').textContent = workspace && !workspace.available
+      ? `${text(workspace.reason) || 'This workspace is unavailable.'} Choose an available workspace before creating a new topic.`
+      : state.create?.state === 'uncertain'
+        ? 'The original workspace, title and request ID are retained for an explicit identical retry.'
+        : 'Choose explicitly for this new topic. Its workspace stays fixed; creating a topic does not start task execution.';
+    return workspace?.available === true;
+  }
   const stamp = (value) => {
     const date = new Date(value);
     return Number.isNaN(date.valueOf()) ? '' : date.toLocaleString();
@@ -112,14 +159,18 @@
     const operation = pending.get(state.selected);
     const busy = state.detail?.turns?.some((turn) => activeTurn(turn.state)) ||
       activeTurn(state.topics.find((topic) => topic.topicId === state.selected)?.turnState);
-    const writable = Boolean(state.configured && state.fresh && state.detail && version(state.detail.topic.version));
+    const writable = Boolean(state.configured && state.fresh && state.detail && version(state.detail.topic.version) &&
+      (!registry() || bindingAvailable(selectedBinding())));
+    const capabilities = topicCapabilities();
     node('talk-new-topic').disabled = !state.configured || !state.capabilities.canCreateTopic || state.create?.state === 'submitting';
     node('talk-message').disabled = !state.configured || !state.selected;
-    node('talk-send').disabled = !writable || !state.capabilities.canSendTurn || busy || Boolean(operation) || !node('talk-message').value.trim();
-    node('talk-link-task').disabled = !writable || !state.capabilities.canLinkTask || busy || Boolean(operation);
+    node('talk-send').disabled = !writable || !capabilities.canSendTurn || busy || Boolean(operation) || !node('talk-message').value.trim();
+    node('talk-link-task').disabled = !writable || !capabilities.canLinkTask || busy || Boolean(operation);
     node('talk-refresh-topic').disabled = !state.selected || !state.configured;
     node('talk-retry').hidden = operation?.state !== 'uncertain';
-    node('talk-retry').disabled = !state.configured;
+    const retryCapability = operation?.kind === 'turn' ? capabilities.canSendTurn : operation?.kind === 'link' ? capabilities.canLinkTask :
+      operation?.kind === 'proposal' ? capabilities.canAcceptProposal : capabilities.canAcknowledge;
+    node('talk-retry').disabled = !state.configured || (registry() && (!bindingAvailable(selectedBinding()) || !retryCapability));
     node('talk-retry').textContent = operation?.kind === 'turn' ? 'Retry the same message' : 'Retry the same request';
     const last = state.detail?.turns?.at(-1);
     node('talk-turn-status').textContent = operation?.state === 'preparing' ? 'Reading the current topic version…' :
@@ -128,24 +179,29 @@
       operation?.state === 'retained' ? 'The request was retained. Reloading its saved state…' :
       state.notice || (last ? turnLabel(last) : '');
     node('talk-composer-help').textContent = !state.selected ? 'Choose a topic to start. Ctrl/⌘ + Enter sends.' :
+      registry() && !bindingAvailable(selectedBinding()) ? 'This workspace is unavailable. Your draft stays with this topic; an existing topic cannot be retargeted.' :
       !state.fresh ? 'Reload this topic before sending. Your draft stays here.' :
       busy ? 'This topic has a reply in progress. You can write a draft or open another topic.' :
       operation ? 'Your draft stays here until the saved request is confirmed.' : 'Only this topic is sent. Ctrl/⌘ + Enter sends.';
-    node('talk-create-topic').disabled = state.create?.state === 'submitting';
+    const workspaceSelected = renderWorkspaceSelector();
+    node('talk-create-topic').disabled = !state.configured || !state.capabilities.canCreateTopic || state.create?.state === 'submitting' ||
+      (registry() && !workspaceSelected);
     for (const button of node('talk-transcript').querySelectorAll('[data-accept-proposal]'))
-      button.disabled = !writable || !state.capabilities.canLinkTask || busy || Boolean(operation);
+      button.disabled = !writable || !(registry() ? capabilities.canAcceptProposal : capabilities.canLinkTask) || busy || Boolean(operation);
   }
   function renderTopics() {
     const needle = node('talk-topic-search').value.trim().toLowerCase();
     const list = node('talk-topic-list');
     list.replaceChildren();
-    const topics = state.topics.filter((topic) => text(topic.title).toLowerCase().includes(needle));
+    const topics = state.topics.filter((topic) => [text(topic.title), ...(registry() ? [text(workspaceFor(topic.binding)?.label), topic.topicId] : [])]
+      .some((value) => value.toLowerCase().includes(needle)));
     for (const topic of topics) {
       const button = make('button', 'talk-topic');
       button.type = 'button';
       button.dataset.topicId = topic.topicId;
       button.setAttribute('aria-current', String(topic.topicId === state.selected));
       button.append(make('span', 'talk-topic-title', text(topic.title) || 'Untitled topic'));
+      if (registry()) button.append(make('span', 'talk-topic-workspace', bindingDescription(topic.binding)));
       const meta = make('span', 'talk-topic-meta');
       if (count(topic.unread)) meta.append(make('span', 'count', `${count(topic.unread)} unread`));
       if (count(topic.attentionCount)) meta.append(make('span', '', `${count(topic.attentionCount)} need attention`));
@@ -162,7 +218,9 @@
     node('talk-nav-count').textContent = String(badge);
     node('talk-nav-count').hidden = badge === 0;
     node('talk-nav-count').setAttribute('aria-label', `${badge} unread attention items`);
-    node('talk-list-status').textContent = state.listError || (state.configured === null ? 'Checking Talk setup…' : `${state.topics.length} topic${state.topics.length === 1 ? '' : 's'}`);
+    const omitted = count(state.topicPage?.omittedBefore) + count(state.topicPage?.omittedAfter);
+    node('talk-list-status').textContent = state.listError || (state.configured === null ? 'Checking Talk setup…' :
+      `${state.topics.length}${registry() && version(state.topicPage?.total) ? ` of ${state.topicPage.total}` : ''} topic${state.topics.length === 1 ? '' : 's'}${omitted ? ` · ${omitted} outside this bounded list` : ''}`);
     renderControls();
   }
   function renderLinkedTasks() {
@@ -214,7 +272,10 @@
       });
       const seen = make('button', 'quiet', 'Mark seen');
       seen.type = 'button';
-      seen.disabled = !state.configured || Boolean(pending.get(item.topicId));
+      const binding = state.topics.find((topic) => topic.topicId === item.topicId)?.binding;
+      const capabilities = item.topicId === state.selected && state.detail ? topicCapabilities() : state.capabilities;
+      seen.disabled = !state.configured || Boolean(pending.get(item.topicId)) ||
+        (registry() && (!bindingAvailable(binding) || !capabilities.canAcknowledge));
       seen.addEventListener('click', () => acknowledge(item));
       actions.append(open, taskLink(item.taskId), seen);
       card.append(actions);
@@ -261,9 +322,10 @@
     if (!detail) {
       state.fingerprint = null;
       empty(transcript, state.selected ? 'Loading this topic' : 'Select a topic', state.selected ? 'Your draft stays separate from other conversations.' : 'Talk here while your linked tasks continue. Other topics stay separate.');
+      if (registry() && state.selected) transcript.replaceChildren(make('p', 'talk-topic-binding', bindingDescription(selectedBinding())), ...transcript.childNodes);
       node('talk-pagination').hidden = true;
     } else {
-      const fingerprint = JSON.stringify([detail.topic.topicId, detail.turns, detail.page]);
+      const fingerprint = JSON.stringify([detail.topic.topicId, detail.turns, detail.page, registry() ? bindingDescription(detail.topic.binding) : null]);
       if (fingerprint !== state.fingerprint) {
         const nearBottom = transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight < 70;
         const previousTop = transcript.scrollTop;
@@ -281,6 +343,7 @@
           transcript.append(box);
         }
         if (!detail.turns.length) empty(transcript, 'Start this conversation', 'Ask a question, work through a plan, or discuss the tasks linked here.');
+        if (registry()) transcript.replaceChildren(make('p', 'talk-topic-binding', bindingDescription(detail.topic.binding)), ...transcript.childNodes);
         state.fingerprint = fingerprint;
         transcript.scrollTop = (!previousFingerprint || nearBottom) && state.offset === null ? transcript.scrollHeight : previousTop;
       }
@@ -306,6 +369,12 @@
         (turn.proposedTask.taskId !== null && !validId(turn.proposedTask.taskId)))) ||
       result.attention.some((item) => !validId(item.attentionId) || item.topicId !== id) ||
       result.linkedTasks.some((task) => !validId(task.taskId))) throw failed('This topic response has an unsupported shape. Reload before making changes.');
+    if (registry()) {
+      const binding = admitBinding(result.topic);
+      if (['canCreateTopic', 'canSendTurn', 'canLinkTask', 'canAcknowledge', 'canAcceptProposal'].some((key) => typeof result.capabilities?.[key] !== 'boolean'))
+        throw failed('This topic capability response is unavailable. Reload before making changes.');
+      bindings.set(id, bindingPin(binding));
+    }
     return result;
   }
   async function readDetail(id, offset = 0) {
@@ -361,7 +430,23 @@
           ['canCreateTopic', 'canSendTurn', 'canLinkTask'].some((key) => typeof result.capabilities?.[key] !== 'boolean') ||
           result.topics.some((topic) => !validId(topic.topicId)) || result.attention.some((item) => !validId(item.topicId) || !validId(item.attentionId)))
           throw failed('The topic list has an unsupported shape.');
+        const mode = result.scopeMode === 'workspace-registry' ? 'workspace-registry' : 'single-workspace';
+        if (result.scopeMode !== undefined && !['workspace-registry', 'single-workspace'].includes(result.scopeMode))
+          throw failed('This Talk workspace mode is unsupported.');
+        if (state.scopeMode !== null && state.scopeMode !== mode)
+          throw failed('Talk workspace setup changed. Reload this page before making changes.');
+        if (mode === 'workspace-registry') {
+          if (!Array.isArray(result.workspaces) || result.workspaces.some((entry) => !workspaceKey(entry.workspaceKey) || !opaqueIdentity(entry.workspaceId) ||
+            typeof entry.label !== 'string' || typeof entry.available !== 'boolean' || !version(entry.topicCount) ||
+            !(entry.reason === null || typeof entry.reason === 'string')) || new Set(result.workspaces.map((entry) => entry.workspaceKey)).size !== result.workspaces.length)
+            throw failed('The workspace choices have an unsupported shape.');
+          for (const topic of result.topics) admitBinding(topic);
+          for (const topic of result.topics) bindings.set(topic.topicId, bindingPin(topic.binding));
+        }
         const changed = state.configured !== result.configured;
+        state.scopeMode = mode;
+        state.workspaces = mode === 'workspace-registry' ? result.workspaces : [];
+        state.topicPage = mode === 'workspace-registry' ? result.page ?? null : null;
         state.configured = result.configured;
         state.capabilities = result.capabilities ?? {};
         state.topics = result.topics;
@@ -483,8 +568,14 @@
     event.preventDefault();
     if (!state.configured || !state.capabilities.canCreateTopic || state.create?.state === 'submitting') return;
     const previous = state.create;
-    const body = previous?.state === 'uncertain' ? previous.body : { requestId: crypto.randomUUID(), title: node('talk-topic-name').value.trim() };
+    const body = previous?.state === 'uncertain' ? previous.body : { requestId: crypto.randomUUID(), title: node('talk-topic-name').value.trim(),
+      ...(registry() ? { workspaceKey: node('talk-topic-workspace').value } : {}) };
     if (!body.title) return;
+    if (registry() && !state.workspaces.some((entry) => entry.workspaceKey === body.workspaceKey && entry.available)) {
+      error('Choose an available host-provided workspace for this new topic.', 'talk-topic-error');
+      renderControls();
+      return;
+    }
     state.create = { body, state: 'submitting' };
     renderControls();
     error('', 'talk-topic-error');
@@ -492,6 +583,14 @@
       await token();
       const result = await request('/api/topics', body);
       if (!validId(result.topic?.topicId)) throw failed('The created topic identity could not be confirmed.', 0, true);
+      if (registry()) {
+        try {
+          const binding = admitBinding(result.topic), selected = state.workspaces.find((entry) => entry.workspaceKey === body.workspaceKey);
+          if (binding.workspaceKey !== body.workspaceKey || binding.workspaceId !== selected?.workspaceId)
+            throw failed('Created topic workspace did not match the explicit selection.');
+          bindings.set(result.topic.topicId, bindingPin(binding));
+        } catch { throw failed('The created topic workspace could not be confirmed. Reload before an identical retry.', 0, true); }
+      }
       state.create = null;
       node('talk-topic-name').readOnly = false;
       node('talk-create-topic').textContent = 'Create topic';
@@ -502,7 +601,7 @@
       state.create = cause.uncertain ? { body, state: 'uncertain' } : null;
       node('talk-topic-name').readOnly = cause.uncertain;
       node('talk-create-topic').textContent = cause.uncertain ? 'Retry the same creation' : 'Create topic';
-      error(cause.uncertain ? `${cause.message} This button retries the identical title and request ID; it does not create a new request.` : cause.message, 'talk-topic-error');
+      error(cause.uncertain ? `${cause.message} This button retries the identical ${registry() ? 'workspace, ' : ''}title and request ID; it does not create a new request.` : cause.message, 'talk-topic-error');
     } finally { renderControls(); }
   }
   async function openLinkDialog() {
@@ -539,6 +638,8 @@
     node('talk-save-link').disabled = true;
     try {
       const detail = await readDetail(id);
+      if (registry() && (!bindingAvailable(detail.topic.binding) || !detail.capabilities.canLinkTask))
+        throw failed('Task linking is not available for this topic workspace.');
       await submit({ kind: 'link', topicId: id, path: `${topicPath(id)}/links`, body: { requestId: crypto.randomUUID(), expectedVersion: detail.topic.version, taskId } });
     } catch (cause) {
       if (pending.get(id)?.state === 'preparing') pending.delete(id);
@@ -556,6 +657,8 @@
     renderAttention();
     try {
       const detail = await readDetail(item.topicId);
+      if (registry() && (!bindingAvailable(detail.topic.binding) || !detail.capabilities.canAcknowledge))
+        throw failed('Acknowledgment is not available for this topic workspace.');
       await submit({ kind: 'ack', topicId: item.topicId, attentionId: item.attentionId,
         path: `${topicPath(item.topicId)}/attention/${encodeURIComponent(item.attentionId)}/ack`,
         body: { requestId: crypto.randomUUID(), expectedVersion: detail.topic.version },
@@ -567,7 +670,8 @@
   }
   async function acceptProposal(turnId) {
     const id = state.selected;
-    if (!validId(id) || !validId(turnId) || !state.fresh || pending.has(id) || !state.capabilities.canLinkTask) return;
+    if (!validId(id) || !validId(turnId) || !state.fresh || pending.has(id) ||
+      !(registry() ? topicCapabilities().canAcceptProposal && bindingAvailable(selectedBinding()) : state.capabilities.canLinkTask)) return;
     const turn = state.detail?.turns.find((entry) => entry.turnId === turnId);
     if (!['offered', 'uncertain'].includes(turn?.proposedTask?.state)) return;
     await submit({ kind: 'proposal', topicId: id, turnId,
@@ -593,16 +697,20 @@
     if (operation?.state === 'uncertain') submit(operation);
   });
   node('talk-new-topic').addEventListener('click', () => {
+    if (node('talk-new-topic').disabled) return;
     if (!state.create) {
       node('talk-topic-name').value = '';
       node('talk-topic-name').readOnly = false;
+      node('talk-topic-workspace').value = '';
       node('talk-create-topic').textContent = 'Create topic';
       error('', 'talk-topic-error');
     }
+    renderControls();
     node('talk-topic-dialog').showModal();
     node('talk-topic-name').focus();
   });
   node('talk-topic-form').addEventListener('submit', createTopic);
+  node('talk-topic-workspace').addEventListener('change', () => { error('', 'talk-topic-error'); renderControls(); });
   node('talk-close-topic').addEventListener('click', () => node('talk-topic-dialog').close());
   node('talk-close-link').addEventListener('click', () => node('talk-link-dialog').close());
   node('talk-link-task').addEventListener('click', openLinkDialog);
