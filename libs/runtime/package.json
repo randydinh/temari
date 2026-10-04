@@ -188,6 +188,19 @@
           "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 tools/merge-reconciliation-dashboard.test.mts",
           "cwd": "{workspaceRoot}"
         }
+      },
+      "reconciliation-ui-test": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "commands": [
+            "node --check tools/dashboard-reconciliation.js",
+            "node --check tools/dashboard-pages.js",
+            "node --test tools/dashboard-reconciliation.ui.test.mjs"
+          ],
+          "parallel": false,
+          "cwd": "{workspaceRoot}"
+        }
       }
     }
   },

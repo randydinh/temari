@@ -45,6 +45,10 @@ export interface TaskViewController {
   describe(): unknown | Promise<unknown>;
   create(input: unknown): Promise<unknown>;
   action(taskId: string, input: unknown): Promise<unknown>;
+  reconciliationList?(): Promise<unknown>;
+  reconciliationReview?(attemptId: string): Promise<unknown>;
+  reconciliationCheckCurrentBinding?(attemptId: string, input: unknown): Promise<unknown>;
+  reconciliationConfirmReviewed?(attemptId: string, input: unknown): Promise<unknown>;
   reconciliationView?(attemptId: string): Promise<unknown>;
   reconciliationCreate?(input: unknown): Promise<unknown>;
   reconciliationInvalidate?(
@@ -263,6 +267,7 @@ const assets = new Map([
     ['dashboard-pages.js', 'text/javascript; charset=utf-8'],
   ],
   ['/dashboard-talk.js', ['dashboard-talk.js', 'text/javascript; charset=utf-8']],
+  ['/dashboard-reconciliation.js', ['dashboard-reconciliation.js', 'text/javascript; charset=utf-8']],
 ] as const);
 
 /** Local task projection with optional mutations delegated to the controller. */
@@ -373,20 +378,72 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
         );
         return;
       }
+      if (url.pathname === '/api/reconciliation' || url.pathname.startsWith('/api/reconciliation/')) {
+        const list = url.pathname === '/api/reconciliation';
+        const match = /^\/api\/reconciliation\/([^/]+)(?:\/(review|invalidate|check-current-binding|confirm|confirm-reviewed))?$/.exec(url.pathname);
+        if ((request.url ?? '').includes('?'))
+          throw new RequestError(400, 'Unexpected reconciliation query.');
+        let attemptId: string | undefined;
+        if (match) {
+          try { attemptId = decodeURIComponent(match[1]!); }
+          catch { throw new RequestError(400, 'Invalid reconciliation attempt identity.'); }
+          if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(attemptId))
+            throw new RequestError(400, 'Invalid reconciliation attempt identity.');
+        }
+        if (!list && !match) { send(404, { error: 'Not found.' }); return; }
+        const action = match?.[2];
+        if (request.method === 'GET' || request.method === 'HEAD') {
+          if (action && action !== 'review') {
+            response.setHeader('Allow', 'POST');
+            send(405, { error: 'Reconciliation intent actions require POST.' });
+          } else if (list) {
+            send(200, options.controller?.reconciliationList
+              ? await options.controller.reconciliationList()
+              : { configured: false, setupReason: 'Merge reconciliation is not configured.', attempts: [], page: { total: 0, limit: 50, omitted: 0 }, capabilities: { canCheckCurrentBinding: false, canRecordConfirmationIntent: false } });
+          } else {
+            const reader = action === 'review' ? options.controller?.reconciliationReview : options.controller?.reconciliationView;
+            if (!reader) throw new RequestError(400, 'Merge reconciliation is not configured.');
+            const result = await reader.call(options.controller, attemptId!);
+            send(result == null ? 404 : 200, result ?? { error: 'Reconciliation attempt not found.' });
+          }
+          return;
+        }
+        if (!options.controller || request.method !== 'POST' || action === 'review' || (!list && !action)) {
+          response.setHeader('Allow', !options.controller || action === 'review' || (!list && !action) ? 'GET, HEAD' : 'POST');
+          send(405, { error: !options.controller ? 'The task view is read-only.' : 'Unsupported reconciliation method.' });
+          return;
+        }
+        const dispatch = list ? options.controller.reconciliationCreate
+          : action === 'check-current-binding' ? options.controller.reconciliationCheckCurrentBinding
+            : action === 'invalidate' ? options.controller.reconciliationInvalidate
+              : action === 'confirm' ? options.controller.reconciliationConfirm
+              : options.controller.reconciliationConfirmReviewed;
+        if (!dispatch) throw new RequestError(400, 'Merge reconciliation is not configured.');
+        if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? ''))
+          throw new RequestError(403, 'Reconciliation intent requires a local connection.');
+        validateMutation(request, csrfToken, 'Reconciliation');
+        const input = await readJsonBody(request);
+        if (action === 'invalidate' || action === 'check-current-binding' || action === 'confirm-reviewed') {
+          const keys = action === 'confirm-reviewed' ? ['requestId', 'reviewSha256'] : [];
+          if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length !== keys.length || !Object.keys(input).every((key) => keys.includes(key)))
+            throw new RequestError(400, 'Unexpected or missing reconciliation request field.');
+          if (action === 'confirm-reviewed') {
+            const selected = input as Record<string, unknown>;
+            if (typeof selected.requestId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(selected.requestId) || typeof selected.reviewSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(selected.reviewSha256))
+              throw new RequestError(400, 'Select exact reconciliation request and review identities.');
+          }
+        }
+        send(200, list
+          ? await options.controller.reconciliationCreate!(input)
+          : await (dispatch as (id: string, input: unknown) => Promise<unknown>).call(options.controller, attemptId!, input));
+        return;
+      }
       const actionMatch =
         /^\/api\/tasks\/([A-Za-z0-9][A-Za-z0-9._-]{0,127})\/actions$/.exec(
           url.pathname,
         );
       const scheduleMatch =
         /^\/api\/schedules\/([A-Za-z0-9][A-Za-z0-9._-]{0,127})\/actions$/.exec(
-          url.pathname,
-        );
-      const reconciliationViewMatch =
-        /^\/api\/reconciliation\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})$/.exec(
-          url.pathname,
-        );
-      const reconciliationActionMatch =
-        /^\/api\/reconciliation\/([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\/(invalidate|confirm)$/.exec(
           url.pathname,
         );
       if (
@@ -412,9 +469,7 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
           (url.pathname !== '/api/tasks' &&
             !actionMatch &&
             url.pathname !== '/api/schedules' &&
-            !scheduleMatch &&
-            url.pathname !== '/api/reconciliation' &&
-            !reconciliationActionMatch)
+            !scheduleMatch)
         ) {
           send(404, { error: 'Not found.' });
           return;
@@ -435,36 +490,13 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
           !options.schedules
         )
           throw new RequestError(400, 'Scheduling is not configured.');
-        if (
-          (url.pathname === '/api/reconciliation' ||
-            reconciliationActionMatch) &&
-          (!options.controller?.reconciliationCreate ||
-            !options.controller.reconciliationInvalidate ||
-            !options.controller.reconciliationConfirm)
-        )
-          throw new RequestError(
-            400,
-            'Merge reconciliation is not configured.',
-          );
-        const result = reconciliationActionMatch
-          ? reconciliationActionMatch[2] === 'invalidate'
-            ? await options.controller!.reconciliationInvalidate!(
-                reconciliationActionMatch[1]!,
-                input,
-              )
-            : await options.controller!.reconciliationConfirm!(
-                reconciliationActionMatch[1]!,
-                input,
-              )
-          : url.pathname === '/api/reconciliation'
-            ? await options.controller!.reconciliationCreate!(input)
-            : scheduleMatch
-              ? await options.schedules!.update(scheduleMatch[1]!, input)
-              : url.pathname === '/api/schedules'
-                ? await options.schedules!.create(input)
-                : actionMatch
-                  ? await options.controller!.action(actionMatch[1]!, input)
-                  : await options.controller!.create(input);
+        const result = scheduleMatch
+          ? await options.schedules!.update(scheduleMatch[1]!, input)
+          : url.pathname === '/api/schedules'
+            ? await options.schedules!.create(input)
+            : actionMatch
+              ? await options.controller!.action(actionMatch[1]!, input)
+              : await options.controller!.create(input);
         send(200, result);
         return;
       }
@@ -491,23 +523,6 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
           options.schedules
             ? await options.schedules.describe()
             : { configured: false, schedules: [], targets: [] },
-        );
-        return;
-      }
-      if (reconciliationViewMatch) {
-        if (!options.controller?.reconciliationView)
-          throw new RequestError(
-            400,
-            'Merge reconciliation is not configured.',
-          );
-        if (url.search)
-          throw new RequestError(400, 'Unexpected reconciliation query.');
-        const view = await options.controller.reconciliationView(
-          reconciliationViewMatch[1]!,
-        );
-        send(
-          view ? 200 : 404,
-          view ?? { error: 'Reconciliation attempt not found.' },
         );
         return;
       }
@@ -606,11 +621,13 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
         error && typeof error === 'object' && 'status' in error
           ? error.status
           : undefined;
+      const reconciliationRequest = /^\/api\/reconciliation(?:\/|\?|$)/.test(request.url ?? '');
       const topicRequest = /^\/api\/topics(?:\/|\?|$)/.test(request.url ?? '');
       const scheduleRequest = /^\/api\/schedules(?:\/|\?|$)/.test(request.url ?? '');
       const serviceError = error instanceof Error && (
         (options.talk && topicRequest && error.name === 'TalkRequestError') ||
-        (options.schedules && scheduleRequest && error.name === 'DashboardScheduleRequestError')
+        (options.schedules && scheduleRequest && error.name === 'DashboardScheduleRequestError') ||
+        (options.controller && reconciliationRequest && error.name === 'ReconciliationBrowserRequestError')
       );
       const status =
         error instanceof RequestError
@@ -629,9 +646,11 @@ export function createTaskViewServer(options: TaskViewOptions): Server {
       }
       // The host can retain the full diagnostic in its selected local stderr;
       // the HTTP projection contains only a plain first-line message.
-      if (status >= 500 || (serviceError && error instanceof Error && error.cause !== undefined)) console.error(error);
+      if ((reconciliationRequest && !(error instanceof RequestError)) || status >= 500 || (serviceError && error instanceof Error && error.cause !== undefined)) console.error(error);
       send(status, {
-        error: plainError(error),
+        error: reconciliationRequest && !(error instanceof RequestError)
+          ? status >= 500 ? 'Reconciliation state could not be read or retained.' : 'Reconciliation request refused.'
+          : plainError(error),
       });
     }
   });

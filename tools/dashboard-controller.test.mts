@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   mkdtemp,
   mkdir,
@@ -7,6 +8,9 @@ import {
   realpath,
   rm,
   writeFile,
+  readdir,
+  symlink,
+  rename,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -27,10 +31,11 @@ import {
 import {
   DashboardController,
   validateDashboardConfig,
+  createDashboardReconciliationInteractionWriter,
   type DashboardImplementationPlan,
 } from './dashboard-controller.mjs';
 import { startTaskViewServer } from './task-view.mjs';
-import { MergeReconciliationDashboard } from './merge-reconciliation-dashboard.mjs';
+import { MergeReconciliationDashboard, projectRetainedReconciliationReview, reconciliationInteractionIdentity, type ReconciliationInteractionEvent } from './merge-reconciliation-dashboard.mjs';
 
 const run = promisify(execFile);
 function implementationPlan(): DashboardImplementationPlan {
@@ -1098,4 +1103,129 @@ test('goal admission recovers a published preparation after bind crash with a fr
   );
   assert.equal(recovered.runs[0]!.childRefs!.length, 2);
   assert.notEqual(recovered.status, 'DONE');
+});
+
+
+async function browserReconciliationConfig(f: Awaited<ReturnType<typeof fixture>>, selectedAttempts: { attemptId: string; reviewSha256: string }[] = []) {
+  return validateDashboardConfig({
+    ...f.config,
+    reconciliation: {
+      storeRoot: join(f.root, 'reconciliation'), sourceRoot: f.workspaceRoot,
+      candidate: { id: 'reconciliation-candidate', sha256: reconciliationSha, root: reconciliationScope('v1').candidateRoot },
+      resolutionIntent: 'preserve', requiredChecks: reconciliationScope('v1').requiredChecks,
+      expectedComparison: reconciliationScope('v1').expectedComparison,
+      browserReview: { selectedAttempts },
+    },
+  });
+}
+
+test('reconciliation host selection rejects caller-shaped, duplicate and oversized admission pins', async (t) => {
+  const f = await fixture(t);
+  const config = await browserReconciliationConfig(f, [{ attemptId: 'attempt:portable', reviewSha256: 'a'.repeat(64) }]);
+  assert.deepEqual(config.reconciliation!.browserReview!.selectedAttempts, [{ attemptId: 'attempt:portable', reviewSha256: 'a'.repeat(64) }]);
+  for (const selectedAttempts of [
+    [{ attemptId: 'attempt', reviewSha256: 'a'.repeat(64), selectedByBrowser: true }],
+    [{ attemptId: 'attempt', reviewSha256: 'A'.repeat(64) }],
+    [{ attemptId: 'attempt', reviewSha256: 'a'.repeat(64) }, { attemptId: 'attempt', reviewSha256: 'b'.repeat(64) }],
+    Array.from({ length: 129 }, (_, i) => ({ attemptId: `attempt-${i}`, reviewSha256: 'a'.repeat(64) })),
+  ]) await assert.rejects(validateDashboardConfig({ ...config, reconciliation: { ...config.reconciliation, browserReview: { selectedAttempts } } }));
+  await assert.rejects(validateDashboardConfig({ ...config, reconciliation: { ...config.reconciliation, storeRoot: join(f.workspaceRoot, 'private-store') } }), /disjoint from source/);
+  for (const storeRoot of [f.preparationRoot, join(f.preparationRoot, 'reconciliation-browser-interactions'), join(f.preparationRoot, 'reconciliation-browser-interactions', 'nested-ledger')])
+    await assert.rejects(validateDashboardConfig({ ...config, reconciliation: { ...config.reconciliation, storeRoot } }), /ledger and interaction stores must be disjoint/);
+  assert.deepEqual(await readdir(f.preparationRoot), []);
+  assert.deepEqual((await readdir(f.workspaceRoot)).sort(), ['.git', 'README.md']);
+});
+
+test('host interaction publication pins actual bytes and refuses replacement or symlink storage', async (t) => {
+  const f = await fixture(t); const config = await browserReconciliationConfig(f);
+  const writer = await createDashboardReconciliationInteractionWriter(config);
+  const input = { attemptId: 'attempt:writer', requestId: 'request:writer' };
+  assert.equal(await writer.read(input), null);
+  const event: ReconciliationInteractionEvent = {
+    schema: 1, kind: 'temari-reconciliation-dashboard-interaction', ...input,
+    planId: 'plan', observationId: 'observation', reviewSha256: 'a'.repeat(64), canonicalRequestSha256: 'b'.repeat(64), expectedBindingSha256: 'c'.repeat(64),
+    bindingCheck: { state: 'matched', beganAt: '2026-10-03T12:00:00.000Z', endedAt: '2026-10-03T12:00:01.000Z', changedFields: [], reasonCode: null },
+    actorKind: 'local-dashboard-interaction', receivedAt: '2026-10-03T12:00:02.000Z',
+  };
+  await writer.publish(event);
+  const retained = (await writer.read(input))!;
+  assert.deepEqual(Buffer.from(retained.bytes), Buffer.from(JSON.stringify(event) + '\n'));
+  assert.equal(retained.evidence.sha256, createHash('sha256').update(retained.bytes).digest('hex'));
+  assert.equal(retained.evidence.bytes, retained.bytes.length);
+  assert.equal(retained.evidence.id, reconciliationInteractionIdentity(input.attemptId, input.requestId).eventId);
+  assert.deepEqual(await writer.readRecorded({ attemptId: input.attemptId, evidenceId: retained.evidence.id }), retained);
+  await writer.publish(event); assert.deepEqual(await writer.read(input), retained);
+  await assert.rejects(writer.publish({ ...event, receivedAt: '2026-10-03T12:00:03.000Z' }), /different content/);
+  assert.deepEqual(await writer.read(input), retained);
+  await assert.rejects(writer.readRecorded({ attemptId: input.attemptId, evidenceId: '/unselected/local/path' }), /identity/);
+  const other = { attemptId: 'attempt:other', requestId: 'request:other' };
+  const linkId = reconciliationInteractionIdentity(other.attemptId, other.requestId).eventId;
+  await symlink(join(f.workspaceRoot, 'README.md'), join(f.preparationRoot, 'reconciliation-browser-interactions', linkId + '.json'));
+  await assert.rejects(writer.read(other));
+  assert.equal(await readFile(join(f.workspaceRoot, 'README.md'), 'utf8'), 'Retained local verification.\n');
+  const interactions = join(f.preparationRoot, 'reconciliation-browser-interactions');
+  await rename(interactions, join(f.preparationRoot, 'preserved-original-interactions'));
+  await mkdir(interactions);
+  await assert.rejects(writer.read(input), /storage changed/);
+  assert.deepEqual(await readdir(interactions), []);
+});
+
+test('browser confirmation records exact retained local intent and replay without task or source effects', async (t) => {
+  const f = await fixture(t); const original = reconciliationRequest('v1', 'browser-actual-record');
+  const attempt = await f.reconciliationStore.createAttempt({ idempotencyKey: 'browser-actual-record', observation: original.observation, plan: original.plan });
+  const projection = projectRetainedReconciliationReview(attempt); assert.equal(projection.complete, true);
+  const config = await browserReconciliationConfig(f, [{ attemptId: attempt.id, reviewSha256: projection.sha256! }]);
+  const writer = await createDashboardReconciliationInteractionWriter(config);
+  let drift = false; let bindingReads = 0;
+  const facade = new MergeReconciliationDashboard(f.reconciliationStore, { async readCurrentBinding({ expected }) { bindingReads++; return drift ? { ...expected, revision: 'drift' } : expected; } }, { browserReview: config.reconciliation!.browserReview, interactionWriter: writer });
+  const controller = new DashboardController({ config, store: f.store, runtime: f.runtime, bridgePath: f.bridgePath, finalizerPath: join(f.root, 'finalizer.ts'), archonHome: f.archonHome, reconciliation: facade, readNative: async () => { throw new Error('No native launch selected.'); } });
+  const server = await startTaskViewServer({ runtime: f.runtime, controller, archonBaseUrl: 'http://127.0.0.1:3091', port: 0 });
+  t.after(() => new Promise<void>((done) => { server.closeAllConnections(); server.close(() => done()); }));
+  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  const dashboard = await (await fetch(base + '/api/dashboard')).json() as { csrfToken: string };
+  const headers = { origin: base, 'content-type': 'application/json', 'x-temari-token': dashboard.csrfToken };
+  const encoded = encodeURIComponent(attempt.id); const post = async (action: string, input: unknown) => {
+    const response = await fetch(`${base}/api/reconciliation/${encoded}/${action}`, { method: 'POST', headers, body: JSON.stringify(input) });
+    return { status: response.status, body: await response.json() as any };
+  };
+  const beforeTask = await f.runtime.listSnapshots(); const beforeSource = await readFile(join(f.workspaceRoot, 'README.md'));
+  const review = await (await fetch(`${base}/api/reconciliation/${encoded}/review`)).json() as any;
+  assert.equal(review.review.sha256, projection.sha256); assert.equal(review.currentBinding.state, 'not-checked');
+  const request = { requestId: 'actual-local-request', reviewSha256: projection.sha256 };
+  const bad = await post('confirm-reviewed', { ...request, confirmedBy: 'browser-human', confirmedAt: 'invented', evidence: [] }); assert.equal(bad.status, 400);
+  assert.equal(await writer.read({ attemptId: attempt.id, requestId: request.requestId }), null);
+  const mismatch = await post('confirm-reviewed', { ...request, reviewSha256: '0'.repeat(64) }); assert.equal(mismatch.body.outcome, 'refused');
+  const recorded = await post('confirm-reviewed', request); assert.equal(recorded.status, 200); assert.equal(recorded.body.outcome, 'recorded');
+  assert.equal(recorded.body.review.confirmation.actorKind, 'local-dashboard-interaction'); assert.equal(recorded.body.review.confirmation.requestId, request.requestId);
+  assert.equal(recorded.body.review.attempt.candidate.readiness, 'not-ready'); assert.equal(recorded.body.review.effects.terminal, false);
+  const retained = (await writer.read({ attemptId: attempt.id, requestId: request.requestId }))!;
+  const event = JSON.parse(Buffer.from(retained.bytes).toString()); assert.equal(event.receivedAt, recorded.body.review.confirmation.confirmedAt); assert.equal(event.actorKind, 'local-dashboard-interaction');
+  assert.equal(recorded.body.review.confirmation.evidence[0].sha256, createHash('sha256').update(retained.bytes).digest('hex'));
+  assert.equal(bindingReads, 2);
+  const replay = await post('confirm-reviewed', request); assert.equal(replay.body.outcome, 'replayed'); assert.deepEqual(replay.body.review.confirmation, recorded.body.review.confirmation);
+  assert.deepEqual(await writer.read({ attemptId: attempt.id, requestId: request.requestId }), retained);
+  const readback = await (await fetch(`${base}/api/reconciliation/${encoded}/review`)).json() as any; assert.equal(readback.confirmation.requestId, request.requestId);
+  drift = true;
+  const checked = await post('check-current-binding', {}); assert.equal(checked.status, 200); assert.equal(checked.body.currentBinding.state, 'drift'); assert.equal(checked.body.attempt.retainedStatus, 'BLOCKED'); assert.equal(Object.hasOwn(checked.body, 'state'), false); assert.equal(checked.body.confirmation.requestId, request.requestId);
+  assert.deepEqual(await f.runtime.listSnapshots(), beforeTask); assert.deepEqual(await readFile(join(f.workspaceRoot, 'README.md')), beforeSource); assert.equal(f.counts().starts, 0);
+});
+
+
+test('new browser binding check excludes unselected legacy text while invalidate retains its old DTO', async (t) => {
+  const f = await fixture(t); const request = reconciliationRequest('safe-check', 'safe-check');
+  request.observation.revision = 'private-revision-do-not-project'; request.plan.revision = request.observation.revision;
+  const attempt = await f.reconciliationStore.createAttempt({ idempotencyKey: 'safe-check', observation: request.observation, plan: request.plan });
+  const body = await f.controller.reconciliationCheckCurrentBinding(attempt.id, {}) as any;
+  assert.equal(body.review.payload, null); assert.equal(body.review.sha256, null); assert.equal(body.currentBinding.state, 'matched');
+  for (const legacyField of ['revision', 'taskVersion', 'observationId', 'blockedReason', 'state']) assert.equal(Object.hasOwn(body, legacyField), false);
+  assert.equal(JSON.stringify(body).includes('private-revision-do-not-project'), false);
+  const legacy = await f.controller.reconciliationInvalidate(attempt.id, {}) as any;
+  assert.equal(legacy.revision, request.observation.revision); assert.equal(legacy.state, 'awaiting-confirmation');
+  assert.equal(Object.hasOwn(legacy, 'currentBinding'), false);
+  const token = (await (await fetch(f.base + '/api/dashboard')).json() as { csrfToken: string }).csrfToken;
+  const headers = { origin: f.base, 'content-type': 'application/json', 'x-temari-token': token };
+  const current = await fetch(`${f.base}/api/reconciliation/${encodeURIComponent(attempt.id)}/check-current-binding`, { method: 'POST', headers, body: '{}' });
+  assert.equal(current.status, 200); assert.equal(JSON.stringify(await current.json()).includes('private-revision-do-not-project'), false);
+  const refused = await fetch(`${f.base}/api/reconciliation/${encodeURIComponent(attempt.id)}/check-current-binding`, { method: 'POST', headers, body: JSON.stringify({ current: {}, revision: '/caller/path' }) });
+  assert.equal(refused.status, 400);
 });

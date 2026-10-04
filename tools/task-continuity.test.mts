@@ -5,6 +5,9 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import test from 'node:test';
+import { validateDashboardConfig } from './dashboard-controller.mjs';
+import { FileMergeReconciliationStore } from '../libs/runtime/src/index.js';
+import { projectRetainedReconciliationReview } from './merge-reconciliation-dashboard.mjs';
 import {
   createTaskContinuityReconciliationDashboard,
   runTaskCommand,
@@ -393,4 +396,66 @@ test('advice-only Talk CLI serves topic organization with no Archon admission or
   assert.equal(turn.status, 503);
   assert.deepEqual((await (await fetch(`${started.url}/api/tasks`)).json()).tasks, []);
   assert.equal((await fetch(`${started.url}/api/tasks`, { method: 'POST', headers, body: '{}' })).status, 405);
+});
+
+
+function reconciliationCliConfig(root: string, workspace: string, preparation: string) {
+  const evidence = { schema: 1 as const, id: 'evidence', sha256: 'a'.repeat(64), bytes: 0, mediaType: 'application/json' };
+  return { schema: 1 as const, workspaceRoot: workspace, preparationRoot: preparation, recipes: [], reconciliation: {
+    storeRoot: join(root, 'reconciliation'), sourceRoot: workspace,
+    candidate: { id: 'candidate', sha256: 'b'.repeat(64), root: { id: 'candidate-root', sha256: 'c'.repeat(64) } },
+    resolutionIntent: 'preserve' as const, requiredChecks: [{ id: 'check', definitionSha256: 'd'.repeat(64) }],
+    expectedComparison: { candidateEvidence: evidence, verificationEvidence: evidence },
+    browserReview: { selectedAttempts: [] as { attemptId: string; reviewSha256: string }[] },
+  } };
+}
+
+test('reconciliation CLI rejects in-source and parent-traversal task storage before creating any store or native admission', async (t) => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'temari-reconciliation-cli-root-')));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const workspace = join(root, 'workspace'); const preparation = join(root, 'preparation'); const outside = join(root, 'outside');
+  for (const path of [workspace, preparation, outside]) await mkdir(path);
+  await mkdir(join(workspace, 'nested')); await symlink(join(workspace, 'nested'), join(outside, 'alias'));
+  await writeFile(join(workspace, 'sentinel.txt'), 'Selected source.');
+  const configPath = join(root, 'control.json'); const config = reconciliationCliConfig(root, workspace, preparation);
+  await writeFile(configPath, JSON.stringify(config));
+  for (const selected of [join(workspace, 'tasks'), `${outside}/alias/../tasks`, join(preparation, 'reconciliation-browser-interactions')])
+    await assert.rejects(runTaskCommand(['serve', '--root', selected, '--control-config', configPath, '--port', '0']), /disjoint|canonical segments/);
+  assert.deepEqual((await readdir(workspace)).sort(), ['nested', 'sentinel.txt']);
+  assert.equal(await readFile(join(workspace, 'sentinel.txt'), 'utf8'), 'Selected source.');
+  assert.deepEqual(await readdir(preparation), []); assert.deepEqual(await readdir(outside), ['alias']);
+  await assert.rejects(readdir(config.reconciliation.storeRoot), { code: 'ENOENT' });
+  const tasks = join(root, 'tasks');
+  await writeFile(configPath, JSON.stringify({ ...config, reconciliation: { ...config.reconciliation, browserReview: { selectedAttempts: [{ attemptId: 'browser-selected', reviewSha256: 'invalid' }] } } }));
+  await assert.rejects(runTaskCommand(['serve', '--root', tasks, '--control-config', configPath, '--port', '0']), /review digest/);
+  await assert.rejects(readdir(tasks), { code: 'ENOENT' });
+  for (const storeRoot of [preparation, join(preparation, 'reconciliation-browser-interactions'), join(preparation, 'reconciliation-browser-interactions', 'nested-ledger')]) {
+    await writeFile(configPath, JSON.stringify({ ...config, reconciliation: { ...config.reconciliation, storeRoot } }));
+    await assert.rejects(runTaskCommand(['serve', '--root', tasks, '--control-config', configPath, '--port', '0']), /ledger and interaction stores must be disjoint/);
+    await assert.rejects(readdir(tasks), { code: 'ENOENT' });
+    assert.deepEqual(await readdir(preparation), []);
+  }
+});
+
+test('CLI reconciliation factory keeps host review pins and refuses absent current task/run without interaction evidence', async (t) => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'temari-reconciliation-cli-factory-')));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const workspace = join(root, 'workspace'); const preparation = join(root, 'preparation'); await mkdir(workspace); await mkdir(preparation);
+  const raw = reconciliationCliConfig(root, workspace, preparation);
+  const store = await FileMergeReconciliationStore.create(raw.reconciliation.storeRoot);
+  const scope = { schema: 1 as const, sourceRoot: { id: 'source', sha256: '0'.repeat(64) }, candidateRoot: raw.reconciliation.candidate.root, baseHead: { id: 'base', sha256: '1'.repeat(64) }, operationHead: { id: 'operation', sha256: '2'.repeat(64) }, affectedPaths: [{ path: 'selected.txt', pathSha256: '3'.repeat(64), classification: 'untracked' as const, indexBlobs: [], unmergedStages: [], worktreeKind: 'file' as const, worktreeSha256: '4'.repeat(64), diffSha256: '5'.repeat(64) }], resolutionIntent: raw.reconciliation.resolutionIntent, requiredChecks: raw.reconciliation.requiredChecks, expectedComparison: raw.reconciliation.expectedComparison };
+  const evidence = raw.reconciliation.expectedComparison.candidateEvidence;
+  const candidate = { schema: 'reconciliation-candidate-v1' as const, id: raw.reconciliation.candidate.id, sha256: raw.reconciliation.candidate.sha256 };
+  const observation = { schema: 1 as const, observationId: 'observation', taskId: 'task', taskVersion: '1', runId: 'run', revision: 'revision', candidate, scope, observedAt: '2026-10-03T12:00:00.000Z', kind: 'untracked' as const, evidence: [evidence] };
+  const plan = { schema: 1 as const, id: 'plan', taskId: observation.taskId, taskVersion: observation.taskVersion, runId: observation.runId, revision: observation.revision, observationId: observation.observationId, candidate, scope, classification: 'requires-confirmation' as const, status: 'awaiting-confirmation' as const, request: { idempotencyKey: 'cli-prepared', canonicalRequestDigestAlgorithm: 'canonical-json-sha256-v1' as const, canonicalRequestSha256: '6'.repeat(64) }, summary: 'Review only selected source metadata.', actions: [{ id: 'preserve', kind: 'preserve' as const, targetId: 'task' }], evidence: [evidence] };
+  const attempt = await store.createAttempt({ idempotencyKey: 'cli-prepared', observation, plan });
+  const projection = projectRetainedReconciliationReview(attempt); assert.equal(projection.complete, true);
+  raw.reconciliation.browserReview.selectedAttempts = [{ attemptId: attempt.id, reviewSha256: projection.sha256! }];
+  const config = await validateDashboardConfig(raw); let taskReads = 0;
+  const facade = (await createTaskContinuityReconciliationDashboard(config, { async snapshot() { taskReads++; throw new Error('No selected current task.'); } } as never))!;
+  const list = await facade.list(); assert.equal(list.attempts[0]!.hostSelectedForReview, true);
+  const review = (await facade.review(attempt.id))!; assert.equal(review.review.sha256, projection.sha256); assert.equal(review.currentBinding.state, 'not-checked');
+  const refused = await facade.confirmReviewed(attempt.id, { requestId: 'local-cli-request', reviewSha256: projection.sha256! });
+  assert.equal(refused.outcome, 'refused'); assert.equal(refused.reasonCode, 'current-binding-unavailable'); assert.equal(refused.review.currentBinding.state, 'unavailable'); assert.equal(taskReads, 1);
+  assert.equal((await store.get(attempt.id))!.confirmation, null); assert.deepEqual(await readdir(preparation), []);
 });
