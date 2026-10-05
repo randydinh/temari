@@ -58,17 +58,25 @@ const foreignInstalled = state.foreignInstalled && {
   marketplaceName: 'another-marketplace',
   installed: true,
 };
+const foreignAvailable = state.foreignAvailable && {
+  pluginId: 'content-registrar-knowledge@another-marketplace',
+  name: 'content-registrar-knowledge',
+  marketplaceName: 'another-marketplace',
+  installed: false,
+};
 if (args.join(' ') === 'plugin marketplace list --json') {
   reply({ marketplaces: root ? [{ name: 'temari-knowledge', root,
     marketplaceSource: { sourceType: 'local', source: root } }] : [] });
-} else if (args.join(' ') === 'plugin list --json') {
-  reply({ installed: [
+} else if (args.join(' ') === 'plugin list --available --json') {
+  const result = { installed: [
     ...(entry && state.installed ? [entry] : []),
     ...(foreignInstalled ? [foreignInstalled] : []),
-  ], available: [] });
-} else if (args.join(' ') === 'plugin list --marketplace temari-knowledge --available --json') {
-  reply({ installed: entry && state.installed ? [entry] : [],
-    available: entry && !state.installed ? [entry] : [] });
+  ], available: [
+    ...(entry && !state.installed ? [entry] : []),
+    ...(foreignAvailable ? [foreignAvailable] : []),
+  ] };
+  if (state.catalogPaddingBytes) result.padding = 'x'.repeat(state.catalogPaddingBytes);
+  reply(result);
 } else if (args[0] === 'plugin' && args[1] === 'marketplace' && args[2] === 'add') {
   if (state.failMarketplaceAdd) process.exit(2);
   state.marketplaceRoot = args[3];
@@ -183,13 +191,6 @@ test('cold install is exact and repeated install is idempotent', async () => {
   assert.equal(mutations.length, 2);
   assert(
     (await calls()).some(
-      (args) =>
-        args.join(' ') ===
-        'plugin list --marketplace temari-knowledge --available --json',
-    ),
-  );
-  assert(
-    !(await calls()).some(
       (args) => args.join(' ') === 'plugin list --available --json',
     ),
   );
@@ -275,12 +276,28 @@ test('foreign marketplace and wrong plugin version fail closed', async () => {
   );
 });
 
-test('bounded marketplace query still refuses an installed name collision', async () => {
+test('global catalog refuses installed and available name collisions', async () => {
+  for (const collision of ['foreignInstalled', 'foreignAvailable']) {
+    const { options, state, calls } = await fixture();
+    await state({ [collision]: true });
+    await assert.rejects(
+      runPrivateKnowledgeInstall({ ...options, command: 'install' }),
+      /Knowledge plugin name collision/,
+    );
+    assert.equal(
+      (await calls()).filter((args) => args.includes('add')).length,
+      0,
+    );
+  }
+});
+
+test('global catalog larger than the old 2 MiB limit remains inspectable', async () => {
   const { options, state, calls } = await fixture();
-  await state({ foreignInstalled: true });
-  await assert.rejects(
-    runPrivateKnowledgeInstall({ ...options, command: 'install' }),
-    /Knowledge plugin name collision/,
+  await state({ catalogPaddingBytes: 3 * 1024 * 1024 });
+  assert.equal(
+    (await runPrivateKnowledgeInstall({ ...options, command: 'status' }))
+      .receipt,
+    'uninitialized',
   );
   assert.equal(
     (await calls()).filter((args) => args.includes('add')).length,
