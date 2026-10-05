@@ -113,7 +113,7 @@ function codexJson(bin, home, args) {
       encoding: 'utf8',
       env: { ...process.env, CODEX_HOME: home, TYPESAFE_API_KEY: '' },
       timeout: 20_000,
-      maxBuffer: 2 * 1024 * 1024,
+      maxBuffer: 16 * 1024 * 1024,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
   } catch {
