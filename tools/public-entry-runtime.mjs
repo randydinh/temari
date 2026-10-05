@@ -104,6 +104,10 @@ const publicFiles = [
     'skills/temari/references/task-tracking.md',
   ],
   [
+    'packages/workflow-runtime/public/skills/temari/references/conversation.md',
+    'skills/temari/references/conversation.md',
+  ],
+  [
     'packages/workflow-runtime/public/skills/temari-knowledge/SKILL.md',
     'skills/temari-knowledge/SKILL.md',
   ],

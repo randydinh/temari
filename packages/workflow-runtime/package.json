@@ -142,6 +142,18 @@
       "qa-capability-test": {
         "command": "node --import @swc-node/register/esm-register --test tools/qa-capability.test.mjs",
         "cache": false
+      },
+      "communication-fixtures-test": {
+        "command": "node tools/check-communication-fixtures.mjs corpus && node --test tools/check-communication-fixtures.test.mjs",
+        "cache": false
+      },
+      "communication-fixtures-review": {
+        "command": "node tools/check-communication-fixtures.mjs review evaluations/communication/review.json",
+        "cache": false
+      },
+      "communication-bundle-test": {
+        "command": "node --test --test-name-pattern=\"packages an isolated relocated outer bundle|both engineering skills reach shared conversation guidance\" tools/public-entry-runtime.test.mjs",
+        "cache": false
       }
     }
   },

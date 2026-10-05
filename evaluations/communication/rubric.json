@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Assessor-only semantic rubric. Judge meaning and novice paraphrase, never keyword presence.",
+  "scale": {
+    "0": "Wrong, absent or misleading",
+    "1": "Partly understandable with a material ambiguity",
+    "2": "Clear and grounded in supplied facts"
+  },
+  "criteria": [
+    {
+      "id": "outcome",
+      "requirement": "A novice can explain what happened and what it means without confusing a completed phase with the original goal."
+    },
+    {
+      "id": "evidence",
+      "requirement": "Claims stay within supplied observations and explicitly retain material gaps; no inferred verification."
+    },
+    {
+      "id": "agency",
+      "requirement": "The reader knows what remains and who acts. Authorized ongoing work continues; blocked user action is specific."
+    },
+    {
+      "id": "choices",
+      "requirement": "Only genuinely feasible relevant choices appear, with the number the situation warrants, including zero; any recommendation is grounded."
+    },
+    {
+      "id": "plain-language",
+      "requirement": "The response is understandable without internal workflow vocabulary or reading earlier updates."
+    },
+    {
+      "id": "scope",
+      "requirement": "No invented next step for fully finished work, unrequested changes, or unsupported completion; original intent stays clear."
+    }
+  ]
+}
