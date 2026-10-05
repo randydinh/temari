@@ -52,10 +52,21 @@ const entry = root && {
   installPolicy: 'INSTALLED_BY_DEFAULT',
   authPolicy: 'ON_INSTALL',
 };
+const foreignInstalled = state.foreignInstalled && {
+  pluginId: 'content-registrar-knowledge@another-marketplace',
+  name: 'content-registrar-knowledge',
+  marketplaceName: 'another-marketplace',
+  installed: true,
+};
 if (args.join(' ') === 'plugin marketplace list --json') {
   reply({ marketplaces: root ? [{ name: 'temari-knowledge', root,
     marketplaceSource: { sourceType: 'local', source: root } }] : [] });
-} else if (args.join(' ') === 'plugin list --available --json') {
+} else if (args.join(' ') === 'plugin list --json') {
+  reply({ installed: [
+    ...(entry && state.installed ? [entry] : []),
+    ...(foreignInstalled ? [foreignInstalled] : []),
+  ], available: [] });
+} else if (args.join(' ') === 'plugin list --marketplace temari-knowledge --available --json') {
   reply({ installed: entry && state.installed ? [entry] : [],
     available: entry && !state.installed ? [entry] : [] });
 } else if (args[0] === 'plugin' && args[1] === 'marketplace' && args[2] === 'add') {
@@ -170,6 +181,18 @@ test('cold install is exact and repeated install is idempotent', async () => {
   );
   const mutations = (await calls()).filter((args) => args.includes('add'));
   assert.equal(mutations.length, 2);
+  assert(
+    (await calls()).some(
+      (args) =>
+        args.join(' ') ===
+        'plugin list --marketplace temari-knowledge --available --json',
+    ),
+  );
+  assert(
+    !(await calls()).some(
+      (args) => args.join(' ') === 'plugin list --available --json',
+    ),
+  );
   assert.equal(
     (await runPrivateKnowledgeInstall({ ...options, command: 'status' }))
       .receipt,
@@ -248,6 +271,19 @@ test('foreign marketplace and wrong plugin version fail closed', async () => {
   );
   assert.equal(
     (await second.calls()).filter((args) => args.includes('add')).length,
+    0,
+  );
+});
+
+test('bounded marketplace query still refuses an installed name collision', async () => {
+  const { options, state, calls } = await fixture();
+  await state({ foreignInstalled: true });
+  await assert.rejects(
+    runPrivateKnowledgeInstall({ ...options, command: 'install' }),
+    /Knowledge plugin name collision/,
+  );
+  assert.equal(
+    (await calls()).filter((args) => args.includes('add')).length,
     0,
   );
 });

@@ -135,9 +135,12 @@ function inspectCodex(bin, home, releaseRoot, version) {
     'list',
     '--json',
   ]);
-  const plugins = codexJson(bin, home, [
+  const installedPlugins = codexJson(bin, home, ['plugin', 'list', '--json']);
+  const marketplacePlugins = codexJson(bin, home, [
     'plugin',
     'list',
+    '--marketplace',
+    marketplaceName,
     '--available',
     '--json',
   ]);
@@ -146,8 +149,16 @@ function inspectCodex(bin, home, releaseRoot, version) {
     'Unknown Codex marketplace state',
   );
   assert(
-    Array.isArray(plugins.installed) && Array.isArray(plugins.available),
+    Array.isArray(installedPlugins.installed) &&
+      Array.isArray(marketplacePlugins.installed) &&
+      Array.isArray(marketplacePlugins.available),
     'Unknown Codex plugin state',
+  );
+  assert(
+    [...marketplacePlugins.installed, ...marketplacePlugins.available].every(
+      (entry) => entry.marketplaceName === marketplaceName,
+    ),
+    'Codex marketplace filter returned another marketplace',
   );
   const ownMarkets = markets.marketplaces.filter(
     (entry) => entry.name === marketplaceName,
@@ -164,8 +175,14 @@ function inspectCodex(bin, home, releaseRoot, version) {
       'Knowledge marketplace collision',
     );
   const all = [
-    ...plugins.installed.map((entry) => ({ entry, kind: 'installed' })),
-    ...plugins.available.map((entry) => ({ entry, kind: 'available' })),
+    ...installedPlugins.installed.map((entry) => ({
+      entry,
+      kind: 'installed',
+    })),
+    ...marketplacePlugins.available.map((entry) => ({
+      entry,
+      kind: 'available',
+    })),
   ];
   assert(
     !all.some(
