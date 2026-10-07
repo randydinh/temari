@@ -29,12 +29,20 @@ import {
 } from '@temari/workflow-engine';
 import {
   MAX_CHILD_TASK_ERROR_LENGTH,
+  childFailureDiagnosticsFromEvent,
+  type ChildFailureDiagnostics,
   type ChildTaskGroupRecord,
   type ChildTaskRecord,
   type ChildTaskStatus,
   type ChildTaskStore,
 } from './child-task-store.js';
-import type { EvidenceReference, EvidenceStore } from './evidence-store.js';
+import {
+  putStreamedEvidence,
+  verifyPortableEvidence,
+  type EvidenceBytes,
+  type EvidenceReference,
+  type EvidenceStore,
+} from './evidence-store.js';
 import type { WorkspaceManifestStore } from './workspace-manifest.js';
 
 export interface ParallelWorkerReceiptStore {
@@ -108,6 +116,11 @@ export interface ExecuteRestartableParallelWorkersRequest {
     assignment: WorkerAssignment,
     result: WorkerResult,
   ) => readonly WorkerEvidenceInput[] | Promise<readonly WorkerEvidenceInput[]>;
+  readonly evidenceForFailure?: (
+    assignment: WorkerAssignment,
+    error: unknown,
+  ) => readonly WorkerEvidenceInput[] | Promise<readonly WorkerEvidenceInput[]>;
+  readonly failureDiagnostics?: { readonly mode: 'required' };
   readonly workspaceManifestStore?: WorkspaceManifestStore;
   readonly workspaceForAssignment?: (
     assignment: WorkerAssignment,
@@ -127,9 +140,31 @@ export interface ExecuteRestartableParallelWorkersRequest {
   readonly now?: () => Date;
 }
 
-export interface WorkerEvidenceInput {
-  readonly kind: EvidenceKind;
-  readonly content: string | Uint8Array;
+export type WorkerEvidenceInput =
+  | {
+      readonly source?: 'buffer';
+      readonly kind: EvidenceKind;
+      readonly content: string | Uint8Array;
+    }
+  | {
+      readonly source: 'stream';
+      readonly kind: EvidenceKind;
+      readonly content: EvidenceBytes;
+    };
+
+/** Adapter-owned sources and capture completeness; never infer paths from prose. */
+export class WorkerExecutionFailure extends Error {
+  constructor(
+    message: string,
+    readonly diagnostics: {
+      readonly complete: boolean;
+      readonly evidence: readonly WorkerEvidenceInput[];
+      readonly reason?: string;
+    },
+  ) {
+    super(message);
+    this.name = 'WorkerExecutionFailure';
+  }
 }
 
 export interface WorkspaceBinding {
@@ -487,7 +522,8 @@ function workerStatus(
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  const value = error instanceof Error ? error.message : String(error);
+  return typeof value === 'string' ? value : String(value);
 }
 
 function boundedFailureMessage(error: unknown): string {
@@ -729,7 +765,7 @@ async function verifyExpectedWorkspaces(
   await Promise.all(
     records.map(async (record) => {
       if (!record) return;
-      await verifyEvidence(request, record);
+      await verifyChildTaskEvidence(request, record);
       const assignment = assignmentByTaskId.get(record.taskId);
       assert(assignment);
       await verifyWorkspaceManifest(request, assignment, record);
@@ -750,24 +786,69 @@ function portableEvidenceReference(
   };
 }
 
-async function verifyEvidence(
-  request: ExecuteRestartableParallelWorkersRequest,
+export async function verifyChildTaskEvidence(
+  request: Pick<
+    ExecuteRestartableParallelWorkersRequest,
+    'childStore' | 'evidenceStore' | 'runId' | 'revision'
+  >,
   record: ChildTaskRecord,
 ): Promise<void> {
-  const references = record.result?.evidenceReferences ?? [];
-  if (references.length === 0) return;
+  const successReferences = record.result?.evidenceReferences ?? [];
+  const failureReferences = [...(record.failureDiagnostics?.references ?? [])];
+  for (const event of await request.childStore.events(record.taskId)) {
+    failureReferences.push(
+      ...(childFailureDiagnosticsFromEvent(event)?.references ?? []),
+    );
+    failureReferences.push(
+      ...(childFailureDiagnosticsFromEvent(event, 'requestFailureDiagnostics')
+        ?.references ?? []),
+    );
+  }
+  if (successReferences.length === 0 && failureReferences.length === 0) return;
   const store = request.evidenceStore;
   assert(
     store,
     `Child ${record.taskId} has retained evidence but no evidence store was configured.`,
   );
-  await Promise.all(
-    references.map(async (reference) => {
-      assert.equal(reference.runId, request.runId);
-      assert.equal(reference.revision, request.revision);
-      await store.loadPortable(reference);
-    }),
+  for (const reference of successReferences) {
+    assert.equal(reference.runId, request.runId);
+    assert.equal(reference.revision, request.revision);
+    await verifyPortableEvidence(store, reference);
+  }
+  assert(
+    failureReferences.length === 0 || store.verifyPortable,
+    'Failure diagnostics require streaming verification.',
   );
+  const verified = new Set<string>();
+  for (const reference of failureReferences) {
+    assert.equal(reference.runId, request.runId);
+    assert.equal(reference.revision, request.revision);
+    const key = canonical(reference);
+    if (verified.has(key)) continue;
+    await store.verifyPortable!(reference);
+    verified.add(key);
+  }
+}
+
+async function publishEvidenceInput(
+  request: ExecuteRestartableParallelWorkersRequest,
+  input: WorkerEvidenceInput,
+): Promise<WorkerEvidenceReference> {
+  const store = request.evidenceStore;
+  assert(store, 'Evidence publication requires an evidenceStore.');
+  const binding = {
+    runId: request.runId,
+    revision: request.revision,
+    kind: input.kind,
+  };
+  if (input.source === 'stream') {
+    return portableEvidenceReference(
+      await putStreamedEvidence(store, { ...binding, content: input.content }),
+    );
+  }
+  const reference = await store.put({ ...binding, content: input.content });
+  await verifyPortableEvidence(store, reference);
+  return portableEvidenceReference(reference);
 }
 
 async function publishWorkerEvidence(
@@ -775,28 +856,199 @@ async function publishWorkerEvidence(
   assignment: WorkerAssignment,
   result: WorkerResult,
 ): Promise<WorkerResult> {
-  const evidenceForAssignment = request.evidenceForAssignment;
-  if (!evidenceForAssignment) return result;
-  const store = request.evidenceStore;
-  assert(store, 'evidenceForAssignment requires an evidenceStore.');
-  const inputs = await evidenceForAssignment(assignment, result);
-  const references = await Promise.all(
-    inputs.map(async (input) => {
-      const reference = await store.put({
-        runId: request.runId,
-        revision: request.revision,
-        kind: input.kind,
-        content: input.content,
-      });
-      await store.load(reference);
-      return portableEvidenceReference(reference);
-    }),
-  );
+  if (!request.evidenceForAssignment) return result;
+  const inputs = await request.evidenceForAssignment(assignment, result);
+  const references: WorkerEvidenceReference[] = [];
+  for (const input of inputs)
+    references.push(await publishEvidenceInput(request, input));
   if (references.length === 0) return result;
   return {
     ...result,
     evidenceReferences: [...(result.evidenceReferences ?? []), ...references],
   };
+}
+
+function fullFailureText(error: unknown): string {
+  if (error instanceof Error) {
+    let message = '';
+    let stack = '';
+    try {
+      message =
+        typeof error.message === 'string'
+          ? error.message
+          : String(error.message);
+    } catch {}
+    try {
+      stack = typeof error.stack === 'string' ? error.stack : '';
+    } catch {}
+    if (stack.trim())
+      return message.trim() && !stack.includes(message)
+        ? `${message}\n${stack}`
+        : stack;
+    if (message.trim()) return message;
+  } else {
+    try {
+      const text = String(error);
+      if (text.trim()) return text;
+    } catch {}
+  }
+  return 'Worker failed without a diagnostic message.';
+}
+
+async function* textEvidence(text: string): EvidenceBytes {
+  for (let offset = 0; offset < text.length;) {
+    let end = Math.min(offset + 16_384, text.length);
+    const last = text.charCodeAt(end - 1);
+    if (end < text.length && last >= 0xd800 && last <= 0xdbff) end--;
+    yield Buffer.from(text.slice(offset, end), 'utf8');
+    offset = end;
+  }
+}
+
+function privateFailureSummary(error: unknown): string {
+  const sha256 = createHash('sha256')
+    .update(fullFailureText(error))
+    .digest('hex');
+  return `sha256=${sha256}`;
+}
+
+function failureProjection(
+  request: ExecuteRestartableParallelWorkersRequest,
+  error: unknown,
+  diagnostics: ChildFailureDiagnostics | undefined,
+): string {
+  if (
+    !request.evidenceStore &&
+    !request.failureDiagnostics &&
+    !request.evidenceForFailure
+  )
+    return boundedFailureMessage(error);
+  if (error instanceof WorkerExecutionFailure) {
+    try {
+      if (
+        typeof error.message === 'string' &&
+        error.message.trim() &&
+        error.message.length <= MAX_CHILD_TASK_ERROR_LENGTH
+      )
+        return error.message;
+    } catch {}
+  }
+  const identity = diagnostics?.references[0]?.sha256;
+  return `Worker execution failed; diagnostics ${diagnostics?.status === 'retained' ? 'retained' : 'archive failed'}; ${identity ? `sha256=${identity}` : privateFailureSummary(error)}.`;
+}
+
+async function retainFailureDiagnostics(
+  request: ExecuteRestartableParallelWorkersRequest,
+  assignment: WorkerAssignment,
+  error: unknown,
+): Promise<ChildFailureDiagnostics | undefined> {
+  if (
+    !request.evidenceStore &&
+    !request.failureDiagnostics &&
+    !request.evidenceForFailure &&
+    !(error instanceof WorkerExecutionFailure)
+  )
+    return undefined;
+  const references: WorkerEvidenceReference[] = [];
+  const failures: string[] = [];
+  const store = request.evidenceStore;
+  if (!store?.putStream || !store.verifyPortable) {
+    return {
+      schema: 1,
+      status: 'archive-failed',
+      references,
+      message:
+        'Complete diagnostics require streaming evidence publication and verification.',
+    };
+  }
+  const archiveProblem = async (
+    cause: unknown,
+    category: string,
+  ): Promise<void> => {
+    failures.push(`${category} (${privateFailureSummary(cause)}).`);
+    try {
+      const reference = await store.putStream!({
+        runId: request.runId,
+        revision: request.revision,
+        kind: 'other',
+        content: textEvidence(fullFailureText(cause)),
+      });
+      const portable = portableEvidenceReference(reference);
+      references.push(portable);
+      await store.verifyPortable!(portable);
+    } catch (secondaryError) {
+      failures.push(
+        `Secondary diagnostic archive failed (${privateFailureSummary(secondaryError)}).`,
+      );
+    }
+  };
+  const archive = async (input: WorkerEvidenceInput) => {
+    try {
+      const content =
+        input.source === 'stream'
+          ? input.content
+          : textOrBytesEvidence(input.content);
+      const reference = await store.putStream!({
+        runId: request.runId,
+        revision: request.revision,
+        kind: input.kind,
+        content,
+      });
+      const portable = portableEvidenceReference(reference);
+      references.push(portable);
+      await store.verifyPortable!(portable);
+    } catch (archiveError) {
+      await archiveProblem(archiveError, 'Diagnostic archive failed');
+    }
+  };
+  await archive({
+    source: 'stream',
+    kind: 'stderr',
+    content: textEvidence(fullFailureText(error)),
+  });
+  if (error instanceof WorkerExecutionFailure) {
+    if (!error.diagnostics.complete)
+      failures.push(
+        error.diagnostics.reason &&
+          error.diagnostics.reason.length <= MAX_CHILD_TASK_ERROR_LENGTH
+          ? error.diagnostics.reason
+          : 'Worker diagnostic capture was incomplete.',
+      );
+    for (const input of error.diagnostics.evidence) await archive(input);
+  }
+  if (request.evidenceForFailure) {
+    try {
+      for (const input of await request.evidenceForFailure(assignment, error))
+        await archive(input);
+    } catch (sourceError) {
+      await archiveProblem(sourceError, 'Diagnostic source discovery failed');
+    }
+  }
+  if (failures.length > 0)
+    return {
+      schema: 1,
+      status: 'archive-failed',
+      references,
+      message: boundedFailureMessage(failures.join('; ')),
+    };
+  assert(references.length > 0, 'Retained diagnostics require evidence.');
+  return {
+    schema: 1,
+    status: 'retained',
+    references: references as [
+      WorkerEvidenceReference,
+      ...WorkerEvidenceReference[],
+    ],
+  };
+}
+
+async function* textOrBytesEvidence(
+  content: string | Uint8Array,
+): EvidenceBytes {
+  if (typeof content === 'string') yield* textEvidence(content);
+  else
+    for (let offset = 0; offset < content.byteLength; offset += 64 * 1024)
+      yield content.subarray(offset, offset + 64 * 1024);
 }
 
 async function reconcileExpectedTasks(
@@ -852,72 +1104,128 @@ async function executeClaimed(
       });
     }, renewalIntervalMs);
   }
-  let result: WorkerResult;
+  let result: WorkerResult | null = null;
+  let failure: unknown = null;
+  let failed = false;
+  let failureDiagnostics: ChildFailureDiagnostics | undefined;
   try {
     result = await request.handler(claimed.assignment);
     assertWorkerResult(result);
     result = await publishWorkerEvidence(request, claimed.assignment, result);
-    const workspaceManifestSaved = await persistWorkspaceManifest(
+    const saved = await persistWorkspaceManifest(
       request,
       claimed.assignment,
       claimed.record.taskId,
       now,
     );
-    if (workspaceManifestSaved) {
-      result = {
-        ...result,
-        workspaceManifestId: claimed.record.taskId,
-      };
-    }
-    await stopRenewal();
-    if (renewalError) throw renewalError;
+    if (saved)
+      result = { ...result, workspaceManifestId: claimed.record.taskId };
   } catch (error) {
-    await stopRenewal();
-    if (renewalError && renewalError !== error) {
-      error = new Error(
-        `${errorMessage(error)}; lease renewal failed: ${errorMessage(renewalError)}`,
-      );
-    }
+    failed = true;
+    failure = error;
     try {
-      await persistWorkspaceManifest(
+      failureDiagnostics = await retainFailureDiagnostics(
         request,
         claimed.assignment,
-        claimed.record.taskId,
-        now,
+        error,
       );
-    } catch (manifestError) {
-      error = new Error(
-        `${errorMessage(error)}; workspace manifest failed: ${errorMessage(manifestError)}`,
-      );
+      try {
+        await persistWorkspaceManifest(
+          request,
+          claimed.assignment,
+          claimed.record.taskId,
+          now,
+        );
+      } catch (manifestError) {
+        if (failureDiagnostics) {
+          const references = [...failureDiagnostics.references];
+          let secondaryIssue = '';
+          try {
+            references.push(
+              await publishEvidenceInput(request, {
+                source: 'stream',
+                kind: 'other',
+                content: textEvidence(fullFailureText(manifestError)),
+              }),
+            );
+          } catch (archiveError) {
+            secondaryIssue = `; Secondary diagnostic archive failed (${privateFailureSummary(archiveError)})`;
+          }
+          failureDiagnostics = {
+            schema: 1,
+            status: 'archive-failed',
+            references,
+            message: boundedFailureMessage(
+              `${failureDiagnostics.status === 'archive-failed' ? failureDiagnostics.message + '; ' : ''}Workspace manifest failed (${privateFailureSummary(manifestError)})${secondaryIssue}`,
+            ),
+          };
+        } else
+          failure = new Error(
+            `${boundedFailureMessage(error)}; workspace manifest failed: ${boundedFailureMessage(manifestError)}`,
+          );
+      }
+    } finally {
+      await stopRenewal();
     }
-    try {
-      await request.childStore.complete({
-        taskId: claimed.record.taskId,
-        owner: request.owner,
-        leaseToken: lease.token,
-        fencingEpoch: lease.fencingEpoch,
-        status: 'FAILED',
-        idempotencyKey,
-        result: null,
-        error: boundedFailureMessage(error),
-        now: now(),
-      });
-      return false;
-    } catch (completionError) {
-      if (isLeaseLoss(completionError)) return true;
-      throw completionError;
-    }
+  } finally {
+    await stopRenewal();
+  }
+  if (
+    renewalError &&
+    !(await request.childStore.cancellationRequested(claimed.record.taskId))
+  ) {
+    const { evidenceForFailure: _failureSources, ...renewalRequest } = request;
+    const renewalDiagnostics = await retainFailureDiagnostics(
+      renewalRequest,
+      claimed.assignment,
+      renewalError,
+    );
+    if (failureDiagnostics && renewalDiagnostics) {
+      const references = [
+        ...failureDiagnostics.references,
+        ...renewalDiagnostics.references,
+      ];
+      const issues = [failureDiagnostics, renewalDiagnostics]
+        .filter((item) => item.status === 'archive-failed')
+        .map((item) => (item.status === 'archive-failed' ? item.message : ''));
+      failureDiagnostics =
+        issues.length > 0
+          ? {
+              schema: 1,
+              status: 'archive-failed',
+              references,
+              message: boundedFailureMessage(issues.join('; ')),
+            }
+          : {
+              schema: 1,
+              status: 'retained',
+              references: references as [
+                WorkerEvidenceReference,
+                ...WorkerEvidenceReference[],
+              ],
+            };
+    } else failureDiagnostics = renewalDiagnostics;
+    failure = failed
+      ? new Error(
+          `${boundedFailureMessage(failure)}; lease renewal failed: ${boundedFailureMessage(renewalError)}`,
+        )
+      : renewalError;
+    failed = true;
   }
   try {
+    assert(failed || result, 'Successful child result is missing.');
     await request.childStore.complete({
       taskId: claimed.record.taskId,
       owner: request.owner,
       leaseToken: lease.token,
       fencingEpoch: lease.fencingEpoch,
-      status: workerStatus(result.status),
+      status: failed ? 'FAILED' : workerStatus(result!.status),
       idempotencyKey,
-      result,
-      error: null,
+      result: failed ? null : result,
+      error: failed
+        ? failureProjection(request, failure, failureDiagnostics)
+        : null,
+      ...(failureDiagnostics === undefined ? {} : { failureDiagnostics }),
       now: now(),
     });
     return false;
@@ -989,6 +1297,12 @@ export async function executeRestartableParallelWorkers(
   assertText(request.revision, 'Revision');
   assertText(request.owner, 'Owner');
   assertLeaseMs(request.leaseMs);
+  if (request.failureDiagnostics?.mode === 'required') {
+    assert(
+      request.evidenceStore?.putStream && request.evidenceStore.verifyPortable,
+      'Complete diagnostics require streaming evidence publication and verification before child claim.',
+    );
+  }
   if (request.leaseRenewal) {
     assertLeaseRenewalInterval(request.leaseRenewal.intervalMs);
   }
@@ -1186,6 +1500,7 @@ export async function executeRestartableParallelWorkers(
         });
         continue;
       }
+      await verifyChildTaskEvidence(request, record);
       await verifyWorkspaceManifest(request, assignment, record);
       finalTasks.push(record);
       const pendingTask = pendingForRecord(

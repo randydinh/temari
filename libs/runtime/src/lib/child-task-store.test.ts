@@ -4,7 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { FileChildTaskStore } from './child-task-store.js';
+import {
+  FileChildTaskStore,
+  childFailureDiagnosticsFromEvent,
+  type ChildFailureDiagnostics,
+} from './child-task-store.js';
 
 test('creates child tasks idempotently and binds their parent graph', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-child-task-store-'));
@@ -1047,3 +1051,173 @@ function setFailureInjection(stage: FailureInjectionStage | null): void {
   };
   constructor.failureInjection = stage;
 }
+
+test('diagnostic completion binds idempotency, retry history, cancellation requested values, and legacy absence', async (t) => {
+  for (const cancelled of [false, true])
+    await t.test(
+      cancelled ? 'cancellation request' : 'failed retry history',
+      async () => {
+        const root = await mkdtemp(join(tmpdir(), 'temari-child-diagnostics-'));
+        try {
+          const store = await FileChildTaskStore.create(root);
+          const taskId = 'diagnostic-child';
+          const runId = 'diagnostic-run';
+          const revision = 'revision-1';
+          await store.create({
+            taskId,
+            runId,
+            revision,
+            dependsOn: [],
+            actor: 'coordinator',
+          });
+          const claim = await store.claim({
+            taskId,
+            owner: 'worker-a',
+            leaseMs: 30_000,
+          });
+          const diagnostics: ChildFailureDiagnostics = {
+            schema: 1,
+            status: 'retained',
+            references: [
+              {
+                schema: 1,
+                runId,
+                revision,
+                kind: 'stderr',
+                sha256: 'a'.repeat(64),
+                bytes: 16_777_217,
+              },
+            ],
+          };
+          const completion = {
+            taskId,
+            owner: 'worker-a',
+            leaseToken: claim.record.lease!.token,
+            fencingEpoch: claim.record.lease!.fencingEpoch,
+            status: 'FAILED' as const,
+            error: 'original failure',
+            idempotencyKey: 'complete-diagnostic',
+            failureDiagnostics: diagnostics,
+          };
+          await assert.rejects(
+            store.complete({
+              ...completion,
+              failureDiagnostics: {
+                schema: 1,
+                status: 'retained',
+                references: [],
+              } as unknown as ChildFailureDiagnostics,
+            }),
+            /require evidence/,
+          );
+          await assert.rejects(
+            store.complete({
+              ...completion,
+              failureDiagnostics: {
+                ...diagnostics,
+                references: [
+                  { ...diagnostics.references[0]!, runId: 'wrong-run' },
+                ],
+              },
+            }),
+            /run changed/,
+          );
+          if (cancelled)
+            await store.cancel({
+              taskId,
+              actor: 'coordinator',
+              idempotencyKey: 'cancel-diagnostic',
+            });
+          const completed = await store.complete(completion);
+          assert.equal(completed.status, cancelled ? 'CANCELLED' : 'FAILED');
+          assert.deepEqual(await store.complete(completion), completed);
+          await assert.rejects(
+            store.complete({
+              ...completion,
+              failureDiagnostics: {
+                ...diagnostics,
+                references: [{ ...diagnostics.references[0]!, bytes: 1 }],
+              },
+            }),
+            /diagnostics changed/,
+          );
+          await assert.rejects(
+            store.complete({ ...completion, failureDiagnostics: undefined }),
+            /diagnostics changed/,
+          );
+          const terminal = (await store.events(taskId)).at(-1)!;
+          assert.deepEqual(
+            childFailureDiagnosticsFromEvent(
+              terminal,
+              cancelled ? 'requestFailureDiagnostics' : 'failureDiagnostics',
+            ),
+            diagnostics,
+          );
+          if (cancelled) {
+            assert.equal(Object.hasOwn(completed, 'failureDiagnostics'), false);
+            assert.equal(childFailureDiagnosticsFromEvent(terminal), undefined);
+          } else {
+            const queued = await store.retry({
+              taskId,
+              actor: 'coordinator',
+              idempotencyKey: 'retry-diagnostic',
+            });
+            assert.equal(Object.hasOwn(queued, 'failureDiagnostics'), false);
+            const retry = (await store.events(taskId)).at(-1)!;
+            assert.deepEqual(
+              childFailureDiagnosticsFromEvent(retry),
+              diagnostics,
+            );
+            assert.equal(
+              retry.payload.fencingEpoch,
+              terminal.payload.fencingEpoch,
+            );
+            const historyPath = join(root, `${taskId}.events.jsonl`);
+            const history = await readFile(historyPath, 'utf8');
+            const events = history
+              .trim()
+              .split('\n')
+              .map((line) => JSON.parse(line));
+            events[events.length - 1].payload.failureDiagnosticsDigest =
+              'b'.repeat(64);
+            await writeFile(
+              historyPath,
+              events.map((event) => JSON.stringify(event)).join('\n') + '\n',
+            );
+            await assert.rejects(
+              store.reconcile(taskId),
+              /history digest changed/,
+            );
+            await writeFile(historyPath, history);
+            assert.deepEqual(await store.reconcile(taskId), queued);
+            const next = await store.claim({
+              taskId,
+              owner: 'worker-a',
+              leaseMs: 30_000,
+            });
+            const legacy = await store.complete({
+              taskId,
+              owner: 'worker-a',
+              leaseToken: next.record.lease!.token,
+              fencingEpoch: next.record.lease!.fencingEpoch,
+              status: 'FAILED',
+              error: 'legacy failure',
+              idempotencyKey: 'legacy-complete',
+            });
+            assert.equal(Object.hasOwn(legacy, 'failureDiagnostics'), false);
+            const legacyEvent = (await store.events(taskId)).at(-1)!;
+            assert.equal(
+              Object.hasOwn(legacyEvent.payload, 'failureDiagnostics'),
+              false,
+            );
+            assert.equal(
+              Object.hasOwn(legacyEvent.payload, 'failureDiagnosticsDigest'),
+              false,
+            );
+          }
+        } finally {
+          await rm(root, { recursive: true, force: true });
+        }
+      },
+    );
+});
