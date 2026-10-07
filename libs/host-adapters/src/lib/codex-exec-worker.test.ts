@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { test } from 'node:test';
-import { chmod, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import {
+  chmod,
+  mkdtemp,
+  readFile,
+  writeFile,
+  open,
+  stat,
+  rm,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -70,6 +79,58 @@ test('missing executable fails before process launch', async () => {
     () => resolveCodexExecutable('/no/such/codex-executable'),
     /missing or not executable/,
   );
+});
+
+test('retains an actual start observation while the independently launched worker is still running', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-worker-start-'));
+  const executable = join(root, 'fake-codex');
+  await writeFile(
+    executable,
+    `#!/usr/bin/env node
+const fs=require('node:fs'), args=process.argv.slice(2);process.stdin.resume();process.stdin.on('end',()=>setTimeout(()=>fs.writeFileSync(args[args.indexOf('--output-last-message')+1],JSON.stringify({status:'PASS',summary:'completed'})),500));
+`,
+  );
+  await chmod(executable, 0o755);
+  let completed = false;
+  const running = runCodexExecWorker(assignment, {
+    executable,
+    workspaceRoot: root,
+    evidenceDirectory: join(root, 'evidence'),
+    timeoutMs: 5000,
+  }).then((result) => {
+    completed = true;
+    return result;
+  });
+  let start: {
+    pid: number;
+    startedAt: string;
+    assignmentId: string;
+    workspaceRoot: string;
+    executable: string;
+  } | null = null;
+  for (let attempt = 0; attempt < 50 && !start; attempt++) {
+    try {
+      start = JSON.parse(
+        await readFile(join(root, 'evidence', 'process-start.json'), 'utf8'),
+      );
+    } catch {}
+    if (!start) await new Promise((done) => setTimeout(done, 10));
+  }
+  assert(start && start.pid > 0 && start.pid !== process.pid);
+  assert.equal(completed, false);
+  assert.equal(start.assignmentId, assignment.id);
+  assert.equal(start.workspaceRoot, root);
+  assert.equal(start.executable, executable);
+  await assert.rejects(
+    readFile(join(root, 'evidence', 'process.json')),
+    /ENOENT/,
+  );
+  assert.equal((await running).status, 'PASS');
+  const terminal = JSON.parse(
+    await readFile(join(root, 'evidence', 'process.json'), 'utf8'),
+  );
+  assert.equal(terminal.pid, start.pid);
+  assert.equal(terminal.startedAt, start.startedAt);
 });
 
 test('write worker Git commands use its clone despite inherited Git routing variables', async () => {
@@ -151,4 +212,108 @@ process.stdin.on('end', () => {
     }).trim(),
     'owned.txt',
   );
+});
+
+const diagnosticStdoutPrefix = 'PRIVATE_STDOUT_SENTINEL:';
+const diagnosticStderrPrefix = 'PRIVATE_STDERR_SENTINEL:';
+function diagnosticHash(prefix: string, value: number): string {
+  const hashing = createHash('sha256').update(prefix);
+  const chunk = Buffer.alloc(65_536, value);
+  for (let index = 0; index < 256; index++) hashing.update(chunk);
+  return hashing.update('!').digest('hex');
+}
+async function actualDiagnosticHash(path: string): Promise<string> {
+  const hashing = createHash('sha256');
+  const file = await open(path, 'r');
+  try {
+    for await (const chunk of file.createReadStream({ autoClose: false }))
+      hashing.update(chunk);
+  } finally {
+    await file.close();
+  }
+  return hashing.digest('hex');
+}
+async function assertLargeDiagnostic(
+  path: string,
+  stderr = false,
+): Promise<void> {
+  const prefix = stderr ? diagnosticStderrPrefix : diagnosticStdoutPrefix;
+  assert.equal((await stat(path)).size, 16_777_217 + Buffer.byteLength(prefix));
+  assert.equal(
+    await actualDiagnosticHash(path),
+    diagnosticHash(prefix, stderr ? 122 : 97),
+  );
+}
+
+test('Codex adapter retains both full raw streams on normal and nonzero exits beyond 16 MiB', async (t) => {
+  for (const code of [0, 7])
+    await t.test(`exit ${code}`, async () => {
+      const root = await mkdtemp(join(tmpdir(), 'temari-codex-large-'));
+      try {
+        const executable = join(root, 'fake-codex');
+        await writeFile(
+          executable,
+          `#!/usr/bin/env node
+const fs=require('node:fs'),args=process.argv.slice(2),final=args[args.indexOf('--output-last-message')+1];
+const emit=async(stream,value,prefix)=>{await new Promise((d,r)=>stream.write(prefix,e=>e?r(e):d()));const chunk=Buffer.alloc(65536,value);for(let n=0;n<256;n++)await new Promise((d,r)=>stream.write(chunk,e=>e?r(e):d()));await new Promise((d,r)=>stream.write('!',e=>e?r(e):d()));};
+process.stdin.resume();process.stdin.on('end',()=>{fs.writeFileSync(final,JSON.stringify({status:'PASS',summary:'known result'}));Promise.all([emit(process.stdout,97,'PRIVATE_STDOUT_SENTINEL:'),emit(process.stderr,122,'PRIVATE_STDERR_SENTINEL:')]).then(()=>process.exit(${code}));});
+`,
+        );
+        await chmod(executable, 0o755);
+        const evidenceDirectory = join(root, 'evidence');
+        const result = await runCodexExecWorker(assignment, {
+          executable,
+          workspaceRoot: root,
+          evidenceDirectory,
+          timeoutMs: 10000,
+          finalResponseLimitBytes: 1024,
+        });
+        assert.equal(result.status, code === 0 ? 'PASS' : 'BLOCKED');
+        assert(!JSON.stringify(result).includes('PRIVATE_STD'));
+        await assertLargeDiagnostic(join(evidenceDirectory, 'stdout.jsonl'));
+        await assertLargeDiagnostic(
+          join(evidenceDirectory, 'stderr.log'),
+          true,
+        );
+        const observed = JSON.parse(
+          await readFile(join(evidenceDirectory, 'process.json'), 'utf8'),
+        );
+        assert.equal(observed.outputLimitExceeded, false);
+        assert.equal(observed.captureComplete, true);
+        assert.equal(
+          observed.stdoutSha256,
+          diagnosticHash(diagnosticStdoutPrefix, 97),
+        );
+        assert.equal(
+          observed.stderrSha256,
+          diagnosticHash(diagnosticStderrPrefix, 122),
+        );
+        const start = JSON.parse(
+          await readFile(join(evidenceDirectory, 'process-start.json'), 'utf8'),
+        );
+        assert.equal(observed.pid, start.pid);
+        assert.equal(observed.startedAt, start.startedAt);
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    });
+});
+
+test('final-response and legacy alias conflict is rejected before process launch', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-codex-alias-'));
+  try {
+    await assert.rejects(
+      runCodexExecWorker(assignment, {
+        executable: '/unused',
+        workspaceRoot: root,
+        evidenceDirectory: join(root, 'evidence'),
+        timeoutMs: 1000,
+        outputLimitBytes: 100,
+        finalResponseLimitBytes: 200,
+      }),
+      /conflict/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });

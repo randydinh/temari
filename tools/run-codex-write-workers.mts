@@ -9,6 +9,7 @@ import {
   realpath,
   stat,
   writeFile,
+  open,
 } from 'node:fs/promises';
 import {
   basename,
@@ -28,14 +29,22 @@ import {
 } from '../libs/contracts/src/index.js';
 import {
   resolveCodexExecutable,
+  runProcessToFiles,
+  retainProcessDiagnostic,
   runCodexExecWriteWorker,
   type CodexWriteOwnedPath,
+  type CapturedStream,
+  type CapturedProcessDiagnostic,
 } from '../libs/host-adapters/src/index.js';
 import {
   preflightParallelWorkers,
   runParallelWorkers,
   type ParallelWorkerReceipt,
 } from '../libs/workflow-engine/src/index.js';
+import {
+  WorkerExecutionFailure,
+  streamEvidenceFile,
+} from '../libs/runtime/src/index.js';
 
 export type OwnedPath = CodexWriteOwnedPath;
 export interface WriteAssignment {
@@ -56,6 +65,7 @@ export interface WriteRunRequest {
   readonly executable: string;
   readonly timeoutMs: number;
   readonly outputLimitBytes?: number;
+  readonly finalResponseLimitBytes?: number;
   readonly prepare?: readonly CommandSpec[];
   readonly verify: readonly CommandSpec[];
   readonly assignments: readonly WriteAssignment[];
@@ -91,7 +101,30 @@ export interface WriteRunReceipt {
     args: readonly string[];
     code: number | null;
     logPath: string;
+    capture?: {
+      readonly complete: boolean;
+      readonly error: string | null;
+      readonly stdout: CapturedStream;
+      readonly stderr: CapturedStream;
+      readonly diagnostics: readonly CapturedProcessDiagnostic[];
+      readonly evidencePaths: readonly string[];
+      readonly transcript?: CapturedProcessDiagnostic | null;
+    };
   }[];
+}
+/** Legacy receipts carry only their combined transcript; new captures also
+ * identify available raw and operational sources without parsing error prose. */
+export function verificationEvidencePaths(
+  receipt: WriteRunReceipt,
+): readonly string[] {
+  return receipt.verification.flatMap((command) => [
+    ...(command.capture && 'transcript' in command.capture
+      ? command.capture.transcript
+        ? [command.logPath]
+        : []
+      : [command.logPath]),
+    ...(command.capture?.evidencePaths ?? []),
+  ]);
 }
 const gitEnv = {
   ...Object.fromEntries(
@@ -218,6 +251,20 @@ export function parseWriteRunRequest(value: unknown): WriteRunRequest {
     item.outputLimitBytes === undefined
       ? undefined
       : numberIn(item.outputLimitBytes, 'outputLimitBytes', 16 * 1024 * 1024);
+  const finalResponseLimitBytes =
+    item.finalResponseLimitBytes === undefined
+      ? undefined
+      : numberIn(
+          item.finalResponseLimitBytes,
+          'finalResponseLimitBytes',
+          16 * 1024 * 1024,
+        );
+  if (
+    outputLimitBytes !== undefined &&
+    finalResponseLimitBytes !== undefined &&
+    outputLimitBytes !== finalResponseLimitBytes
+  )
+    throw new Error('outputLimitBytes and finalResponseLimitBytes conflict.');
   if (
     typeof item.executable !== 'string' ||
     !item.executable.trim() ||
@@ -264,6 +311,9 @@ export function parseWriteRunRequest(value: unknown): WriteRunRequest {
     timeoutMs,
     executable: item.executable,
     outputLimitBytes,
+    ...(finalResponseLimitBytes === undefined
+      ? {}
+      : { finalResponseLimitBytes }),
     prepare: (item.prepare ?? []).map(command),
     verify: item.verify.map(command),
     assignments,
@@ -275,7 +325,7 @@ function killGroup(pid: number | undefined): void {
     process.kill(process.platform === 'win32' ? pid : -pid, 'SIGKILL');
   } catch {}
 }
-async function runArgv(
+async function runBufferedSemanticCommand(
   program: string,
   args: readonly string[],
   cwd: string,
@@ -352,7 +402,14 @@ async function checked(
   signal?: AbortSignal,
   input?: Buffer,
 ): Promise<Buffer> {
-  const result = await runArgv(program, args, cwd, timeoutMs, signal, input);
+  const result = await runBufferedSemanticCommand(
+    program,
+    args,
+    cwd,
+    timeoutMs,
+    signal,
+    input,
+  );
   if (
     result.code !== 0 ||
     result.timedOut ||
@@ -695,36 +752,181 @@ export async function integrateWriteWorkerPatches(
         throw new Error('Integration candidate contains untracked files.');
       await onPhase?.('verifying');
       for (const [index, command] of request.verify.entries()) {
-        const output = await runArgv(
-          command.program,
-          command.args,
-          integrationPath,
-          command.timeoutMs ?? 120000,
-          signal,
-        );
         const logPath = join(runPath, `verify-${index}.log`);
-        await writeFile(
-          logPath,
-          Buffer.concat([
-            output.stdout,
-            Buffer.from('\n--- stderr ---\n'),
-            output.stderr,
-          ]),
-          { mode: 0o600 },
-        );
-        verification.push({
+        const stdoutPath = join(runPath, `verify-${index}.stdout.log`);
+        const stderrPath = join(runPath, `verify-${index}.stderr.log`);
+        const output = await runProcessToFiles({
+          program: command.program,
+          args: command.args,
+          cwd: integrationPath,
+          timeoutMs: command.timeoutMs ?? 120000,
+          signal,
+          stdoutPath,
+          stderrPath,
+          env: gitEnv,
+        });
+        const diagnosticPaths: string[] = [];
+        for (const diagnostic of output.diagnostics) {
+          try {
+            if ((await lstat(diagnostic.path)).isFile())
+              diagnosticPaths.push(diagnostic.path);
+          } catch {}
+        }
+        const evidencePaths = [
+          ...(output.stdout.available ? [stdoutPath] : []),
+          ...(output.stderr.available ? [stderrPath] : []),
+          ...diagnosticPaths,
+        ];
+        const entry: WriteRunReceipt['verification'][number] = {
           program: command.program,
           args: command.args,
           code: output.code,
           logPath,
-        });
+          capture: {
+            complete: output.captureComplete,
+            error: output.error,
+            stdout: output.stdout,
+            stderr: output.stderr,
+            diagnostics: output.diagnostics,
+            evidencePaths,
+            transcript: null,
+          },
+        };
+        verification.push(entry);
+        if (!output.stdout.available || !output.stderr.available)
+          throw new WorkerExecutionFailure(
+            `Verification command ${index} capture setup failed.`,
+            {
+              complete: false,
+              reason: 'Verification capture setup was incomplete.',
+              evidence: evidencePaths.map((path) => ({
+                source: 'stream',
+                kind: 'verification',
+                content: streamEvidenceFile(path, runPath),
+              })),
+            },
+          );
+        const assemblyCauses: unknown[] = [];
+        let transcript: Awaited<ReturnType<typeof open>> | undefined;
+        try {
+          transcript = await open(logPath, 'wx', 0o600);
+          for (const path of [stdoutPath, stderrPath]) {
+            if (path === stderrPath)
+              await transcript.writeFile('\n--- stderr ---\n');
+            const source = await open(path, 'r');
+            try {
+              for await (const chunk of source.createReadStream({
+                autoClose: false,
+              }))
+                await transcript.writeFile(chunk);
+            } catch (cause) {
+              assemblyCauses.push(cause);
+            } finally {
+              try {
+                await source.close();
+              } catch (cause) {
+                assemblyCauses.push(cause);
+              }
+            }
+            if (assemblyCauses.length) break;
+          }
+          await transcript.sync();
+        } catch (cause) {
+          assemblyCauses.push(cause);
+        } finally {
+          if (transcript) {
+            try {
+              await transcript.close();
+            } catch (cause) {
+              assemblyCauses.push(cause);
+            }
+          }
+        }
+        let transcriptIdentity: CapturedProcessDiagnostic | null = null;
+        try {
+          if ((await lstat(logPath)).isFile()) {
+            const hash = createHash('sha256');
+            let bytes = 0;
+            for await (const chunk of streamEvidenceFile(logPath, runPath)) {
+              bytes += chunk.byteLength;
+              hash.update(chunk);
+            }
+            transcriptIdentity = {
+              category: 'verification-transcript',
+              path: logPath,
+              status: assemblyCauses.length ? 'capture-failed' : 'complete',
+              bytes,
+              sha256: hash.digest('hex'),
+              error: assemblyCauses.length
+                ? 'Verification transcript capture failed.'
+                : null,
+            };
+          }
+        } catch (cause) {
+          assemblyCauses.push(cause);
+        }
+        const assemblyDiagnostics: CapturedProcessDiagnostic[] = [];
+        for (const [causeIndex, cause] of assemblyCauses.entries()) {
+          const diagnostic = await retainProcessDiagnostic(
+            join(
+              runPath,
+              `verify-${index}.transcript-failure-${causeIndex}.log`,
+            ),
+            'verification-transcript',
+            cause,
+          );
+          assemblyDiagnostics.push(diagnostic);
+          try {
+            if ((await lstat(diagnostic.path)).isFile())
+              evidencePaths.push(diagnostic.path);
+          } catch {}
+        }
+        entry.capture = {
+          ...entry.capture!,
+          complete: output.captureComplete && assemblyCauses.length === 0,
+          error: assemblyCauses.length
+            ? 'Verification transcript capture failed.'
+            : output.error,
+          diagnostics: [...output.diagnostics, ...assemblyDiagnostics],
+          transcript: transcriptIdentity,
+        };
+        if (assemblyCauses.length)
+          throw new WorkerExecutionFailure(
+            `Verification command ${index} transcript capture failed.`,
+            {
+              complete: false,
+              reason: 'Verification transcript capture was incomplete.',
+              evidence: [
+                ...(transcriptIdentity ? [logPath] : []),
+                ...evidencePaths,
+              ].map((path) => ({
+                source: 'stream',
+                kind: 'verification',
+                content: streamEvidenceFile(path, runPath),
+              })),
+            },
+          );
         if (
           output.code !== 0 ||
           output.timedOut ||
           output.cancelled ||
-          output.outputLimitExceeded
+          !output.captureComplete ||
+          output.error
         )
-          throw new Error(`Verification command ${index} failed.`);
+          throw new WorkerExecutionFailure(
+            `Verification command ${index} failed (exit=${output.code}, timeout=${output.timedOut}, capture=${output.captureComplete}).`,
+            {
+              complete: output.captureComplete,
+              reason: output.captureComplete
+                ? undefined
+                : 'Verification diagnostic capture was incomplete.',
+              evidence: [logPath, ...evidencePaths].map((path) => ({
+                source: 'stream',
+                kind: 'verification',
+                content: streamEvidenceFile(path, runPath),
+              })),
+            },
+          );
       }
       const after = await git(
         ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
@@ -930,6 +1132,7 @@ export async function runCodexWriteWorkersRequest(
           evidenceDirectory: evidenceDir,
           timeoutMs: request.timeoutMs,
           outputLimitBytes: request.outputLimitBytes,
+          finalResponseLimitBytes: request.finalResponseLimitBytes,
           signal,
           baseCommit: request.baseCommit,
           owns: entry.owns,
