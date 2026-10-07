@@ -1,4 +1,9 @@
 import assert from 'node:assert/strict';
+import {
+  retainDashboardDiagnostic,
+  verifyDashboardDiagnostics,
+  type DashboardDiagnostic,
+} from './dashboard-diagnostics.mjs';
 import { execFile, spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import {
@@ -32,6 +37,10 @@ import {
   prepareRestartableParallelWorkers,
   FileChildTaskStore,
   FileEvidenceStore,
+  streamEvidenceFile,
+  verifyEvidenceFile,
+  verifyChildTaskEvidence,
+  WorkerExecutionFailure,
   FileParallelWorkerReceiptStore,
   type ChildTaskRecord,
   type ChildTaskEvent,
@@ -44,6 +53,7 @@ import {
   cloneWriteWorkspace,
   prepareWriteWorkspace,
   captureWriteWorkerPatch,
+  verificationEvidencePaths,
   integrateWriteWorkerPatches,
   assertWriteCandidate,
   type WriteAssignment,
@@ -159,6 +169,7 @@ export interface DashboardImplementationSnapshot {
   readonly integrityIssue: string | null;
   readonly canCancel: boolean;
   readonly statusNote: string;
+  readonly diagnostics?: readonly DashboardDiagnostic[];
 }
 interface SealedIntegration {
   readonly receipt: WriteRunReceipt;
@@ -222,7 +233,7 @@ async function canonicalTarget(path: string): Promise<string> {
     );
   }
 }
-async function bytes(path: string): Promise<Buffer> {
+async function readBoundedRecord(path: string): Promise<Buffer> {
   const st = await lstat(path);
   assert(
     st.isFile() && !st.isSymbolicLink() && st.size <= 16 * 1024 * 1024,
@@ -232,7 +243,7 @@ async function bytes(path: string): Promise<Buffer> {
 }
 async function optional<T>(path: string): Promise<T | null> {
   try {
-    return JSON.parse((await bytes(path)).toString()) as T;
+    return JSON.parse((await readBoundedRecord(path)).toString()) as T;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw error;
@@ -259,7 +270,7 @@ async function publish(
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       if (exclusive) return false;
       assert.equal(
-        (await bytes(path)).toString(),
+        (await readBoundedRecord(path)).toString(),
         content,
         'Implementation record binding changed.',
       );
@@ -355,7 +366,7 @@ function validate(
 }
 async function load(handle: DashboardImplementationHandle): Promise<Manifest> {
   assert(isAbsolute(handle.requestPath));
-  const content = await bytes(handle.requestPath);
+  const content = await readBoundedRecord(handle.requestPath);
   assert.equal(
     sha(content),
     handle.manifestSha256,
@@ -427,7 +438,6 @@ export async function prepareDashboardImplementation(
     baseCommit,
     evidenceRoot: join(root, input.runId, input.revision),
     executable: await resolveCodexExecutable(input.executable),
-    outputLimitBytes: 1024 * 1024,
   });
   const request: DashboardImplementationRequest = {
     ...input,
@@ -532,13 +542,34 @@ async function verifyFiles(
       'Evidence escaped its assigned directory.',
     );
     assert.equal(await realpath(path), path, 'Evidence resolution changed.');
-    await store.loadPortable(reference);
-    const content = await bytes(path);
-    assert.equal(content.length, reference.bytes, 'Evidence length changed.');
-    assert.equal(sha(content), reference.sha256, 'Evidence hash changed.');
+    await store.verifyPortable(reference);
+    await verifyEvidenceFile(path, allowedRoot, reference);
   }
 }
 async function verifyResult(m: Manifest, worker: WorkerView): Promise<void> {
+  if (
+    !worker.task.result &&
+    !worker.task.failureDiagnostics &&
+    !worker.events.some(
+      (event) =>
+        event.payload.failureDiagnostics ||
+        event.payload.requestFailureDiagnostics,
+    )
+  )
+    return;
+  const childStore = await FileChildTaskStore.create(m.childStoreRoot);
+  const evidenceStore = await FileEvidenceStore.openExisting(
+    join(m.write.evidenceRoot, 'evidence'),
+  );
+  await verifyChildTaskEvidence(
+    {
+      runId: m.request.runId,
+      revision: m.request.revision,
+      childStore,
+      evidenceStore,
+    },
+    worker.task,
+  );
   if (!worker.task.result) return;
   const result = worker.task.result,
     refs = result.evidenceReferences ?? [];
@@ -551,6 +582,44 @@ async function verifyResult(m: Manifest, worker: WorkerView): Promise<void> {
     refs.map((reference, i) => ({ path: result.evidencePaths[i]!, reference })),
     join(m.write.evidenceRoot, 'workers', worker.assignment.id),
   );
+}
+async function requireWorkerTransport(
+  result: WorkerResult,
+  evidenceDirectory: string,
+): Promise<void> {
+  let observed: {
+    exitCode: number | null;
+    timedOut: boolean;
+    cancelled: boolean;
+    error: string | null;
+    captureComplete?: boolean;
+  } | null = null;
+  try {
+    observed = await optional(join(evidenceDirectory, 'process.json'));
+  } catch {}
+  if (
+    !observed ||
+    observed.timedOut ||
+    observed.error ||
+    observed.captureComplete === false ||
+    (!observed.cancelled && observed.exitCode !== 0)
+  ) {
+    throw new WorkerExecutionFailure(
+      `Worker transport failed (exit=${observed?.exitCode ?? null}, timeout=${observed?.timedOut ?? false}, capture=${Boolean(observed && observed.captureComplete !== false)}).`,
+      {
+        complete: Boolean(observed && observed.captureComplete !== false),
+        reason:
+          !observed || observed.captureComplete === false
+            ? 'Worker diagnostic capture failed.'
+            : undefined,
+        evidence: result.evidencePaths.map((path) => ({
+          source: 'stream',
+          kind: 'other',
+          content: streamEvidenceFile(path, evidenceDirectory),
+        })),
+      },
+    );
+  }
 }
 async function retainedReceipt(
   m: Manifest,
@@ -578,11 +647,11 @@ async function integration(m: Manifest): Promise<SealedIntegration | null> {
   const path = join(m.write.evidenceRoot, 'execution', 'receipt.json');
   assert.deepEqual(
     value.files.map((file) => file.path),
-    [path, ...value.receipt.verification.map((item) => item.logPath)],
+    [path, ...verificationEvidencePaths(value.receipt)],
     'Integration evidence membership changed.',
   );
   assert.deepEqual(
-    JSON.parse((await bytes(path)).toString()),
+    JSON.parse((await readBoundedRecord(path)).toString()),
     value.receipt,
     'Integration receipt changed.',
   );
@@ -615,6 +684,7 @@ export async function inspectDashboardImplementation(
   const ended = await optional<{
     nonce: string;
     workersDrained: boolean;
+    diagnostics?: readonly DashboardDiagnostic[];
     completed?: boolean;
     error: string | null;
   }>(join(root, 'ended.json'));
@@ -638,6 +708,18 @@ export async function inspectDashboardImplementation(
   };
   for (const worker of [...workers, reviewer])
     await check(() => verifyResult(m, worker), undefined);
+  if (ended?.diagnostics?.length)
+    await check(
+      async () =>
+        verifyDashboardDiagnostics(
+          await FileEvidenceStore.openExisting(join(root, 'evidence')),
+          m.request.runId,
+          m.request.revision,
+          ended.diagnostics!,
+          root,
+        ),
+      undefined,
+    );
   const receipt = await check(() => retainedReceipt(m), null);
   const reviewReceipt = await check(() => retainedReceipt(m, true), null);
   const sealed = await check(() => integration(m), null);
@@ -653,7 +735,9 @@ export async function inspectDashboardImplementation(
       )
         assert(resolved, 'Missing reviewer candidate binding.');
       if (resolved) {
-        const input = JSON.parse((await bytes(resolved)).toString());
+        const input = JSON.parse(
+          (await readBoundedRecord(resolved)).toString(),
+        );
         assert.equal(input.manifestSha256, handle.manifestSha256);
         assert.equal(
           input.revision,
@@ -761,6 +845,9 @@ export async function inspectDashboardImplementation(
           : 'prepared',
     workers,
     receipt,
+    ...(ended?.diagnostics === undefined
+      ? {}
+      : { diagnostics: ended.diagnostics }),
     integration: sealed
       ? {
           status: sealed.receipt.status,
@@ -873,7 +960,9 @@ async function readPatches(
       path.endsWith('/patch.json'),
     );
     assert(path, `Missing patch metadata for ${worker.assignment.id}.`);
-    const patch = JSON.parse((await bytes(path)).toString()) as WorkerPatch;
+    const patch = JSON.parse(
+      (await readBoundedRecord(path)).toString(),
+    ) as WorkerPatch;
     const entry = m.request.assignments.find(
       (entry) => entry.worker.id === worker.assignment.id,
     )!;
@@ -886,7 +975,7 @@ async function readPatches(
       'Patch bytes are not sealed worker evidence.',
     );
     assert.equal(
-      sha(await bytes(patch.patchPath)),
+      sha(await readBoundedRecord(patch.patchPath)),
       patch.sha256,
       'Patch digest changed.',
     );
@@ -929,6 +1018,7 @@ async function supervise(
     childStore = await FileChildTaskStore.create(m.childStoreRoot),
     evidenceStore = await FileEvidenceStore.create(join(root, 'evidence'));
   const active = new Set<Promise<unknown>>();
+  const diagnostics: DashboardDiagnostic[] = [];
   let polling: Promise<void> | null = null,
     pollError: unknown,
     failure: string | null = null,
@@ -995,13 +1085,13 @@ async function supervise(
           active.add(promise);
           return promise;
         },
-        evidenceForAssignment: async (_assignment, result) =>
-          Promise.all(
-            result.evidencePaths.map(async (path) => ({
-              kind: 'other' as const,
-              content: await bytes(path),
-            })),
-          ),
+        failureDiagnostics: { mode: 'required' },
+        evidenceForAssignment: (_assignment, result) =>
+          result.evidencePaths.map((path) => ({
+            source: 'stream' as const,
+            kind: 'other' as const,
+            content: streamEvidenceFile(path, m.write.evidenceRoot),
+          })),
       });
       if (pollError) throw pollError;
       if (
@@ -1054,11 +1144,13 @@ async function supervise(
         evidenceDirectory,
         timeoutMs: m.write.timeoutMs,
         outputLimitBytes: m.write.outputLimitBytes,
+        finalResponseLimitBytes: m.write.finalResponseLimitBytes,
         baseCommit: m.write.baseCommit,
         owns: entry.owns,
         signal: controller.signal,
       });
       if (controller.signal.aborted) return result;
+      await requireWorkerTransport(result, evidenceDirectory);
       const captured = await captureWriteWorkerPatch(
         m.write,
         entry,
@@ -1099,18 +1191,19 @@ async function supervise(
     );
     const files = [
       join(runPath, 'receipt.json'),
-      ...integrated.verification.map((item) => item.logPath),
+      ...verificationEvidencePaths(integrated),
     ];
     const sealed: SealedIntegration = {
       receipt: integrated,
       files: await Promise.all(
         files.map(async (path) => {
-          const { path: _storedPath, ...reference } = await evidenceStore.put({
-            runId: m.request.runId,
-            revision: m.request.revision,
-            kind: 'other',
-            content: await bytes(path),
-          });
+          const { path: _storedPath, ...reference } =
+            await evidenceStore.putStream({
+              runId: m.request.runId,
+              revision: m.request.revision,
+              kind: 'other',
+              content: streamEvidenceFile(path, m.write.evidenceRoot),
+            });
           return { path, reference };
         }),
       ),
@@ -1151,17 +1244,28 @@ async function supervise(
         evidenceDirectory,
         timeoutMs: m.write.timeoutMs,
         outputLimitBytes: m.write.outputLimitBytes,
+        finalResponseLimitBytes: m.write.finalResponseLimitBytes,
         signal: controller.signal,
       });
+      await requireWorkerTransport(result, evidenceDirectory);
       const evidencePaths = [...result.evidencePaths, resolvedPath];
       try {
         await assertWriteCandidate(integrationPath, revision);
       } catch (error) {
+        const diagnostic = await retainDashboardDiagnostic(
+          evidenceStore,
+          m.request.runId,
+          m.request.revision,
+          join(evidenceDirectory, 'review-candidate-failure.log'),
+          'review-candidate',
+          error,
+        );
+        diagnostics.push(diagnostic);
         return {
           ...result,
           status: 'BLOCKED',
-          summary: `Reviewer candidate changed: ${String(error)}`,
-          evidencePaths,
+          summary: `Reviewer candidate changed; ${diagnostic.summary}`,
+          evidencePaths: [...evidencePaths, diagnostic.source.path],
         };
       }
       return { ...result, evidencePaths };
@@ -1173,10 +1277,16 @@ async function supervise(
     await phase('complete');
     completed = true;
   } catch (error) {
-    failure = (error instanceof Error ? error.message : String(error)).slice(
-      0,
-      4096,
+    const diagnostic = await retainDashboardDiagnostic(
+      evidenceStore,
+      m.request.runId,
+      m.request.revision,
+      join(root, 'supervisor-failure.log'),
+      'supervisor',
+      error,
     );
+    diagnostics.push(diagnostic);
+    failure = diagnostic.summary;
     // A failed integration still resolves the already-bound reviewer through the
     // durable runtime, with no model call and no misleading queued child.
     if (!controller.signal.aborted) {
@@ -1202,7 +1312,16 @@ async function supervise(
           };
         });
       } catch (reviewError) {
-        failure += `; review resolution: ${String(reviewError).slice(0, 500)}`;
+        const diagnostic = await retainDashboardDiagnostic(
+          evidenceStore,
+          m.request.runId,
+          m.request.revision,
+          join(root, 'review-resolution-failure.log'),
+          'review-resolution',
+          reviewError,
+        );
+        diagnostics.push(diagnostic);
+        failure += `; ${diagnostic.summary}`;
       }
     }
     controller.abort(error);
@@ -1233,6 +1352,7 @@ async function supervise(
       error: failure,
       workersDrained: true,
       completed,
+      ...(diagnostics.length ? { diagnostics } : {}),
     });
   }
 }
@@ -1243,7 +1363,9 @@ if (process.argv[1] && resolve(process.argv[1]) === script) {
       'Internal implementation supervisor.',
     );
     const path = process.argv[3]!,
-      manifest = JSON.parse((await bytes(path)).toString()) as Manifest;
+      manifest = JSON.parse(
+        (await readBoundedRecord(path)).toString(),
+      ) as Manifest;
     await supervise(
       handleFor(path, manifest, process.argv[4]!),
       process.argv[5]!,

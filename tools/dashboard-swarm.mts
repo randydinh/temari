@@ -29,6 +29,10 @@ import {
   prepareRestartableParallelWorkers,
   FileChildTaskStore,
   FileEvidenceStore,
+  streamEvidenceFile,
+  verifyEvidenceFile,
+  verifyChildTaskEvidence,
+  WorkerExecutionFailure,
   FileParallelWorkerReceiptStore,
   type ChildTaskRecord,
   type ChildTaskEvent,
@@ -38,6 +42,12 @@ import {
   parseCodexWorkersRequest,
   type CodexWorkersRequest,
 } from './run-codex-workers.mjs';
+
+import {
+  retainDashboardDiagnostic,
+  verifyDashboardDiagnostics,
+  type DashboardDiagnostic,
+} from './dashboard-diagnostics.mjs';
 
 const runFile = promisify(execFile);
 const script = fileURLToPath(import.meta.url);
@@ -115,6 +125,7 @@ export interface DashboardSwarmSnapshot {
   /** Whether queued work or unconfirmed process ownership can still be cancelled. */
   readonly canCancel: boolean;
   readonly statusNote: string;
+  readonly diagnostics?: readonly DashboardDiagnostic[];
 }
 function sha(bytes: string | Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex');
@@ -150,7 +161,7 @@ async function canonicalTarget(path: string): Promise<string> {
     );
   }
 }
-async function bytes(path: string): Promise<Buffer> {
+async function readBoundedRecord(path: string): Promise<Buffer> {
   const info = await lstat(path);
   assert(
     info.isFile() && !info.isSymbolicLink() && info.size <= 4 * 1024 * 1024,
@@ -160,7 +171,7 @@ async function bytes(path: string): Promise<Buffer> {
 }
 async function optional<T>(path: string): Promise<T | null> {
   try {
-    return JSON.parse((await bytes(path)).toString('utf8')) as T;
+    return JSON.parse((await readBoundedRecord(path)).toString('utf8')) as T;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw error;
@@ -187,7 +198,7 @@ async function publish(
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       if (exclusive) return false;
       assert.equal(
-        (await bytes(path)).toString(),
+        (await readBoundedRecord(path)).toString(),
         content,
         'Swarm record binding changed.',
       );
@@ -262,7 +273,7 @@ async function load(handle: DashboardSwarmHandle): Promise<Manifest> {
     isAbsolute(handle.requestPath),
     'Swarm request path must be absolute.',
   );
-  const content = await bytes(handle.requestPath);
+  const content = await readBoundedRecord(handle.requestPath);
   assert.equal(
     sha(content),
     handle.manifestSha256,
@@ -330,7 +341,6 @@ export async function prepareDashboardSwarm(
     workspaceRoot,
     evidenceRoot: join(root, input.runId, input.revision),
     executable: await resolveCodexExecutable(input.executable),
-    outputLimitBytes: 1024 * 1024,
   });
   const plan = reconcilePlan({
     workType: 'investigation',
@@ -373,6 +383,7 @@ export async function inspectDashboardSwarm(
     nonce: string;
     error: string | null;
     workersDrained?: boolean;
+    diagnostics?: readonly DashboardDiagnostic[];
   }>(join(request.evidenceRoot, 'ended.json'));
   const receiptStore = await FileParallelWorkerReceiptStore.create(
     join(request.evidenceRoot, 'receipts'),
@@ -411,11 +422,48 @@ export async function inspectDashboardSwarm(
     }),
   );
   const integrityIssues: string[] = [];
+  if (ended?.diagnostics?.length) {
+    try {
+      await verifyDashboardDiagnostics(
+        await FileEvidenceStore.openExisting(
+          join(request.evidenceRoot, 'evidence'),
+        ),
+        request.runId,
+        request.revision,
+        ended.diagnostics,
+        request.evidenceRoot,
+      );
+    } catch {
+      integrityIssues.push('Supervisor diagnostic evidence did not verify.');
+    }
+  }
   // A child result is advisory, but the findings we present must still match
   // their retained bytes. Check both the portable store and the linked files.
-  for (const { assignment, task } of workers) {
-    if (!task.result) continue;
+  for (const { assignment, task, events } of workers) {
+    if (
+      !task.result &&
+      !task.failureDiagnostics &&
+      !events.some(
+        (event) =>
+          event.payload.failureDiagnostics ||
+          event.payload.requestFailureDiagnostics,
+      )
+    )
+      continue;
     try {
+      const diagnosticStore = await FileEvidenceStore.openExisting(
+        join(request.evidenceRoot, 'evidence'),
+      );
+      await verifyChildTaskEvidence(
+        {
+          runId: request.runId,
+          revision: request.revision,
+          childStore,
+          evidenceStore: diagnosticStore,
+        },
+        task,
+      );
+      if (!task.result) continue;
       const references = task.result.evidenceReferences ?? [];
       assert(
         references.length > 0,
@@ -440,27 +488,12 @@ export async function inspectDashboardSwarm(
           request.revision,
           'Worker evidence revision changed.',
         );
-        await evidenceStore.loadPortable(reference);
+        await evidenceStore.verifyPortable(reference);
         const path: string = task.result.evidencePaths[index]!;
-        assert(
-          inside(join(request.evidenceRoot, 'workers', assignment.id), path),
-          'Worker evidence escaped its assignment.',
-        );
-        assert.equal(
-          await realpath(path),
+        await verifyEvidenceFile(
           path,
-          'Worker evidence resolution changed.',
-        );
-        const content = await bytes(path);
-        assert.equal(
-          content.length,
-          reference.bytes,
-          'Worker evidence byte count changed.',
-        );
-        assert.equal(
-          sha(content),
-          reference.sha256,
-          'Worker evidence hash changed.',
+          join(request.evidenceRoot, 'workers', assignment.id),
+          reference,
         );
       }
     } catch (error) {
@@ -514,7 +547,8 @@ export async function inspectDashboardSwarm(
       intent.at <= Date.now() + 5_000
     ) {
       state = 'STARTING';
-      statusNote = 'Launch is reserved; awaiting the supervisor’s first heartbeat.';
+      statusNote =
+        'Launch is reserved; awaiting the supervisor’s first heartbeat.';
     } else {
       state = 'RECOVERY_REQUIRED';
       statusNote =
@@ -540,6 +574,9 @@ export async function inspectDashboardSwarm(
     state,
     workers,
     receipt: retained?.receipt ?? null,
+    ...(ended?.diagnostics === undefined
+      ? {}
+      : { diagnostics: ended.diagnostics }),
     integrityIssue,
     canCancel,
     statusNote,
@@ -657,6 +694,7 @@ async function supervise(
   );
   const evidenceStore = await FileEvidenceStore.create(join(root, 'evidence'));
   const activeHandlers = new Set<Promise<unknown>>();
+  const diagnostics: DashboardDiagnostic[] = [];
   let pollInFlight: Promise<void> | null = null;
   let pollFailure: unknown;
   const poll = async (): Promise<void> => {
@@ -725,26 +763,51 @@ async function supervise(
               evidenceDirectory,
               timeoutMs: request.timeoutMs,
               outputLimitBytes: request.outputLimitBytes,
+              finalResponseLimitBytes: request.finalResponseLimitBytes,
               signal: controller.signal,
             });
-            const observed = JSON.parse(
-              (await bytes(join(evidenceDirectory, 'process.json'))).toString(),
-            ) as {
+            let observed: {
               cancelled: boolean;
               timedOut: boolean;
               outputLimitExceeded: boolean;
+              captureComplete?: boolean;
               error: string | null;
               exitCode: number | null;
-            };
+            } | null = null;
+            try {
+              observed = JSON.parse(
+                (
+                  await readBoundedRecord(
+                    join(evidenceDirectory, 'process.json'),
+                  )
+                ).toString(),
+              );
+            } catch {}
             if (
               !controller.signal.aborted &&
-              (observed.timedOut ||
+              (!observed ||
+                observed.timedOut ||
                 observed.outputLimitExceeded ||
+                observed.captureComplete === false ||
                 observed.error ||
                 observed.exitCode !== 0)
             )
-              throw new Error(
-                `Worker transport failed: ${result.summary}; evidence: ${evidenceDirectory}`,
+              throw new WorkerExecutionFailure(
+                `Worker transport failed (exit=${observed?.exitCode ?? null}, timeout=${observed?.timedOut ?? false}, capture=${Boolean(observed && observed.captureComplete !== false)}).`,
+                {
+                  complete: Boolean(
+                    observed && observed.captureComplete !== false,
+                  ),
+                  reason:
+                    !observed || observed.captureComplete === false
+                      ? 'Worker process diagnostic capture failed.'
+                      : undefined,
+                  evidence: result.evidencePaths.map((path) => ({
+                    source: 'stream',
+                    kind: 'other',
+                    content: streamEvidenceFile(path, evidenceDirectory),
+                  })),
+                },
               );
             assert.equal(
               await cleanHead(request.workspaceRoot),
@@ -759,13 +822,16 @@ async function supervise(
           activeHandlers.add(tracked);
           return tracked;
         },
-        evidenceForAssignment: async (_assignment, result) =>
-          Promise.all(
-            result.evidencePaths.map(async (path) => ({
-              kind: 'other' as const,
-              content: await bytes(path),
-            })),
-          ),
+        failureDiagnostics: { mode: 'required' },
+        evidenceForAssignment: (_assignment, result) =>
+          result.evidencePaths.map((path) => ({
+            source: 'stream' as const,
+            kind: 'other' as const,
+            content: streamEvidenceFile(
+              path,
+              join(root, 'workers', _assignment.id),
+            ),
+          })),
       });
       if (pollFailure) throw pollFailure;
       if (
@@ -778,10 +844,16 @@ async function supervise(
       if (!result.pending.some((item) => item.reason === 'queued')) break;
     }
   } catch (error) {
-    failure =
-      error instanceof Error
-        ? error.message.slice(0, 4096)
-        : String(error).slice(0, 4096);
+    const diagnostic = await retainDashboardDiagnostic(
+      evidenceStore,
+      request.runId,
+      request.revision,
+      join(root, 'supervisor-failure.log'),
+      'supervisor',
+      error,
+    );
+    diagnostics.push(diagnostic);
+    failure = diagnostic.summary;
     controller.abort(error);
   } finally {
     // A failed runtime Promise.all can leave sibling handlers active. Abort and
@@ -797,6 +869,7 @@ async function supervise(
       nonce,
       error: failure,
       workersDrained: true,
+      ...(diagnostics.length ? { diagnostics } : {}),
     });
   }
 }
@@ -808,7 +881,7 @@ if (process.argv[1] && resolve(process.argv[1]) === script) {
       'This module is an internal dashboard supervisor.',
     );
     const requestPath = process.argv[3]!;
-    const content = await bytes(requestPath);
+    const content = await readBoundedRecord(requestPath);
     const manifest = JSON.parse(content.toString()) as Manifest;
     const handle = handleFor(requestPath, manifest, process.argv[4]!);
     await supervise(handle, process.argv[5]!);

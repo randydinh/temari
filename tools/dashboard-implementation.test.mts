@@ -8,9 +8,13 @@ import {
   readFile,
   rm,
   writeFile,
+  open,
+  stat,
+  readdir,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 import { promisify } from 'node:util';
 import { FileChildTaskStore } from '../libs/runtime/src/index.js';
@@ -61,7 +65,7 @@ let prompt='';process.stdin.on('data',d=>prompt+=d);process.stdin.on('end',()=>{
  }
  setTimeout(()=>{
   fs.writeFileSync(final,JSON.stringify({status:goal==='review-issues'?'ISSUES':'PASS',summary:goal+' result'}));
-  console.log(JSON.stringify({type:'fixture.complete',goal}));
+  if(goal.startsWith('large-')){ const emit=async(stream,value,prefix)=>{await new Promise((d,r)=>stream.write(prefix,e=>e?r(e):d()));const chunk=Buffer.alloc(65536,value);for(let n=0;n<256;n++)await new Promise((d,r)=>stream.write(chunk,e=>e?r(e):d()));await new Promise((d,r)=>stream.write('!',e=>e?r(e):d()));}; Promise.all([emit(process.stdout,97,['PRIVATE','STDOUT','SENTINEL'].join('_')+':'),emit(process.stderr,122,['PRIVATE','STDERR','SENTINEL'].join('_')+':')]).then(()=>process.exit(goal==='large-exit'?7:0)); }else console.log(JSON.stringify({type:'fixture.complete',goal}));
  },goal==='alpha'?400:100);
 });
 `,
@@ -587,6 +591,13 @@ test('oversized inline verification metadata blocks reviewer launch without drop
   assert.equal(result.review?.result?.status, 'BLOCKED');
   assert.match(
     result.review!.result!.summary,
+    /supervisor failed; diagnostic retained; sha256=/,
+  );
+  assert.match(
+    await readFile(
+      join(dirname(handle.requestPath), 'supervisor-failure.log'),
+      'utf8',
+    ),
     /verification summary exceeds 16 KiB/,
   );
   assert.equal((await calls(f.root)).length, 2);
@@ -625,32 +636,47 @@ test('observed supervisor awaiting its first heartbeat stays starting only withi
 });
 
 test('a terminal marker published during a child read cannot produce an earlier reviewer snapshot', async (t) => {
-  const f = await fixture(t), input = request(f);
+  const f = await fixture(t),
+    input = request(f);
   const handle = await prepareDashboardImplementation({
     ...input,
-    verify: [{ program: process.execPath, args: ['-e', input.verify[0]!.args[1]!, 'x'.repeat(16 * 1024)] }],
+    verify: [
+      {
+        program: process.execPath,
+        args: ['-e', input.verify[0]!.args[1]!, 'x'.repeat(16 * 1024)],
+      },
+    ],
   });
   const prepared = await inspectDashboardImplementation(handle);
   await startDashboardImplementation(handle);
-  const complete = await until(handle, (s) => s.state === 'FAILED' && s.review?.result?.status === 'BLOCKED');
+  const complete = await until(
+    handle,
+    (s) => s.state === 'FAILED' && s.review?.result?.status === 'BLOCKED',
+  );
   assert.equal(complete.integration?.status, 'PASS');
   assert.equal((await calls(f.root)).length, 2);
   const root = dirname(handle.requestPath);
   const markerPath = join(root, 'ended.json');
   const marker = await readFile(markerPath);
   await rm(markerPath);
-  const pulse = JSON.parse(await readFile(join(root, 'heartbeat.json'), 'utf8'));
+  const pulse = JSON.parse(
+    await readFile(join(root, 'heartbeat.json'), 'utf8'),
+  );
   t.mock.method(Date, 'now', () => pulse.at);
   const originalLoad = FileChildTaskStore.prototype.load;
   let published = false;
-  const load = t.mock.method(FileChildTaskStore.prototype, 'load', async function (this: FileChildTaskStore, taskId: string) {
-    if (!published && taskId === prepared.review!.task.taskId) {
-      published = true;
-      await writeFile(markerPath, marker);
-      return structuredClone(prepared.review!.task);
-    }
-    return originalLoad.call(this, taskId);
-  });
+  const load = t.mock.method(
+    FileChildTaskStore.prototype,
+    'load',
+    async function (this: FileChildTaskStore, taskId: string) {
+      if (!published && taskId === prepared.review!.task.taskId) {
+        published = true;
+        await writeFile(markerPath, marker);
+        return structuredClone(prepared.review!.task);
+      }
+      return originalLoad.call(this, taskId);
+    },
+  );
   const duringPublication = await inspectDashboardImplementation(handle);
   assert(published);
   assert.equal(duringPublication.state, 'RUNNING');
@@ -661,10 +687,405 @@ test('a terminal marker published during a child read cannot produce an earlier 
   assert.equal(terminal.state, 'FAILED');
   assert.equal(terminal.integration?.status, 'PASS');
   assert.equal(terminal.review?.result?.status, 'BLOCKED');
-  assert.match(terminal.review!.result!.summary, /verification summary exceeds 16 KiB/);
+  assert.match(
+    terminal.review!.result!.summary,
+    /supervisor failed; diagnostic retained; sha256=/,
+  );
+  assert.match(
+    await readFile(
+      join(dirname(handle.requestPath), 'supervisor-failure.log'),
+      'utf8',
+    ),
+    /verification summary exceeds 16 KiB/,
+  );
   assert.equal(terminal.integrityIssue, null);
   const log = await readFile(join(root, 'supervisor.log'));
   assert.equal((await startDashboardImplementation(handle)).state, 'FAILED');
   assert.deepEqual(await readFile(join(root, 'supervisor.log')), log);
+  assert.equal((await calls(f.root)).length, 2);
+});
+
+const diagnosticStdoutPrefix = 'PRIVATE_STDOUT_SENTINEL:';
+const diagnosticStderrPrefix = 'PRIVATE_STDERR_SENTINEL:';
+function diagnosticHash(prefix: string, value: number): string {
+  const hashing = createHash('sha256').update(prefix);
+  const chunk = Buffer.alloc(65_536, value);
+  for (let index = 0; index < 256; index++) hashing.update(chunk);
+  return hashing.update('!').digest('hex');
+}
+async function actualDiagnosticHash(path: string): Promise<string> {
+  const hashing = createHash('sha256');
+  const file = await open(path, 'r');
+  try {
+    for await (const chunk of file.createReadStream({ autoClose: false }))
+      hashing.update(chunk);
+  } finally {
+    await file.close();
+  }
+  return hashing.digest('hex');
+}
+async function assertLargeDiagnostic(
+  path: string,
+  stderr = false,
+): Promise<void> {
+  const prefix = stderr ? diagnosticStderrPrefix : diagnosticStdoutPrefix;
+  assert.equal((await stat(path)).size, 16_777_217 + Buffer.byteLength(prefix));
+  assert.equal(
+    await actualDiagnosticHash(path),
+    diagnosticHash(prefix, stderr ? 122 : 97),
+  );
+}
+
+test('implementation dashboard streams large worker, reviewer and sealed verification evidence and rejects changed artifacts', async (t) => {
+  for (const failed of [false, true])
+    await t.test(
+      failed ? 'nonzero worker' : 'normal worker and verification',
+      async (sub) => {
+        const f = await fixture(sub);
+        const emitter =
+          "const emit=async(stream,value,prefix)=>{await new Promise((d,r)=>stream.write(prefix,e=>e?r(e):d()));const chunk=Buffer.alloc(65536,value);for(let n=0;n<256;n++)await new Promise((d,r)=>stream.write(chunk,e=>e?r(e):d()));await new Promise((d,r)=>stream.write('!',e=>e?r(e):d()));};";
+        const input = {
+          ...request(
+            f,
+            [failed ? 'large-exit' : 'large-pass', 'beta'],
+            'large-review',
+          ),
+          verify: [
+            {
+              program: process.execPath,
+              args: [
+                '-e',
+                emitter +
+                  "Promise.all([emit(process.stdout,97,['PRIVATE','STDOUT','SENTINEL'].join('_')+':'),emit(process.stderr,122,['PRIVATE','STDERR','SENTINEL'].join('_')+':')]).then(()=>process.exit(0));",
+              ],
+            },
+          ],
+        };
+        const handle = await prepareDashboardImplementation(input);
+        await startDashboardImplementation(handle);
+        const snapshot = await finish(handle);
+        assert.equal(
+          snapshot.state,
+          failed ? 'FAILED' : 'COMPLETE',
+          JSON.stringify(snapshot),
+        );
+        const worker = snapshot.workers[0]!;
+        assert.equal(worker.task.status, failed ? 'FAILED' : 'SUCCEEDED');
+        const directory = dirname(handle.requestPath),
+          attempts = await readdir(
+            join(directory, 'workers', worker.assignment.id),
+          ),
+          attempt = join(
+            directory,
+            'workers',
+            worker.assignment.id,
+            attempts[0]!,
+          );
+        await assertLargeDiagnostic(join(attempt, 'stdout.jsonl'));
+        await assertLargeDiagnostic(join(attempt, 'stderr.log'), true);
+        assert(!JSON.stringify(snapshot).includes('PRIVATE_STD'));
+        assert(
+          (await calls(f.root)).every(
+            (call) => !call.prompt.includes('PRIVATE_STD'),
+          ),
+        );
+        const references = failed
+          ? worker.task.failureDiagnostics!.references
+          : worker.task.result!.evidenceReferences!;
+        const reference = references.find(
+          (ref) => ref.sha256 === diagnosticHash(diagnosticStdoutPrefix, 97),
+        )!;
+        assert(reference);
+        const initialCalls = (await calls(f.root)).length;
+        assert.equal(
+          (await inspectDashboardImplementation(handle)).state,
+          snapshot.state,
+        );
+        assert.equal((await calls(f.root)).length, initialCalls);
+        if (!failed) {
+          const verification = snapshot.integration!.verification[0]!;
+          assert((await stat(verification.logPath)).size > 32 * 1024 * 1024);
+          const reviewer = snapshot.review!;
+          const reviewStdout = reviewer.task.result!.evidencePaths.find(
+            (path) => path.endsWith('stdout.jsonl'),
+          )!;
+          await assertLargeDiagnostic(reviewStdout);
+          const log = await open(verification.logPath, 'r+');
+          await log.write(Buffer.from('X'), 0, 1, 0);
+          await log.close();
+          const changed = await inspectDashboardImplementation(handle);
+          assert.equal(changed.state, snapshot.state);
+          assert(changed.integrityIssue);
+          assert.equal((await calls(f.root)).length, initialCalls);
+        } else {
+          const artifact = join(
+            directory,
+            'evidence',
+            `${reference.sha256}.artifact`,
+          );
+          const file = await open(artifact, 'r+');
+          await file.write(Buffer.from('X'), 0, 1, 0);
+          await file.close();
+          assert((await inspectDashboardImplementation(handle)).integrityIssue);
+          await rm(artifact);
+          assert((await inspectDashboardImplementation(handle)).integrityIssue);
+          assert.equal((await calls(f.root)).length, initialCalls);
+        }
+      },
+    );
+});
+
+test('failed large verification is sealed in full and its raw bytes never enter the dashboard summary', async (t) => {
+  const f = await fixture(t),
+    emitter =
+      "const emit=async(stream,value,prefix)=>{await new Promise((d,r)=>stream.write(prefix,e=>e?r(e):d()));const chunk=Buffer.alloc(65536,value);for(let n=0;n<256;n++)await new Promise((d,r)=>stream.write(chunk,e=>e?r(e):d()));await new Promise((d,r)=>stream.write('!',e=>e?r(e):d()));};";
+  const handle = await prepareDashboardImplementation({
+    ...request(f),
+    verify: [
+      {
+        program: process.execPath,
+        args: [
+          '-e',
+          emitter +
+            "Promise.all([emit(process.stdout,97,['PRIVATE','STDOUT','SENTINEL'].join('_')+':'),emit(process.stderr,122,['PRIVATE','STDERR','SENTINEL'].join('_')+':')]).then(()=>process.exit(7));",
+        ],
+      },
+    ],
+  });
+  await startDashboardImplementation(handle);
+  const snapshot = await finish(handle);
+  assert.equal(snapshot.state, 'FAILED', JSON.stringify(snapshot));
+  const verification = snapshot.integration!.verification[0]!;
+  assert.equal(verification.code, 7);
+  assert((await stat(verification.logPath)).size > 32 * 1024 * 1024);
+  assert(!JSON.stringify(snapshot).includes('PRIVATE_STD'));
+  assert.equal((await inspectDashboardImplementation(handle)).state, 'FAILED');
+});
+
+test('verification launch causes are typed, sealed, and reverified without starting the reviewer or rerunning workers', async (t) => {
+  const f = await fixture(t),
+    program = join(f.root, 'unlaunchable-verifier');
+  await writeFile(program, '#!/no/such/interpreter\n');
+  await chmod(program, 0o755);
+  const handle = await prepareDashboardImplementation({
+    ...request(f),
+    verify: [{ program, args: [] }],
+  });
+  await startDashboardImplementation(handle);
+  const snapshot = await finish(handle);
+  assert.equal(snapshot.state, 'FAILED', JSON.stringify(snapshot));
+  assert.equal((await calls(f.root)).length, 2);
+  const capture = snapshot.integration!.verification[0]!.capture!;
+  assert(capture);
+  assert(capture.error);
+  const cause = capture.diagnostics.find((item) => item.category === 'launch')!;
+  assert(cause);
+  assert(capture.evidencePaths.includes(cause.path));
+  assert.equal(await actualDiagnosticHash(cause.path), cause.sha256);
+  assert.equal(
+    (await inspectDashboardImplementation(handle)).integrityIssue,
+    null,
+  );
+  await rm(
+    join(dirname(handle.requestPath), 'evidence', `${cause.sha256}.artifact`),
+  );
+  const changed = await inspectDashboardImplementation(handle);
+  assert(changed.integrityIssue);
+  assert.equal(changed.integration, null);
+  assert.equal((await calls(f.root)).length, 2);
+});
+
+test('dashboard seals captured originals and full assembly cause after transcript write failure and refuses replay tamper', async (t) => {
+  const f = await fixture(t),
+    preload = join(f.root, 'transcript-fault.mjs');
+  await writeFile(
+    preload,
+    `import fs from 'node:fs/promises';
+import {syncBuiltinESMExports} from 'node:module';
+const open=fs.open;
+fs.open=async(...args)=>{const file=await open(...args);if(String(args[0]).endsWith('/verify-0.log'))file.writeFile=async()=>{throw ['PRIVATE','TRANSCRIPT','ASSEMBLY','SENTINEL'].join('_')+':'+ 'q'.repeat(16*1024*1024+1);};return file;};
+syncBuiltinESMExports();
+`,
+  );
+  const handle = await prepareDashboardImplementation({
+    ...request(f),
+    verify: [
+      {
+        program: process.execPath,
+        args: [
+          '-e',
+          "process.stdout.write('original stdout');process.stderr.write('original stderr');",
+        ],
+      },
+    ],
+  });
+  const before = process.env.NODE_OPTIONS;
+  process.env.NODE_OPTIONS =
+    `${before ?? ''} --import=${pathToFileURL(preload).href}`.trim();
+  try {
+    await startDashboardImplementation(handle);
+  } finally {
+    if (before === undefined) delete process.env.NODE_OPTIONS;
+    else process.env.NODE_OPTIONS = before;
+  }
+  const snapshot = await finish(handle);
+  assert.equal(snapshot.state, 'FAILED', JSON.stringify(snapshot));
+  assert.equal(snapshot.integrityIssue, null);
+  assert.equal((await calls(f.root)).length, 2);
+  const capture = snapshot.integration!.verification[0]!.capture!;
+  assert.equal(capture.complete, false);
+  assert.equal(capture.transcript!.status, 'capture-failed');
+  const cause = capture.diagnostics.find(
+    (d) => d.category === 'verification-transcript',
+  )!;
+  assert(cause);
+  const privateCause = await readFile(cause.path, 'utf8');
+  assert.equal(
+    privateCause,
+    'PRIVATE_TRANSCRIPT_ASSEMBLY_SENTINEL:' + 'q'.repeat(16 * 1024 * 1024 + 1),
+  );
+  assert.equal(cause.bytes, Buffer.byteLength(privateCause));
+  assert.equal(await readFile(capture.stdout.path, 'utf8'), 'original stdout');
+  assert.equal(await readFile(capture.stderr.path, 'utf8'), 'original stderr');
+  assert(
+    !JSON.stringify(snapshot).includes('PRIVATE_TRANSCRIPT_ASSEMBLY_SENTINEL'),
+  );
+  const root = dirname(handle.requestPath),
+    sealed = JSON.parse(await readFile(join(root, 'integration.json'), 'utf8'));
+  for (const path of [capture.stdout.path, capture.stderr.path, cause.path])
+    assert(sealed.files.some((file: { path: string }) => file.path === path));
+  assert.equal(
+    (await inspectDashboardImplementation(handle)).integrityIssue,
+    null,
+  );
+  await writeFile(capture.stdout.path, 'tampered source');
+  assert((await inspectDashboardImplementation(handle)).integrityIssue);
+  await writeFile(capture.stdout.path, 'original stdout');
+  assert.equal(
+    (await inspectDashboardImplementation(handle)).integrityIssue,
+    null,
+  );
+  await rm(join(root, 'evidence', `${cause.sha256}.artifact`));
+  assert((await inspectDashboardImplementation(handle)).integrityIssue);
+  assert.equal((await calls(f.root)).length, 2);
+});
+
+test('dashboard retains current and historical private captures when terminal worker metadata publication fails', async (t) => {
+  const f = await fixture(t),
+    preload = join(f.root, 'metadata-fault.mjs');
+  await writeFile(
+    preload,
+    `import fs from 'node:fs/promises';import {syncBuiltinESMExports} from 'node:module';
+const write=fs.writeFile;fs.writeFile=async(...args)=>{if(String(args[0]).endsWith('/process.json'))throw ['PRIVATE','METADATA','CAUSE','SENTINEL'].join('_')+':'+ 'm'.repeat(16*1024*1024+1);return write(...args);};syncBuiltinESMExports();`,
+  );
+  const handle = await prepareDashboardImplementation(request(f));
+  const before = process.env.NODE_OPTIONS;
+  process.env.NODE_OPTIONS =
+    `${before ?? ''} --import=${pathToFileURL(preload).href}`.trim();
+  try {
+    await startDashboardImplementation(handle);
+  } finally {
+    if (before === undefined) delete process.env.NODE_OPTIONS;
+    else process.env.NODE_OPTIONS = before;
+  }
+  const snapshot = await finish(handle);
+  assert.equal(snapshot.state, 'FAILED', JSON.stringify(snapshot));
+  assert.equal(snapshot.integrityIssue, null);
+  assert(!JSON.stringify(snapshot).includes('PRIVATE_METADATA_CAUSE_SENTINEL'));
+  const count = (await calls(f.root)).length;
+  const root = dirname(handle.requestPath),
+    hash = createHash('sha256')
+      .update(
+        'PRIVATE_METADATA_CAUSE_SENTINEL:' + 'm'.repeat(16 * 1024 * 1024 + 1),
+      )
+      .digest('hex');
+  const refs = snapshot.workers.flatMap(
+    (w) => w.task.failureDiagnostics?.references ?? [],
+  );
+  assert(refs.some((ref) => ref.sha256 === hash));
+  const privateArtifact = join(root, 'evidence', `${hash}.artifact`);
+  assert.equal(
+    (await stat(privateArtifact)).size,
+    16 * 1024 * 1024 +
+      1 +
+      Buffer.byteLength('PRIVATE_METADATA_CAUSE_SENTINEL:'),
+  );
+  assert.equal(
+    (await inspectDashboardImplementation(handle)).integrityIssue,
+    null,
+  );
+  await rm(privateArtifact);
+  assert((await inspectDashboardImplementation(handle)).integrityIssue);
+  assert.equal((await calls(f.root)).length, count);
+});
+
+test('detached dashboard seals available verification bootstrap spools and full cause, refusing source and portable replay tamper without rerun', async (t) => {
+  const f = await fixture(t),
+    preload = join(f.root, 'verification-bootstrap-fault.mjs');
+  await writeFile(
+    preload,
+    `import fs from 'node:fs/promises';import {syncBuiltinESMExports} from 'node:module';const open=fs.open;
+fs.open=async(...args)=>{if(String(args[0]).endsWith('/verify-0.stderr.log'))throw ['PRIVATE','VERIFICATION','SETUP'].join('_')+':'+ 'x'.repeat(16_777_217);return open(...args);};syncBuiltinESMExports();`,
+  );
+  const handle = await prepareDashboardImplementation({
+    ...request(f),
+    verify: [
+      {
+        program: process.execPath,
+        args: [
+          '-e',
+          "process.stdout.write('retained stdout');process.stderr.write('retained stderr');",
+        ],
+      },
+    ],
+  });
+  const before = process.env.NODE_OPTIONS;
+  process.env.NODE_OPTIONS =
+    `${before ?? ''} --import=${pathToFileURL(preload).href}`.trim();
+  try {
+    await startDashboardImplementation(handle);
+  } finally {
+    if (before === undefined) delete process.env.NODE_OPTIONS;
+    else process.env.NODE_OPTIONS = before;
+  }
+  const snapshot = await finish(handle);
+  assert.equal(snapshot.state, 'FAILED', JSON.stringify(snapshot));
+  assert.equal(snapshot.integrityIssue, null);
+  assert.equal((await calls(f.root)).length, 2);
+  const entry = snapshot.integration!.verification[0]!,
+    capture = entry.capture!;
+  assert.equal(capture.complete, false);
+  assert.equal(capture.transcript, null);
+  assert.equal(capture.stdout.available, true);
+  assert.equal(capture.stderr.available, false);
+  assert.equal(await readFile(capture.stdout.path, 'utf8'), '');
+  assert.equal(await stat(capture.stderr.path).catch(() => null), null);
+  const cause = capture.diagnostics.find((d) => d.category === 'launch')!;
+  assert(cause);
+  assert.equal(
+    await readFile(cause.path, 'utf8'),
+    'PRIVATE_VERIFICATION_SETUP:' + 'x'.repeat(16_777_217),
+  );
+  assert.equal(await actualDiagnosticHash(cause.path), cause.sha256);
+  assert(!JSON.stringify(snapshot).includes('PRIVATE_VERIFICATION_SETUP'));
+  const root = dirname(handle.requestPath),
+    sealed = JSON.parse(await readFile(join(root, 'integration.json'), 'utf8'));
+  assert.deepEqual(
+    sealed.files.map((f: { path: string }) => f.path),
+    [join(root, 'execution', 'receipt.json'), capture.stdout.path, cause.path],
+  );
+  assert.equal(
+    (await inspectDashboardImplementation(handle)).integrityIssue,
+    null,
+  );
+  await writeFile(capture.stdout.path, 'changed source');
+  assert((await inspectDashboardImplementation(handle)).integrityIssue);
+  await writeFile(capture.stdout.path, '');
+  assert.equal(
+    (await inspectDashboardImplementation(handle)).integrityIssue,
+    null,
+  );
+  await rm(join(root, 'evidence', `${cause.sha256}.artifact`));
+  assert((await inspectDashboardImplementation(handle)).integrityIssue);
   assert.equal((await calls(f.root)).length, 2);
 });
