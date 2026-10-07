@@ -11,12 +11,18 @@ pnpm temari:doctor
 
 `doctor` is read-only. It checks the required tools, platform support, and
 lockfiles, plus the integrity and native version of managed Archon. Run it
-after initialization on supported platforms. `init` runs the locked installations declared in
+after initialization on supported platforms. When Bun or Archon is missing,
+doctor exits 1 and prints `pnpm temari:init`. It does not install either one.
+
+`init` bootstraps pinned Bun 1.4.2 into the user-local Temari cache when that
+managed executable is missing or older than the manifest major. A later
+`pnpm temari:doctor` sees that binary with no Bun installer and no `PATH`
+export. `init` then runs the locked installations declared in
 [`dependency-manifest.json`](dependency-manifest.json):
 
 1. `pnpm install --frozen-lockfile` at the Nx workspace root.
 2. stages the packaged Poteto runtime into the user-local Temari cache and
-   runs `bun install --frozen-lockfile --ignore-scripts` there.
+   runs `bun install --frozen-lockfile --ignore-scripts` with the managed Bun.
 3. downloads the pinned Archon v0.10.1 native executable for the current
    supported OS/architecture into the versioned Temari component cache and
    verifies its published byte count and SHA-256 before publication.
