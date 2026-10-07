@@ -1,0 +1,1219 @@
+{
+  "reviewer": {
+    "id": "independent-reader",
+    "independent": true,
+    "method": "blind authored-example review against frozen scenario facts; no expectations read"
+  },
+  "bindings": {
+    "rubricSha256": "9ce1dd5d00985c75d65414ebdd11c7122fb7c7140060cdb684e46aa24480f0e0",
+    "responsesSha256": "ea37500549fe5681fbb49f19693528aae0564666dff581fc2c5b7301274eada7",
+    "fixturesSha256": "470a610375b0efccac8f9cdfbe3f39e1a40a4ca31fb577ea46cadfbf4669affb"
+  },
+  "schemaVersion": 1,
+  "assessments": [
+    {
+      "readerAnswers": {
+        "nextAction": "Check exported file.",
+        "happened": "Formulas corrected; two checks passed.",
+        "recommendation": "Continue checks; user need not act.",
+        "actor": "Assistant.",
+        "remaining": "Export/delivery check.",
+        "means": "Calculation work is done; delivery is pending."
+      },
+      "classification": "adequate",
+      "criteria": [
+        {
+          "score": 2,
+          "id": "outcome",
+          "reason": "Distinguishes corrected formulas from undelivered workbook.",
+          "evidence": [
+            {
+              "end": 182,
+              "quote": "The formulas are fixed and the two calculation checks passed. I’m checking the exported file next; the updated workbook is not ready to hand over yet. You do not need to do anything.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "evidence",
+          "reason": "Limits success to calculations and retains delivery gap.",
+          "evidence": [
+            {
+              "end": 182,
+              "quote": "The formulas are fixed and the two calculation checks passed. I’m checking the exported file next; the updated workbook is not ready to hand over yet. You do not need to do anything.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "agency",
+          "reason": "Names assistant's next check and releases user from action.",
+          "evidence": [
+            {
+              "end": 182,
+              "quote": "The formulas are fixed and the two calculation checks passed. I’m checking the exported file next; the updated workbook is not ready to hand over yet. You do not need to do anything.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "choices",
+          "reason": "No unnecessary choice; continuing checks is authorized.",
+          "evidence": [
+            {
+              "end": 182,
+              "quote": "The formulas are fixed and the two calculation checks passed. I’m checking the exported file next; the updated workbook is not ready to hand over yet. You do not need to do anything.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "plain-language",
+          "reason": "Everyday terms explain status without earlier context.",
+          "evidence": [
+            {
+              "end": 182,
+              "quote": "The formulas are fixed and the two calculation checks passed. I’m checking the exported file next; the updated workbook is not ready to hand over yet. You do not need to do anything.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "scope",
+          "reason": "Continues the requested delivery work.",
+          "evidence": [
+            {
+              "end": 182,
+              "quote": "The formulas are fixed and the two calculation checks passed. I’m checking the exported file next; the updated workbook is not ready to hand over yet. You do not need to do anything.",
+              "start": 0
+            }
+          ]
+        }
+      ],
+      "responseId": "r-1"
+    },
+    {
+      "readerAnswers": {
+        "nextAction": "No next action supplied.",
+        "happened": "Two checks passed.",
+        "recommendation": "Implicitly hand over workbook.",
+        "actor": "No actor supplied.",
+        "remaining": "Reader would infer nothing remains.",
+        "means": "Claims workbook ready."
+      },
+      "classification": "inadequate",
+      "criteria": [
+        {
+          "score": 0,
+          "id": "outcome",
+          "reason": "Claims goal completion while delivery checks remain.",
+          "evidence": [
+            {
+              "end": 54,
+              "quote": "Done—the workbook is ready. Two formula checks passed.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "evidence",
+          "reason": "Two formula checks cannot establish delivery readiness.",
+          "evidence": [
+            {
+              "end": 54,
+              "quote": "Done—the workbook is ready. Two formula checks passed.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "agency",
+          "reason": "Hides remaining checks and their actor.",
+          "evidence": [
+            {
+              "end": 54,
+              "quote": "Done—the workbook is ready. Two formula checks passed.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "choices",
+          "reason": "No irrelevant choices introduced.",
+          "evidence": [
+            {
+              "end": 54,
+              "quote": "Done—the workbook is ready. Two formula checks passed.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "plain-language",
+          "reason": "Short wording is easily understood although false.",
+          "evidence": [
+            {
+              "end": 54,
+              "quote": "Done—the workbook is ready. Two formula checks passed.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "scope",
+          "reason": "Unsupported completion ends the original task prematurely.",
+          "evidence": [
+            {
+              "end": 54,
+              "quote": "Done—the workbook is ready. Two formula checks passed.",
+              "start": 0
+            }
+          ]
+        }
+      ],
+      "responseId": "r-2"
+    },
+    {
+      "readerAnswers": {
+        "nextAction": "No action supplied.",
+        "happened": "Claims project updated despite authentication failure.",
+        "recommendation": "No grounded recovery recommendation.",
+        "actor": "No actor stated.",
+        "remaining": "No retry or sign-in stated.",
+        "means": "Contradictory update/access status."
+      },
+      "classification": "inadequate",
+      "criteria": [
+        {
+          "score": 0,
+          "id": "outcome",
+          "reason": "Update contradicts no download fact.",
+          "evidence": [
+            {
+              "end": 81,
+              "quote": "The project is updated. The access check completed, though authentication failed.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "evidence",
+          "reason": "Completed access check cannot substantiate update.",
+          "evidence": [
+            {
+              "end": 81,
+              "quote": "The project is updated. The access check completed, though authentication failed.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "agency",
+          "reason": "Does not explain sign-in and retry ownership.",
+          "evidence": [
+            {
+              "end": 81,
+              "quote": "The project is updated. The access check completed, though authentication failed.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "choices",
+          "reason": "No extra choice offered.",
+          "evidence": [
+            {
+              "end": 81,
+              "quote": "The project is updated. The access check completed, though authentication failed.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 1,
+          "id": "plain-language",
+          "reason": "Ordinary words but contradictory sentences impede understanding.",
+          "evidence": [
+            {
+              "end": 81,
+              "quote": "The project is updated. The access check completed, though authentication failed.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "scope",
+          "reason": "Claims unsupported fulfillment of download request.",
+          "evidence": [
+            {
+              "end": 81,
+              "quote": "The project is updated. The access check completed, though authentication failed.",
+              "start": 0
+            }
+          ]
+        }
+      ],
+      "responseId": "r-3"
+    },
+    {
+      "readerAnswers": {
+        "nextAction": "Sign in to existing project account.",
+        "happened": "Download stopped; files unchanged.",
+        "recommendation": "Sign in once then retry.",
+        "actor": "User signs in; assistant retries.",
+        "remaining": "Sign-in then download retry.",
+        "means": "Authentication must recover first."
+      },
+      "classification": "adequate",
+      "criteria": [
+        {
+          "score": 2,
+          "id": "outcome",
+          "reason": "Clearly distinguishes blocked download from completion.",
+          "evidence": [
+            {
+              "end": 150,
+              "quote": "The download stopped because the project account is signed out. Your files are unchanged. Sign in to that account once; then I can retry the download.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 1,
+          "id": "evidence",
+          "reason": "Failure is grounded, but signed-out cause and unchanged files are more specific than supplied facts.",
+          "evidence": [
+            {
+              "end": 150,
+              "quote": "The download stopped because the project account is signed out. Your files are unchanged. Sign in to that account once; then I can retry the download.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "agency",
+          "reason": "Specific user action precedes assistant retry.",
+          "evidence": [
+            {
+              "end": 150,
+              "quote": "The download stopped because the project account is signed out. Your files are unchanged. Sign in to that account once; then I can retry the download.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "choices",
+          "reason": "Only recovery choice is relevant and feasible.",
+          "evidence": [
+            {
+              "end": 150,
+              "quote": "The download stopped because the project account is signed out. Your files are unchanged. Sign in to that account once; then I can retry the download.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "plain-language",
+          "reason": "Account sign-in and retry are understandable.",
+          "evidence": [
+            {
+              "end": 150,
+              "quote": "The download stopped because the project account is signed out. Your files are unchanged. Sign in to that account once; then I can retry the download.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "scope",
+          "reason": "Preserves download goal without changing credentials itself.",
+          "evidence": [
+            {
+              "end": 150,
+              "quote": "The download stopped because the project account is signed out. Your files are unchanged. Sign in to that account once; then I can retry the download.",
+              "start": 0
+            }
+          ]
+        }
+      ],
+      "responseId": "r-4"
+    },
+    {
+      "readerAnswers": {
+        "nextAction": "Check delivery and permissions.",
+        "happened": "Sample columns verified.",
+        "recommendation": "Continue authorized checks.",
+        "actor": "Assistant.",
+        "remaining": "Delivery and permissions checks.",
+        "means": "Format alone cannot establish release readiness."
+      },
+      "classification": "adequate",
+      "criteria": [
+        {
+          "score": 2,
+          "id": "outcome",
+          "reason": "Separates format phase from release goal.",
+          "evidence": [
+            {
+              "end": 182,
+              "quote": "The sample has the right columns, but that only verifies its format. Delivery and permissions are still unchecked, so I cannot yet confirm release readiness. I’m checking those next.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "evidence",
+          "reason": "Explicitly names both unchecked dimensions.",
+          "evidence": [
+            {
+              "end": 182,
+              "quote": "The sample has the right columns, but that only verifies its format. Delivery and permissions are still unchecked, so I cannot yet confirm release readiness. I’m checking those next.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "agency",
+          "reason": "Assistant owns the remaining checks.",
+          "evidence": [
+            {
+              "end": 182,
+              "quote": "The sample has the right columns, but that only verifies its format. Delivery and permissions are still unchecked, so I cannot yet confirm release readiness. I’m checking those next.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "choices",
+          "reason": "No unnecessary alternatives; check recommendation fits authorization.",
+          "evidence": [
+            {
+              "end": 182,
+              "quote": "The sample has the right columns, but that only verifies its format. Delivery and permissions are still unchecked, so I cannot yet confirm release readiness. I’m checking those next.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "plain-language",
+          "reason": "Explains limitation in familiar terms.",
+          "evidence": [
+            {
+              "end": 182,
+              "quote": "The sample has the right columns, but that only verifies its format. Delivery and permissions are still unchecked, so I cannot yet confirm release readiness. I’m checking those next.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "scope",
+          "reason": "Continues the release-readiness investigation.",
+          "evidence": [
+            {
+              "end": 182,
+              "quote": "The sample has the right columns, but that only verifies its format. Delivery and permissions are still unchecked, so I cannot yet confirm release readiness. I’m checking those next.",
+              "start": 0
+            }
+          ]
+        }
+      ],
+      "responseId": "r-5"
+    },
+    {
+      "readerAnswers": {
+        "nextAction": "Reader might release report.",
+        "happened": "Sample passed.",
+        "recommendation": "Implicit release recommendation.",
+        "actor": "No actor stated.",
+        "remaining": "No remaining checks conveyed.",
+        "means": "Claims release safe everywhere."
+      },
+      "classification": "inadequate",
+      "criteria": [
+        {
+          "score": 0,
+          "id": "outcome",
+          "reason": "Conflates sample success with release readiness.",
+          "evidence": [
+            {
+              "end": 63,
+              "quote": "The sample passed, so the report is safe to release everywhere.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "evidence",
+          "reason": "Universal release safety exceeds observations.",
+          "evidence": [
+            {
+              "end": 63,
+              "quote": "The sample passed, so the report is safe to release everywhere.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "agency",
+          "reason": "Omits delivery and permission checks and ownership.",
+          "evidence": [
+            {
+              "end": 63,
+              "quote": "The sample passed, so the report is safe to release everywhere.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "choices",
+          "reason": "Release recommendation is unsupported.",
+          "evidence": [
+            {
+              "end": 63,
+              "quote": "The sample passed, so the report is safe to release everywhere.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "plain-language",
+          "reason": "Sentence is linguistically simple.",
+          "evidence": [
+            {
+              "end": 63,
+              "quote": "The sample passed, so the report is safe to release everywhere.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "scope",
+          "reason": "Premature completion abandons requested readiness assessment.",
+          "evidence": [
+            {
+              "end": 63,
+              "quote": "The sample passed, so the report is safe to release everywhere.",
+              "start": 0
+            }
+          ]
+        }
+      ],
+      "responseId": "r-6"
+    },
+    {
+      "readerAnswers": {
+        "nextAction": "Nothing requested of user.",
+        "happened": "Names-only removal claimed.",
+        "recommendation": "Names only because simplest.",
+        "actor": "Assistant acted; user bypassed.",
+        "remaining": "Rule decision and confirmation absent.",
+        "means": "Assistant selected duplicate meaning."
+      },
+      "classification": "inadequate",
+      "criteria": [
+        {
+          "score": 0,
+          "id": "outcome",
+          "reason": "Removal contradicts preserved unresolved state.",
+          "evidence": [
+            {
+              "end": 70,
+              "quote": "I chose names only and removed the older entries. That seems simplest.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "evidence",
+          "reason": "Claims unsupported deletion.",
+          "evidence": [
+            {
+              "end": 70,
+              "quote": "I chose names only and removed the older entries. That seems simplest.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "agency",
+          "reason": "Bypasses required user rule selection.",
+          "evidence": [
+            {
+              "end": 70,
+              "quote": "I chose names only and removed the older entries. That seems simplest.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "choices",
+          "reason": "Simplest does not justify removing distinct dated entries.",
+          "evidence": [
+            {
+              "end": 70,
+              "quote": "I chose names only and removed the older entries. That seems simplest.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "plain-language",
+          "reason": "Plain words make the action understandable.",
+          "evidence": [
+            {
+              "end": 70,
+              "quote": "I chose names only and removed the older entries. That seems simplest.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "scope",
+          "reason": "Unrequested rule and removal exceed authorized inspection.",
+          "evidence": [
+            {
+              "end": 70,
+              "quote": "I chose names only and removed the older entries. That seems simplest.",
+              "start": 0
+            }
+          ]
+        }
+      ],
+      "responseId": "r-7"
+    },
+    {
+      "readerAnswers": {
+        "nextAction": "Choose names alone or name/date.",
+        "happened": "Matching names with different dates found; not removed.",
+        "recommendation": "Use name/date if dates mean distinct events.",
+        "actor": "User chooses; assistant implicitly applies rule.",
+        "remaining": "User's rule choice then removal.",
+        "means": "Duplicate definition needs clarification."
+      },
+      "classification": "adequate",
+      "criteria": [
+        {
+          "score": 2,
+          "id": "outcome",
+          "reason": "Shows inspection progress and remaining ambiguity.",
+          "evidence": [
+            {
+              "end": 219,
+              "quote": "I found entries with matching names but different dates, and have not removed them. Should duplicates mean the same name, or the same name and date? I recommend name and date if separate dates represent separate events.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "evidence",
+          "reason": "Does not claim removal or settled meaning.",
+          "evidence": [
+            {
+              "end": 219,
+              "quote": "I found entries with matching names but different dates, and have not removed them. Should duplicates mean the same name, or the same name and date? I recommend name and date if separate dates represent separate events.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "agency",
+          "reason": "Specific question identifies user decision; removal follows implicitly.",
+          "evidence": [
+            {
+              "end": 219,
+              "quote": "I found entries with matching names but different dates, and have not removed them. Should duplicates mean the same name, or the same name and date? I recommend name and date if separate dates represent separate events.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "choices",
+          "reason": "Both feasible rules offered with conditional reason.",
+          "evidence": [
+            {
+              "end": 219,
+              "quote": "I found entries with matching names but different dates, and have not removed them. Should duplicates mean the same name, or the same name and date? I recommend name and date if separate dates represent separate events.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "plain-language",
+          "reason": "Concrete names and dates explain decision.",
+          "evidence": [
+            {
+              "end": 219,
+              "quote": "I found entries with matching names but different dates, and have not removed them. Should duplicates mean the same name, or the same name and date? I recommend name and date if separate dates represent separate events.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "scope",
+          "reason": "Waits for rule before changing entries.",
+          "evidence": [
+            {
+              "end": 219,
+              "quote": "I found entries with matching names but different dates, and have not removed them. Should duplicates mean the same name, or the same name and date? I recommend name and date if separate dates represent separate events.",
+              "start": 0
+            }
+          ]
+        }
+      ],
+      "responseId": "r-8"
+    },
+    {
+      "readerAnswers": {
+        "nextAction": "Continue preparation and inspection.",
+        "happened": "First chart checked.",
+        "recommendation": "Continue already authorized work.",
+        "actor": "Assistant; no user action.",
+        "remaining": "Finish two charts and label checks.",
+        "means": "Two charts remain unfinished."
+      },
+      "classification": "adequate",
+      "criteria": [
+        {
+          "score": 2,
+          "id": "outcome",
+          "reason": "Clearly separates first chart from complete three-chart request.",
+          "evidence": [
+            {
+              "end": 112,
+              "quote": "The first chart is checked. I’m finishing the other two and checking their labels; no action is needed from you.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "evidence",
+          "reason": "Claims only known first-chart inspection.",
+          "evidence": [
+            {
+              "end": 112,
+              "quote": "The first chart is checked. I’m finishing the other two and checking their labels; no action is needed from you.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "agency",
+          "reason": "Names remaining work and responsible assistant.",
+          "evidence": [
+            {
+              "end": 112,
+              "quote": "The first chart is checked. I’m finishing the other two and checking their labels; no action is needed from you.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "choices",
+          "reason": "Zero choices appropriate to authorized continuation.",
+          "evidence": [
+            {
+              "end": 112,
+              "quote": "The first chart is checked. I’m finishing the other two and checking their labels; no action is needed from you.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "plain-language",
+          "reason": "Concrete counts and labels are easy to follow.",
+          "evidence": [
+            {
+              "end": 112,
+              "quote": "The first chart is checked. I’m finishing the other two and checking their labels; no action is needed from you.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "scope",
+          "reason": "Continues original request without asking again.",
+          "evidence": [
+            {
+              "end": 112,
+              "quote": "The first chart is checked. I’m finishing the other two and checking their labels; no action is needed from you.",
+              "start": 0
+            }
+          ]
+        }
+      ],
+      "responseId": "r-9"
+    },
+    {
+      "readerAnswers": {
+        "nextAction": "Answer whether to continue.",
+        "happened": "First chart checked.",
+        "recommendation": "Optional continuation request.",
+        "actor": "User must respond; assistant waits.",
+        "remaining": "Two charts and label inspections.",
+        "means": "Two remain but work pauses for permission."
+      },
+      "classification": "inadequate",
+      "criteria": [
+        {
+          "score": 2,
+          "id": "outcome",
+          "reason": "First-chart completion is correctly bounded.",
+          "evidence": [
+            {
+              "end": 77,
+              "quote": "The first chart is checked. Would you like me to continue with the other two?",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "evidence",
+          "reason": "Does not claim unchecked charts passed.",
+          "evidence": [
+            {
+              "end": 77,
+              "quote": "The first chart is checked. Would you like me to continue with the other two?",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "agency",
+          "reason": "Unnecessarily shifts action to user despite authorization.",
+          "evidence": [
+            {
+              "end": 77,
+              "quote": "The first chart is checked. Would you like me to continue with the other two?",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "choices",
+          "reason": "Invents a permission choice already settled.",
+          "evidence": [
+            {
+              "end": 77,
+              "quote": "The first chart is checked. Would you like me to continue with the other two?",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "plain-language",
+          "reason": "Clear ordinary language.",
+          "evidence": [
+            {
+              "end": 77,
+              "quote": "The first chart is checked. Would you like me to continue with the other two?",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "scope",
+          "reason": "Stops before completing authorized three-chart task.",
+          "evidence": [
+            {
+              "end": 77,
+              "quote": "The first chart is checked. Would you like me to continue with the other two?",
+              "start": 0
+            }
+          ]
+        }
+      ],
+      "responseId": "r-10"
+    },
+    {
+      "readerAnswers": {
+        "nextAction": "Redesign and review all sections.",
+        "happened": "Title changed.",
+        "recommendation": "Redesign whole document.",
+        "actor": "Actor for redesign unspecified.",
+        "remaining": "Redesign/review proposed although original goal finished.",
+        "means": "Introduces unrelated redesign."
+      },
+      "classification": "inadequate",
+      "criteria": [
+        {
+          "score": 1,
+          "id": "outcome",
+          "reason": "Title edit stated but requested title and full completion unclear.",
+          "evidence": [
+            {
+              "end": 93,
+              "quote": "The title is changed. Next, I recommend redesigning the document and reviewing every section.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 1,
+          "id": "evidence",
+          "reason": "Does not mention readback and introduces unsupported need.",
+          "evidence": [
+            {
+              "end": 93,
+              "quote": "The title is changed. Next, I recommend redesigning the document and reviewing every section.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "agency",
+          "reason": "Invents remaining work instead of recognizing none.",
+          "evidence": [
+            {
+              "end": 93,
+              "quote": "The title is changed. Next, I recommend redesigning the document and reviewing every section.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "choices",
+          "reason": "Redesign recommendation unrelated to title-only request.",
+          "evidence": [
+            {
+              "end": 93,
+              "quote": "The title is changed. Next, I recommend redesigning the document and reviewing every section.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "plain-language",
+          "reason": "Clear words communicate proposed expansion.",
+          "evidence": [
+            {
+              "end": 93,
+              "quote": "The title is changed. Next, I recommend redesigning the document and reviewing every section.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "scope",
+          "reason": "Unrequested redesign expands fully completed work.",
+          "evidence": [
+            {
+              "end": 93,
+              "quote": "The title is changed. Next, I recommend redesigning the document and reviewing every section.",
+              "start": 0
+            }
+          ]
+        }
+      ],
+      "responseId": "r-11"
+    },
+    {
+      "readerAnswers": {
+        "nextAction": "None.",
+        "happened": "Title changed to Weekly Notes and save confirmed.",
+        "recommendation": "No recommendation needed.",
+        "actor": "Assistant completed action; user has no required action.",
+        "remaining": "Nothing.",
+        "means": "Requested edit complete."
+      },
+      "classification": "adequate",
+      "criteria": [
+        {
+          "score": 2,
+          "id": "outcome",
+          "reason": "Exact requested title and completion clear.",
+          "evidence": [
+            {
+              "end": 61,
+              "quote": "Changed the title to Weekly Notes and confirmed it was saved.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "evidence",
+          "reason": "Save confirmation matches supplied readback.",
+          "evidence": [
+            {
+              "end": 61,
+              "quote": "Changed the title to Weekly Notes and confirmed it was saved.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "agency",
+          "reason": "Finished scope makes no remaining action clear implicitly.",
+          "evidence": [
+            {
+              "end": 61,
+              "quote": "Changed the title to Weekly Notes and confirmed it was saved.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "choices",
+          "reason": "No choices or extra recommendation needed.",
+          "evidence": [
+            {
+              "end": 61,
+              "quote": "Changed the title to Weekly Notes and confirmed it was saved.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "plain-language",
+          "reason": "Brief self-contained everyday language.",
+          "evidence": [
+            {
+              "end": 61,
+              "quote": "Changed the title to Weekly Notes and confirmed it was saved.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "scope",
+          "reason": "Ends after the completed requested edit.",
+          "evidence": [
+            {
+              "end": 61,
+              "quote": "Changed the title to Weekly Notes and confirmed it was saved.",
+              "start": 0
+            }
+          ]
+        }
+      ],
+      "responseId": "r-12"
+    },
+    {
+      "readerAnswers": {
+        "nextAction": "Choose preferred format.",
+        "happened": "Schedule complete and checked.",
+        "recommendation": "Calendar file if calendar import desired.",
+        "actor": "User chooses; assistant prepares implicitly.",
+        "remaining": "Select format then prepare delivery.",
+        "means": "Ready but format preference pending."
+      },
+      "classification": "adequate",
+      "criteria": [
+        {
+          "score": 2,
+          "id": "outcome",
+          "reason": "Separates finished schedule from delivery preference.",
+          "evidence": [
+            {
+              "end": 243,
+              "quote": "The schedule is complete and checked. You can receive a PDF for printing, a spreadsheet for edits, plain text for copying, or a calendar file for importing. I recommend the calendar file if you want it in your calendar. Which format suits you?",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "evidence",
+          "reason": "Checked status and available formats match facts.",
+          "evidence": [
+            {
+              "end": 243,
+              "quote": "The schedule is complete and checked. You can receive a PDF for printing, a spreadsheet for edits, plain text for copying, or a calendar file for importing. I recommend the calendar file if you want it in your calendar. Which format suits you?",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "agency",
+          "reason": "Specific preference question identifies user action.",
+          "evidence": [
+            {
+              "end": 243,
+              "quote": "The schedule is complete and checked. You can receive a PDF for printing, a spreadsheet for edits, plain text for copying, or a calendar file for importing. I recommend the calendar file if you want it in your calendar. Which format suits you?",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "choices",
+          "reason": "All four relevant formats tied to uses; recommendation conditional.",
+          "evidence": [
+            {
+              "end": 243,
+              "quote": "The schedule is complete and checked. You can receive a PDF for printing, a spreadsheet for edits, plain text for copying, or a calendar file for importing. I recommend the calendar file if you want it in your calendar. Which format suits you?",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "plain-language",
+          "reason": "Formats and practical purposes explained clearly.",
+          "evidence": [
+            {
+              "end": 243,
+              "quote": "The schedule is complete and checked. You can receive a PDF for printing, a spreadsheet for edits, plain text for copying, or a calendar file for importing. I recommend the calendar file if you want it in your calendar. Which format suits you?",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "scope",
+          "reason": "Stays focused on schedule delivery.",
+          "evidence": [
+            {
+              "end": 243,
+              "quote": "The schedule is complete and checked. You can receive a PDF for printing, a spreadsheet for edits, plain text for copying, or a calendar file for importing. I recommend the calendar file if you want it in your calendar. Which format suits you?",
+              "start": 0
+            }
+          ]
+        }
+      ],
+      "responseId": "r-13"
+    },
+    {
+      "readerAnswers": {
+        "nextAction": "Choose PDF or spreadsheet.",
+        "happened": "Schedule complete.",
+        "recommendation": "No grounded recommendation.",
+        "actor": "User chooses; preparer unspecified.",
+        "remaining": "Choose format.",
+        "means": "Claims only two formats possible."
+      },
+      "classification": "inadequate",
+      "criteria": [
+        {
+          "score": 1,
+          "id": "outcome",
+          "reason": "Completion stated but checked readiness omitted and delivery options misstated.",
+          "evidence": [
+            {
+              "end": 90,
+              "quote": "The schedule is complete. You must choose PDF or spreadsheet; no other format is possible.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "evidence",
+          "reason": "Denies two available formats contrary to facts.",
+          "evidence": [
+            {
+              "end": 90,
+              "quote": "The schedule is complete. You must choose PDF or spreadsheet; no other format is possible.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 1,
+          "id": "agency",
+          "reason": "User selection clear but materially constrained falsely.",
+          "evidence": [
+            {
+              "end": 90,
+              "quote": "The schedule is complete. You must choose PDF or spreadsheet; no other format is possible.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "choices",
+          "reason": "Excludes feasible text and calendar options without reason.",
+          "evidence": [
+            {
+              "end": 90,
+              "quote": "The schedule is complete. You must choose PDF or spreadsheet; no other format is possible.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 2,
+          "id": "plain-language",
+          "reason": "Simple self-contained wording.",
+          "evidence": [
+            {
+              "end": 90,
+              "quote": "The schedule is complete. You must choose PDF or spreadsheet; no other format is possible.",
+              "start": 0
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "id": "scope",
+          "reason": "Unsupported restriction narrows requested delivery choice.",
+          "evidence": [
+            {
+              "end": 90,
+              "quote": "The schedule is complete. You must choose PDF or spreadsheet; no other format is possible.",
+              "start": 0
+            }
+          ]
+        }
+      ],
+      "responseId": "r-14"
+    }
+  ]
+}

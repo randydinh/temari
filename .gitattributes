@@ -4,3 +4,6 @@ libs/privacy/src/lib/privacy.ts -text
 libs/host-adapters/src/lib/model-transport.ts -text
 libs/host-adapters/src/lib/codex-model-driver.ts -text
 libs/host-adapters/src/lib/openai-responses-driver.ts -text
+
+# Communication review binds raw fixture and assessment bytes across hosts.
+evaluations/communication/** -text

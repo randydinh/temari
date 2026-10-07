@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Authored response examples, not captured model outputs. Labels do not reveal assessor expectations.",
+  "responses": [
+    {
+      "id": "r-1",
+      "caseId": "case-1",
+      "author": "fixture-author",
+      "text": "The formulas are fixed and the two calculation checks passed. I’m checking the exported file next; the updated workbook is not ready to hand over yet. You do not need to do anything."
+    },
+    {
+      "id": "r-2",
+      "caseId": "case-1",
+      "author": "fixture-author",
+      "text": "Done—the workbook is ready. Two formula checks passed."
+    },
+    {
+      "id": "r-3",
+      "caseId": "case-2",
+      "author": "fixture-author",
+      "text": "The project is updated. The access check completed, though authentication failed."
+    },
+    {
+      "id": "r-4",
+      "caseId": "case-2",
+      "author": "fixture-author",
+      "text": "The download stopped because the project account is signed out. Your files are unchanged. Sign in to that account once; then I can retry the download."
+    },
+    {
+      "id": "r-5",
+      "caseId": "case-3",
+      "author": "fixture-author",
+      "text": "The sample has the right columns, but that only verifies its format. Delivery and permissions are still unchecked, so I cannot yet confirm release readiness. I’m checking those next."
+    },
+    {
+      "id": "r-6",
+      "caseId": "case-3",
+      "author": "fixture-author",
+      "text": "The sample passed, so the report is safe to release everywhere."
+    },
+    {
+      "id": "r-7",
+      "caseId": "case-4",
+      "author": "fixture-author",
+      "text": "I chose names only and removed the older entries. That seems simplest."
+    },
+    {
+      "id": "r-8",
+      "caseId": "case-4",
+      "author": "fixture-author",
+      "text": "I found entries with matching names but different dates, and have not removed them. Should duplicates mean the same name, or the same name and date? I recommend name and date if separate dates represent separate events."
+    },
+    {
+      "id": "r-9",
+      "caseId": "case-5",
+      "author": "fixture-author",
+      "text": "The first chart is checked. I’m finishing the other two and checking their labels; no action is needed from you."
+    },
+    {
+      "id": "r-10",
+      "caseId": "case-5",
+      "author": "fixture-author",
+      "text": "The first chart is checked. Would you like me to continue with the other two?"
+    },
+    {
+      "id": "r-11",
+      "caseId": "case-6",
+      "author": "fixture-author",
+      "text": "The title is changed. Next, I recommend redesigning the document and reviewing every section."
+    },
+    {
+      "id": "r-12",
+      "caseId": "case-6",
+      "author": "fixture-author",
+      "text": "Changed the title to Weekly Notes and confirmed it was saved."
+    },
+    {
+      "id": "r-13",
+      "caseId": "case-7",
+      "author": "fixture-author",
+      "text": "The schedule is complete and checked. You can receive a PDF for printing, a spreadsheet for edits, plain text for copying, or a calendar file for importing. I recommend the calendar file if you want it in your calendar. Which format suits you?"
+    },
+    {
+      "id": "r-14",
+      "caseId": "case-7",
+      "author": "fixture-author",
+      "text": "The schedule is complete. You must choose PDF or spreadsheet; no other format is possible."
+    }
+  ]
+}
