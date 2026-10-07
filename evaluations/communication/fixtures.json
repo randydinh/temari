@@ -1,0 +1,141 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Fixed fictional contexts for independent comprehension review; no live actions.",
+  "cases": [
+    {
+      "id": "case-1",
+      "situation": "phase-complete",
+      "request": "Update my workbook and deliver the checked result.",
+      "goal": "Update my workbook and deliver the checked result.",
+      "phase": "Workbook formulas are corrected; delivery checks remain.",
+      "evidenceFacts": [
+        "Two local calculation checks passed.",
+        "The revised file exists."
+      ],
+      "evidenceBounds": [
+        "No rendering or export check has run."
+      ],
+      "authorizedActions": [
+        "Run local delivery checks and prepare the revised file."
+      ],
+      "feasibleChoices": []
+    },
+    {
+      "id": "case-2",
+      "situation": "auth-recovery",
+      "request": "Download the latest project changes.",
+      "goal": "Download the latest project changes.",
+      "phase": "Remote authentication failed; access can recover through user sign-in.",
+      "evidenceFacts": [
+        "The remote rejected authentication.",
+        "No download occurred."
+      ],
+      "evidenceBounds": [
+        "Project access has not been verified."
+      ],
+      "authorizedActions": [
+        "Inspect access status without changing credentials."
+      ],
+      "feasibleChoices": [
+        "Sign in to the existing project account, then retry the download."
+      ]
+    },
+    {
+      "id": "case-3",
+      "situation": "partial-evidence",
+      "request": "Confirm whether the report can be released.",
+      "goal": "Confirm whether the report can be released.",
+      "phase": "Local format check complete; release decision remains open.",
+      "evidenceFacts": [
+        "A local sample contained the expected columns."
+      ],
+      "evidenceBounds": [
+        "Delivery and permission checks have not run."
+      ],
+      "authorizedActions": [
+        "Run the authorized local delivery check; inspect permissions read-only."
+      ],
+      "feasibleChoices": []
+    },
+    {
+      "id": "case-4",
+      "situation": "ambiguous-choices",
+      "request": "Remove duplicate entries from my list.",
+      "goal": "Remove duplicate entries from my list.",
+      "phase": "Duplicate meaning is unresolved.",
+      "evidenceFacts": [
+        "Some entries share a name but have different dates.",
+        "Some entries share both name and date."
+      ],
+      "evidenceBounds": [
+        "No duplicate rule was supplied.",
+        "Nothing has been removed."
+      ],
+      "authorizedActions": [
+        "Inspect entries; ask for the rule before removing ambiguous entries."
+      ],
+      "feasibleChoices": [
+        "Treat the same name as a duplicate.",
+        "Treat the same name and date as a duplicate."
+      ]
+    },
+    {
+      "id": "case-5",
+      "situation": "ongoing-authorized",
+      "request": "Prepare the three charts and check their labels.",
+      "goal": "Prepare the three charts and check their labels.",
+      "phase": "First chart checked; two remain.",
+      "evidenceFacts": [
+        "The first chart and its labels passed inspection."
+      ],
+      "evidenceBounds": [
+        "Two charts have not been inspected."
+      ],
+      "authorizedActions": [
+        "Continue preparing and checking all three charts."
+      ],
+      "feasibleChoices": []
+    },
+    {
+      "id": "case-6",
+      "situation": "trivial-finished",
+      "request": "Change the document title to Weekly Notes.",
+      "goal": "Change the document title to Weekly Notes.",
+      "phase": "Requested title edit is fully complete.",
+      "evidenceFacts": [
+        "The title now reads Weekly Notes.",
+        "The saved document was read back and confirmed."
+      ],
+      "evidenceBounds": [
+        "No other change was requested."
+      ],
+      "authorizedActions": [
+        "Change and verify the title."
+      ],
+      "feasibleChoices": []
+    },
+    {
+      "id": "case-7",
+      "situation": "several-choices",
+      "request": "Choose how I should receive the finished schedule.",
+      "goal": "Choose how I should receive the finished schedule.",
+      "phase": "The checked schedule is ready; delivery format needs a preference.",
+      "evidenceFacts": [
+        "The schedule is complete and checked.",
+        "PDF, editable spreadsheet, plain text, and calendar file are available."
+      ],
+      "evidenceBounds": [
+        "No delivery format preference was supplied."
+      ],
+      "authorizedActions": [
+        "Prepare the chosen local format."
+      ],
+      "feasibleChoices": [
+        "PDF for printing.",
+        "Editable spreadsheet for revisions.",
+        "Plain text for copying.",
+        "Calendar file for importing."
+      ]
+    }
+  ]
+}

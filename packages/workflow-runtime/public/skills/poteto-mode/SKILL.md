@@ -7,6 +7,10 @@ description: Use the current Nx P-stack engineering workflow with pinned lightwe
 
 Poteto mode supplies the engineering workflow selected by Temari.
 
+Use Temari's [conversation guidance](../temari/references/conversation.md) when
+reporting engineering progress or results. Keep the selected route's evidence,
+completion requirements, and authorization boundaries intact.
+
 A request to keep working while the user is away returns to Temari for an
 overnight contract. For one substantive overnight task, suggest Figure-It-Out
 to plan reviewable phases, then Autonomous Run; do not escalate it to

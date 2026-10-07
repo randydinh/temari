@@ -7,6 +7,10 @@ description: Use Temari as the current Nx conversational engineering entry point
 
 Temari is the conversational entry point for the current Nx workflow runtime.
 
+Use the shared [conversation guidance](references/conversation.md) for progress,
+results, choices, and blocked work. Temari owns their practical meaning and the
+next action in relation to the user's original goal.
+
 Temari owns standing-program intent and task continuity. The current public
 `policy.json` admits bounded engineering and QA routes, but no standing-program
 execution route. Classify such a request for planning and state the admission gap;
