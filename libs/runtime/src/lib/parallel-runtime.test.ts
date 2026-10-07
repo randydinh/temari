@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import {
+  mkdtemp,
+  mkdir,
+  rm,
+  writeFile,
+  readdir,
+  symlink,
+  open,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -11,9 +19,15 @@ import {
   executeRestartableParallelWorkers,
   prepareRestartableParallelWorkers,
   FileParallelWorkerReceiptStore,
+  WorkerExecutionFailure,
 } from './parallel-runtime.js';
 import { FileChildTaskStore } from './child-task-store.js';
-import { FileEvidenceStore } from './evidence-store.js';
+import {
+  FileEvidenceStore,
+  streamEvidenceFile,
+  verifyEvidenceFile,
+  type EvidenceStore,
+} from './evidence-store.js';
 import { FileWorkspaceManifestStore } from './workspace-manifest.js';
 
 test('prepares stable child identities without claiming work before the parent binds them', async () => {
@@ -965,6 +979,19 @@ for (const fault of [
                 throw new Error('takeover probe: completion');
               const record = await completeChildA(request);
               if (!isSecond) {
+                if (
+                  record.status !== 'SUCCEEDED' &&
+                  record.failureDiagnostics?.references[0]
+                ) {
+                  const retained = await evidenceStoreA.loadPortable(
+                    record.failureDiagnostics.references[0],
+                  );
+                  assert(
+                    Buffer.from(retained)
+                      .toString()
+                      .includes(`takeover probe: ${fault}`),
+                  );
+                }
                 if (record.status !== 'SUCCEEDED')
                   throw new Error(
                     record.error ?? `Worker-1 completed as ${record.status}`,
@@ -1123,12 +1150,19 @@ for (const fault of [
       })();
       if (fault === 'none') await run;
       else
-        await assert.rejects(run, {
-          message:
-            fault === 'missing-signal'
-              ? 'takeover readiness deadline exceeded'
-              : `takeover probe: ${fault}`,
-        });
+        await assert.rejects(
+          run,
+          fault === 'evidence' ||
+            fault === 'slow-held-start' ||
+            fault === 'failed-drain'
+            ? /Worker execution failed; diagnostics retained; sha256=/
+            : {
+                message:
+                  fault === 'missing-signal'
+                    ? 'takeover readiness deadline exceeded'
+                    : `takeover probe: ${fault}`,
+              },
+        );
       assert.equal(secondSettled, true);
       assert.equal(cleaned, true);
     },
@@ -1310,3 +1344,825 @@ function setFailureInjection(stage: FailureInjectionStage | null): void {
   };
   constructor.failureInjection = stage;
 }
+
+async function* largeDiagnosticBytes() {
+  const chunk = Buffer.alloc(64 * 1024, 0x61);
+  for (let index = 0; index < 256; index++) yield chunk;
+  yield Buffer.from('!');
+}
+
+function largeDiagnosticHash() {
+  const hash = createHash('sha256');
+  const chunk = Buffer.alloc(64 * 1024, 0x61);
+  for (let index = 0; index < 256; index++) hash.update(chunk);
+  return hash.update('!').digest('hex');
+}
+
+test('streamed evidence retains exact bytes beyond 16 MiB, validates duplicates, and refuses tamper, missing and symlink sources', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-stream-evidence-'));
+  try {
+    const store = await FileEvidenceStore.create(join(root, 'evidence'));
+    const request = {
+      runId: 'stream-1',
+      revision: 'revision-1',
+      kind: 'stderr' as const,
+    };
+    const reference = await store.putStream({
+      ...request,
+      content: largeDiagnosticBytes(),
+    });
+    assert.equal(reference.bytes, 16_777_217);
+    assert.equal(reference.sha256, largeDiagnosticHash());
+    await store.verifyPortable(reference);
+    assert.deepEqual(
+      await store.putStream({ ...request, content: largeDiagnosticBytes() }),
+      reference,
+    );
+    await assert.rejects(store.load(reference), /16 MiB/);
+    await assert.rejects(
+      store.put({ ...request, content: Buffer.alloc(16_777_217) }),
+      /16 MiB/,
+    );
+    await assert.rejects(
+      store.verifyPortable({ ...reference, bytes: reference.bytes + 1 }),
+      /byte count/,
+    );
+    await mkdir(join(root, 'sources'));
+    await symlink(reference.path, join(root, 'sources', 'linked'));
+    await assert.rejects(
+      store.putStream({
+        ...request,
+        content: streamEvidenceFile(
+          join(root, 'sources', 'linked'),
+          join(root, 'sources'),
+        ),
+      }),
+      /symlink/,
+    );
+    await assert.rejects(
+      store.putStream({
+        ...request,
+        content: streamEvidenceFile(reference.path, join(root, 'sources')),
+      }),
+      /outside/,
+    );
+    await symlink(
+      join(root, 'evidence'),
+      join(root, 'sources', 'linked-parent'),
+    );
+    await assert.rejects(
+      store.putStream({
+        ...request,
+        content: streamEvidenceFile(
+          join(
+            root,
+            'sources',
+            'linked-parent',
+            `${reference.sha256}.artifact`,
+          ),
+          join(root, 'sources'),
+        ),
+      }),
+      /symlink/,
+    );
+    const file = await open(reference.path, 'r+');
+    await file.write(Buffer.from('b'), 0, 1, 0);
+    await file.close();
+    await assert.rejects(store.verifyPortable(reference), /hash changed/);
+    await assert.rejects(
+      store.putStream({ ...request, content: largeDiagnosticBytes() }),
+      /hash changed/,
+    );
+    await rm(reference.path);
+    await assert.rejects(store.verifyPortable(reference), /ENOENT/);
+    await store.putStream({ ...request, content: largeDiagnosticBytes() });
+    await rm(reference.path);
+    await symlink(join(root, 'sources'), reference.path);
+    await assert.rejects(store.verifyPortable(reference), /symlink/);
+    assert(
+      (await readdir(join(root, 'evidence'))).every(
+        (name) => !name.endsWith('.tmp'),
+      ),
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('stream publication cleans temporary files after source, write, fsync, and publication errors', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-stream-errors-'));
+  try {
+    const store = await FileEvidenceStore.create(join(root, 'evidence'));
+    const request = {
+      runId: 'stream-errors',
+      revision: 'revision-1',
+      kind: 'stderr' as const,
+    };
+    await assert.rejects(
+      store.putStream({
+        ...request,
+        content: (async function* () {
+          yield Buffer.from('partial');
+          throw new Error('source read failed');
+        })(),
+      }),
+      /source read failed/,
+    );
+    for (const operation of ['writeFile', 'sync'] as const) {
+      const probe = await open(join(root, 'probe'), 'w');
+      const prototype = Object.getPrototypeOf(probe);
+      await probe.close();
+      const mocked = t.mock.method(prototype, operation, async () => {
+        throw new Error(`${operation} failed`);
+      });
+      try {
+        await assert.rejects(
+          store.putStream({ ...request, content: largeDiagnosticBytes() }),
+          new RegExp(`${operation} failed`),
+        );
+      } finally {
+        mocked.mock.restore();
+      }
+    }
+    const blocked = createHash('sha256')
+      .update('blocked publication')
+      .digest('hex');
+    await mkdir(join(root, 'evidence', `${blocked}.artifact`));
+    await assert.rejects(
+      store.putStream({
+        ...request,
+        content: (async function* () {
+          yield Buffer.from('blocked publication');
+        })(),
+      }),
+      /regular file/,
+    );
+    assert(
+      (await readdir(join(root, 'evidence'))).every(
+        (name) => !name.endsWith('.tmp'),
+      ),
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('failed children archive full thrown text and typed sources, then replay without handler execution', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-full-failure-'));
+  try {
+    const evidenceStore = await FileEvidenceStore.create(
+      join(root, 'evidence'),
+    );
+    const childStore = await FileChildTaskStore.create(join(root, 'children'));
+    let calls = 0;
+    const text = 'available failure text '.repeat(800_000);
+    const request = {
+      runId: 'full-failure',
+      revision: 'revision-1',
+      plan: parallelPlan('feature', 1),
+      capabilities: parallelCapabilities(),
+      assignments: workerAssignments(1),
+      childStore,
+      receiptStore: await FileParallelWorkerReceiptStore.create(
+        join(root, 'receipts'),
+      ),
+      evidenceStore,
+      failureDiagnostics: { mode: 'required' as const },
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      handler: () => {
+        calls++;
+        throw new WorkerExecutionFailure(text, {
+          complete: true,
+          evidence: [
+            {
+              source: 'stream',
+              kind: 'stdout',
+              content: largeDiagnosticBytes(),
+            },
+          ],
+        });
+      },
+    };
+    const completed = await executeRestartableParallelWorkers(request);
+    const diagnostics = completed.tasks[0]?.failureDiagnostics;
+    assert.equal(diagnostics?.status, 'retained');
+    assert.equal(diagnostics?.references.length, 2);
+    assert(diagnostics!.references[0]!.bytes > 16_777_216);
+    assert.equal(diagnostics!.references[1]!.sha256, largeDiagnosticHash());
+    assert(completed.tasks[0]!.error!.length <= 4096);
+    assert.deepEqual(
+      await executeRestartableParallelWorkers(request),
+      completed,
+    );
+    assert.equal(calls, 1);
+    const source = diagnostics!.references[1]!;
+    const path = join(root, 'evidence', `${source.sha256}.artifact`);
+    await verifyEvidenceFile(path, join(root, 'evidence'), source);
+    await rm(path);
+    await assert.rejects(executeRestartableParallelWorkers(request), /ENOENT/);
+    assert.equal(calls, 1);
+    await evidenceStore.putStream({
+      runId: request.runId,
+      revision: request.revision,
+      kind: 'stdout',
+      content: largeDiagnosticBytes(),
+    });
+    const file = await open(path, 'r+');
+    await file.write(Buffer.from('b'), 0, 1, 0);
+    await file.close();
+    await assert.rejects(
+      executeRestartableParallelWorkers(request),
+      /hash changed/,
+    );
+    assert.equal(calls, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('complete diagnostics preflight preserves legacy custom stores and refuses required routes before claim', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-diagnostic-preflight-'));
+  try {
+    const files = await FileEvidenceStore.create(join(root, 'evidence'));
+    const legacy: EvidenceStore = {
+      put: files.put.bind(files),
+      load: files.load.bind(files),
+      loadPortable: files.loadPortable.bind(files),
+    };
+    const childStore = await FileChildTaskStore.create(join(root, 'children'));
+    let calls = 0;
+    const request = {
+      runId: 'preflight',
+      revision: 'revision-1',
+      plan: parallelPlan('feature', 1),
+      capabilities: parallelCapabilities(),
+      assignments: workerAssignments(1),
+      childStore,
+      receiptStore: await FileParallelWorkerReceiptStore.create(
+        join(root, 'receipts'),
+      ),
+      evidenceStore: legacy,
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      handler: () => {
+        calls++;
+        throw new Error('original failure');
+      },
+    };
+    await assert.rejects(
+      executeRestartableParallelWorkers({
+        ...request,
+        failureDiagnostics: { mode: 'required' },
+      }),
+      /before child claim/,
+    );
+    assert.equal(calls, 0);
+    assert.deepEqual(await readdir(join(root, 'children')), []);
+    const completed = await executeRestartableParallelWorkers(request);
+    assert.match(
+      completed.tasks[0]!.error!,
+      /Worker execution failed; diagnostics archive failed; sha256=/,
+    );
+    assert.equal(
+      completed.tasks[0]?.failureDiagnostics?.status,
+      'archive-failed',
+    );
+    assert.deepEqual(
+      await executeRestartableParallelWorkers(request),
+      completed,
+    );
+    assert.equal(calls, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('failure archival retains partial evidence and original failure when capture or a stream fails', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-partial-failure-'));
+  try {
+    const completed = await executeRestartableParallelWorkers({
+      runId: 'partial-failure',
+      revision: 'revision-1',
+      plan: parallelPlan('feature', 1),
+      capabilities: parallelCapabilities(),
+      assignments: workerAssignments(1),
+      childStore: await FileChildTaskStore.create(join(root, 'children')),
+      receiptStore: await FileParallelWorkerReceiptStore.create(
+        join(root, 'receipts'),
+      ),
+      evidenceStore: await FileEvidenceStore.create(join(root, 'evidence')),
+      failureDiagnostics: { mode: 'required' },
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      handler: () => {
+        throw new WorkerExecutionFailure('primary worker failure', {
+          complete: false,
+          reason: 'stderr capture failed',
+          evidence: [
+            {
+              source: 'stream',
+              kind: 'stdout',
+              content: (async function* () {
+                yield Buffer.from('available subset');
+              })(),
+            },
+            {
+              source: 'stream',
+              kind: 'stderr',
+              content: (async function* () {
+                throw new Error('source read failed');
+                yield Buffer.from('unreachable');
+              })(),
+            },
+          ],
+        });
+      },
+    });
+    const diagnostics = completed.tasks[0]?.failureDiagnostics;
+    assert.equal(completed.tasks[0]?.error, 'primary worker failure');
+    assert.equal(diagnostics?.status, 'archive-failed');
+    assert.equal(diagnostics?.references.length, 3);
+    assert(
+      diagnostics?.status === 'archive-failed' &&
+        /stderr capture failed.*Diagnostic archive failed.*sha256=/.test(
+          diagnostics.message,
+        ),
+    );
+    assert(
+      (await readdir(join(root, 'evidence'))).every(
+        (name) => !name.endsWith('.tmp'),
+      ),
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('failure archival renews through a slow stream and refuses a lost lease fence', async (t) => {
+  for (const loseLease of [false, true])
+    await t.test(
+      loseLease ? 'renewal loss' : 'renewed slow archive',
+      async () => {
+        const root = await mkdtemp(join(tmpdir(), 'temari-slow-failure-'));
+        try {
+          const childStore = await FileChildTaskStore.create(
+            join(root, 'children'),
+          );
+          const files = await FileEvidenceStore.create(join(root, 'evidence'));
+          let archiveStarted = false;
+          let renewals = 0;
+          const originalRenew = childStore.renew.bind(childStore);
+          childStore.renew = async (request) => {
+            renewals++;
+            if (loseLease && archiveStarted)
+              throw new Error('lease renewal rejected');
+            return originalRenew(request);
+          };
+          const completed = await executeRestartableParallelWorkers({
+            runId: 'slow-failure',
+            revision: 'revision-1',
+            plan: parallelPlan('feature', 1),
+            capabilities: parallelCapabilities(),
+            assignments: workerAssignments(1),
+            childStore,
+            receiptStore: await FileParallelWorkerReceiptStore.create(
+              join(root, 'receipts'),
+            ),
+            evidenceStore: files,
+            failureDiagnostics: { mode: 'required' },
+            owner: 'worker-a',
+            leaseMs: 400,
+            leaseRenewal: { intervalMs: 30 },
+            evidenceForFailure: () => [
+              {
+                source: 'stream',
+                kind: 'stdout',
+                content: (async function* () {
+                  archiveStarted = true;
+                  await new Promise((resolve) => setTimeout(resolve, 600));
+                  yield Buffer.from('slow diagnostics');
+                })(),
+              },
+            ],
+            handler: () => {
+              throw new Error('slow worker failure');
+            },
+          });
+          assert(renewals > 0);
+          if (loseLease) {
+            assert.equal(completed.state, 'RUNNING');
+            assert.equal(completed.receipt, null);
+            assert.equal(completed.tasks[0]?.status, 'RUNNING');
+            assert(
+              !(await childStore.events(completed.tasks[0]!.taskId)).some(
+                (event) => event.type === 'task-completed',
+              ),
+            );
+          } else {
+            assert.equal(completed.state, 'COMPLETE');
+            assert.equal(
+              completed.tasks[0]?.failureDiagnostics?.status,
+              'retained',
+            );
+          }
+        } finally {
+          await rm(root, { recursive: true, force: true });
+        }
+      },
+    );
+});
+
+test('retry replay verifies diagnostic artifacts from the prior failed attempt', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-retry-diagnostics-'));
+  try {
+    const childStore = await FileChildTaskStore.create(join(root, 'children'));
+    let calls = 0;
+    const request = {
+      runId: 'retry-diagnostics',
+      revision: 'revision-1',
+      plan: parallelPlan('feature', 1),
+      capabilities: parallelCapabilities(),
+      assignments: workerAssignments(1),
+      childStore,
+      receiptStore: await FileParallelWorkerReceiptStore.create(
+        join(root, 'receipts'),
+      ),
+      evidenceStore: await FileEvidenceStore.create(join(root, 'evidence')),
+      failureDiagnostics: { mode: 'required' as const },
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      retryPolicy: { maxAttempts: 2 },
+      handler: () => {
+        if (++calls === 1) throw new Error('first attempt failure');
+        return result('recovered');
+      },
+    };
+    const completed = await executeRestartableParallelWorkers(request);
+    assert.equal(completed.tasks[0]?.status, 'SUCCEEDED');
+    assert.equal(
+      Object.hasOwn(completed.tasks[0]!, 'failureDiagnostics'),
+      false,
+    );
+    const events = await childStore.events(completed.tasks[0]!.taskId);
+    const terminal = events.find(
+      (event) =>
+        event.type === 'task-completed' && event.payload.to === 'FAILED',
+    )!;
+    const retry = events.find((event) => event.type === 'task-retried')!;
+    assert.equal(
+      terminal.payload.failureDiagnostics,
+      retry.payload.failureDiagnostics,
+    );
+    const diagnostics = JSON.parse(
+      terminal.payload.failureDiagnostics as string,
+    );
+    await rm(
+      join(root, 'evidence', `${diagnostics.references[0].sha256}.artifact`),
+    );
+    await assert.rejects(executeRestartableParallelWorkers(request), /ENOENT/);
+    assert.equal(calls, 2);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('a non-fencing renewal failure retains its full cause and terminalizes FAILED under the still-valid lease', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-renewal-cause-'));
+  try {
+    const childStore = await FileChildTaskStore.create(join(root, 'children'));
+    const files = await FileEvidenceStore.create(join(root, 'evidence'));
+    const cause = 'renewal storage error '.repeat(800_000);
+    childStore.renew = async () => {
+      throw cause;
+    };
+    const completed = await executeRestartableParallelWorkers({
+      runId: 'renewal-cause',
+      revision: 'revision-1',
+      plan: parallelPlan('feature', 1),
+      capabilities: parallelCapabilities(),
+      assignments: workerAssignments(1),
+      childStore,
+      receiptStore: await FileParallelWorkerReceiptStore.create(
+        join(root, 'receipts'),
+      ),
+      evidenceStore: files,
+      failureDiagnostics: { mode: 'required' },
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      leaseRenewal: { intervalMs: 20 },
+      handler: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        return result('handler succeeded');
+      },
+    });
+    assert.equal(completed.state, 'COMPLETE');
+    assert.equal(completed.tasks[0]?.status, 'FAILED');
+    const diagnostics = completed.tasks[0]!.failureDiagnostics!;
+    assert.equal(diagnostics.status, 'retained');
+    assert.equal(diagnostics.references.length, 1);
+    assert.equal(diagnostics.references[0]!.bytes, Buffer.byteLength(cause));
+    assert.equal(
+      diagnostics.references[0]!.sha256,
+      createHash('sha256').update(cause).digest('hex'),
+    );
+    await files.verifyPortable(diagnostics.references[0]!);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('cancellation during failure archival clears current diagnostics and retains the requested archive in history', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-cancel-archive-'));
+  try {
+    const childStore = await FileChildTaskStore.create(join(root, 'children'));
+    const request = {
+      runId: 'cancel-archive',
+      revision: 'revision-1',
+      plan: parallelPlan('feature', 1),
+      capabilities: parallelCapabilities(),
+      assignments: workerAssignments(1),
+      childStore,
+      receiptStore: await FileParallelWorkerReceiptStore.create(
+        join(root, 'receipts'),
+      ),
+      evidenceStore: await FileEvidenceStore.create(join(root, 'evidence')),
+      failureDiagnostics: { mode: 'required' as const },
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      leaseRenewal: { intervalMs: 20 },
+      handler: () => {
+        throw new Error('original failure');
+      },
+    };
+    const prepared = await prepareRestartableParallelWorkers(request);
+    const completed = await executeRestartableParallelWorkers({
+      ...request,
+      evidenceForFailure: () => [
+        {
+          source: 'stream',
+          kind: 'stdout',
+          content: (async function* () {
+            await childStore.cancel({
+              taskId: prepared.tasks[0]!.taskId,
+              actor: 'coordinator',
+              idempotencyKey: 'cancel-in-archive',
+            });
+            await new Promise((resolve) => setTimeout(resolve, 60));
+            yield Buffer.from('private diagnostic sentinel');
+          })(),
+        },
+      ],
+    });
+    const task = completed.tasks[0]!;
+    assert.equal(task.status, 'CANCELLED');
+    assert.equal(Object.hasOwn(task, 'failureDiagnostics'), false);
+    const terminal = (await childStore.events(task.taskId)).at(-1)!;
+    const diagnostics = JSON.parse(
+      terminal.payload.requestFailureDiagnostics as string,
+    );
+    assert.equal(diagnostics.references.length, 2);
+    const historyText = JSON.stringify(await childStore.events(task.taskId));
+    assert(!historyText.includes('private diagnostic sentinel'));
+    await rm(
+      join(root, 'evidence', `${diagnostics.references[1].sha256}.artifact`),
+    );
+    await assert.rejects(executeRestartableParallelWorkers(request), /ENOENT/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('a replacement owner can reclaim during slow failed archival and the old owner cannot complete its attempt', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-archive-reclaim-'));
+  try {
+    const childStore = await FileChildTaskStore.create(join(root, 'children'));
+    const files = await FileEvidenceStore.create(join(root, 'evidence'));
+    let archiveStarted = false;
+    let replacement: import('./child-task-store.js').ChildTaskRecord | null =
+      null;
+    const originalRenew = childStore.renew.bind(childStore);
+    childStore.renew = async (request) => {
+      if (archiveStarted) throw new Error('lease renewal storage failed');
+      return originalRenew(request);
+    };
+    const request = {
+      runId: 'archive-reclaim',
+      revision: 'revision-1',
+      plan: parallelPlan('feature', 1),
+      capabilities: parallelCapabilities(),
+      assignments: workerAssignments(1),
+      childStore,
+      receiptStore: await FileParallelWorkerReceiptStore.create(
+        join(root, 'receipts'),
+      ),
+      evidenceStore: files,
+      failureDiagnostics: { mode: 'required' as const },
+      owner: 'worker-a',
+      leaseMs: 400,
+      leaseRenewal: { intervalMs: 25 },
+      handler: () => {
+        throw new Error('old attempt failed');
+      },
+    };
+    const prepared = await prepareRestartableParallelWorkers(request);
+    await executeRestartableParallelWorkers({
+      ...request,
+      evidenceForFailure: () => [
+        {
+          source: 'stream',
+          kind: 'stdout',
+          content: (async function* () {
+            archiveStarted = true;
+            await new Promise((resolve) => setTimeout(resolve, 600));
+            const claimed = await childStore.claim({
+              taskId: prepared.tasks[0]!.taskId,
+              owner: 'replacement',
+              leaseMs: 30_000,
+            });
+            assert(claimed.claimed);
+            assert.equal(claimed.record.attempt, 2);
+            replacement = await childStore.complete({
+              taskId: claimed.record.taskId,
+              owner: 'replacement',
+              leaseToken: claimed.record.lease!.token,
+              fencingEpoch: claimed.record.lease!.fencingEpoch,
+              status: 'SUCCEEDED',
+              result: result('replacement succeeded'),
+              idempotencyKey: 'replacement-complete',
+            });
+            yield Buffer.from('old retained diagnostic bytes');
+          })(),
+        },
+      ],
+    });
+    const retained = await childStore.load(prepared.tasks[0]!.taskId);
+    assert.deepEqual(retained, replacement);
+    const terminal = (
+      await childStore.events(prepared.tasks[0]!.taskId)
+    ).filter((event) => event.type === 'task-completed');
+    assert.equal(terminal.length, 1);
+    assert.equal(terminal[0]!.actor, 'replacement');
+    assert.equal(terminal[0]!.payload.attempt, 2);
+    assert.equal(Object.hasOwn(retained!, 'failureDiagnostics'), false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('required diagnostics keep ordinary thrown sentinel text exclusively in the exact private artifact', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-private-failure-'));
+  try {
+    const text =
+      'PRIVATE_FAILURE_SENTINEL:' +
+      'a'.repeat(16_383) +
+      '😀' +
+      'b'.repeat(16_777_217);
+    const childStore = await FileChildTaskStore.create(join(root, 'children'));
+    const completed = await executeRestartableParallelWorkers({
+      runId: 'private-failure',
+      revision: 'revision-1',
+      plan: parallelPlan('feature', 1),
+      capabilities: parallelCapabilities(),
+      assignments: workerAssignments(1),
+      childStore,
+      receiptStore: await FileParallelWorkerReceiptStore.create(
+        join(root, 'receipts'),
+      ),
+      evidenceStore: await FileEvidenceStore.create(join(root, 'evidence')),
+      failureDiagnostics: { mode: 'required' },
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      handler: () => {
+        throw text;
+      },
+    });
+    const reference = completed.tasks[0]!.failureDiagnostics!.references[0]!;
+    assert.equal(reference.bytes, Buffer.byteLength(text));
+    assert.equal(
+      reference.sha256,
+      createHash('sha256').update(text).digest('hex'),
+    );
+    assert(completed.tasks[0]!.error!.includes(reference.sha256));
+    assert(!JSON.stringify(completed).includes('PRIVATE_FAILURE_SENTINEL'));
+    assert(
+      !JSON.stringify(
+        await childStore.events(completed.tasks[0]!.taskId),
+      ).includes('PRIVATE_FAILURE_SENTINEL'),
+    );
+    const file = await open(
+      join(root, 'evidence', `${reference.sha256}.artifact`),
+      'r',
+    );
+    try {
+      const prefix = Buffer.alloc(64);
+      await file.read(prefix, 0, prefix.length, 0);
+      assert(prefix.toString('utf8').startsWith('PRIVATE_FAILURE_SENTINEL:'));
+    } finally {
+      await file.close();
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('full thrown-text normalization preserves messages with hostile and custom stack properties', async (t) => {
+  for (const hostile of [false, true])
+    await t.test(
+      hostile ? 'throwing stack getter' : 'custom stack omits message',
+      async () => {
+        const root = await mkdtemp(join(tmpdir(), 'temari-stack-failure-'));
+        try {
+          const error = new Error('available primary diagnostic');
+          if (hostile)
+            Object.defineProperty(error, 'stack', {
+              get() {
+                throw new Error('unreadable stack');
+              },
+            });
+          else error.stack = 'custom stack';
+          const expected = hostile
+            ? error.message
+            : `${error.message}\ncustom stack`;
+          const completed = await executeRestartableParallelWorkers({
+            runId: 'stack-failure',
+            revision: 'revision-1',
+            plan: parallelPlan('feature', 1),
+            capabilities: parallelCapabilities(),
+            assignments: workerAssignments(1),
+            childStore: await FileChildTaskStore.create(join(root, 'children')),
+            receiptStore: await FileParallelWorkerReceiptStore.create(
+              join(root, 'receipts'),
+            ),
+            evidenceStore: await FileEvidenceStore.create(
+              join(root, 'evidence'),
+            ),
+            failureDiagnostics: { mode: 'required' },
+            owner: 'worker-a',
+            leaseMs: 30_000,
+            handler: () => {
+              throw error;
+            },
+          });
+          const reference =
+            completed.tasks[0]!.failureDiagnostics!.references[0]!;
+          assert.equal(
+            reference.sha256,
+            createHash('sha256').update(expected).digest('hex'),
+          );
+          assert.equal(reference.bytes, Buffer.byteLength(expected));
+        } finally {
+          await rm(root, { recursive: true, force: true });
+        }
+      },
+    );
+});
+
+test('source-discovery failure retains its entire secondary cause separately from the primary failure', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-secondary-source-'));
+  try {
+    const primary = 'primary worker failure';
+    const secondary = 'PRIVATE_SOURCE_FAILURE:' + 'x'.repeat(16_777_217);
+    const files = await FileEvidenceStore.create(join(root, 'evidence'));
+    const completed = await executeRestartableParallelWorkers({
+      runId: 'secondary-source',
+      revision: 'revision-1',
+      plan: parallelPlan('feature', 1),
+      capabilities: parallelCapabilities(),
+      assignments: workerAssignments(1),
+      childStore: await FileChildTaskStore.create(join(root, 'children')),
+      receiptStore: await FileParallelWorkerReceiptStore.create(
+        join(root, 'receipts'),
+      ),
+      evidenceStore: files,
+      failureDiagnostics: { mode: 'required' },
+      evidenceForFailure: () => {
+        throw secondary;
+      },
+      owner: 'worker-a',
+      leaseMs: 30_000,
+      handler: () => {
+        throw primary;
+      },
+    });
+    const diagnostics = completed.tasks[0]!.failureDiagnostics!;
+    assert.equal(diagnostics.status, 'archive-failed');
+    assert.equal(diagnostics.references.length, 2);
+    assert.equal(
+      diagnostics.references[0]!.sha256,
+      createHash('sha256').update(primary).digest('hex'),
+    );
+    assert.equal(
+      diagnostics.references[1]!.bytes,
+      Buffer.byteLength(secondary),
+    );
+    assert.equal(
+      diagnostics.references[1]!.sha256,
+      createHash('sha256').update(secondary).digest('hex'),
+    );
+    await files.verifyPortable(diagnostics.references[1]!);
+    assert(!JSON.stringify(completed).includes('PRIVATE_SOURCE_FAILURE'));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
