@@ -47,3 +47,21 @@ When Temari has selected a durable engineering task, use its
 [task tracking contract](../temari/references/task-tracking.md) with public
 `start` or `resume`. Preserve the same task through recovery; task handoffs remain
 context pending trusted closeout.
+
+For a confirmed systemic discrepancy, Temari selects the obligation and existing
+task authority; Poteto supplies the bounded repair method. Preserve the actual
+counterexample, change the smallest durable source within the admitted typed
+ownership, obtain independent review of the exact integration commit, build a
+fresh installed artifact, and rerun that failing case plus neighboring checks.
+Use Temari's installed `repair start/status/accept` support operation under the
+same logical task. Continue compatible parent work after actual worker start;
+do not rebind its current run, create another user chat or treat supervisor
+heartbeat as worker proof. The existing runtime child store owns attempts and
+leases. Uncertain launch stays uncertain across restart or lease expiry, with no
+replacement process. PASS awaits coordinator review and reopened artifact,
+candidate and regression evidence; it does not resolve the obligation by itself.
+Recheck preserved counterexample and assertion/helper byte identities on every
+resolution read. Freeze the admitted candidate so compatible parent source
+progress cannot dirty the child. Only explicit `repair readmit` may admit an
+unchanged, never-launched BLOCKED report after its missing authority is proven;
+retain the refusal history and compare the current task version.

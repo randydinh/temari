@@ -23,6 +23,7 @@ export * from './lib/v4-1-route-replay.js';
 export * from './lib/task-store.js';
 export * from './lib/task-runtime.js';
 export * from './lib/task-pickup.js';
+export * from './lib/task-repair.js';
 export * from './lib/schedule-store.js';
 export * from './lib/merge-reconciliation-store.js';
 export * from './lib/source-head-store.js';

@@ -81,6 +81,12 @@ export interface TaskPickupBrief {
   readonly currentRun: TaskPickupCurrentRun | null;
   readonly evidence: TaskEvidenceSnapshot;
   readonly semanticAcceptance: boolean;
+  readonly repairs: readonly {
+    readonly repairId: string;
+    readonly state: string;
+    readonly issue: string | null;
+    readonly selectionContext: TaskContextRef | null;
+  }[];
   /** Handoff prose is context; refreshed status and evidence remain separate. */
   readonly handoff: (TaskHandoff & { readonly contextOnly: true }) | null;
   readonly recentEvents: readonly {
@@ -96,6 +102,8 @@ export interface TaskPickupBrief {
     readonly omittedEvents: number;
     readonly totalRuns: number;
     readonly omittedRuns: number;
+    readonly totalRepairs: number;
+    readonly omittedRepairs: number;
   };
   readonly truncation: {
     readonly fields: readonly string[];
@@ -281,6 +289,16 @@ function eventSummary(event: TaskEvent): string {
       return 'Persisted stage evidence verified at this point.';
     case 'task-accepted':
       return 'Coordinator acceptance recorded at this point.';
+    case 'repair-bound':
+      return 'Required same-task repair and launch reservation retained.';
+    case 'repair-admitted':
+      return 'Never-launched blocked repair admitted under independently selected authority.';
+    case 'repair-launch-observed':
+      return 'Exact repair supervisor observed.';
+    case 'repair-launch-uncertain':
+      return 'Repair launch requires reconciliation; no replacement launch.';
+    case 'repair-resolved':
+      return 'Coordinator repair resolution recorded; evidence is rechecked.';
   }
 }
 
@@ -376,6 +394,23 @@ export function projectTaskPickupBrief(
         .map((issue, index) => clip(issue, 512, `evidence.issues[${index}]`)),
     },
     semanticAcceptance: snapshot.semanticAcceptance,
+    repairs: snapshot.repairSnapshots.slice(0, 8).map((repair) => ({
+      repairId: repair.repairId,
+      state: repair.state,
+      issue: repair.issues[0]
+        ? clip(repair.issues[0], 256, 'repairs.issue')
+        : null,
+      selectionContext: repair.selectionRef
+        ? {
+            ...repair.selectionRef,
+            location: clip(
+              repair.selectionRef.location,
+              1024,
+              'repairs.selectionContext.location',
+            ),
+          }
+        : null,
+    })),
     handoff: sourceHandoff
       ? {
           summary: clip(sourceHandoff.summary, 2048, 'handoff.summary'),
@@ -407,6 +442,8 @@ export function projectTaskPickupBrief(
       omittedEvents: snapshot.events.length - recent.length,
       totalRuns: snapshot.runs.length,
       omittedRuns: snapshot.runs.length - (run ? 1 : 0),
+      totalRepairs: snapshot.repairSnapshots.length,
+      omittedRepairs: Math.max(0, snapshot.repairSnapshots.length - 8),
     },
     truncation: {
       fields: [],

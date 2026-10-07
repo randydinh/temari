@@ -14,6 +14,16 @@ import {
 import { isAbsolute, join } from 'node:path';
 import { hostname } from 'node:os';
 import {
+  assertRepairRecord,
+  assertRepairReference,
+  assertRepairSelection,
+  type TaskRepair,
+  type TaskRepairResolution,
+  type RepairSupervisorRef,
+  type TaskRepairAdmission,
+  type TaskRepairLaunch,
+} from './task-repair.js';
+import {
   DEFAULT_STAGES,
   HOST_CAPABILITIES,
   type ExecutionPlan,
@@ -129,9 +139,35 @@ export interface TaskRecord {
   readonly acceptance: TaskAcceptance | null;
   readonly sessions: readonly TaskSessionRef[];
   readonly handoff: TaskHandoff | null;
+  readonly repairs: readonly TaskRepair[];
   readonly events: readonly TaskEvent[];
 }
 export type TaskChange =
+  | { readonly type: 'repair-bound'; readonly repair: TaskRepair }
+  | {
+      readonly type: 'repair-admitted';
+      readonly repairId: string;
+      readonly admission: TaskRepairAdmission;
+      readonly launch: TaskRepairLaunch;
+    }
+  | {
+      readonly type: 'repair-launch-observed';
+      readonly repairId: string;
+      readonly launchId: string;
+      readonly reference: RepairSupervisorRef;
+    }
+  | {
+      readonly type: 'repair-launch-uncertain';
+      readonly repairId: string;
+      readonly launchId: string;
+      readonly reason: string;
+      readonly diagnosticRef?: TaskContextRef;
+    }
+  | {
+      readonly type: 'repair-resolved';
+      readonly repairId: string;
+      readonly resolution: TaskRepairResolution;
+    }
   | {
       readonly type: 'task-entered';
       readonly session: TaskSessionIdentity;
@@ -501,6 +537,7 @@ function createdTask(event: TaskEvent, input: TaskCreationInput): TaskRecord {
     acceptance: null,
     sessions: [],
     handoff: null,
+    repairs: [],
     events: [event],
   };
 }
@@ -565,6 +602,134 @@ function apply(task: TaskRecord | undefined, event: TaskEvent): TaskRecord {
     updatedAt: event.at,
     events: [...task.events, event],
   };
+  if (change.type === 'repair-bound') {
+    keys(change, ['type', 'repair']);
+    assertRepairRecord(change.repair);
+    assert(task.repairs.length < 64, 'Task repair limit exceeded.');
+    assert(
+      !task.repairs.some(
+        (repair) => repair.report.repairId === change.repair.report.repairId,
+      ),
+      'Repair binding is immutable.',
+    );
+    return { ...next, repairs: [...task.repairs, change.repair] };
+  }
+  if (change.type === 'repair-admitted') {
+    keys(change, ['type', 'repairId', 'admission', 'launch']);
+    const old = task.repairs.find(
+      (item) => item.report.repairId === change.repairId,
+    );
+    assert(
+      old &&
+        old.admission.status === 'BLOCKED' &&
+        !old.launch &&
+        !old.resolution,
+      'Only a never-launched BLOCKED repair may be admitted.',
+    );
+    assert.equal(change.admission.status, 'ADMITTED');
+    const amended = {
+      ...old,
+      admission: change.admission,
+      launch: change.launch,
+    };
+    assertRepairRecord(amended);
+    return {
+      ...next,
+      repairs: task.repairs.map((item) => (item === old ? amended : item)),
+    };
+  }
+  if (
+    change.type === 'repair-launch-observed' ||
+    change.type === 'repair-launch-uncertain' ||
+    change.type === 'repair-resolved'
+  ) {
+    const repair = task.repairs.find(
+      (item) => item.report.repairId === change.repairId,
+    );
+    assert(
+      repair && repair.admission.status === 'ADMITTED' && repair.launch,
+      'Admitted repair reservation is missing.',
+    );
+    let amended: TaskRepair;
+    if (change.type === 'repair-resolved') {
+      keys(change, ['type', 'repairId', 'resolution']);
+      keys(change.resolution, ['selection', 'reason', 'actor', 'at']);
+      assertRepairSelection(change.resolution.selection);
+      text(change.resolution.reason, 'repair resolution', 4096);
+      assert.equal(change.resolution.actor, event.actor);
+      assert(Number.isFinite(Date.parse(change.resolution.at)));
+      assert(!repair.resolution, 'Repair resolution is immutable.');
+      amended = { ...repair, resolution: change.resolution };
+    } else {
+      assert.equal(
+        change.launchId,
+        repair.launch.launchId,
+        'Repair launch binding changed.',
+      );
+      if (change.type === 'repair-launch-observed') {
+        keys(change, ['type', 'repairId', 'launchId', 'reference']);
+        assertRepairReference(change.reference);
+        assert.equal(change.reference.launchId, repair.launch.launchId);
+        assert.equal(
+          change.reference.executionId,
+          repair.admission.executionId,
+        );
+        assert.equal(
+          change.reference.manifestSha256,
+          repair.admission.manifestSha256,
+        );
+        if (repair.launch.reference)
+          assert.deepEqual(
+            repair.launch.reference,
+            change.reference,
+            'Repair observation is immutable.',
+          );
+        amended = {
+          ...repair,
+          launch: {
+            ...repair.launch,
+            state: 'CONFIRMED',
+            reference: change.reference,
+            reason: null,
+          },
+        };
+      } else {
+        keys(change, [
+          'type',
+          'repairId',
+          'launchId',
+          'reason',
+          'diagnosticRef',
+        ]);
+        text(change.reason, 'repair launch uncertainty', 4096);
+        if (change.diagnosticRef) {
+          keys(change.diagnosticRef, ['kind', 'location', 'sha256']);
+          assert.equal(change.diagnosticRef.kind, 'repair-controller-failure');
+          assert(isAbsolute(change.diagnosticRef.location));
+          digest(change.diagnosticRef.sha256!);
+        }
+        assert(
+          !repair.launch.reference,
+          'Observed repair launch cannot become unobserved.',
+        );
+        amended = {
+          ...repair,
+          launch: {
+            ...repair.launch,
+            state: 'UNCERTAIN',
+            reason: change.reason,
+            ...(change.diagnosticRef
+              ? { diagnosticRef: change.diagnosticRef }
+              : {}),
+          },
+        };
+      }
+    }
+    return {
+      ...next,
+      repairs: task.repairs.map((item) => (item === repair ? amended : item)),
+    };
+  }
   if (change.type === 'handoff-recorded') {
     keys(change, ['type', 'handoff']);
     handoffInput(change.handoff);

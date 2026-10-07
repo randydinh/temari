@@ -59,6 +59,7 @@ const publicFiles = [
     'host/feature-proof.mjs',
   ],
   ['packages/workflow-runtime/host/local-worker.mjs', 'host/local-worker.mjs'],
+  ['packages/workflow-runtime/host/task-repair.mjs', 'host/task-repair.mjs'],
   [
     'packages/workflow-runtime/assets/v4.1/skills/poteto-mode/playbook-contracts/v1/lightweight-engineering.json',
     'source/lightweight-engineering.json',
