@@ -38,6 +38,9 @@
     },
     {
       "path": "./libs/shared-control"
+    },
+    {
+      "path": "./packages/testmo-mcp"
     }
   ],
   "compilerOptions": {}
