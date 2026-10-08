@@ -13,7 +13,13 @@
       "path": "../../libs/runtime/tsconfig.lib.json"
     },
     {
+      "path": "../../libs/host-adapters/tsconfig.lib.json"
+    },
+    {
       "path": "../../libs/temari-core/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/contracts/tsconfig.lib.json"
     }
   ]
 }

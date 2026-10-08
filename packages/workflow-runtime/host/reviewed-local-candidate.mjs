@@ -1,0 +1,952 @@
+import assert from 'node:assert/strict';
+import { spawn, execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import {
+  mkdir,
+  readFile,
+  writeFile,
+  readdir,
+  lstat,
+  realpath,
+  access,
+} from 'node:fs/promises';
+import { isAbsolute, join, relative, dirname, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  DEFAULT_STAGES,
+  HOST_CAPABILITIES,
+} from '../../../libs/contracts/src/index.ts';
+import {
+  REVIEWED_LOCAL_CANDIDATE_POLICY,
+  createReviewedLocalCandidatePlan,
+} from '../../../libs/temari-core/src/index.ts';
+import { observeCodexProvider } from '../../../libs/host-adapters/src/index.ts';
+import {
+  FileChildTaskStore,
+  FileParallelWorkerReceiptStore,
+  FileEvidenceStore,
+  FileWorkflowReceiptStore,
+  executeRestartableParallelWorkers,
+  executeAndPersist,
+  verifyPersistedStageEvidence,
+} from '../../../libs/runtime/src/index.ts';
+import {
+  runCodexWorkersRequest,
+  parseCodexWorkersRequest,
+} from '../../../tools/run-codex-workers.mts';
+import {
+  runCodexWriteWorkersRequest,
+  parseWriteRunRequest,
+  assertWriteCandidate,
+} from '../../../tools/run-codex-write-workers.mts';
+
+export const digest = (bytes) =>
+  createHash('sha256').update(bytes).digest('hex');
+export const objectDigest = (value) => digest(canonical(value));
+function canonical(value) {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (value && typeof value === 'object')
+    return `{${Object.entries(value)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`)
+      .join(',')}}`;
+  return JSON.stringify(value);
+}
+function inside(root, path) {
+  const r = relative(root, path);
+  return !r || (!r.startsWith(`..${sep}`) && r !== '..' && !isAbsolute(r));
+}
+function id(value) {
+  assert(
+    typeof value === 'string' &&
+      /^[A-Za-z0-9][A-Za-z0-9._-]{0,100}$/.test(value),
+    'Invalid managed identity.',
+  );
+}
+async function json(path) {
+  return JSON.parse(await readFile(path, 'utf8'));
+}
+async function sealed(path, value) {
+  try {
+    await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, {
+      flag: 'wx',
+      mode: 0o600,
+    });
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error;
+    assert.deepEqual(
+      await json(path),
+      value,
+      'Immutable managed record changed.',
+    );
+  }
+}
+async function exists(path) {
+  try {
+    await access(path);
+    return true;
+  } catch (error) {
+    if (error.code === 'ENOENT') return false;
+    throw error;
+  }
+}
+function git(root, ...args) {
+  return execFileSync('git', ['-C', root, ...args], {
+    encoding: 'utf8',
+    timeout: 10000,
+    maxBuffer: 1024 * 1024,
+  }).trim();
+}
+function pinned(root, commit) {
+  assert.equal(
+    git(root, 'rev-parse', 'HEAD'),
+    commit,
+    'Candidate revision drifted.',
+  );
+  assert.equal(
+    git(root, 'status', '--porcelain=v1', '--untracked-files=all'),
+    '',
+    'Candidate is dirty.',
+  );
+}
+async function files(root, checkOutputs = false) {
+  const result = [];
+  for (const item of await readdir(root, { withFileTypes: true })) {
+    const path = join(root, item.name);
+    if (item.isDirectory()) {
+      if (
+        item.name === '.git' ||
+        (checkOutputs && /(?:-derived|-ui|-legacy|unit-copy)$/.test(item.name))
+      )
+        continue;
+      result.push(...(await files(path, checkOutputs)));
+    } else {
+      assert(item.isFile(), 'Managed evidence cannot contain symlinks.');
+      const bytes = await readFile(path);
+      result.push({ path, sha256: digest(bytes), bytes: bytes.length });
+    }
+  }
+  return result;
+}
+async function checkRefs(refs) {
+  assert(Array.isArray(refs) && refs.length > 0, 'Evidence refs missing.');
+  for (const ref of refs) {
+    assert(isAbsolute(ref.path));
+    assert(
+      (await lstat(ref.path)).isFile(),
+      'Evidence must be a regular file.',
+    );
+    const bytes = await readFile(ref.path);
+    assert.equal(digest(bytes), ref.sha256, `Evidence drift: ${ref.path}`);
+    if (ref.bytes !== undefined) assert.equal(bytes.length, ref.bytes);
+  }
+}
+function capabilities(source, observedAt) {
+  return {
+    host: 'managed-local-codex',
+    available: ['subagents'],
+    missing: HOST_CAPABILITIES.filter((x) => x !== 'subagents'),
+    notes: { subagents: source },
+    provenance: { subagents: { status: 'proven', source, observedAt } },
+  };
+}
+
+/** Source-only admission. Digest arguments are supplied independently of the request. */
+export async function admitReviewedLocalCandidate({
+  specPath,
+  expectedSha256,
+}) {
+  assert(isAbsolute(specPath));
+  assert.match(expectedSha256, /^[0-9a-f]{64}$/);
+  const bytes = await readFile(specPath);
+  assert(bytes.length <= 256 * 1024, 'Managed request too large.');
+  assert.equal(
+    digest(bytes),
+    expectedSha256,
+    'Managed request digest changed.',
+  );
+  const spec = JSON.parse(bytes);
+  assert.equal(spec.schema, 1);
+  assert.equal(spec.profile, 'reviewed-local-candidate-v1');
+  id(spec.runId);
+  id(spec.taskId);
+  assert.deepEqual(
+    spec.plan,
+    createReviewedLocalCandidatePlan(),
+    'Managed plan/policy mismatch.',
+  );
+  assert.equal(
+    spec.policySha256,
+    objectDigest(REVIEWED_LOCAL_CANDIDATE_POLICY),
+    'Managed policy changed.',
+  );
+  assert.match(spec.baseCommit, /^[0-9a-f]{40}$/);
+  for (const key of ['repositoryRoot', 'evidenceRoot']) {
+    assert(isAbsolute(spec[key]));
+    assert.equal(
+      await realpath(spec[key]),
+      spec[key],
+      'Managed roots must be canonical existing directories.',
+    );
+  }
+  assert(
+    !inside(spec.repositoryRoot, spec.evidenceRoot) &&
+      !inside(spec.evidenceRoot, spec.repositoryRoot),
+    'Candidate/evidence roots overlap.',
+  );
+  assert(
+    !inside(spec.repositoryRoot, specPath),
+    'Request must be protected outside candidate.',
+  );
+  assert(
+    spec.timeoutMs >= 1000 &&
+      spec.timeoutMs <= 900000 &&
+      Number.isSafeInteger(spec.timeoutMs),
+    'Managed timeout exceeds bound.',
+  );
+  assert.equal(spec.workers.architect.role, 'investigator');
+  assert.equal(spec.workers.builder.role, 'implementer');
+  assert.equal(spec.workers.reviewer.role, 'reviewer');
+  const assignments = Object.values(spec.workers);
+  assert.equal(
+    new Set(assignments.map((a) => a.id)).size,
+    3,
+    'Worker identities must be distinct.',
+  );
+  assert(
+    assignments.every((a) => a.required === true),
+    'Every worker is required.',
+  );
+  assert(
+    Array.isArray(spec.acceptance) &&
+      spec.acceptance.length > 0 &&
+      spec.acceptance.every((x) => typeof x === 'string' && x.trim()),
+    'Frozen acceptance required.',
+  );
+  const common = {
+    runId: spec.runId,
+    revision: spec.baseCommit,
+    workspaceRoot: spec.repositoryRoot,
+    sourceRepo: spec.repositoryRoot,
+    baseCommit: spec.baseCommit,
+    evidenceRoot: spec.evidenceRoot,
+    maxConcurrency: 1,
+    executable: spec.executable,
+    timeoutMs: spec.timeoutMs,
+    providerSelection: spec.providerSelection,
+  };
+  parseCodexWorkersRequest({
+    ...common,
+    assignments: [spec.workers.architect],
+  });
+  parseCodexWorkersRequest({ ...common, assignments: [spec.workers.reviewer] });
+  parseWriteRunRequest({
+    ...common,
+    assignments: [{ worker: spec.workers.builder, owns: spec.owns }],
+    verify: [{ program: 'git', args: ['diff', '--check'] }],
+  });
+  await checkRefs(spec.protectedInputs);
+  for (const ref of spec.protectedInputs)
+    assert(
+      !inside(spec.repositoryRoot, await realpath(ref.path)),
+      'Protected input is inside builder candidate.',
+    );
+  assert(
+    spec.baselineChecks.length > 0 && spec.acceptanceChecks.length > 0,
+    'Protected baseline and acceptance checks required.',
+  );
+  for (const command of [...spec.baselineChecks, ...spec.acceptanceChecks]) {
+    assert(
+      isAbsolute(command.program) &&
+        spec.protectedInputs.some((x) => x.path === command.program),
+      'Check executable must be protected.',
+    );
+    assert(
+      Array.isArray(command.args) &&
+        command.args.every((x) => typeof x === 'string' && !x.includes('\0')),
+    );
+    assert(
+      Number.isSafeInteger(command.timeoutMs) &&
+        command.timeoutMs > 0 &&
+        command.timeoutMs <= 600000,
+      'Check bound invalid.',
+    );
+  }
+  pinned(spec.repositoryRoot, spec.baseCommit);
+  const provider = await observeCodexProvider(
+    spec.executable,
+    spec.providerSelection,
+  );
+  // Establish CLI transport/sandbox/auth support before native dispatch; this is
+  // admission evidence, not a claim that planning/build/review have run.
+  const help = execFileSync(provider.executable, ['exec', '--help'], {
+    encoding: 'utf8',
+    timeout: 10000,
+    maxBuffer: 65536,
+  });
+  for (const flag of ['--sandbox', '--output-schema', '--json'])
+    assert(help.includes(flag), 'Missing Codex execution capability.');
+  const auth = execFileSync(provider.executable, ['login', 'status'], {
+    encoding: 'utf8',
+    timeout: 10000,
+    maxBuffer: 65536,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  assert(
+    auth.includes('Logged in') || auth === '',
+    'Codex authentication unavailable.',
+  );
+  return {
+    spec,
+    provider,
+    requestSha256: expectedSha256,
+    policySha256: spec.policySha256,
+    planSha256: objectDigest(spec.plan),
+  };
+}
+function binding(admitted, nativeRunId) {
+  return {
+    runId: admitted.spec.runId,
+    nativeRunId,
+    requestSha256: admitted.requestSha256,
+    policySha256: admitted.policySha256,
+    planSha256: admitted.planSha256,
+    baseCommit: admitted.spec.baseCommit,
+  };
+}
+async function loadStage(admitted, artifacts, nativeRunId, stage) {
+  const record = await json(join(artifacts, `${stage}.json`));
+  assert.equal(record.sha256, objectDigest(record.body), 'Stage record drift.');
+  assert.deepEqual(
+    record.body.binding,
+    binding(admitted, nativeRunId),
+    'Native/request/policy binding drift.',
+  );
+  assert.equal(record.body.stage, stage);
+  assert.equal(record.body.status, 'PASS');
+  await checkRefs(record.body.refs);
+  return record.body;
+}
+async function integration(admitted, artifacts, nativeRunId) {
+  const build = await loadStage(admitted, artifacts, nativeRunId, 'build');
+  const { integrationPath, integratedCommit } = build.result;
+  assert(
+    isAbsolute(integrationPath) &&
+      inside(admitted.spec.evidenceRoot, integrationPath),
+  );
+  assert.match(integratedCommit, /^[0-9a-f]{40}$/);
+  pinned(integrationPath, integratedCommit);
+  return { root: integrationPath, commit: integratedCommit };
+}
+async function fixedCheck(command, candidate, evidence, signal) {
+  const args = command.args.map((x) =>
+    x.replaceAll('{candidate}', candidate).replaceAll('{evidence}', evidence),
+  );
+  const startedAt = new Date().toISOString();
+  const child = spawn(command.program, args, {
+    cwd: candidate,
+    shell: false,
+    detached: process.platform !== 'win32',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const out = [];
+  const err = [];
+  let size = 0;
+  let timedOut = false;
+  let cancelled = false;
+  let limited = false;
+  const kill = () => {
+    try {
+      process.kill(
+        process.platform === 'win32' ? child.pid : -child.pid,
+        'SIGKILL',
+      );
+    } catch {}
+  };
+  const abort = () => {
+    cancelled = true;
+    kill();
+  };
+  signal?.addEventListener('abort', abort, { once: true });
+  if (signal?.aborted) abort();
+  const timer = setTimeout(() => {
+    timedOut = true;
+    kill();
+  }, command.timeoutMs);
+  const collect = (target, chunk) => {
+    size += chunk.length;
+    if (size > 4 * 1024 * 1024) {
+      limited = true;
+      kill();
+    } else target.push(chunk);
+  };
+  child.stdout.on('data', (x) => collect(out, x));
+  child.stderr.on('data', (x) => collect(err, x));
+  const end = await new Promise((resolve) => {
+    child.once('error', (e) => resolve({ code: null, error: e.message }));
+    child.once('close', (code, signal) => resolve({ code, signal }));
+  });
+  clearTimeout(timer);
+  signal?.removeEventListener('abort', abort);
+  const record = {
+    program: command.program,
+    args,
+    pid: child.pid,
+    startedAt,
+    endedAt: new Date().toISOString(),
+    ...end,
+    timedOut,
+    cancelled,
+    outputLimitExceeded: limited,
+    stdout: Buffer.concat(out).toString(),
+    stderr: Buffer.concat(err).toString(),
+  };
+  return record;
+}
+async function runChecks(admitted, commands, candidate, stage, signal) {
+  const root = join(
+    admitted.spec.evidenceRoot,
+    admitted.spec.runId,
+    `checks-${stage}`,
+  );
+  await mkdir(root, { recursive: true });
+  const results = [];
+  for (let i = 0; i < commands.length; i++) {
+    await checkRefs(admitted.spec.protectedInputs);
+    const path = join(root, `${i}.json`);
+    assert(
+      !(await exists(path)),
+      'Check outcome exists without stage capture; reconcile before continuing.',
+    );
+    const result = await fixedCheck(commands[i], candidate, root, signal);
+    await sealed(path, result);
+    results.push(result);
+    assert(
+      result.code === 0 &&
+        !result.timedOut &&
+        !result.cancelled &&
+        !result.outputLimitExceeded,
+      'Protected check failed; later stages blocked.',
+    );
+  }
+  return { results, refs: await files(root, true) };
+}
+async function worker(admitted, stage, candidate, assignment, signal) {
+  const spec = admitted.spec;
+  const root = join(spec.evidenceRoot, spec.runId);
+  await mkdir(root, { recursive: true });
+  const childStore = await FileChildTaskStore.create(join(root, 'children'));
+  const receiptStore = await FileParallelWorkerReceiptStore.create(
+    join(root, 'child-receipts'),
+  );
+  const evidenceStore = await FileEvidenceStore.create(
+    join(root, 'child-evidence'),
+  );
+  const runId = `${spec.runId}-${stage}`;
+  const workerRoot = join(root, stage);
+  await mkdir(workerRoot, { recursive: true });
+  const common = {
+    runId,
+    revision: candidate.commit,
+    workspaceRoot: candidate.root,
+    sourceRepo: candidate.root,
+    baseCommit: candidate.commit,
+    evidenceRoot: workerRoot,
+    maxConcurrency: 1,
+    executable: spec.executable,
+    timeoutMs: spec.timeoutMs,
+    providerSelection: spec.providerSelection,
+  };
+  const plan = {
+    ...spec.plan,
+    workType: stage === 'build' ? 'feature' : 'investigation',
+  };
+  const result = await executeRestartableParallelWorkers({
+    runId,
+    revision: candidate.commit,
+    plan,
+    capabilities: capabilities(
+      'Pinned supported Codex exec transport; actual child evidence required for closeout',
+      new Date().toISOString(),
+    ),
+    assignments: [assignment],
+    childStore,
+    receiptStore,
+    evidenceStore,
+    owner: `archon:${stage}`,
+    leaseMs: 30000,
+    leaseRenewal: { intervalMs: 5000 },
+    retryPolicy: { maxAttempts: 1 },
+    maxConcurrency: 1,
+    handler: async () => {
+      const result =
+        stage === 'build'
+          ? await runCodexWriteWorkersRequest(
+              {
+                ...common,
+                assignments: [{ worker: assignment, owns: spec.owns }],
+                verify: [
+                  {
+                    program: 'git',
+                    args: ['diff', '--check'],
+                    timeoutMs: 10000,
+                  },
+                ],
+              },
+              signal,
+            )
+          : await runCodexWorkersRequest(
+              { ...common, assignments: [assignment] },
+              signal,
+            );
+      await sealed(join(workerRoot, 'operation-result.json'), result);
+      const refs = await files(join(workerRoot, runId));
+      return {
+        status: result.status,
+        summary: `Managed ${stage} ${result.status}`,
+        evidencePaths: refs.map((x) => x.path),
+        rawLogPath: null,
+      };
+    },
+    evidenceForAssignment: async (_, result) => [
+      { kind: 'worker-result', content: JSON.stringify(result) },
+    ],
+  });
+  assert.equal(
+    result.state,
+    'COMPLETE',
+    'Worker is unresolved; no duplicate dispatch permitted.',
+  );
+  assert.equal(result.receipt.status, 'PASS', JSON.stringify(result.receipt));
+  const operation = await json(join(workerRoot, 'operation-result.json'));
+  assert.equal(operation.status, 'PASS');
+  return {
+    operation,
+    child: {
+      storeRoot: join(root, 'children'),
+      groupId: result.group.groupId,
+      runId,
+      revision: candidate.commit,
+      taskIds: result.group.taskIds,
+    },
+    refs: await files(join(workerRoot, runId)),
+  };
+}
+
+/** Each native node calls exactly one operation. Immutable captures prevent replay. */
+export async function captureReviewedLocalCandidate({
+  specPath,
+  expectedSha256,
+  artifacts,
+  nativeRunId,
+  stage,
+  signal,
+  reconcileIntentSha256,
+}) {
+  const admitted = await admitReviewedLocalCandidate({
+    specPath,
+    expectedSha256,
+  });
+  id(nativeRunId);
+  assert(DEFAULT_STAGES.includes(stage));
+  assert(isAbsolute(artifacts));
+  await mkdir(artifacts, { recursive: true });
+  const path = join(artifacts, `${stage}.json`);
+  if (await exists(path))
+    return loadStage(admitted, artifacts, nativeRunId, stage);
+  const predecessors = [];
+  for (const prior of DEFAULT_STAGES.slice(0, DEFAULT_STAGES.indexOf(stage)))
+    predecessors.push(await loadStage(admitted, artifacts, nativeRunId, prior));
+  const intent = join(artifacts, `${stage}.intent.json`);
+  if (await exists(intent)) {
+    assert(
+      stage === 'build' && reconcileIntentSha256,
+      'Uncertain stage dispatch retained; reconcile exact child/native identities before any re-execution.',
+    );
+    const bytes = await readFile(intent);
+    assert.equal(
+      digest(bytes),
+      reconcileIntentSha256,
+      'Retained dispatch intent changed.',
+    );
+    const retained = JSON.parse(bytes);
+    assert.deepEqual(retained.binding, binding(admitted, nativeRunId));
+    assert.equal(retained.stage, stage);
+    const store = await FileParallelWorkerReceiptStore.create(
+      join(admitted.spec.evidenceRoot, admitted.spec.runId, 'child-receipts'),
+    );
+    const accepted = await store.load(`${admitted.spec.runId}-build`);
+    assert.equal(
+      accepted?.receipt.status,
+      'PASS',
+      'Uncertain build has no accepted exact child result; duplicate dispatch denied.',
+    );
+    assert(
+      await exists(
+        join(
+          admitted.spec.evidenceRoot,
+          admitted.spec.runId,
+          'build',
+          'operation-result.json',
+        ),
+      ),
+      'Accepted integration result is missing.',
+    );
+  } else {
+    assert(!reconcileIntentSha256, 'No retained build intent to reconcile.');
+    await sealed(intent, {
+      binding: binding(admitted, nativeRunId),
+      stage,
+      pid: process.pid,
+      startedAt: new Date().toISOString(),
+    });
+  }
+  const startedAt = new Date().toISOString();
+  const spec = admitted.spec;
+  let result;
+  let refs;
+  const baseline = { root: spec.repositoryRoot, commit: spec.baseCommit };
+  if (stage === 'investigate') {
+    const checks = await runChecks(
+      admitted,
+      spec.baselineChecks,
+      baseline.root,
+      'baseline',
+      signal,
+    );
+    const observed = await worker(
+      admitted,
+      stage,
+      baseline,
+      spec.workers.architect,
+      signal,
+    );
+    result = {
+      architect: observed.operation,
+      child: observed.child,
+      baseline: checks.results,
+    };
+    refs = [...checks.refs, ...observed.refs];
+  } else if (stage === 'plan') {
+    // The independent architect's retained proposal is supplied verbatim to the
+    // sole builder, while authority, ownership and check expectations stay frozen.
+    const proposal = predecessors[0].result.architect;
+    result = {
+      acceptance: spec.acceptance,
+      owns: spec.owns,
+      architectReceipt: proposal.receiptPath,
+      architectReceiptSha256: digest(await readFile(proposal.receiptPath)),
+    };
+    refs = [
+      { path: proposal.receiptPath, sha256: result.architectReceiptSha256 },
+    ];
+  } else if (stage === 'build') {
+    const assignment = {
+      ...spec.workers.builder,
+      brief: {
+        ...spec.workers.builder.brief,
+        context: `${spec.workers.builder.brief.context}\nIndependent architect proposal: ${predecessors[1].result.architectReceipt}. Read it before editing. Frozen acceptance: ${JSON.stringify(spec.acceptance)}`,
+      },
+    };
+    const observed = await worker(
+      admitted,
+      stage,
+      baseline,
+      assignment,
+      signal,
+    );
+    await assertWriteCandidate(
+      observed.operation.integrationPath,
+      observed.operation.integratedCommit,
+    );
+    assert.notEqual(
+      observed.operation.integratedCommit,
+      spec.baseCommit,
+      'Build must produce a changed candidate.',
+    );
+    result = { ...observed.operation, child: observed.child };
+    refs = observed.refs;
+  } else if (stage === 'review') {
+    const candidate = await integration(admitted, artifacts, nativeRunId);
+    const assignment = {
+      ...spec.workers.reviewer,
+      brief: {
+        ...spec.workers.reviewer.brief,
+        context: `${spec.workers.reviewer.brief.context}\nExact baseline ${spec.baseCommit}; review candidate ${candidate.commit}. Frozen acceptance: ${JSON.stringify(spec.acceptance)}. Protected tests: ${JSON.stringify(spec.protectedInputs)}`,
+      },
+    };
+    const observed = await worker(
+      admitted,
+      stage,
+      candidate,
+      assignment,
+      signal,
+    );
+    pinned(candidate.root, candidate.commit);
+    result = { ...observed.operation, candidate, child: observed.child };
+    refs = observed.refs;
+  } else if (stage === 'verify') {
+    const candidate = await integration(admitted, artifacts, nativeRunId);
+    const checks = await runChecks(
+      admitted,
+      spec.acceptanceChecks,
+      candidate.root,
+      'acceptance',
+      signal,
+    );
+    pinned(candidate.root, candidate.commit);
+    result = { candidate, checks: checks.results };
+    refs = checks.refs;
+  } else {
+    const candidate = await integration(admitted, artifacts, nativeRunId);
+    result = {
+      profile: spec.profile,
+      delivery: 'local',
+      candidate,
+      acceptance: spec.acceptance,
+      publication: 'denied',
+    };
+    refs = predecessors.flatMap((x) => x.refs);
+  }
+  await checkRefs(spec.protectedInputs);
+  pinned(spec.repositoryRoot, spec.baseCommit);
+  assert(!signal?.aborted, 'Cancelled stage cannot publish completion.');
+  const body = {
+    binding: binding(admitted, nativeRunId),
+    stage,
+    status: 'PASS',
+    startedAt,
+    endedAt: new Date().toISOString(),
+    result,
+    refs,
+  };
+  await sealed(path, { body, sha256: objectDigest(body) });
+  return body;
+}
+
+/** Independent readback: worker PASS and native success never suffice alone. */
+export async function verifyReviewedLocalCandidate({
+  specPath,
+  expectedSha256,
+  artifacts,
+  nativeRunId,
+}) {
+  const admitted = await admitReviewedLocalCandidate({
+    specPath,
+    expectedSha256,
+  });
+  id(nativeRunId);
+  const stages = [];
+  for (const stage of DEFAULT_STAGES)
+    stages.push(await loadStage(admitted, artifacts, nativeRunId, stage));
+  for (let i = 1; i < stages.length; i++)
+    assert(
+      Date.parse(stages[i].startedAt) >= Date.parse(stages[i - 1].endedAt),
+      'Stage ordering changed.',
+    );
+  const candidate = await integration(admitted, artifacts, nativeRunId);
+  assert.deepEqual(stages[3].result.candidate, candidate);
+  assert.deepEqual(stages[4].result.candidate, candidate);
+  assert.deepEqual(stages[5].result.candidate, candidate);
+  const workers = [];
+  for (const index of [0, 2, 3]) {
+    const stage = stages[index];
+    const assignment =
+      index === 0
+        ? admitted.spec.workers.architect
+        : index === 2
+          ? admitted.spec.workers.builder
+          : admitted.spec.workers.reviewer;
+    const processes = stage.refs.filter((x) =>
+      x.path.endsWith(`/process.json`),
+    );
+    assert.equal(processes.length, 1, 'Exactly one observed worker required.');
+    const processEvidence = await json(processes[0].path);
+    assert(processEvidence.pid > 0);
+    assert.equal(processEvidence.exitCode, 0);
+    assert(
+      !processEvidence.timedOut &&
+        !processEvidence.cancelled &&
+        !processEvidence.outputLimitExceeded &&
+        !processEvidence.error,
+    );
+    assert.deepEqual(
+      processEvidence.provider.requested,
+      admitted.spec.providerSelection,
+    );
+    assert.equal(
+      processEvidence.provider.observed.sha256,
+      admitted.spec.providerSelection.executableSha256,
+    );
+    assert(
+      processEvidence.argv.includes(
+        index === 2 ? 'workspace-write' : 'read-only',
+      ),
+    );
+    const child = stage.result.child;
+    assert.equal(
+      child.revision,
+      index === 3 ? candidate.commit : admitted.spec.baseCommit,
+    );
+    const store = await FileChildTaskStore.create(child.storeRoot);
+    const group = await store.loadGroup(child.groupId);
+    assert.equal(group.runId, child.runId);
+    assert.deepEqual(group.taskIds, child.taskIds);
+    for (const taskId of child.taskIds) {
+      const task = await store.load(taskId);
+      assert.equal(task.status, 'SUCCEEDED');
+      assert.deepEqual(group.assignmentIds, [assignment.id]);
+      assert.equal(task.revision, child.revision);
+    }
+    workers.push({
+      id: assignment.id,
+      role: assignment.role,
+      pid: processEvidence.pid,
+      nativeThreadId: processEvidence.nativeThreadId ?? null,
+      process: processes[0],
+      child,
+    });
+  }
+  assert.equal(
+    new Set(workers.map((x) => x.pid)).size,
+    3,
+    'Workers must be distinct processes.',
+  );
+  assert(stages[0].result.baseline.every((x) => x.code === 0));
+  assert.equal(
+    stages[4].result.checks.length,
+    admitted.spec.acceptanceChecks.length,
+  );
+  assert(
+    stages[4].result.checks.every(
+      (x) => x.code === 0 && !x.timedOut && !x.cancelled,
+    ),
+  );
+  return { admitted, stages, candidate, workers };
+}
+
+export async function finalizeReviewedLocalCandidate(input) {
+  const verified = await verifyReviewedLocalCandidate(input);
+  const { admitted, stages, candidate, workers } = verified;
+  const root = join(input.artifacts, 'reviewed-local-candidate');
+  const receipts = await FileWorkflowReceiptStore.create(
+    join(root, 'receipts'),
+  );
+  const evidence = await FileEvidenceStore.create(join(root, 'evidence'));
+  let receipt = await receipts.load(admitted.spec.runId);
+  if (!receipt)
+    receipt = await executeAndPersist({
+      runId: admitted.spec.runId,
+      revision: admitted.spec.baseCommit,
+      plan: admitted.spec.plan,
+      capabilities: capabilities(
+        `Three exact pinned worker processes: ${workers.map((x) => x.pid).join(',')}`,
+        stages[3].endedAt,
+      ),
+      store: receipts,
+      stageEvidence: { store: evidence },
+      handler: (stage) => ({
+        status: 'PASS',
+        summary: `Archon-managed ${stage}; ${admitted.spec.profile}`,
+        evidence: [
+          {
+            name: 'managed-capture',
+            kind: 'verification',
+            content: JSON.stringify(stages[DEFAULT_STAGES.indexOf(stage)]),
+          },
+        ],
+      }),
+    });
+  assert.equal(receipt.status, 'PASS');
+  assert.deepEqual(receipt.plan, admitted.spec.plan);
+  const readback = await verifyPersistedStageEvidence({
+    runId: admitted.spec.runId,
+    revision: admitted.spec.baseCommit,
+    store: receipts,
+    evidenceStore: evidence,
+  });
+  for (let i = 0; i < stages.length; i++)
+    assert.deepEqual(
+      JSON.parse(
+        Buffer.from(readback.stages[i].payloads[0].content).toString(),
+      ),
+      stages[i],
+      'Canonical capture drift.',
+    );
+  const completion = {
+    schema: 1,
+    profile: admitted.spec.profile,
+    status: 'PASS',
+    binding: binding(admitted, input.nativeRunId),
+    taskId: admitted.spec.taskId,
+    candidate,
+    workers,
+    receiptSha256: objectDigest(receipt),
+    scope: 'reviewed-local-candidate-only',
+    publication: 'denied',
+  };
+  await sealed(join(root, 'completion.json'), completion);
+  await sealed(join(input.artifacts, 'evidence.json'), {
+    version: 1,
+    kind: 'temari-reviewed-local-candidate',
+    ...completion,
+  });
+  return completion;
+}
+
+async function main(args) {
+  const command = args.shift();
+  const options = {};
+  for (let i = 0; i < args.length; i += 2) {
+    assert(
+      [
+        '--spec',
+        '--sha256',
+        '--artifacts',
+        '--workflow-id',
+        '--stage',
+        '--intent-sha256',
+      ].includes(args[i]) &&
+        args[i + 1] &&
+        !options[args[i]],
+      'Invalid managed CLI argument.',
+    );
+    options[args[i]] = args[i + 1];
+  }
+  const input = {
+    specPath: options['--spec'],
+    expectedSha256: options['--sha256'],
+    artifacts: options['--artifacts'],
+    nativeRunId: options['--workflow-id'],
+    stage: options['--stage'],
+    reconcileIntentSha256: options['--intent-sha256'],
+  };
+  const controller = new AbortController();
+  for (const event of ['SIGINT', 'SIGTERM'])
+    process.once(event, () => controller.abort());
+  input.signal = controller.signal;
+  const result =
+    command === 'capture'
+      ? await captureReviewedLocalCandidate(input)
+      : command === 'finalize'
+        ? await finalizeReviewedLocalCandidate(input)
+        : command === 'verify'
+          ? await verifyReviewedLocalCandidate(input)
+          : command === 'admit'
+            ? await admitReviewedLocalCandidate(input)
+            : null;
+  assert(result, 'Unsupported managed CLI command.');
+  const report = command === 'capture'
+    ? { status: result.status, stage: result.stage, binding: result.binding }
+    : command === 'admit'
+      ? { requestSha256: result.requestSha256, policySha256: result.policySha256, planSha256: result.planSha256, provider: result.provider }
+      : command === 'verify'
+        ? { status: 'evidence-verified', candidate: result.candidate, workers: result.workers }
+        : result;
+  console.log(JSON.stringify(report));
+}
+if (process.argv[1] === fileURLToPath(import.meta.url))
+  main(process.argv.slice(2)).catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });

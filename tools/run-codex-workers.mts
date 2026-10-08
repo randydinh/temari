@@ -9,6 +9,8 @@ import {
 } from '../libs/contracts/src/index.js';
 import {
   resolveCodexExecutable,
+  assertCodexProviderSelection,
+  type CodexProviderSelection,
   runCodexExecWorker,
 } from '../libs/host-adapters/src/index.js';
 import {
@@ -27,6 +29,7 @@ export interface CodexWorkersRequest {
   readonly timeoutMs: number;
   readonly outputLimitBytes?: number;
   readonly finalResponseLimitBytes?: number;
+  readonly providerSelection?: CodexProviderSelection;
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -100,6 +103,8 @@ function parseAssignment(value: unknown): WorkerAssignment {
 
 export function parseCodexWorkersRequest(value: unknown): CodexWorkersRequest {
   const input = record(value);
+  if (input.providerSelection !== undefined)
+    assertCodexProviderSelection(input.providerSelection);
   const runId = identifier(input.runId, 'runId');
   const revision = identifier(input.revision, 'revision');
   const workspaceRoot = absolutePath(input.workspaceRoot, 'workspaceRoot');
@@ -160,6 +165,9 @@ export function parseCodexWorkersRequest(value: unknown): CodexWorkersRequest {
     ...(finalResponseLimitBytes === undefined
       ? {}
       : { finalResponseLimitBytes }),
+    ...(input.providerSelection
+      ? { providerSelection: input.providerSelection }
+      : {}),
   };
 }
 
@@ -223,6 +231,7 @@ export async function runCodexWorkersRequest(
         timeoutMs: request.timeoutMs,
         outputLimitBytes: request.outputLimitBytes,
         finalResponseLimitBytes: request.finalResponseLimitBytes,
+        providerSelection: request.providerSelection,
         signal,
       }),
   });

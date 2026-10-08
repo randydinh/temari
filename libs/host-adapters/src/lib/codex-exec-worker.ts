@@ -3,6 +3,11 @@ import {
   retainProcessDiagnostic,
   type CapturedProcessDiagnostic,
 } from './process-capture.js';
+import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { promisify } from 'node:util';
+import { createReadStream } from 'node:fs';
+import { createInterface } from 'node:readline';
 import { constants } from 'node:fs';
 import {
   access,
@@ -64,6 +69,61 @@ export interface CodexExecWorkerOptions {
   readonly signal?: AbortSignal;
   /** For isolated synthetic read-only probes outside a Git checkout. */
   readonly skipGitRepoCheck?: boolean;
+  /** Explicit managed execution preserves the user's model settings. */
+  readonly providerSelection?: CodexProviderSelection;
+}
+
+export interface CodexProviderSelection {
+  readonly provider: 'codex';
+  readonly executableSha256: string;
+  readonly executableVersion: string;
+}
+
+export function assertCodexProviderSelection(
+  value: unknown,
+): asserts value is CodexProviderSelection {
+  const item = value as Partial<CodexProviderSelection> | null;
+  if (
+    !item ||
+    item.provider !== 'codex' ||
+    !/^[0-9a-f]{64}$/.test(item.executableSha256 ?? '') ||
+    !item.executableVersion?.startsWith('codex-cli ') ||
+    Object.keys(item).sort().join(',') !==
+      'executableSha256,executableVersion,provider'
+  )
+    throw new Error('Unsupported or unpinned coding provider selection.');
+}
+
+export async function observeCodexProvider(
+  executable: string,
+  selection: CodexProviderSelection,
+) {
+  assertCodexProviderSelection(selection);
+  const path = await resolveCodexExecutable(executable);
+  const sha256 = createHash('sha256')
+    .update(await readFile(path))
+    .digest('hex');
+  const version = (
+    await promisify(execFile)(path, ['--version'], {
+      timeout: 10000,
+      maxBuffer: 65536,
+    })
+  ).stdout.trim();
+  if (
+    sha256 !== selection.executableSha256 ||
+    version !== selection.executableVersion
+  )
+    throw new Error('Coding provider executable identity drifted.');
+  return {
+    provider: 'codex' as const,
+    executable: path,
+    sha256,
+    version,
+    model: null,
+    reasoning: null,
+    observation:
+      'CLI version and executable bytes; model/reasoning unavailable from this transport',
+  };
 }
 
 interface ProcessEvidence {
@@ -89,6 +149,13 @@ interface ProcessEvidence {
   readonly captureError: string | null;
   readonly finalResponseLimitBytes: number;
   readonly diagnostics: readonly CapturedProcessDiagnostic[];
+  readonly provider?: {
+    readonly requested: CodexProviderSelection;
+    readonly observed: Awaited<ReturnType<typeof observeCodexProvider>>;
+    readonly tools: readonly string[];
+  };
+  readonly argv?: readonly string[];
+  readonly nativeThreadId?: string | null;
 }
 
 export async function resolveCodexExecutable(
@@ -161,6 +228,9 @@ async function executeCodexExecWorker(
   if (!Number.isSafeInteger(limit) || limit < 1) {
     throw new Error('finalResponseLimitBytes must be a positive integer.');
   }
+  const provider = options.providerSelection
+    ? await observeCodexProvider(options.executable, options.providerSelection)
+    : null;
   await mkdir(options.evidenceDirectory, { recursive: true, mode: 0o700 });
   const schemaPath = join(options.evidenceDirectory, 'output-schema.json');
   const finalPath = join(options.evidenceDirectory, 'final.json');
@@ -226,7 +296,7 @@ async function executeCodexExecWorker(
   }
   const args = [
     'exec',
-    '--ignore-user-config',
+    ...(options.providerSelection ? [] : ['--ignore-user-config']),
     '--ephemeral',
     '--sandbox',
     sandbox,
@@ -268,6 +338,23 @@ async function executeCodexExecWorker(
       cause,
     );
   }
+  const nativeThreadIds = new Set<string>();
+  let nativeIdentityError: string | null = null;
+  if (provider && capture.stdout.available) {
+    const lines = createInterface({ input: createReadStream(stdoutPath), crlfDelay: Infinity });
+    try {
+      for await (const line of lines) {
+        try {
+          const event = JSON.parse(line);
+          if (event.type === 'thread.started' && typeof event.thread_id === 'string') nativeThreadIds.add(event.thread_id);
+        } catch { /* Retain non-event output in the raw log. */ }
+      }
+      if (nativeThreadIds.size > 1) nativeIdentityError = 'Worker transport returned conflicting native thread identities.';
+    } catch (cause) {
+      nativeIdentityError = 'Worker native thread identity capture failed.';
+      await retainAdapterCause('metadata', cause);
+    } finally { lines.close(); }
+  }
   const evidence: ProcessEvidence = {
     schema: 1,
     pid: capture.pid,
@@ -278,7 +365,7 @@ async function executeCodexExecWorker(
     timedOut: capture.timedOut,
     cancelled: capture.cancelled,
     outputLimitExceeded: false,
-    error: capture.error,
+    error: nativeIdentityError ?? capture.error,
     stdoutAvailable: capture.stdout.available,
     stderrAvailable: capture.stderr.available,
     stdoutBytes: capture.stdout.receivedBytes,
@@ -291,6 +378,17 @@ async function executeCodexExecWorker(
     captureError: capture.stdout.error ?? capture.stderr.error,
     finalResponseLimitBytes: limit,
     diagnostics: capture.diagnostics,
+    ...(provider && options.providerSelection
+      ? {
+          provider: {
+            requested: options.providerSelection,
+            observed: provider,
+            tools: [sandbox],
+          },
+          argv: args,
+          nativeThreadId: nativeThreadIds.values().next().value ?? null,
+        }
+      : {}),
   };
   try {
     await writeFile(processPath, `${JSON.stringify(evidence, null, 2)}\n`, {
@@ -305,7 +403,7 @@ async function executeCodexExecWorker(
     );
   }
   const { cancelled, timedOut } = capture;
-  const spawnError = capture.error;
+  const spawnError = nativeIdentityError ?? capture.error;
   const exit = { code: capture.code, signal: capture.signal };
   let status: WorkerResult['status'] = 'BLOCKED';
   let summary: string;

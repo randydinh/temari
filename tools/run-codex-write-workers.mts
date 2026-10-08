@@ -38,6 +38,8 @@ import {
   resolveCodexExecutable,
   runProcessToFiles,
   retainProcessDiagnostic,
+  assertCodexProviderSelection,
+  type CodexProviderSelection,
   runCodexExecWriteWorker,
   type CodexWriteOwnedPath,
   type CapturedStream,
@@ -73,6 +75,7 @@ export interface WriteRunRequest {
   readonly timeoutMs: number;
   readonly outputLimitBytes?: number;
   readonly finalResponseLimitBytes?: number;
+  readonly providerSelection?: CodexProviderSelection;
   readonly prepare?: readonly CommandSpec[];
   readonly verify: readonly CommandSpec[];
   readonly assignments: readonly WriteAssignment[];
@@ -260,6 +263,8 @@ function worker(value: unknown): WorkerAssignment {
 }
 export function parseWriteRunRequest(value: unknown): WriteRunRequest {
   const item = object(value);
+  if (item.providerSelection !== undefined)
+    assertCodexProviderSelection(item.providerSelection);
   const runId = id(item.runId, 'runId');
   const sourceRepo = absolute(item.sourceRepo, 'sourceRepo');
   const evidenceRoot = absolute(item.evidenceRoot, 'evidenceRoot');
@@ -337,6 +342,9 @@ export function parseWriteRunRequest(value: unknown): WriteRunRequest {
     ...(finalResponseLimitBytes === undefined
       ? {}
       : { finalResponseLimitBytes }),
+    ...(item.providerSelection
+      ? { providerSelection: item.providerSelection }
+      : {}),
     prepare: (item.prepare ?? []).map(command),
     verify: item.verify.map(command),
     assignments,
@@ -1253,6 +1261,7 @@ export async function runCodexWriteWorkersRequest(
           timeoutMs: request.timeoutMs,
           outputLimitBytes: request.outputLimitBytes,
           finalResponseLimitBytes: request.finalResponseLimitBytes,
+          providerSelection: request.providerSelection,
           signal,
           baseCommit: request.baseCommit,
           owns: entry.owns,

@@ -93,8 +93,8 @@ function canonical(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function sha256(value: string): string {
-  return createHash('sha256').update(value, 'utf8').digest('hex');
+function sha256(value: string | Uint8Array): string {
+  return createHash('sha256').update(value).digest('hex');
 }
 
 function nativeBinding(reference: Omit<HarnessRunRef, 'externalRunId' | 'startedAt'>): Record<string, unknown> {
@@ -420,6 +420,88 @@ export class ArchonHarness implements ExecutionHarness {
         ? { nativeProjectId: output.codebase_id }
         : {}),
     };
+  }
+
+  /** Explicit source-managed local candidate; separate from conformance and
+   * from feature-v1. Pinned bridge admission runs before native dispatch. */
+  async startReviewedLocalCandidate(
+    request: Omit<HarnessRunRequest, 'entrypoint' | 'inputs'>,
+    paths: {
+      readonly specPath: string;
+      readonly bridgePath: string;
+      readonly expectedRequestSha256: string;
+      readonly expectedBridgeSha256: string;
+    },
+  ): Promise<HarnessRunRef> {
+    if (
+      !this.options.workflowSource ||
+      !isAbsolute(this.options.workflowSource)
+    )
+      throw new Error(
+        'Managed candidate requires an explicit workflow source.',
+      );
+    await access(
+      join(
+        this.options.workflowSource,
+        '.archon',
+        'workflows',
+        'temari-reviewed-local-candidate.yaml',
+      ),
+    );
+    for (const path of [paths.specPath, paths.bridgePath])
+      if (!isAbsolute(path))
+        throw new Error('Managed candidate paths must be absolute.');
+    const bytes = await readFile(paths.specPath);
+    if (
+      sha256(bytes) !== paths.expectedRequestSha256 ||
+      sha256(await readFile(paths.bridgePath)) !== paths.expectedBridgeSha256
+    )
+      throw new Error('Managed candidate external input pin changed.');
+    const spec = JSON.parse(bytes.toString('utf8')) as {
+      profile?: unknown;
+      runId?: unknown;
+      baseCommit?: unknown;
+      repositoryRoot?: unknown;
+      plan?: unknown;
+    };
+    if (
+      spec.profile !== 'reviewed-local-candidate-v1' ||
+      spec.runId !== request.runId ||
+      spec.baseCommit !== request.revision ||
+      spec.repositoryRoot !== request.workspaceRoot ||
+      canonical(spec.plan) !== canonical(request.plan) ||
+      request.plan.delegation !== 'required' ||
+      request.plan.review !== 'independent' ||
+      request.plan.delivery !== 'local' ||
+      (request.plan.parallelism?.maxConcurrency ?? 0) !== 1 ||
+      canonical(request.plan.stages) !== canonical(DEFAULT_STAGES)
+    )
+      throw new Error(
+        'Managed candidate request, baseline or obligations changed.',
+      );
+    const admission = await (this.options.commandRunner ?? defaultRunner()).run(
+      'bun',
+      [paths.bridgePath, 'admit', '--spec', paths.specPath, '--sha256', paths.expectedRequestSha256],
+      request.workspaceRoot,
+      { ...process.env, ...this.options.environment },
+      30_000,
+    );
+    if (admission.exitCode !== 0)
+      throw new Error(`Managed candidate admission refused before native dispatch: ${admission.stderr}`);
+    const admitted = parseJson(admission.stdout, 'Managed candidate admission');
+    if (admitted.requestSha256 !== paths.expectedRequestSha256 || admitted.planSha256 !== sha256(canonical(request.plan)))
+      throw new Error('Managed candidate admission identity changed.');
+    return this.start({
+      ...request,
+      recovery: 'required',
+      entrypoint: 'temari-reviewed-local-candidate',
+      inputs: {
+        bridge: paths.bridgePath,
+        spec: paths.specPath,
+        request_sha256: paths.expectedRequestSha256,
+        bridge_sha256: paths.expectedBridgeSha256,
+      },
+    });
   }
 
   async verifyRunIdentity(reference: HarnessRunRef): Promise<void> {

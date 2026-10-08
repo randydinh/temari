@@ -175,6 +175,10 @@
         "options": {
           "command": "tsc --ignoreConfig --noEmit --module nodenext --moduleResolution nodenext --target es2022 --types node --strict --skipLibCheck tools/pinned-submodules.mts tools/pinned-submodules.test.mts tools/run-codex-write-workers.mts tools/run-codex-write-workers.test.mts"
         }
+      },
+      "managed-candidate-test": {
+        "command": "node --import @swc-node/register/esm-register --test tools/reviewed-local-candidate.test.mjs",
+        "cache": false
       }
     }
   },

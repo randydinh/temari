@@ -475,3 +475,28 @@ test('native project links use only a safe observed codebase identity', async ()
     assert.equal(snapshot.nativeProjectId, codebaseId === 'project-123' ? 'project-123' : undefined);
   }
 });
+
+test('managed candidate admission is pinned and refuses missing capabilities before native dispatch', async () => {
+  const { mkdir } = await import('node:fs/promises');
+  const { createHash } = await import('node:crypto');
+  const { reconcilePlan } = await import('@temari/contracts');
+  const root = await mkdtemp(join(tmpdir(), 'temari-managed-admission-'));
+  const sha = (bytes: string | Uint8Array) => createHash('sha256').update(bytes).digest('hex');
+  try {
+    const workflowSource = join(root, 'source');
+    await mkdir(join(workflowSource, '.archon/workflows'), { recursive: true });
+    await writeFile(join(workflowSource, '.archon/workflows/temari-reviewed-local-candidate.yaml'), 'fixture');
+    const plan = reconcilePlan({workType:'feature',delegation:'required',review:'independent',evidence:'revision-bound',delivery:'local',parallelism:{maxConcurrency:1}});
+    const specPath=join(root,'spec.json');const bridgePath=join(root,'bridge.mjs');
+    const spec=JSON.stringify({profile:'reviewed-local-candidate-v1',runId:'managed-run',baseCommit:'b'.repeat(40),repositoryRoot:root,plan});
+    await writeFile(specPath,spec);await writeFile(bridgePath,'fixture');
+    const paths={specPath,bridgePath,expectedRequestSha256:sha(spec),expectedBridgeSha256:sha('fixture')};
+    const calls: Array<{args:readonly string[];cwd:string}>=[];
+    const harness=new ArchonHarness({runtime,workflowSource,commandRunner:{async run(executable,args,cwd){calls.push({args,cwd});assert.equal(executable,'bun');return {exitCode:1,stdout:'',stderr:'Missing supported coding transport'};}}});
+    const request={runId:'managed-run',revision:'b'.repeat(40),plan,workspaceRoot:root,recovery:'required' as const};
+    await assert.rejects(harness.startReviewedLocalCandidate(request,paths),/before native dispatch/);
+    assert.equal(calls.length,1);assert.equal(calls[0]!.args[1],'admit');
+    await assert.rejects(harness.startReviewedLocalCandidate(request,{...paths,expectedBridgeSha256:'0'.repeat(64)}),/pin changed/);
+    assert.equal(calls.length,1);
+  } finally { await rm(root,{recursive:true,force:true}); }
+});

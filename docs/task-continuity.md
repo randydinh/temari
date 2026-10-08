@@ -33,6 +33,13 @@ automatically restarted. There is no Pause control. See the
 [configuration and limits](task-dashboard.md#control-configuration-reference)
 before enabling execution.
 
+The separate source-only [reviewed local candidate operation](reviewed-local-candidate.md)
+admits one coupled builder inside an Archon-managed six-stage journey. Its
+route-specific result reader verifies current task/native/worker/evidence and
+protected acceptance bindings. It does not change generic TaskRuntime acceptance
+or installed feature-v1 delivery. Retain its exact result as task continuation
+context; ordinary task snapshots do not report stronger-route DONE.
+
 For implementation, the coordinator selects the host-configured plan and pins
 the user's goal with its typed ownership scopes and verification commands. Bind
 both implementer and reviewer groups to the logical task. Child success does not

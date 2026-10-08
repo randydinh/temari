@@ -1,0 +1,64 @@
+name: temari-reviewed-local-candidate
+description: Temari-governed one-builder local candidate with independent review and protected checks.
+inputs:
+  temari_binding:
+    required: true
+  bridge:
+    required: true
+  spec:
+    required: true
+  request_sha256:
+    required: true
+  bridge_sha256:
+    required: true
+evidence_policy:
+  required: true
+nodes:
+  - id: investigate
+    mutates_checkout: false
+    bash: >-
+      test "$(shasum -a 256 "$INPUTS_BRIDGE" | cut -d " " -f 1)" = "$INPUTS_BRIDGE_SHA256" &&
+      bun "$INPUTS_BRIDGE" capture --spec "$INPUTS_SPEC" --sha256 "$INPUTS_REQUEST_SHA256"
+      --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --stage investigate
+  - id: plan
+    depends_on: [investigate]
+    mutates_checkout: false
+    bash: >-
+      test "$(shasum -a 256 "$INPUTS_BRIDGE" | cut -d " " -f 1)" = "$INPUTS_BRIDGE_SHA256" &&
+      bun "$INPUTS_BRIDGE" capture --spec "$INPUTS_SPEC" --sha256 "$INPUTS_REQUEST_SHA256"
+      --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --stage plan
+  - id: build
+    depends_on: [plan]
+    mutates_checkout: false
+    bash: >-
+      test "$(shasum -a 256 "$INPUTS_BRIDGE" | cut -d " " -f 1)" = "$INPUTS_BRIDGE_SHA256" &&
+      bun "$INPUTS_BRIDGE" capture --spec "$INPUTS_SPEC" --sha256 "$INPUTS_REQUEST_SHA256"
+      --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --stage build
+  - id: review
+    depends_on: [build]
+    mutates_checkout: false
+    bash: >-
+      test "$(shasum -a 256 "$INPUTS_BRIDGE" | cut -d " " -f 1)" = "$INPUTS_BRIDGE_SHA256" &&
+      bun "$INPUTS_BRIDGE" capture --spec "$INPUTS_SPEC" --sha256 "$INPUTS_REQUEST_SHA256"
+      --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --stage review
+  - id: verify
+    depends_on: [review]
+    mutates_checkout: false
+    bash: >-
+      test "$(shasum -a 256 "$INPUTS_BRIDGE" | cut -d " " -f 1)" = "$INPUTS_BRIDGE_SHA256" &&
+      bun "$INPUTS_BRIDGE" capture --spec "$INPUTS_SPEC" --sha256 "$INPUTS_REQUEST_SHA256"
+      --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --stage verify
+  - id: deliver
+    depends_on: [verify]
+    mutates_checkout: false
+    bash: >-
+      test "$(shasum -a 256 "$INPUTS_BRIDGE" | cut -d " " -f 1)" = "$INPUTS_BRIDGE_SHA256" &&
+      bun "$INPUTS_BRIDGE" capture --spec "$INPUTS_SPEC" --sha256 "$INPUTS_REQUEST_SHA256"
+      --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --stage deliver
+  - id: finalize
+    depends_on: [deliver]
+    mutates_checkout: false
+    bash: >-
+      test "$(shasum -a 256 "$INPUTS_BRIDGE" | cut -d " " -f 1)" = "$INPUTS_BRIDGE_SHA256" &&
+      bun "$INPUTS_BRIDGE" finalize --spec "$INPUTS_SPEC" --sha256 "$INPUTS_REQUEST_SHA256"
+      --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID"
