@@ -38,6 +38,7 @@ before(async () => {
     'feature-proof.mjs',
     'forge.mjs',
     'local-worker.mjs',
+    'git-candidate.mjs',
   ])
     await copyFile(
       new URL(`../packages/workflow-runtime/host/${file}`, import.meta.url),
@@ -68,6 +69,7 @@ async function fixture(t, changes = {}) {
     'feature-proof.mjs',
     'forge.mjs',
     'local-worker.mjs',
+    'git-candidate.mjs',
   ])
     await copyFile(join(build, file), join(root, file));
   const candidate = join(root, 'candidate');

@@ -1645,6 +1645,8 @@ for (const trackingMode of [
   'tracked',
   'worker-failure',
   'duplicate-start',
+  'pinned-submodules',
+  'pinned-reviewer-mutation',
 ]) {
   test(`full feature start binds local host proof to six persisted stages (${trackingMode})`, async (t) => {
     if (process.platform === 'win32')
@@ -1662,6 +1664,47 @@ for (const trackingMode of [
     await writeFile(join(candidate, 'README.md'), 'base\n');
     execFileSync('git', ['add', 'README.md'], { cwd: candidate });
     execFileSync('git', ['commit', '-qm', 'base'], { cwd: candidate });
+    if (trackingMode.startsWith('pinned-')) {
+      const child = join(root, 'local-dependency');
+      execFileSync('git', ['init', '-q', child]);
+      const git = (...args) => execFileSync('git', ['-C', child, ...args]);
+      git('config', 'user.name', 'Test');
+      git('config', 'user.email', 'test@localhost');
+      await writeFile(join(child, 'privacy.txt'), 'pinned dependency\n');
+      await writeFile(join(child, '.gitignore'), 'private.txt\n');
+      git('add', '.');
+      git('commit', '-qm', 'dependency');
+      execFileSync('git', [
+        '-C',
+        candidate,
+        '-c',
+        'protocol.file.allow=always',
+        'submodule',
+        'add',
+        '-q',
+        child,
+        'app/dependencies/privacy',
+      ]);
+      execFileSync('git', [
+        '-C',
+        candidate,
+        'commit',
+        '-qam',
+        'pin dependency',
+      ]);
+      execFileSync('git', [
+        '-C',
+        candidate,
+        'config',
+        'submodule.app/dependencies/privacy.ignore',
+        'all',
+      ]);
+      await writeFile(
+        join(candidate, 'app/dependencies/privacy/private.txt'),
+        'private',
+      );
+    }
+
     execFileSync('git', [
       '-C',
       candidate,
@@ -1712,6 +1755,7 @@ process.stdin.on('end', () => {
   const finish = () => {
   const id = prompt.match(/Goal: ([A-Za-z]+)/)?.[1] ?? 'unknown';
   if (sandbox === 'workspace-write') fs.writeFileSync(id + '.txt', id + '\\n');
+  if (id === 'review' && process.env.FAKE_REVIEW_MUTATION === 'yes') fs.writeFileSync('app/dependencies/privacy/privacy.txt', 'reviewer mutation');
   fs.writeFileSync(final, JSON.stringify({status:process.env.FAKE_WORKER_FAIL === 'yes' ? 'ISSUES' : 'PASS',summary:id}));
   };
   if (process.env.FAKE_WAIT_GATE && !fs.existsSync(process.env.FAKE_WAIT_GATE)) {
@@ -1823,6 +1867,8 @@ process.stdin.on('end', () => {
             FAKE_INTEGRATION_PATH: integrationPath,
             FAKE_FORGE_LOG: join(root, 'forge-calls.log'),
             FAKE_WORKER_LOG: join(root, 'worker-calls.log'),
+            FAKE_REVIEW_MUTATION:
+              trackingMode === 'pinned-reviewer-mutation' ? 'yes' : 'no',
             FAKE_WORKER_FAIL: trackingMode === 'worker-failure' ? 'yes' : 'no',
             FAKE_WAIT_GATE:
               trackingMode === 'duplicate-start'
@@ -1872,7 +1918,7 @@ process.stdin.on('end', () => {
               reject,
               timer: setTimeout(
                 () => reject(new Error(`Feature stage timeout: ${stderr}`)),
-                15000,
+                60000,
               ),
             };
           });
@@ -1954,6 +2000,18 @@ process.stdin.on('end', () => {
         forgeBefore,
       );
       await writeFile(join(root, 'release-workers'), 'continue\n');
+    }
+    if (trackingMode === 'pinned-reviewer-mutation') {
+      assert.notEqual(await session.done, 0);
+      await assert.rejects(lstat(runDirectory), { code: 'ENOENT' });
+      assert.equal(
+        await readFile(
+          join(candidate, 'app/dependencies/privacy/privacy.txt'),
+          'utf8',
+        ),
+        'pinned dependency\n',
+      );
+      return;
     }
     if (trackingMode === 'worker-failure') {
       assert.notEqual(await session.done, 0);
@@ -2131,7 +2189,10 @@ process.stdin.on('end', () => {
     const runtime = await import(
       pathToFileURL(artifactRequire.resolve('@temari/runtime')).href
     );
-    const current = await runtime.observeCandidate(descriptor.candidate);
+    const current = await runtime.observeCandidate({
+      ...descriptor.candidate,
+      observation: descriptor.expectedInitial.scope,
+    });
     const currentBytes = Buffer.from(JSON.stringify(current));
     const currentPath = join(root, 'current.json');
     await writeFile(currentPath, currentBytes);
@@ -2158,6 +2219,95 @@ process.stdin.on('end', () => {
       },
     );
     assert.equal(JSON.parse(closeout.stdout).status, 'candidate-verified');
+    assert.equal(descriptor.expectedInitial.scope, 'git-tracked-files-v1');
+    if (trackingMode === 'pinned-submodules') {
+      const dependencies = runtime.observePinnedDependencies(
+        candidate,
+        baseCommit,
+      );
+      runtime.verifyPinnedDependencies(integrationPath, dependencies);
+      await assert.rejects(
+        readFile(join(integrationPath, 'app/dependencies/privacy/private.txt')),
+        /ENOENT/,
+      );
+      const before = await runtime.observeCandidate({
+        ...descriptor.candidate,
+        observation: 'git-tracked-files-v1',
+      });
+      await writeFile(
+        join(integrationPath, '.git/description'),
+        'metadata change only',
+      );
+      assert.deepEqual(
+        await runtime.observeCandidate({
+          ...descriptor.candidate,
+          observation: 'git-tracked-files-v1',
+        }),
+        before,
+      );
+      const { verifyLocalFeatureHostProof } = await import(
+        pathToFileURL(join(artifact, 'host/feature-proof.mjs')).href
+      );
+      const verifyProof = () =>
+        verifyLocalFeatureHostProof({
+          runId: descriptor.runId,
+          revision: descriptor.revision,
+          candidateRoot: candidate,
+          evidenceRoot,
+          baseCommit,
+          hostBinding: descriptor.featureHost.hostBinding,
+          proofSha256: descriptor.featureHost.proofSha256,
+        });
+      const oldPath = process.env.PATH;
+      process.env.PATH = root + ':' + oldPath;
+      const oldIntegration = process.env.FAKE_INTEGRATION_PATH;
+      process.env.FAKE_INTEGRATION_PATH = integrationPath;
+      const oldLog = process.env.FAKE_FORGE_LOG;
+      process.env.FAKE_FORGE_LOG = join(root, 'forge-calls.log');
+      try {
+        await verifyProof();
+        for (const target of [candidate, integrationPath]) {
+          const path = join(target, 'app/dependencies/privacy/privacy.txt');
+          await writeFile(path, 'hidden mutation');
+          await assert.rejects(verifyProof());
+          await writeFile(path, 'pinned dependency\n');
+        }
+      } finally {
+        if (oldPath === undefined) delete process.env.PATH;
+        else process.env.PATH = oldPath;
+        if (oldIntegration === undefined)
+          delete process.env.FAKE_INTEGRATION_PATH;
+        else process.env.FAKE_INTEGRATION_PATH = oldIntegration;
+        if (oldLog === undefined) delete process.env.FAKE_FORGE_LOG;
+        else process.env.FAKE_FORGE_LOG = oldLog;
+      }
+      await writeFile(
+        join(integrationPath, 'app/dependencies/privacy/privacy.txt'),
+        'closeout mutation',
+      );
+      await childResult(
+        [
+          join(artifact, 'bin/closeout.mjs'),
+          'verify',
+          '--request',
+          requestPath,
+          '--expected-request-sha256',
+          digest(requestBytes),
+          '--expected-manifest-sha256',
+          manifestSha256(manifest),
+          '--expected-current',
+          currentPath,
+          '--expected-current-sha256',
+          digest(currentBytes),
+        ],
+        1,
+        {
+          PATH: root + ':' + process.env.PATH,
+          FAKE_INTEGRATION_PATH: integrationPath,
+          FAKE_FORGE_LOG: join(root, 'forge-calls.log'),
+        },
+      );
+    }
   });
 }
 

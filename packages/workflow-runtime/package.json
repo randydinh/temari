@@ -154,6 +154,27 @@
       "communication-bundle-test": {
         "command": "node --test --test-name-pattern=\"packages an isolated relocated outer bundle|both engineering skills reach shared conversation guidance\" tools/public-entry-runtime.test.mjs",
         "cache": false
+      },
+      "pinned-submodules-test": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test --test-isolation=none tools/pinned-submodules.test.mts tools/run-codex-write-workers.test.mts tools/run-codex-parallel.test.mts libs/runtime/src/lib/candidate.test.ts libs/contracts/src/lib/workflow-receipt.test.ts"
+        }
+      },
+      "pinned-submodules-package-test": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --test --test-name-pattern=\"packages an isolated relocated|full feature|feature host proof|packaged closeout|host forge gate|relocated public bundle routes\" tools/public-entry-runtime.test.mjs"
+        }
+      },
+      "pinned-submodules-typecheck": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "tsc --ignoreConfig --noEmit --module nodenext --moduleResolution nodenext --target es2022 --types node --strict --skipLibCheck tools/pinned-submodules.mts tools/pinned-submodules.test.mts tools/run-codex-write-workers.mts tools/run-codex-write-workers.test.mts"
+        }
       }
     }
   },

@@ -1,5 +1,5 @@
+import { verifyGitCandidate } from './git-candidate.mjs';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { lstat, mkdir, realpath, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
@@ -7,9 +7,7 @@ import { exactFields, readBoundedFile } from './stdio.mjs';
 
 const RECEIPT_BYTES = 4 * 1024 * 1024;
 const PROCESS_BYTES = 64 * 1024;
-const gitEnvironment = Object.fromEntries(
-  Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_')),
-);
+const OBSERVATION_BYTES = 4 * 1024 * 1024;
 
 function digest(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
@@ -34,31 +32,6 @@ async function existingDirectory(path, label) {
   return realpath(selected);
 }
 
-function git(root, ...args) {
-  return execFileSync('git', ['-C', root, ...args], {
-    encoding: 'utf8',
-    env: gitEnvironment,
-    timeout: 10000,
-  }).trim();
-}
-
-function assertPinnedCandidate(root, baseCommit) {
-  assert.equal(
-    git(root, 'rev-parse', '--show-toplevel'),
-    root,
-    'Candidate must be the Git root.',
-  );
-  assert.equal(
-    git(root, 'rev-parse', 'HEAD'),
-    baseCommit,
-    'Candidate HEAD changed.',
-  );
-  assert.equal(
-    git(root, 'status', '--porcelain=v1', '--untracked-files=all'),
-    '',
-    'Candidate must be clean.',
-  );
-}
 
 function workerRoute(assignment) {
   assert(
@@ -133,7 +106,10 @@ export async function runLocalHostWorker(input, signal) {
       'Host verification commands are required.',
     );
   }
-  assertPinnedCandidate(candidateRoot, input.baseCommit);
+  const dependencies = await verifyGitCandidate(
+    candidateRoot,
+    input.baseCommit,
+  );
   const common = {
     runId: input.runId,
     evidenceRoot,
@@ -159,7 +135,7 @@ export async function runLocalHostWorker(input, signal) {
         };
   const { runCodexParallelRequest } = await import('../bin/codex-parallel.mjs');
   const result = await runCodexParallelRequest(request, signal);
-  assertPinnedCandidate(candidateRoot, input.baseCommit);
+  await verifyGitCandidate(candidateRoot, input.baseCommit, dependencies);
   assert.equal(result.route, route);
   const runRoot =
     route === 'read-only'
@@ -213,6 +189,7 @@ export async function runLocalHostWorker(input, signal) {
     runId: input.runId,
     revision: input.revision,
     candidate: { root: candidateRoot, baseCommit: input.baseCommit },
+    dependencies,
     worker: {
       id: input.assignment.id,
       role: input.assignment.role,
@@ -355,6 +332,12 @@ export async function runLocalFeatureWorkerPair(input, signal) {
     build.integratedCommit,
     'Reviewer inspected a different commit.',
   );
+  await verifyGitCandidate(candidateRoot, input.baseCommit, build.dependencies);
+  await verifyGitCandidate(
+    build.integrationPath,
+    build.integratedCommit,
+    build.dependencies,
+  );
   const report = {
     schemaVersion: 1,
     host: 'local-codex',
@@ -365,6 +348,7 @@ export async function runLocalFeatureWorkerPair(input, signal) {
       ? {}
       : { hostBinding: input.hostBinding }),
     source: build.candidate,
+    dependencies: build.dependencies,
     integratedCommit: build.integratedCommit,
     builder: {
       id: build.worker.id,
@@ -418,7 +402,7 @@ export async function verifyLocalFeatureWorkerPair(input) {
       !contains(evidenceRoot, candidateRoot),
     'Candidate and worker evidence must be disjoint.',
   );
-  assertPinnedCandidate(candidateRoot, input.baseCommit);
+  await verifyGitCandidate(candidateRoot, input.baseCommit);
   const pairRoot = join(evidenceRoot, input.runId);
   const reportPath = join(pairRoot, 'feature-workers.json');
   const reportBytes = await readBoundedFile(reportPath, RECEIPT_BYTES);
@@ -428,18 +412,28 @@ export async function verifyLocalFeatureWorkerPair(input) {
     'Worker report digest changed.',
   );
   const report = JSON.parse(reportBytes.toString());
-  exactFields(report, [
-    'schemaVersion',
-    'host',
-    'status',
-    'runId',
-    'revision',
-    'hostBinding',
-    'source',
-    'integratedCommit',
-    'builder',
-    'reviewer',
-  ]);
+  exactFields(
+    report,
+    [
+      'schemaVersion',
+      'host',
+      'status',
+      'runId',
+      'revision',
+      'hostBinding',
+      'source',
+      'integratedCommit',
+      'builder',
+      'reviewer',
+    ],
+    ['dependencies'],
+  );
+  if (report.dependencies !== undefined)
+    await verifyGitCandidate(
+      candidateRoot,
+      input.baseCommit,
+      report.dependencies,
+    );
   assert.equal(report.schemaVersion, 1);
   assert.equal(report.host, 'local-codex');
   assert.equal(report.status, 'PASS');
@@ -457,9 +451,10 @@ export async function verifyLocalFeatureWorkerPair(input) {
     `${input.runId}-build`,
     'integration',
   );
-  assertPinnedCandidate(
+  await verifyGitCandidate(
     await existingDirectory(integrationPath, 'integrationPath'),
     report.integratedCommit,
+    report.dependencies,
   );
   async function checkWorker(record, expected) {
     exactFields(record, [
@@ -484,7 +479,10 @@ export async function verifyLocalFeatureWorkerPair(input) {
       record.observationPath,
       join(runRoot, 'host-observation.json'),
     );
-    const bytes = await readBoundedFile(record.observationPath, PROCESS_BYTES);
+    const bytes = await readBoundedFile(
+      record.observationPath,
+      OBSERVATION_BYTES,
+    );
     assert.equal(digest(bytes), record.observationSha256);
     const observation = JSON.parse(bytes.toString());
     assert.equal(observation.status, 'PASS');

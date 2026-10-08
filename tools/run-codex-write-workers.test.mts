@@ -741,3 +741,136 @@ test('write verification setup failure retains the empty owned stdout and full p
   assert(!JSON.stringify(receipt).includes('PRIVATE_VERIFICATION_SETUP'));
   assert.equal(git(f.repo, 'rev-parse', 'HEAD'), f.baseCommit);
 });
+
+async function submoduleFixture() {
+  const f = await fixture();
+  const childSource = join(f.root, 'dependency');
+  git(f.root, 'init', '-q', childSource);
+  git(childSource, 'config', 'user.name', 'Test');
+  git(childSource, 'config', 'user.email', 'test@localhost');
+  await writeFile(join(childSource, 'library.txt'), 'pinned\n');
+  await writeFile(join(childSource, '.gitignore'), 'private.txt\n');
+  git(childSource, 'add', '.');
+  git(childSource, 'commit', '-qm', 'dependency');
+  git(
+    f.repo,
+    '-c',
+    'protocol.file.allow=always',
+    'submodule',
+    'add',
+    '-q',
+    childSource,
+    'app/dependencies/privacy',
+  );
+  git(f.repo, 'commit', '-qam', 'pin');
+  git(f.repo, 'config', 'submodule.app/dependencies/privacy.ignore', 'all');
+  await writeFile(
+    join(f.repo, 'app/dependencies/privacy/private.txt'),
+    'private',
+  );
+  return { ...f, baseCommit: git(f.repo, 'rev-parse', 'HEAD') };
+}
+
+test('application-only workers preserve pinned dependencies and retain portable dependency evidence', async () => {
+  const f = await submoduleFixture();
+  const result = await runCodexWriteWorkersRequest(request(f, 'pins'));
+  const receipt = JSON.parse(await readFile(result.receiptPath, 'utf8'));
+  assert.equal(result.status, 'PASS', receipt.reason);
+  assert.equal(receipt.dependencies.schema, 'pinned-readonly-dependencies-v1');
+  assert.equal(
+    receipt.dependencies.dependencies[0].path,
+    'app/dependencies/privacy',
+  );
+  assert.deepEqual(receipt.patches[0].dependencies, receipt.dependencies);
+  assert.equal(
+    await readFile(
+      join(result.integrationPath, 'app/dependencies/privacy/library.txt'),
+      'utf8',
+    ),
+    'pinned\n',
+  );
+  await assert.rejects(
+    readFile(
+      join(result.integrationPath, 'app/dependencies/privacy/private.txt'),
+    ),
+    /ENOENT/,
+  );
+  assert.equal(git(f.repo, 'rev-parse', 'HEAD'), f.baseCommit);
+  assert.equal(
+    git(f.repo, 'status', '--porcelain', '--ignore-submodules=none'),
+    '',
+  );
+});
+
+for (const phase of ['prepare', 'verify', 'worker']) {
+  for (const mutation of [
+    'tracked',
+    'untracked',
+    'mode',
+    'gitmodules',
+    'gitlink',
+  ]) {
+    test(`${phase} dependency ${mutation} mutation cannot publish an integration commit`, async () => {
+      const f = await submoduleFixture();
+      const code =
+        `const fs=require('node:fs');const cp=require('node:child_process');cp.execFileSync('git',['config','submodule.app/dependencies/privacy.ignore','all']);` +
+        {
+          tracked: `cp.execFileSync('git',['-C','app/dependencies/privacy','update-index','--assume-unchanged','library.txt']);fs.writeFileSync('app/dependencies/privacy/library.txt','mutated');`,
+          untracked: `fs.writeFileSync('app/dependencies/privacy/new.txt','mutated');`,
+          mode: `cp.execFileSync('git',['-C','app/dependencies/privacy','config','core.filemode','false']);fs.chmodSync('app/dependencies/privacy/library.txt',0o755);`,
+          gitmodules: `fs.appendFileSync('.gitmodules','\\n# mutated');`,
+          gitlink: `cp.execFileSync('git',['update-index','--force-remove','app/dependencies/privacy']);`,
+        }[mutation];
+      const input = {
+        ...request(f, `${phase}-${mutation}`, ['alpha']),
+        assignments: [
+          {
+            ...assignment('alpha'),
+            owns: [
+              { kind: 'file' as const, path: 'alpha.txt' },
+              { kind: 'directory' as const, path: 'app' },
+            ],
+          },
+        ],
+      };
+      if (phase === 'worker') {
+        const original = await readFile(f.executable, 'utf8');
+        await writeFile(
+          f.executable,
+          original.replace(
+            "else fs.writeFileSync(file, id + '\\n');",
+            `else { ${code} fs.writeFileSync(file, id + '\\n'); }`,
+          ),
+        );
+        // A broad parent scope still cannot grant permission to the dependency.
+      }
+      const result = await runCodexWriteWorkersRequest({
+        ...input,
+        ...(phase === 'worker'
+          ? {}
+          : { [phase]: [{ program: process.execPath, args: ['-e', code] }] }),
+      });
+      assert.notEqual(result.status, 'PASS');
+      assert.equal(result.integratedCommit, null);
+      assert.equal(git(f.repo, 'rev-parse', 'HEAD'), f.baseCommit);
+      assert.equal(
+        await readFile(
+          join(f.repo, 'app/dependencies/privacy/library.txt'),
+          'utf8',
+        ),
+        'pinned\n',
+      );
+    });
+  }
+}
+
+test('verification cannot hide an original-source dependency mutation', async () => {
+  const f = await submoduleFixture();
+  const target = join(f.repo, 'app/dependencies/privacy/library.txt');
+  const result = await runCodexWriteWorkersRequest({ ...request(f, 'source-mutation', ['alpha']), verify: [{ program: process.execPath, args: ['-e', `require('fs').writeFileSync(${JSON.stringify(target)},'mutated source');`] }] });
+  assert.equal(result.status, 'BLOCKED');
+  assert.equal(result.integratedCommit, null);
+  const receipt = JSON.parse(await readFile(result.receiptPath, 'utf8'));
+  assert.match(receipt.reason, /Dependency tracked bytes changed/);
+  assert.equal(receipt.verification.length, 1, 'Retain logs even when post-verification dependency checks fail.');
+});

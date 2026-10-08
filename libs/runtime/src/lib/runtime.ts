@@ -1,3 +1,4 @@
+import { observePinnedDependencies } from './git-dependencies.js';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import {
@@ -481,7 +482,19 @@ function captureExecutionRequest<T extends ExecuteAndPersistRequest>(
       ...request,
       plan: immutableCopy(request.plan),
       capabilities: immutableCopy(request.capabilities),
-      candidate: immutableCopy(request.candidate),
+      candidate: immutableCopy({
+        ...request.candidate,
+        scope: {
+          ...request.candidate.scope,
+          ...(request.candidate.scope.observation === 'git-tracked-files-v1'
+            ? {
+                dependencies:
+                  request.candidate.scope.dependencies ??
+                  observePinnedDependencies(request.candidate.scope.root),
+              }
+            : {}),
+        },
+      }),
       stageEvidence: { store: request.stageEvidence.store },
       checkpoint: request.checkpoint
         ? immutableCopy(request.checkpoint)
@@ -755,7 +768,8 @@ export interface CandidateCloseoutRequest {
 
 export interface VerifiedCandidateCloseout {
   readonly status: 'candidate-verified';
-  readonly scope: 'local-regular-file-candidate-only';
+  readonly scope:
+    'local-regular-file-candidate-only' | 'git-tracked-file-candidate-only';
   readonly runId: string;
   readonly revision: string;
   readonly initial: CandidateIdentity;
@@ -826,7 +840,10 @@ export async function verifyCandidateCloseout(
   await roots.recheck();
   return {
     status: 'candidate-verified',
-    scope: 'local-regular-file-candidate-only',
+    scope:
+      current.scope === 'git-tracked-files-v1'
+        ? 'git-tracked-file-candidate-only'
+        : 'local-regular-file-candidate-only',
     runId: selected.runId,
     revision: selected.revision,
     initial: { ...binding.initial },
