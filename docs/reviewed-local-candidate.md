@@ -43,14 +43,31 @@ patches into an isolated clone. The read-only reviewer sees that exact commit.
 Each operation uses the existing child store with renewable lease and one total
 handler attempt. Stage captures retain baseline, integration, plan, policy,
 request, native, child and process identities, plus evidence file hashes.
+Before child acceptance, the host publishes the exact operation-result bytes
+as portable `worker-result` evidence and a `verification` manifest through the
+existing evidence store. The manifest freezes the native/request/policy/plan
+binding, complete assignment, input and output candidate identity, result-file
+digest, and hashes of external worker/receipt/patch evidence. Successful build
+publication and readback require the operation's integration and patch to match
+the write receipt, its exact assignment and baseline, and the clean candidate.
+Stage refs also retain the accepted parallel receipt and both portable artifacts.
 Replay opens captures; it cannot rerun a successful builder. An uncertain
 intent refuses further dispatch. For a lost build capture after an accepted
 child, supply `--intent-sha256` independently; capture reconstructs the result
-only from the existing PASS child receipt and integration result. Unaccepted
-or ambiguous work stays blocked. Native uncertainty uses the existing
+only through a pre-existing PASS receipt read path. It uses the runtime's
+existing replay validation to check group/assignment identity and portable
+evidence, matches the receipt outcome to the SUCCEEDED child, and verifies the
+frozen operation bytes and external hashes before using the retained result.
+It never takes a new evidence snapshot or falls through to worker dispatch.
+Missing/inconsistent receipts, artifacts, result files or evidence refuse
+recovery; older reduced child results without the manifest are not upgraded.
+Unaccepted or ambiguous work stays blocked. Native uncertainty uses the existing
 `TaskRuntime.reconcileNative` with exact executor identity; never start again.
 
 After six valid captures, `finalize` independently reads every artifact and
+reopens each worker's accepted receipt and portable evidence through that same
+read path, comparing the captured operation and refs with the accepted child.
+It then
 uses `executeAndPersist` and the canonical evidence store. It does not write
 a hand-made workflow success receipt. `readReviewedLocalCandidateResult()`
 then checks the task's current run, confirmed controls, exact successful native

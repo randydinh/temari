@@ -440,7 +440,325 @@ async function runChecks(admitted, commands, candidate, stage, signal) {
   }
   return { results, refs: await files(root, true) };
 }
-async function worker(admitted, stage, candidate, assignment, signal) {
+function workerAssignment(spec, stage, candidate, architectReceipt) {
+  if (stage === 'investigate') return spec.workers.architect;
+  if (stage === 'build')
+    return {
+      ...spec.workers.builder,
+      brief: {
+        ...spec.workers.builder.brief,
+        context: `${spec.workers.builder.brief.context}\nIndependent architect proposal: ${architectReceipt}. Read it before editing. Frozen acceptance: ${JSON.stringify(spec.acceptance)}`,
+      },
+    };
+  assert.equal(stage, 'review');
+  return {
+    ...spec.workers.reviewer,
+    brief: {
+      ...spec.workers.reviewer.brief,
+      context: `${spec.workers.reviewer.brief.context}\nExact baseline ${spec.baseCommit}; review candidate ${candidate.commit}. Frozen acceptance: ${JSON.stringify(spec.acceptance)}. Protected tests: ${JSON.stringify(spec.protectedInputs)}`,
+    },
+  };
+}
+
+function workerSelection(admitted, nativeRunId, stage, candidate, assignment) {
+  const root = join(admitted.spec.evidenceRoot, admitted.spec.runId);
+  const runId = `${admitted.spec.runId}-${stage}`;
+  return {
+    root,
+    workerRoot: join(root, stage),
+    runId,
+    candidate,
+    assignment,
+    stage,
+    binding: {
+      ...binding(admitted, nativeRunId),
+      stage,
+      workerRunId: runId,
+      inputCandidate: candidate,
+      assignment,
+    },
+    plan: {
+      ...admitted.spec.plan,
+      workType: stage === 'build' ? 'feature' : 'investigation',
+    },
+  };
+}
+
+function parallelRequest(selection, childStore, receiptStore, evidenceStore) {
+  return {
+    runId: selection.runId,
+    revision: selection.candidate.commit,
+    plan: selection.plan,
+    capabilities: capabilities(
+      'Pinned supported Codex exec transport; actual child evidence required for closeout',
+      new Date().toISOString(),
+    ),
+    assignments: [selection.assignment],
+    childStore,
+    receiptStore,
+    evidenceStore,
+    owner: `archon:${selection.stage}`,
+    leaseMs: 30000,
+    leaseRenewal: { intervalMs: 5000 },
+    retryPolicy: { maxAttempts: 1 },
+    maxConcurrency: 1,
+  };
+}
+
+function outputCandidate(selection, operation) {
+  return selection.stage === 'build'
+    ? { root: operation.integrationPath, commit: operation.integratedCommit }
+    : selection.candidate;
+}
+
+async function verifyWorkerOperation(selection, operation, refs) {
+  assert.equal(operation.status, 'PASS');
+  const runPath = join(selection.workerRoot, selection.runId);
+  assert.equal(
+    operation.receiptPath,
+    selection.stage === 'build'
+      ? join(runPath, 'receipt.json')
+      : join(runPath, selection.candidate.commit, 'receipt.json'),
+    'Accepted operation receipt identity changed.',
+  );
+  const refByPath = new Map(refs.map((ref) => [ref.path, ref]));
+  assert(
+    refByPath.has(operation.receiptPath),
+    'Operation receipt is not frozen.',
+  );
+  const receipt = await json(operation.receiptPath);
+  assert.equal(receipt.schema, 1);
+  assert.equal(receipt.runId, selection.runId);
+  assert.equal(receipt.status, 'PASS');
+  let workerReceipt = receipt;
+  if (selection.stage === 'build') {
+    assert.equal(receipt.baseCommit, selection.candidate.commit);
+    assert.equal(receipt.reason, null);
+    assert.equal(receipt.integrationPath, operation.integrationPath);
+    assert.equal(receipt.integratedCommit, operation.integratedCommit);
+    assert.equal(operation.integrationPath, join(runPath, 'integration'));
+    assert.match(operation.integratedCommit, /^[0-9a-f]{40}$/);
+    assert.notEqual(operation.integratedCommit, selection.candidate.commit);
+    await assertWriteCandidate(
+      operation.integrationPath,
+      operation.integratedCommit,
+    );
+    assert.deepEqual(
+      git(
+        operation.integrationPath,
+        'rev-list',
+        '--parents',
+        '-n',
+        '1',
+        'HEAD',
+      ).split(' '),
+      [operation.integratedCommit, selection.candidate.commit],
+      'Accepted integration is not the builder baseline child.',
+    );
+    assert.equal(receipt.patches.length, 1);
+    const patch = receipt.patches[0];
+    assert.equal(patch.assignmentId, selection.assignment.id);
+    assert.equal(patch.baseCommit, selection.candidate.commit);
+    const patchRef = refByPath.get(patch.patchPath);
+    assert(patchRef, 'Write receipt patch evidence is missing.');
+    assert.match(patch.sha256, /^[0-9a-f]{64}$/);
+    assert.equal(
+      patchRef.sha256,
+      patch.sha256,
+      'Write receipt patch is not frozen in accepted evidence.',
+    );
+    assert.equal(receipt.verification.length, 1);
+    assert.equal(receipt.verification[0].code, 0);
+    assert(refByPath.has(receipt.verification[0].logPath));
+    workerReceipt = receipt.workerReceipt;
+  }
+  assert.equal(workerReceipt.runId, selection.runId);
+  assert.equal(workerReceipt.schema, 1);
+  assert.equal(workerReceipt.revision, selection.candidate.commit);
+  assert.equal(workerReceipt.status, 'PASS');
+  assert.equal(workerReceipt.failure, null);
+  assert.equal(workerReceipt.maxConcurrency, 1);
+  assert.equal(workerReceipt.outcomes.length, 1);
+  const outcome = workerReceipt.outcomes[0];
+  assert.deepEqual(outcome.assignment, selection.assignment);
+  assert.equal(outcome.error, null);
+  assert.equal(outcome.result.status, 'PASS');
+  assert(outcome.result.evidencePaths.every((path) => refByPath.has(path)));
+}
+
+/** Reads only a pre-existing accepted receipt. Missing proof cannot fall into dispatch. */
+async function readAcceptedWorker(
+  admitted,
+  nativeRunId,
+  stage,
+  candidate,
+  assignment,
+) {
+  const selection = workerSelection(
+    admitted,
+    nativeRunId,
+    stage,
+    candidate,
+    assignment,
+  );
+  const { root, runId, workerRoot } = selection;
+  for (const name of ['children', 'child-receipts', 'child-evidence'])
+    assert(
+      (await lstat(join(root, name))).isDirectory(),
+      'Accepted child store missing.',
+    );
+  const childStore = await FileChildTaskStore.create(join(root, 'children'));
+  const receipts = await FileParallelWorkerReceiptStore.create(
+    join(root, 'child-receipts'),
+  );
+  const evidenceStore = await FileEvidenceStore.openExisting(
+    join(root, 'child-evidence'),
+  );
+  const receiptPath = join(
+    root,
+    'child-receipts',
+    `${runId}.parallel.receipt.json`,
+  );
+  const receiptBytes = await readFile(receiptPath);
+  const accepted = await receipts.load(runId);
+  assert.equal(
+    accepted?.receipt.status,
+    'PASS',
+    'No accepted exact child result; duplicate dispatch denied.',
+  );
+  assert.equal(accepted.receipt.failure, null);
+  assert.equal(accepted.receipt.maxConcurrency, 1);
+  assert.deepEqual(JSON.parse(receiptBytes).receipt, accepted.receipt);
+  const result = await executeRestartableParallelWorkers({
+    ...parallelRequest(
+      selection,
+      childStore,
+      {
+        load: async (id) => {
+          assert.equal(id, runId);
+          return accepted;
+        },
+        save: async () => {
+          throw new Error('Accepted readback cannot publish or dispatch.');
+        },
+      },
+      evidenceStore,
+    ),
+    handler: async () => {
+      throw new Error('Accepted readback cannot dispatch a worker.');
+    },
+  });
+  assert.equal(result.state, 'COMPLETE');
+  assert.equal(result.tasks.length, 1);
+  assert.equal(result.group.runId, runId);
+  assert.equal(result.group.revision, candidate.commit);
+  assert.deepEqual(result.group.assignmentIds, [assignment.id]);
+  assert.deepEqual(
+    result.group.taskIds,
+    result.tasks.map((task) => task.taskId),
+  );
+  const task = result.tasks[0];
+  assert.equal(task.status, 'SUCCEEDED');
+  assert.equal(task.attempt, 1);
+  assert.equal(task.runId, runId);
+  assert.equal(task.revision, candidate.commit);
+  assert.equal(task.error, null);
+  assert.equal(accepted.receipt.outcomes.length, 1);
+  assert.deepEqual(accepted.receipt.outcomes[0], {
+    assignment,
+    result: task.result,
+    error: null,
+  });
+  const references = task.result.evidenceReferences;
+  assert.equal(
+    references?.length,
+    2,
+    'Accepted child is missing frozen operation evidence.',
+  );
+  const operationRef = references.find((ref) => ref.kind === 'worker-result');
+  const manifestRef = references.find((ref) => ref.kind === 'verification');
+  assert(
+    operationRef && manifestRef,
+    'Accepted operation/manifest evidence missing.',
+  );
+  const operationBytes = Buffer.from(
+    await evidenceStore.loadPortable(operationRef),
+  );
+  const manifest = JSON.parse(
+    Buffer.from(await evidenceStore.loadPortable(manifestRef)),
+  );
+  assert.equal(manifest.schema, 1);
+  assert.deepEqual(
+    manifest.binding,
+    selection.binding,
+    'Accepted operation binding changed.',
+  );
+  const { evidenceReferences, ...workerResult } = task.result;
+  assert.deepEqual(
+    workerResult,
+    manifest.result,
+    'Accepted child result differs from frozen manifest.',
+  );
+  assert.deepEqual(manifest.operation, {
+    path: join(workerRoot, 'operation-result.json'),
+    sha256: operationRef.sha256,
+    bytes: operationRef.bytes,
+  });
+  assert.equal(
+    new Set(manifest.refs.map((ref) => ref.path)).size,
+    manifest.refs.length,
+  );
+  assert(manifest.refs.every((ref) => inside(workerRoot, ref.path)));
+  assert.deepEqual(
+    manifest.refs.find((ref) => ref.path === manifest.operation.path),
+    manifest.operation,
+  );
+  assert.deepEqual(
+    manifest.result.evidencePaths,
+    manifest.refs.map((ref) => ref.path),
+  );
+  await checkRefs(manifest.refs);
+  const operation = JSON.parse(operationBytes);
+  assert.deepEqual(
+    manifest.outputCandidate,
+    outputCandidate(selection, operation),
+  );
+  await verifyWorkerOperation(selection, operation, manifest.refs);
+  const acceptedReceiptRef = {
+    path: receiptPath,
+    sha256: digest(receiptBytes),
+    bytes: receiptBytes.length,
+  };
+  await checkRefs([acceptedReceiptRef]);
+  return {
+    operation,
+    child: {
+      storeRoot: join(root, 'children'),
+      groupId: result.group.groupId,
+      runId,
+      revision: candidate.commit,
+      taskIds: result.group.taskIds,
+    },
+    refs: [
+      ...manifest.refs,
+      acceptedReceiptRef,
+      ...references.map((ref) => ({
+        path: join(root, 'child-evidence', `${ref.sha256}.artifact`),
+        sha256: ref.sha256,
+        bytes: ref.bytes,
+      })),
+    ],
+  };
+}
+
+async function worker(
+  admitted,
+  nativeRunId,
+  stage,
+  candidate,
+  assignment,
+  signal,
+) {
   const spec = admitted.spec;
   const root = join(spec.evidenceRoot, spec.runId);
   await mkdir(root, { recursive: true });
@@ -466,27 +784,16 @@ async function worker(admitted, stage, candidate, assignment, signal) {
     timeoutMs: spec.timeoutMs,
     providerSelection: spec.providerSelection,
   };
-  const plan = {
-    ...spec.plan,
-    workType: stage === 'build' ? 'feature' : 'investigation',
-  };
+  const selection = workerSelection(
+    admitted,
+    nativeRunId,
+    stage,
+    candidate,
+    assignment,
+  );
+  let publication;
   const result = await executeRestartableParallelWorkers({
-    runId,
-    revision: candidate.commit,
-    plan,
-    capabilities: capabilities(
-      'Pinned supported Codex exec transport; actual child evidence required for closeout',
-      new Date().toISOString(),
-    ),
-    assignments: [assignment],
-    childStore,
-    receiptStore,
-    evidenceStore,
-    owner: `archon:${stage}`,
-    leaseMs: 30000,
-    leaseRenewal: { intervalMs: 5000 },
-    retryPolicy: { maxAttempts: 1 },
-    maxConcurrency: 1,
+    ...parallelRequest(selection, childStore, receiptStore, evidenceStore),
     handler: async () => {
       const result =
         stage === 'build'
@@ -508,18 +815,49 @@ async function worker(admitted, stage, candidate, assignment, signal) {
               { ...common, assignments: [assignment] },
               signal,
             );
-      await sealed(join(workerRoot, 'operation-result.json'), result);
-      const refs = await files(join(workerRoot, runId));
-      return {
+      const path = join(workerRoot, 'operation-result.json');
+      await sealed(path, result);
+      const bytes = await readFile(path);
+      const operation = { path, sha256: digest(bytes), bytes: bytes.length };
+      const refs = [...(await files(join(workerRoot, runId))), operation];
+      const workerResult = {
         status: result.status,
         summary: `Managed ${stage} ${result.status}`,
         evidencePaths: refs.map((x) => x.path),
         rawLogPath: null,
       };
+      publication = {
+        bytes,
+        manifest: {
+          schema: 1,
+          binding: selection.binding,
+          operation,
+          outputCandidate: outputCandidate(selection, result),
+          refs,
+          result: workerResult,
+        },
+      };
+      return workerResult;
     },
-    evidenceForAssignment: async (_, result) => [
-      { kind: 'worker-result', content: JSON.stringify(result) },
-    ],
+    evidenceForAssignment: async (acceptedAssignment, result) => {
+      assert(
+        publication,
+        'Operation publication missing before child acceptance.',
+      );
+      assert.deepEqual(acceptedAssignment, assignment);
+      assert.deepEqual(result, publication.manifest.result);
+      await checkRefs(publication.manifest.refs);
+      if (result.status === 'PASS')
+        await verifyWorkerOperation(
+          selection,
+          JSON.parse(publication.bytes),
+          publication.manifest.refs,
+        );
+      return [
+        { kind: 'worker-result', content: publication.bytes },
+        { kind: 'verification', content: JSON.stringify(publication.manifest) },
+      ];
+    },
   });
   assert.equal(
     result.state,
@@ -527,19 +865,13 @@ async function worker(admitted, stage, candidate, assignment, signal) {
     'Worker is unresolved; no duplicate dispatch permitted.',
   );
   assert.equal(result.receipt.status, 'PASS', JSON.stringify(result.receipt));
-  const operation = await json(join(workerRoot, 'operation-result.json'));
-  assert.equal(operation.status, 'PASS');
-  return {
-    operation,
-    child: {
-      storeRoot: join(root, 'children'),
-      groupId: result.group.groupId,
-      runId,
-      revision: candidate.commit,
-      taskIds: result.group.taskIds,
-    },
-    refs: await files(join(workerRoot, runId)),
-  };
+  return readAcceptedWorker(
+    admitted,
+    nativeRunId,
+    stage,
+    candidate,
+    assignment,
+  );
 }
 
 /** Each native node calls exactly one operation. Immutable captures prevent replay. */
@@ -567,7 +899,8 @@ export async function captureReviewedLocalCandidate({
   for (const prior of DEFAULT_STAGES.slice(0, DEFAULT_STAGES.indexOf(stage)))
     predecessors.push(await loadStage(admitted, artifacts, nativeRunId, prior));
   const intent = join(artifacts, `${stage}.intent.json`);
-  if (await exists(intent)) {
+  const recoveringBuild = await exists(intent);
+  if (recoveringBuild) {
     assert(
       stage === 'build' && reconcileIntentSha256,
       'Uncertain stage dispatch retained; reconcile exact child/native identities before any re-execution.',
@@ -581,26 +914,6 @@ export async function captureReviewedLocalCandidate({
     const retained = JSON.parse(bytes);
     assert.deepEqual(retained.binding, binding(admitted, nativeRunId));
     assert.equal(retained.stage, stage);
-    const store = await FileParallelWorkerReceiptStore.create(
-      join(admitted.spec.evidenceRoot, admitted.spec.runId, 'child-receipts'),
-    );
-    const accepted = await store.load(`${admitted.spec.runId}-build`);
-    assert.equal(
-      accepted?.receipt.status,
-      'PASS',
-      'Uncertain build has no accepted exact child result; duplicate dispatch denied.',
-    );
-    assert(
-      await exists(
-        join(
-          admitted.spec.evidenceRoot,
-          admitted.spec.runId,
-          'build',
-          'operation-result.json',
-        ),
-      ),
-      'Accepted integration result is missing.',
-    );
   } else {
     assert(!reconcileIntentSha256, 'No retained build intent to reconcile.');
     await sealed(intent, {
@@ -625,6 +938,7 @@ export async function captureReviewedLocalCandidate({
     );
     const observed = await worker(
       admitted,
+      nativeRunId,
       stage,
       baseline,
       spec.workers.architect,
@@ -650,15 +964,15 @@ export async function captureReviewedLocalCandidate({
       { path: proposal.receiptPath, sha256: result.architectReceiptSha256 },
     ];
   } else if (stage === 'build') {
-    const assignment = {
-      ...spec.workers.builder,
-      brief: {
-        ...spec.workers.builder.brief,
-        context: `${spec.workers.builder.brief.context}\nIndependent architect proposal: ${predecessors[1].result.architectReceipt}. Read it before editing. Frozen acceptance: ${JSON.stringify(spec.acceptance)}`,
-      },
-    };
-    const observed = await worker(
+    const assignment = workerAssignment(
+      spec,
+      stage,
+      baseline,
+      predecessors[1].result.architectReceipt,
+    );
+    const observed = await (recoveringBuild ? readAcceptedWorker : worker)(
       admitted,
+      nativeRunId,
       stage,
       baseline,
       assignment,
@@ -677,15 +991,10 @@ export async function captureReviewedLocalCandidate({
     refs = observed.refs;
   } else if (stage === 'review') {
     const candidate = await integration(admitted, artifacts, nativeRunId);
-    const assignment = {
-      ...spec.workers.reviewer,
-      brief: {
-        ...spec.workers.reviewer.brief,
-        context: `${spec.workers.reviewer.brief.context}\nExact baseline ${spec.baseCommit}; review candidate ${candidate.commit}. Frozen acceptance: ${JSON.stringify(spec.acceptance)}. Protected tests: ${JSON.stringify(spec.protectedInputs)}`,
-      },
-    };
+    const assignment = workerAssignment(spec, stage, candidate);
     const observed = await worker(
       admitted,
+      nativeRunId,
       stage,
       candidate,
       assignment,
@@ -758,14 +1067,63 @@ export async function verifyReviewedLocalCandidate({
   assert.deepEqual(stages[4].result.candidate, candidate);
   assert.deepEqual(stages[5].result.candidate, candidate);
   const workers = [];
+  assert.equal(
+    stages[1].result.architectReceipt,
+    stages[0].result.architect.receiptPath,
+  );
   for (const index of [0, 2, 3]) {
     const stage = stages[index];
-    const assignment =
+    const inputCandidate =
+      index === 3
+        ? candidate
+        : {
+            root: admitted.spec.repositoryRoot,
+            commit: admitted.spec.baseCommit,
+          };
+    const assignment = workerAssignment(
+      admitted.spec,
+      stage.stage,
+      inputCandidate,
+      stages[1].result.architectReceipt,
+    );
+    const observed = await readAcceptedWorker(
+      admitted,
+      nativeRunId,
+      stage.stage,
+      inputCandidate,
+      assignment,
+    );
+    const baselineChecksRoot = join(
+      admitted.spec.evidenceRoot,
+      admitted.spec.runId,
+      'checks-baseline',
+    );
+    const workerRefs =
       index === 0
-        ? admitted.spec.workers.architect
-        : index === 2
-          ? admitted.spec.workers.builder
-          : admitted.spec.workers.reviewer;
+        ? stage.refs.filter((ref) => !inside(baselineChecksRoot, ref.path))
+        : stage.refs;
+    assert.deepEqual(
+      workerRefs,
+      observed.refs,
+      'Captured worker evidence differs from accepted child.',
+    );
+    assert.deepEqual(
+      stage.result.child,
+      observed.child,
+      'Captured child identity changed.',
+    );
+    if (index === 0)
+      assert.deepEqual(stage.result.architect, observed.operation);
+    else
+      assert.deepEqual(
+        stage.result,
+        {
+          ...observed.operation,
+          ...(index === 3 ? { candidate } : {}),
+          child: observed.child,
+        },
+        'Captured operation differs from accepted child.',
+      );
     const processes = stage.refs.filter((x) =>
       x.path.endsWith(`/process.json`),
     );
@@ -797,16 +1155,6 @@ export async function verifyReviewedLocalCandidate({
       child.revision,
       index === 3 ? candidate.commit : admitted.spec.baseCommit,
     );
-    const store = await FileChildTaskStore.create(child.storeRoot);
-    const group = await store.loadGroup(child.groupId);
-    assert.equal(group.runId, child.runId);
-    assert.deepEqual(group.taskIds, child.taskIds);
-    for (const taskId of child.taskIds) {
-      const task = await store.load(taskId);
-      assert.equal(task.status, 'SUCCEEDED');
-      assert.deepEqual(group.assignmentIds, [assignment.id]);
-      assert.equal(task.revision, child.revision);
-    }
     workers.push({
       id: assignment.id,
       role: assignment.role,

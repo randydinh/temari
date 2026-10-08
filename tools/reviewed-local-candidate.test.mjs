@@ -27,6 +27,9 @@ import {
   FileTaskStore,
   TaskRuntime,
   readReviewedLocalCandidateResult,
+  FileChildTaskStore,
+  FileParallelWorkerReceiptStore,
+  FileEvidenceStore,
 } from '../libs/runtime/src/index.ts';
 
 async function fixture(t, mode = 'pass') {
@@ -235,6 +238,240 @@ let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{
   };
 }
 const stages = ['investigate', 'plan', 'build', 'review', 'verify', 'deliver'];
+async function acceptedChild(f, stage = 'build') {
+  const root = join(f.spec.evidenceRoot, f.spec.runId);
+  const runId = `${f.spec.runId}-${stage}`;
+  const receiptRoot = join(root, 'child-receipts');
+  const receipts = await FileParallelWorkerReceiptStore.create(receiptRoot);
+  const accepted = await receipts.load(runId);
+  const children = await FileChildTaskStore.create(join(root, 'children'));
+  const group = await children.loadGroup(accepted.binding.groupId);
+  assert.equal(group.taskIds.length, 1);
+  const task = await children.load(group.taskIds[0]);
+  const evidenceRoot = join(root, 'child-evidence');
+  return {
+    accepted,
+    task,
+    evidenceRoot,
+    receiptPath: join(receiptRoot, `${runId}.parallel.receipt.json`),
+    operationPath: join(root, stage, 'operation-result.json'),
+  };
+}
+
+async function replacementReceipt(f, bytes, change) {
+  const record = JSON.parse(bytes);
+  change(record.receipt);
+  const store = await FileParallelWorkerReceiptStore.create(
+    await mkdtemp(join(f.root, 'replacement-receipt-')),
+  );
+  const path = await store.save(record.receipt, {
+    groupId: record.groupId,
+    fingerprint: record.fingerprint,
+  });
+  assert.deepEqual(
+    (await store.load(record.receipt.runId)).receipt,
+    record.receipt,
+  );
+  return readFile(path);
+}
+
+test('accepted child freezes exact operation bytes, candidate identity and external evidence hashes', async (t) => {
+  const f = await fixture(t);
+  for (const stage of stages.slice(0, 3)) await f.run(stage);
+  const retained = await acceptedChild(f);
+  const store = await FileEvidenceStore.openExisting(retained.evidenceRoot);
+  const refs = retained.task.result.evidenceReferences;
+  assert.equal(refs.length, 2);
+  const operationRef = refs.find((x) => x.kind === 'worker-result');
+  const manifestRef = refs.find((x) => x.kind === 'verification');
+  const bytes = Buffer.from(await store.loadPortable(operationRef));
+  assert.deepEqual(bytes, await readFile(retained.operationPath));
+  const manifest = JSON.parse(
+    Buffer.from(await store.loadPortable(manifestRef)),
+  );
+  assert.equal(manifest.operation.sha256, digest(bytes));
+  const operation = JSON.parse(bytes);
+  assert.deepEqual(manifest.outputCandidate, {
+    root: operation.integrationPath,
+    commit: operation.integratedCommit,
+  });
+  assert(manifest.refs.some((x) => x.path === operation.receiptPath));
+  assert.deepEqual(
+    retained.accepted.receipt.outcomes[0].result,
+    retained.task.result,
+  );
+  for (const ref of manifest.refs)
+    assert.equal(digest(await readFile(ref.path)), ref.sha256);
+});
+
+test('accepted-build recovery refuses missing or inconsistent frozen proof without builder replay', async (t) => {
+  const f = await fixture(t);
+  for (const stage of stages.slice(0, 3)) await f.run(stage);
+  const retained = await acceptedChild(f);
+  const buildPath = join(f.input.artifacts, 'build.json');
+  await rm(buildPath);
+  const intent = await readFile(join(f.input.artifacts, 'build.intent.json'));
+  const count = await readFile(f.counter, 'utf8');
+  const operationBytes = await readFile(retained.operationPath);
+  const operation = JSON.parse(operationBytes);
+  const receiptBytes = await readFile(retained.receiptPath);
+  const wrongAssignment = await replacementReceipt(
+    f,
+    receiptBytes,
+    (receipt) => {
+      receipt.outcomes[0].assignment.brief.context += 'Different assignment';
+    },
+  );
+  const wrongResult = await replacementReceipt(f, receiptBytes, (receipt) => {
+    receipt.outcomes[0].result.summary = 'Different accepted child result';
+  });
+  const writeReceipt = JSON.parse(await readFile(operation.receiptPath));
+  const cases = [
+    [
+      'operation bytes changed',
+      retained.operationPath,
+      Buffer.from(JSON.stringify(operation)),
+    ],
+    [
+      'operation receipt identity changed',
+      retained.operationPath,
+      Buffer.from(
+        JSON.stringify({
+          ...operation,
+          receiptPath: join(f.root, 'unaccepted.json'),
+        }),
+      ),
+    ],
+    ['operation missing', retained.operationPath, null],
+    ['write receipt missing', operation.receiptPath, null],
+    [
+      'write receipt integration identity changed',
+      operation.receiptPath,
+      Buffer.from(
+        JSON.stringify({
+          ...writeReceipt,
+          integratedCommit: f.spec.baseCommit,
+        }),
+      ),
+    ],
+    [
+      'checksummed receipt has different assignment',
+      retained.receiptPath,
+      wrongAssignment,
+    ],
+    [
+      'checksummed receipt has different child result',
+      retained.receiptPath,
+      wrongResult,
+    ],
+    [
+      'external evidence changed',
+      retained.task.result.evidencePaths.find((x) =>
+        x.endsWith('/process.json'),
+      ),
+      Buffer.from('{}'),
+    ],
+    ['accepted receipt missing', retained.receiptPath, null],
+    [
+      'accepted portable evidence missing',
+      join(
+        retained.evidenceRoot,
+        `${retained.task.result.evidenceReferences[0].sha256}.artifact`,
+      ),
+      null,
+    ],
+  ];
+  for (const [name, path, replacement] of cases) {
+    await t.test(name, async (t) => {
+      const original = await readFile(path);
+      t.after(async () => {
+        await writeFile(path, original);
+        await rm(buildPath, { force: true });
+      });
+      if (replacement === null) await rm(path);
+      else await writeFile(path, replacement);
+      await assert.rejects(
+        captureReviewedLocalCandidate({
+          ...f.input,
+          stage: 'build',
+          reconcileIntentSha256: digest(intent),
+        }),
+      );
+      assert.equal(await readFile(f.counter, 'utf8'), count);
+      await assert.rejects(readFile(buildPath), { code: 'ENOENT' });
+    });
+  }
+});
+
+test('final readback reopens accepted receipts and portable evidence for every worker', async (t) => {
+  const f = await fixture(t);
+  for (const stage of stages) await f.run(stage);
+  await finalizeReviewedLocalCandidate(f.input);
+  const count = await readFile(f.counter, 'utf8');
+  for (const stage of ['investigate', 'build', 'review']) {
+    const retained = await acceptedChild(f, stage);
+    const paths = [
+      retained.receiptPath,
+      ...retained.task.result.evidenceReferences.map((ref) =>
+        join(retained.evidenceRoot, `${ref.sha256}.artifact`),
+      ),
+    ];
+    for (const path of paths) {
+      await t.test(`${stage}: missing ${path.split('/').at(-1)}`, async (t) => {
+        const original = await readFile(path);
+        t.after(() => writeFile(path, original));
+        await rm(path);
+        await assert.rejects(verifyReviewedLocalCandidate(f.input));
+        await assert.rejects(finalizeReviewedLocalCandidate(f.input));
+        assert.equal(await readFile(f.counter, 'utf8'), count);
+      });
+    }
+  }
+  const retained = await acceptedChild(f);
+  const receiptBytes = await readFile(retained.receiptPath);
+  const captures = await Promise.all(
+    stages.map(async (stage) => {
+      const path = join(f.input.artifacts, `${stage}.json`);
+      return { path, bytes: await readFile(path) };
+    }),
+  );
+  for (const property of ['assignment', 'result']) {
+    await t.test(
+      `checksummed receipt differs from accepted ${property}, with matching stage refs`,
+      async (t) => {
+        t.after(async () => {
+          await writeFile(retained.receiptPath, receiptBytes);
+          for (const capture of captures)
+            await writeFile(capture.path, capture.bytes);
+        });
+        const bytes = await replacementReceipt(f, receiptBytes, (receipt) => {
+          const outcome = receipt.outcomes[0];
+          if (property === 'assignment')
+            outcome.assignment.brief.context += 'Different assignment';
+          else outcome.result.summary = 'Different accepted child result';
+        });
+        await writeFile(retained.receiptPath, bytes);
+        for (const capture of captures) {
+          const record = JSON.parse(capture.bytes);
+          for (const ref of record.body.refs)
+            if (ref.path === retained.receiptPath) {
+              ref.sha256 = digest(bytes);
+              ref.bytes = bytes.length;
+            }
+          record.sha256 = objectDigest(record.body);
+          await writeFile(capture.path, JSON.stringify(record));
+        }
+        await assert.rejects(
+          verifyReviewedLocalCandidate(f.input),
+          /Expected values to be strictly deep-equal/,
+        );
+        await assert.rejects(finalizeReviewedLocalCandidate(f.input));
+        assert.equal(await readFile(f.counter, 'utf8'), count);
+      },
+    );
+  }
+});
+
 test('one coupled builder, exact independent review, protected checks and fresh-process replay', async (t) => {
   const f = await fixture(t);
   for (const stage of stages) await f.run(stage);
@@ -438,7 +675,7 @@ test('cancellation terminates owned worker and cannot publish successful build',
   await assert.rejects(finalizeReviewedLocalCandidate(f.input));
 });
 
-test('accepted builder capture reconciliation reuses the exact child without rebuilding', async (t) => {
+test('accepted builder capture reconciliation in a fresh process reuses the exact child without rebuilding', async (t) => {
   const f = await fixture(t);
   for (const stage of stages.slice(0, 3)) await f.run(stage);
   const bytes = await readFile(join(f.input.artifacts, 'build.json'));
@@ -446,17 +683,40 @@ test('accepted builder capture reconciliation reuses the exact child without reb
   await assert.rejects(f.run('build'), /Uncertain stage/);
   const count = await readFile(f.counter, 'utf8');
   const intent = await readFile(join(f.input.artifacts, 'build.intent.json'));
-  await captureReviewedLocalCandidate({
-    ...f.input,
-    stage: 'build',
-    reconcileIntentSha256: digest(intent),
-  });
+  const output = execFileSync(
+    process.execPath,
+    [
+      '--import',
+      '@swc-node/register/esm-register',
+      'packages/workflow-runtime/host/reviewed-local-candidate.mjs',
+      'capture',
+      '--spec',
+      f.input.specPath,
+      '--sha256',
+      f.input.expectedSha256,
+      '--artifacts',
+      f.input.artifacts,
+      '--workflow-id',
+      f.input.nativeRunId,
+      '--stage',
+      'build',
+      '--intent-sha256',
+      digest(intent),
+    ],
+    { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 },
+  );
+  assert.equal(JSON.parse(output).status, 'PASS');
   assert.equal(await readFile(f.counter, 'utf8'), count);
   assert.equal(
-    JSON.parse(await readFile(join(f.input.artifacts, 'build.json'))).body
-      .result.integratedCommit,
-    JSON.parse(bytes).body.result.integratedCommit,
+    count.split('\n').filter((role) => role === 'builder').length,
+    1,
   );
+  const recovered = JSON.parse(
+    await readFile(join(f.input.artifacts, 'build.json')),
+  ).body;
+  const original = JSON.parse(bytes).body;
+  assert.deepEqual(recovered.result, original.result);
+  assert.deepEqual(recovered.refs, original.refs);
 });
 test('a cancellation arriving after completed build cannot relaunch it', async (t) => {
   const f = await fixture(t);
