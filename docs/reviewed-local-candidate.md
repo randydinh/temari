@@ -23,7 +23,12 @@ sole builder ownership, acceptance outcomes, protected files and baseline /
 acceptance command argv with bounded timeouts. Protected executables and input
 files are outside the candidate and hashed before execution and closeout.
 `{candidate}` and `{evidence}` substitutions are argv strings, never shell code.
-The host preserves user model settings. Model and reasoning observations stay
+The host requires a pinned account-catalog snapshot for the selected CLI version,
+plus the actual inherited user config digest and requested model/reasoning. It
+parses that config with Python's TOML parser, refuses unsupported catalog models
+or reasoning, and refuses ambiguous profile/provider/project overrides. A cached
+catalog is a prerequisite, not server execution proof. The host preserves user
+model settings. Model and reasoning observations stay
 null when the transport does not expose them; CLI selection is not model proof.
 
 The existing write-worker controller validates owned changes and integrates

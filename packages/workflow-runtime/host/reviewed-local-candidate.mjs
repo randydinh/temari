@@ -20,7 +20,10 @@ import {
   REVIEWED_LOCAL_CANDIDATE_POLICY,
   createReviewedLocalCandidatePlan,
 } from '../../../libs/temari-core/src/index.ts';
-import { observeCodexProvider } from '../../../libs/host-adapters/src/index.ts';
+import {
+  observeCodexProvider,
+  observeCodexModelSelection,
+} from '../../../libs/host-adapters/src/index.ts';
 import {
   FileChildTaskStore,
   FileParallelWorkerReceiptStore,
@@ -273,6 +276,11 @@ export async function admitReviewedLocalCandidate({
     );
   }
   pinned(spec.repositoryRoot, spec.baseCommit);
+  const modelSelection = await observeCodexModelSelection(
+    spec.providerSelection,
+    spec.modelAdmission,
+    spec.repositoryRoot,
+  );
   const provider = await observeCodexProvider(
     spec.executable,
     spec.providerSelection,
@@ -299,6 +307,7 @@ export async function admitReviewedLocalCandidate({
   return {
     spec,
     provider,
+    modelSelection,
     requestSha256: expectedSha256,
     policySha256: spec.policySha256,
     planSha256: objectDigest(spec.plan),
@@ -936,13 +945,23 @@ async function main(args) {
             ? await admitReviewedLocalCandidate(input)
             : null;
   assert(result, 'Unsupported managed CLI command.');
-  const report = command === 'capture'
-    ? { status: result.status, stage: result.stage, binding: result.binding }
-    : command === 'admit'
-      ? { requestSha256: result.requestSha256, policySha256: result.policySha256, planSha256: result.planSha256, provider: result.provider }
-      : command === 'verify'
-        ? { status: 'evidence-verified', candidate: result.candidate, workers: result.workers }
-        : result;
+  const report =
+    command === 'capture'
+      ? { status: result.status, stage: result.stage, binding: result.binding }
+      : command === 'admit'
+        ? {
+            requestSha256: result.requestSha256,
+            policySha256: result.policySha256,
+            planSha256: result.planSha256,
+            provider: result.provider,
+          }
+        : command === 'verify'
+          ? {
+              status: 'evidence-verified',
+              candidate: result.candidate,
+              workers: result.workers,
+            }
+          : result;
   console.log(JSON.stringify(report));
 }
 if (process.argv[1] === fileURLToPath(import.meta.url))

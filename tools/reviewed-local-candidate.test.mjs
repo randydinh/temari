@@ -34,6 +34,50 @@ async function fixture(t, mode = 'pass') {
     await mkdtemp(join(tmpdir(), 'managed-candidate-')),
   );
   t.after(() => rm(root, { recursive: true, force: true }));
+  let parserExecutable;
+  for (const command of ['python3', 'python3.11', 'python3.12']) {
+    try {
+      parserExecutable = await realpath(
+        execFileSync(
+          command,
+          ['-c', 'import sys,tomllib;print(sys.executable)'],
+          { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+        ).trim(),
+      );
+      break;
+    } catch {}
+  }
+  assert(
+    parserExecutable,
+    'A Python TOML parser is required by the managed model admission fixture.',
+  );
+  const previousCodexHome = process.env.CODEX_HOME;
+  const codexHome = join(root, 'codex-home');
+  await mkdir(codexHome);
+  process.env.CODEX_HOME = codexHome;
+  t.after(() => {
+    if (previousCodexHome === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = previousCodexHome;
+  });
+  const configPath = join(codexHome, 'config.toml');
+  await writeFile(
+    configPath,
+    'model = "fixture-model"\nmodel_reasoning_effort = "high"\n',
+  );
+  const catalogPath = join(root, 'catalog.json');
+  await writeFile(
+    catalogPath,
+    JSON.stringify({
+      client_version: 'fixture',
+      fetched_at: new Date().toISOString(),
+      models: [
+        {
+          slug: 'fixture-model',
+          supported_reasoning_levels: [{ effort: 'high' }],
+        },
+      ],
+    }),
+  );
   const candidate = join(root, 'candidate');
   const evidence = join(root, 'evidence');
   const artifacts = join(root, 'native');
@@ -79,7 +123,14 @@ let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{
     `import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import {join} from 'node:path';const [mode,root]=process.argv.slice(2);assert.equal(readFileSync(join(root,'value.txt'),'utf8'),mode==='baseline'?'base\\n':'implemented\\n');assert.equal(readFileSync(join(root,'protected.txt'),'utf8'),'keep\\n');`,
   );
   const protectedInputs = await Promise.all(
-    [process.execPath, check, executable].map(async (path) => ({
+    [
+      process.execPath,
+      check,
+      executable,
+      configPath,
+      catalogPath,
+      parserExecutable,
+    ].map(async (path) => ({
       path,
       sha256: digest(await readFile(path)),
     })),
@@ -114,6 +165,16 @@ let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{
       provider: 'codex',
       executableSha256: digest(await readFile(executable)),
       executableVersion: 'codex-cli fixture',
+      model: 'fixture-model',
+      reasoning: 'high',
+    },
+    modelAdmission: {
+      configPath,
+      configSha256: digest(await readFile(configPath)),
+      catalogPath,
+      catalogSha256: digest(await readFile(catalogPath)),
+      parserExecutable,
+      parserSha256: digest(await readFile(parserExecutable)),
     },
     workers: {
       architect: assignment('architect', 'investigator'),
@@ -135,7 +196,11 @@ let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{
     acceptanceChecks: [
       {
         program: process.execPath,
-        args: [check, 'acceptance', '{candidate}'],
+        args: [
+          check,
+          mode === 'check-fail' ? 'baseline' : 'acceptance',
+          '{candidate}',
+        ],
         timeoutMs: 10000,
       },
     ],
@@ -534,4 +599,40 @@ test('route-specific task closeout checks native identity, canonical evidence an
     }),
     /Task changed/,
   );
+});
+
+test('unsupported inherited model is refused without native/worker dispatch or settings substitution', async (t) => {
+  const f = await fixture(t);
+  const config = f.spec.modelAdmission.configPath;
+  await writeFile(
+    config,
+    'model = "unsupported-host-alias"\nmodel_reasoning_effort = "high"\n',
+  );
+  f.spec.providerSelection.model = 'unsupported-host-alias';
+  f.spec.modelAdmission.configSha256 = digest(await readFile(config));
+  f.spec.protectedInputs.find((x) => x.path === config).sha256 =
+    f.spec.modelAdmission.configSha256;
+  const expectedSha256 = await f.save();
+  await assert.rejects(
+    admitReviewedLocalCandidate({ ...f.input, expectedSha256 }),
+    /Unsupported selected Codex CLI model/,
+  );
+  await assert.rejects(readFile(f.counter), { code: 'ENOENT' });
+  assert.match(await readFile(config, 'utf8'), /unsupported-host-alias/);
+});
+
+test('a failing protected check process blocks delivery on an otherwise clean candidate', async (t) => {
+  const f = await fixture(t, 'check-fail');
+  for (const stage of stages.slice(0, 4)) await f.run(stage);
+  await assert.rejects(f.run('verify'), /Protected check failed/);
+  await assert.rejects(f.run('deliver'));
+  const processEvidence = JSON.parse(
+    await readFile(
+      join(f.spec.evidenceRoot, f.spec.runId, 'checks-acceptance/0.json'),
+      'utf8',
+    ),
+  );
+  assert.equal(processEvidence.code, 1);
+  assert.equal(processEvidence.cancelled, false);
+  await assert.rejects(finalizeReviewedLocalCandidate(f.input));
 });

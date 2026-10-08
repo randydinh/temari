@@ -17,7 +17,8 @@ import {
   writeFile,
   readFile,
 } from 'node:fs/promises';
-import { delimiter, isAbsolute, join, resolve } from 'node:path';
+import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
+import { homedir } from 'node:os';
 import {
   assertWorkerResult,
   type WorkerAssignment,
@@ -77,6 +78,8 @@ export interface CodexProviderSelection {
   readonly provider: 'codex';
   readonly executableSha256: string;
   readonly executableVersion: string;
+  readonly model?: string;
+  readonly reasoning?: string | null;
 }
 
 export function assertCodexProviderSelection(
@@ -88,8 +91,21 @@ export function assertCodexProviderSelection(
     item.provider !== 'codex' ||
     !/^[0-9a-f]{64}$/.test(item.executableSha256 ?? '') ||
     !item.executableVersion?.startsWith('codex-cli ') ||
-    Object.keys(item).sort().join(',') !==
-      'executableSha256,executableVersion,provider'
+    Object.keys(item).some(
+      (key) =>
+        ![
+          'provider',
+          'executableSha256',
+          'executableVersion',
+          'model',
+          'reasoning',
+        ].includes(key),
+    ) ||
+    (item.model !== undefined &&
+      (typeof item.model !== 'string' || !item.model.trim())) ||
+    (item.reasoning !== undefined &&
+      item.reasoning !== null &&
+      typeof item.reasoning !== 'string')
   )
     throw new Error('Unsupported or unpinned coding provider selection.');
 }
@@ -123,6 +139,131 @@ export async function observeCodexProvider(
     reasoning: null,
     observation:
       'CLI version and executable bytes; model/reasoning unavailable from this transport',
+  };
+}
+
+export interface CodexModelAdmission {
+  readonly configPath: string;
+  readonly configSha256: string;
+  readonly catalogPath: string;
+  readonly catalogSha256: string;
+  readonly parserExecutable: string;
+  readonly parserSha256: string;
+}
+
+/** A pinned account catalog can refuse unsupported selections without inference.
+ * It is an admission prerequisite, not evidence that a model served a request.
+ * Only the simple inherited user configuration is admitted in this increment. */
+export async function observeCodexModelSelection(
+  selection: CodexProviderSelection,
+  input: CodexModelAdmission,
+  workspaceRoot: string,
+) {
+  assertCodexProviderSelection(selection);
+  if (
+    !input ||
+    !isAbsolute(input.configPath) ||
+    !isAbsolute(input.catalogPath) ||
+    !selection.model ||
+    selection.reasoning === undefined
+  )
+    throw new Error(
+      'Managed coding requires explicit pinned model/config/catalog admission.',
+    );
+  const expectedConfig = resolve(
+    process.env.CODEX_HOME ?? join(homedir(), '.codex'),
+    'config.toml',
+  );
+  if (input.configPath !== expectedConfig)
+    throw new Error(
+      'Model configuration is not the actual inherited Codex user configuration.',
+    );
+  for (let root = resolve(workspaceRoot); ; root = dirname(root)) {
+    const path = join(root, '.codex', 'config.toml');
+    if (path !== expectedConfig) {
+      try {
+        await stat(path);
+        throw new Error(
+          'Project model configuration is not supported by this bounded adapter.',
+        );
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+    }
+    if (dirname(root) === root) break;
+  }
+  if (!isAbsolute(input.parserExecutable))
+    throw new Error('TOML parser executable must be explicitly pinned.');
+  const configBytes = await readFile(input.configPath);
+  const catalogBytes = await readFile(input.catalogPath);
+  const sha = (bytes: Uint8Array) =>
+    createHash('sha256').update(bytes).digest('hex');
+  if (sha(await readFile(input.parserExecutable)) !== input.parserSha256)
+    throw new Error('TOML parser executable identity drifted.');
+  if (
+    sha(configBytes) !== input.configSha256 ||
+    sha(catalogBytes) !== input.catalogSha256
+  )
+    throw new Error('Model configuration/catalog identity drifted.');
+  const parse = `import json,sys,tomllib
+c=tomllib.load(open(sys.argv[1],'rb'))
+print(json.dumps({k:c.get(k) for k in ['model','model_reasoning_effort','model_provider','profile','model_catalog_json']}))`;
+  const parsed = JSON.parse(
+    (
+      await promisify(execFile)(
+        input.parserExecutable,
+        ['-c', parse, input.configPath],
+        { timeout: 10000, maxBuffer: 65536 },
+      )
+    ).stdout,
+  );
+  if (
+    parsed.profile ||
+    parsed.model_catalog_json ||
+    ![null, 'openai'].includes(parsed.model_provider)
+  )
+    throw new Error(
+      'Unsupported model profile/provider/catalog override; explicit adapter support is required.',
+    );
+  if (
+    parsed.model !== selection.model ||
+    parsed.model_reasoning_effort !== selection.reasoning
+  )
+    throw new Error(
+      'Requested model/reasoning differs from inherited user settings; refusing silent override.',
+    );
+  const catalog = JSON.parse(catalogBytes.toString());
+  if (
+    catalog.client_version !==
+    selection.executableVersion.slice('codex-cli '.length)
+  )
+    throw new Error('Model catalog belongs to a different CLI version.');
+  const age = Date.now() - Date.parse(catalog.fetched_at);
+  if (!Number.isFinite(age) || age < -60000 || age > 24 * 60 * 60 * 1000)
+    throw new Error('Account model catalog is missing or stale.');
+  const model = catalog.models?.find(
+    (item: { slug?: string }) => item.slug === selection.model,
+  );
+  if (!model)
+    throw new Error(`Unsupported selected Codex CLI model: ${selection.model}`);
+  if (
+    selection.reasoning &&
+    !model.supported_reasoning_levels?.some(
+      (item: { effort?: string }) => item.effort === selection.reasoning,
+    )
+  )
+    throw new Error('Unsupported reasoning selection for this model.');
+  return {
+    requested: { model: selection.model, reasoning: selection.reasoning },
+    observed: { model: null, reasoning: null },
+    config: { path: input.configPath, sha256: input.configSha256 },
+    catalog: {
+      path: input.catalogPath,
+      sha256: input.catalogSha256,
+      fetchedAt: catalog.fetched_at,
+      clientVersion: catalog.client_version,
+    },
+    scope: 'pinned-inherited-selection-and-cached-account-admission-only',
   };
 }
 
