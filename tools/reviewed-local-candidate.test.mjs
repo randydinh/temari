@@ -8,6 +8,7 @@ import {
   readFile,
   rm,
   realpath,
+  cp,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -39,7 +40,35 @@ async function fixture(t, mode = 'pass') {
   const root = await realpath(
     await mkdtemp(join(tmpdir(), 'managed-candidate-')),
   );
-  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(async () => {
+    const destination = process.env.WORKER_SHUTDOWN_FIXTURE_EVIDENCE_ROOT;
+    if (destination) {
+      await mkdir(destination, { recursive: true });
+      const target = join(
+        destination,
+        `managed-${digest(t.name + root).slice(0, 16)}`,
+      );
+      await cp(root, target, {
+        recursive: true,
+        errorOnExist: true,
+        force: false,
+      });
+      await writeFile(
+        join(target, 'archive-origin.json'),
+        JSON.stringify(
+          {
+            test: t.name,
+            sourceRoot: root,
+            archivedAt: new Date().toISOString(),
+            scope: 'Synthetic evidence only; no PID signalling authority.',
+          },
+          null,
+          2,
+        ) + '\n',
+      );
+    }
+    await rm(root, { recursive: true, force: true });
+  });
   let parserExecutable;
   for (const command of ['python3', 'python3.11', 'python3.12']) {
     try {
@@ -160,6 +189,7 @@ let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{
     profile: 'reviewed-local-candidate-v1',
     runId: 'fixture-managed',
     taskId: 'fixture-task',
+    taskStoreRoot: join(root, 'managed-tasks'),
     repositoryRoot: candidate,
     evidenceRoot: evidence,
     baseCommit: base,
@@ -216,6 +246,70 @@ let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{
     await writeFile(specPath, JSON.stringify(spec));
     return digest(await readFile(specPath));
   };
+  const tasks = await FileTaskStore.create(spec.taskStoreRoot);
+  const task = await tasks.createTask({
+    taskId: spec.taskId,
+    title: 'Managed fixture',
+    goal: 'fixture',
+    workspaceRoot: candidate,
+    actor: 'fixture',
+    idempotencyKey: 'create',
+  });
+  let boundTask = await tasks.bindRun({
+    taskId: spec.taskId,
+    actor: 'fixture',
+    idempotencyKey: 'bind',
+    expectedVersion: task.version,
+    run: {
+      runId: spec.runId,
+      revision: spec.baseCommit,
+      plan: spec.plan,
+      executionStoreRoot: join(evidence, spec.runId, 'children'),
+    },
+  });
+  boundTask = (
+    await tasks.append(
+      {
+        taskId: spec.taskId,
+        actor: 'fixture',
+        idempotencyKey: 'native-launch',
+        expectedVersion: boundTask.version,
+      },
+      {
+        type: 'dispatch-requested',
+        runId: spec.runId,
+        entrypoint: 'temari-reviewed-local-candidate',
+        inputs: {},
+        harnessId: 'archon',
+        harnessVersion: '0.10.1',
+      },
+    )
+  ).task;
+  await tasks.append(
+    {
+      taskId: spec.taskId,
+      actor: 'fixture',
+      idempotencyKey: 'native-link',
+      expectedVersion: boundTask.version,
+    },
+    {
+      type: 'native-bound',
+      runId: spec.runId,
+      operationId: 'native-launch',
+      reference: {
+        schema: 1,
+        harnessId: 'archon',
+        harnessVersion: '0.10.1',
+        runId: spec.runId,
+        revision: spec.baseCommit,
+        planSha256: objectDigest(spec.plan),
+        externalRunId: 'native-fixture',
+        workspaceRoot: candidate,
+        entrypoint: 'temari-reviewed-local-candidate',
+        startedAt: new Date().toISOString(),
+      },
+    },
+  );
   const expectedSha256 = await save();
   return {
     root,
@@ -229,6 +323,7 @@ let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{
       expectedSha256,
       artifacts,
       nativeRunId: 'native-fixture',
+      observeSupervisor: async () => true,
     },
     run: (stage) =>
       captureReviewedLocalCandidate({
@@ -236,6 +331,7 @@ let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{
         expectedSha256,
         artifacts,
         nativeRunId: 'native-fixture',
+        observeSupervisor: async () => true,
         stage,
       }),
   };
@@ -762,6 +858,41 @@ test('accepted builder capture reconciliation in a fresh process reuses the exac
   await assert.rejects(f.run('build'), /Uncertain stage/);
   const count = await readFile(f.counter, 'utf8');
   const intent = await readFile(join(f.input.artifacts, 'build.intent.json'));
+  const nativeExecutable = join(f.root, 'native-supervisor');
+  const nativeRecord = join(f.root, 'native-supervision.json');
+  await writeFile(
+    nativeExecutable,
+    `#!${process.execPath}\nconsole.log(require('node:fs').readFileSync(${JSON.stringify(nativeRecord)},'utf8'))\n`,
+    { mode: 0o700 },
+  );
+  const nativeSha = digest(await readFile(nativeExecutable));
+  await writeFile(
+    nativeRecord,
+    JSON.stringify({
+      id: f.input.nativeRunId,
+      status: 'running',
+      workflow_name: 'temari-reviewed-local-candidate',
+      working_path: f.spec.repositoryRoot,
+      metadata: {
+        inputs: {
+          temari_binding: JSON.stringify({
+            schema: 1,
+            harnessId: 'archon',
+            harnessVersion: '0.10.1',
+            workspaceRoot: f.spec.repositoryRoot,
+            runId: f.spec.runId,
+            revision: f.spec.baseCommit,
+            planSha256: objectDigest(f.spec.plan),
+            entrypoint: 'temari-reviewed-local-candidate',
+          }),
+          request_sha256: f.input.expectedSha256,
+          native_home: f.root,
+          native_executable: nativeExecutable,
+          native_executable_sha256: nativeSha,
+        },
+      },
+    }),
+  );
   const output = execFileSync(
     process.execPath,
     [
@@ -782,7 +913,16 @@ test('accepted builder capture reconciliation in a fresh process reuses the exac
       '--intent-sha256',
       digest(intent),
     ],
-    { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 },
+    {
+      encoding: 'utf8',
+      maxBuffer: 8 * 1024 * 1024,
+      env: {
+        ...process.env,
+        INPUTS_NATIVE_EXECUTABLE: nativeExecutable,
+        INPUTS_NATIVE_EXECUTABLE_SHA256: nativeSha,
+        INPUTS_NATIVE_HOME: f.root,
+      },
+    },
   );
   assert.equal(JSON.parse(output).status, 'PASS');
   assert.equal(await readFile(f.counter, 'utf8'), count);
@@ -974,4 +1114,84 @@ test('a failing protected check process blocks delivery on an otherwise clean ca
   assert.equal(processEvidence.code, 1);
   assert.equal(processEvidence.cancelled, false);
   await assert.rejects(finalizeReviewedLocalCandidate(f.input));
+});
+
+test('parent cancel intent revokes builder authority before native cancellation is observed', async (t) => {
+  const f = await fixture(t, 'builder-wait');
+  await f.run('investigate');
+  await f.run('plan');
+  const tasks = await FileTaskStore.create(f.spec.taskStoreRoot);
+  let task = await tasks.load(f.spec.taskId);
+  const builder = f.run('build');
+  const stopped = assert.rejects(builder);
+  const end = Date.now() + 10000;
+  while (Date.now() < end) {
+    if ((await readFile(f.counter, 'utf8')).includes('builder')) break;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  assert((await readFile(f.counter, 'utf8')).includes('builder'));
+  await tasks.append(
+    {
+      taskId: f.spec.taskId,
+      actor: 'fixture',
+      expectedVersion: task.version,
+      idempotencyKey: 'cancel-intent',
+    },
+    { type: 'control-requested', runId: f.spec.runId, kind: 'cancel' },
+  );
+  await stopped;
+  assert.equal(
+    (await tasks.load(f.spec.taskId)).runs[0].operations.at(-1).state,
+    'PENDING',
+  );
+  await assert.rejects(readFile(join(f.input.artifacts, 'build.json')), {
+    code: 'ENOENT',
+  });
+  const children = await FileChildTaskStore.create(
+    join(f.spec.evidenceRoot, f.spec.runId, 'children'),
+  );
+  const records = await children.executionRecords(f.spec.runId);
+  const build = records.filter(
+    (record) => record.execution && record.taskId.includes('-build-control-'),
+  );
+  assert.equal(build.length, 1);
+  assert.equal(build[0].execution.state, 'CLEANED');
+  assert.equal(build[0].result, null);
+});
+
+test('worker lease loss propagates into the owned operation rather than leaving it running', async (t) => {
+  const f = await fixture(t, 'builder-wait');
+  await f.run('investigate');
+  await f.run('plan');
+  const original = FileChildTaskStore.prototype.renew;
+  let lost = false;
+  FileChildTaskStore.prototype.renew = async function (request) {
+    if (request.owner === 'archon:build') {
+      lost = true;
+      throw new Error('Fixture worker lease lost.');
+    }
+    return original.call(this, request);
+  };
+  t.after(() => {
+    FileChildTaskStore.prototype.renew = original;
+  });
+  const started = Date.now();
+  await assert.rejects(f.run('build'));
+  assert(lost);
+  assert(
+    Date.now() - started < 9500,
+    'Lease loss must stop before the synthetic worker timeout.',
+  );
+  const store = await FileChildTaskStore.create(
+    join(f.spec.evidenceRoot, f.spec.runId, 'children'),
+  );
+  const records = await store.executionRecords(f.spec.runId);
+  const worker = records.find(
+    (record) => record.execution && record.taskId.includes('-build-control-'),
+  );
+  assert.equal(worker.execution.state, 'CLEANED');
+  assert.equal(worker.result, null);
+  await assert.rejects(readFile(join(f.input.artifacts, 'build.json')), {
+    code: 'ENOENT',
+  });
 });

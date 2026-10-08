@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createManagedArchonSupervisor } from '../../../libs/archon-harness/src/lib/managed-supervision.ts';
 import { spawn, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
@@ -21,10 +22,13 @@ import {
   createReviewedLocalCandidatePlan,
 } from '../../../libs/temari-core/src/index.ts';
 import {
+  createOwnedExecutionAdapter,
   observeCodexProvider,
   observeCodexModelSelection,
 } from '../../../libs/host-adapters/src/index.ts';
 import {
+  ManagedExecutionControl,
+  FileTaskStore,
   FileChildTaskStore,
   FileParallelWorkerReceiptStore,
   FileEvidenceStore,
@@ -215,7 +219,7 @@ export async function admitReviewedLocalCandidate({
     'Managed policy changed.',
   );
   assert.match(spec.baseCommit, /^[0-9a-f]{40}$/);
-  for (const key of ['repositoryRoot', 'evidenceRoot']) {
+  for (const key of ['repositoryRoot', 'evidenceRoot', 'taskStoreRoot']) {
     assert(isAbsolute(spec[key]));
     assert.equal(
       await realpath(spec[key]),
@@ -380,72 +384,52 @@ async function integration(admitted, artifacts, nativeRunId) {
   pinned(integrationPath, integratedCommit);
   return { root: integrationPath, commit: integratedCommit };
 }
-async function fixedCheck(command, candidate, evidence, signal) {
+async function fixedCheck(command, candidate, evidence, control, taskId) {
   const args = command.args.map((x) =>
     x.replaceAll('{candidate}', candidate).replaceAll('{evidence}', evidence),
   );
   const startedAt = new Date().toISOString();
-  const child = spawn(command.program, args, {
-    cwd: candidate,
-    shell: false,
-    detached: process.platform !== 'win32',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  const out = [];
-  const err = [];
-  let size = 0;
-  let timedOut = false;
-  let cancelled = false;
-  let limited = false;
-  const kill = () => {
-    try {
-      process.kill(
-        process.platform === 'win32' ? child.pid : -child.pid,
-        'SIGKILL',
+  let result;
+  try {
+    result = await control.run(taskId, {
+      program: command.program,
+      args,
+      cwd: candidate,
+      timeoutMs: command.timeoutMs,
+    });
+  } catch (error) {
+    if (error.outcome) result = error.outcome;
+    else
+      throw new Error(
+        `Protected check failed; later stages blocked: ${error.message}`,
+        { cause: error },
       );
-    } catch {}
-  };
-  const abort = () => {
-    cancelled = true;
-    kill();
-  };
-  signal?.addEventListener('abort', abort, { once: true });
-  if (signal?.aborted) abort();
-  const timer = setTimeout(() => {
-    timedOut = true;
-    kill();
-  }, command.timeoutMs);
-  const collect = (target, chunk) => {
-    size += chunk.length;
-    if (size > 4 * 1024 * 1024) {
-      limited = true;
-      kill();
-    } else target.push(chunk);
-  };
-  child.stdout.on('data', (x) => collect(out, x));
-  child.stderr.on('data', (x) => collect(err, x));
-  const end = await new Promise((resolve) => {
-    child.once('error', (e) => resolve({ code: null, error: e.message }));
-    child.once('close', (code, signal) => resolve({ code, signal }));
-  });
-  clearTimeout(timer);
-  signal?.removeEventListener('abort', abort);
-  const record = {
+  }
+  return {
     program: command.program,
     args,
-    pid: child.pid,
+    pid: result.witness.anchorPid,
     startedAt,
     endedAt: new Date().toISOString(),
-    ...end,
-    timedOut,
-    cancelled,
-    outputLimitExceeded: limited,
-    stdout: Buffer.concat(out).toString(),
-    stderr: Buffer.concat(err).toString(),
+    code: result.code,
+    signal: result.signal,
+    timedOut: result.reason === 'timeout',
+    cancelled: result.reason === 'cancelled',
+    outputLimitExceeded: result.reason === 'output-limit',
+    cleanup: result.cleanup,
+    ownership: result.identity,
+    stdout: result.stdout,
+    stderr: result.stderr,
   };
-  return record;
 }
-async function runChecks(admitted, commands, candidate, stage, signal) {
+async function runChecks(
+  admitted,
+  commands,
+  candidate,
+  stage,
+  signal,
+  control,
+) {
   const root = join(
     admitted.spec.evidenceRoot,
     admitted.spec.runId,
@@ -460,7 +444,13 @@ async function runChecks(admitted, commands, candidate, stage, signal) {
       !(await exists(path)),
       'Check outcome exists without stage capture; reconcile before continuing.',
     );
-    const result = await fixedCheck(commands[i], candidate, root, signal);
+    const result = await fixedCheck(
+      commands[i],
+      candidate,
+      root,
+      control,
+      `${control.options.authorityId}-check-${i}`,
+    );
     await sealed(path, result);
     results.push(result);
     assert(
@@ -791,6 +781,7 @@ async function worker(
   candidate,
   assignment,
   signal,
+  control,
 ) {
   const spec = admitted.spec;
   const root = join(spec.evidenceRoot, spec.runId);
@@ -827,11 +818,20 @@ async function worker(
   let publication;
   const result = await executeRestartableParallelWorkers({
     ...parallelRequest(selection, childStore, receiptStore, evidenceStore),
-    handler: async () => {
-      const result =
-        stage === 'build'
-          ? await runCodexWriteWorkersRequest(
-              {
+    signal: control.controller.signal,
+    handler: async (_assignment, context) => {
+      const revoke = () => {
+        void control
+          .stop('Worker child lease/cancellation lost.')
+          .catch(() => {});
+      };
+      context.signal.addEventListener('abort', revoke, { once: true });
+      if (context.signal.aborted) revoke();
+      try {
+        await control.assertActive();
+        const request =
+          stage === 'build'
+            ? {
                 ...common,
                 assignments: [{ worker: assignment, owns: spec.owns }],
                 verify: [
@@ -841,38 +841,73 @@ async function worker(
                     timeoutMs: 10000,
                   },
                 ],
-              },
-              signal,
-            )
-          : await runCodexWorkersRequest(
-              { ...common, assignments: [assignment] },
-              signal,
-            );
-      const path = join(workerRoot, 'operation-result.json');
-      await sealed(path, result);
-      const bytes = await readFile(path);
-      const operation = { path, sha256: digest(bytes), bytes: bytes.length };
-      const refs = [...(await files(join(workerRoot, runId))), operation];
-      const workerResult = {
-        status: result.status,
-        summary: `Managed ${stage} ${result.status}`,
-        evidencePaths: refs.map((x) => x.path),
-        rawLogPath: null,
-      };
-      publication = {
-        bytes,
-        manifest: {
-          schema: 1,
-          binding: selection.binding,
-          operation,
-          outputCandidate: outputCandidate(selection, result),
-          refs,
-          result: workerResult,
-        },
-      };
-      return workerResult;
+              }
+            : { ...common, assignments: [assignment] };
+        const requestPath = join(workerRoot, 'owned-operation-input.json');
+        const resultPath = join(workerRoot, 'owned-operation-output.json');
+        await sealed(requestPath, { stage, request });
+        const tool = fileURLToPath(
+          new URL(
+            '../../../tools/managed-candidate-operation.mts',
+            import.meta.url,
+          ),
+        );
+        const node = process.versions.bun ? 'bun' : process.execPath;
+        const args = process.versions.bun
+          ? [tool, requestPath, resultPath]
+          : [
+              '--import',
+              '@swc-node/register/esm-register',
+              tool,
+              requestPath,
+              resultPath,
+            ];
+        await control.run(
+          `${control.options.authorityId}-worker`,
+          {
+            program: node,
+            args,
+            cwd: fileURLToPath(new URL('../../../', import.meta.url)),
+            timeoutMs: spec.timeoutMs + (stage === 'build' ? 900000 : 180000),
+          },
+          {
+            taskId: context.child.taskId,
+            runId: context.child.runId,
+            attempt: context.child.attempt,
+            fencingEpoch: context.child.lease.fencingEpoch,
+          },
+        );
+        await control.assertActive();
+        const result = await json(resultPath);
+        const path = join(workerRoot, 'operation-result.json');
+        await sealed(path, result);
+        const bytes = await readFile(path);
+        const operation = { path, sha256: digest(bytes), bytes: bytes.length };
+        const refs = [...(await files(join(workerRoot, runId))), operation];
+        const workerResult = {
+          status: result.status,
+          summary: `Managed ${stage} ${result.status}`,
+          evidencePaths: refs.map((x) => x.path),
+          rawLogPath: null,
+        };
+        publication = {
+          bytes,
+          manifest: {
+            schema: 1,
+            binding: selection.binding,
+            operation,
+            outputCandidate: outputCandidate(selection, result),
+            refs,
+            result: workerResult,
+          },
+        };
+        return workerResult;
+      } finally {
+        context.signal.removeEventListener('abort', revoke);
+      }
     },
     evidenceForAssignment: async (acceptedAssignment, result) => {
+      await control.assertActive();
       assert(
         publication,
         'Operation publication missing before child acceptance.',
@@ -908,7 +943,7 @@ async function worker(
 }
 
 /** Each native node calls exactly one operation. Immutable captures prevent replay. */
-export async function captureReviewedLocalCandidate({
+async function captureOperation({
   specPath,
   expectedSha256,
   artifacts,
@@ -916,6 +951,7 @@ export async function captureReviewedLocalCandidate({
   stage,
   signal,
   reconcileIntentSha256,
+  control,
 }) {
   const admitted = await admitReviewedLocalCandidate({
     specPath,
@@ -968,6 +1004,7 @@ export async function captureReviewedLocalCandidate({
       baseline.root,
       'baseline',
       signal,
+      control,
     );
     const observed = await worker(
       admitted,
@@ -976,6 +1013,7 @@ export async function captureReviewedLocalCandidate({
       baseline,
       spec.workers.architect,
       signal,
+      control,
     );
     result = {
       architect: observed.operation,
@@ -1010,6 +1048,7 @@ export async function captureReviewedLocalCandidate({
       baseline,
       assignment,
       signal,
+      control,
     );
     await assertWriteCandidate(
       observed.operation.integrationPath,
@@ -1032,6 +1071,7 @@ export async function captureReviewedLocalCandidate({
       candidate,
       assignment,
       signal,
+      control,
     );
     pinned(candidate.root, candidate.commit);
     result = { ...observed.operation, candidate, child: observed.child };
@@ -1044,6 +1084,7 @@ export async function captureReviewedLocalCandidate({
       candidate.root,
       'acceptance',
       signal,
+      control,
     );
     pinned(candidate.root, candidate.commit);
     result = { candidate, checks: checks.results };
@@ -1061,6 +1102,7 @@ export async function captureReviewedLocalCandidate({
   }
   await checkRefs(spec.protectedInputs);
   pinned(spec.repositoryRoot, spec.baseCommit);
+  await control.assertActive();
   assert(!signal?.aborted, 'Cancelled stage cannot publish completion.');
   const body = {
     binding: binding(admitted, nativeRunId),
@@ -1071,8 +1113,156 @@ export async function captureReviewedLocalCandidate({
     result,
     refs,
   };
+  await control.finish();
+  const controlRefs = (await files(control.options.root)).filter((ref) =>
+    ref.path.split(sep).at(-1).startsWith(control.options.authorityId),
+  );
+  refs.push(...controlRefs);
   await sealed(path, { body, sha256: objectDigest(body) });
   return body;
+}
+
+async function assertStageCleanup(admitted, nativeRunId, stage) {
+  const root = join(admitted.spec.evidenceRoot, admitted.spec.runId);
+  const store = await FileChildTaskStore.create(join(root, 'children'));
+  const authorityId = `${admitted.spec.runId.slice(0, 55)}-${stage}-control-${objectDigest(binding(admitted, nativeRunId)).slice(0, 12)}`;
+  const group = await store.loadGroup(authorityId);
+  assert(
+    group &&
+      group.runId === admitted.spec.runId &&
+      group.revision === admitted.spec.baseCommit,
+    'Managed stage ownership missing.',
+  );
+  const adapter = createOwnedExecutionAdapter();
+  for (const taskId of group.taskIds) {
+    const record = await store.load(taskId);
+    assert.equal(
+      record?.status,
+      'SUCCEEDED',
+      'Managed stage execution is not complete.',
+    );
+    if (record.execution) {
+      assert.equal(
+        record.execution.state,
+        'CLEANED',
+        'Managed cleanup unresolved; accepted replay refused.',
+      );
+      const e = record.execution;
+      const result = await adapter.recover({
+        nonce: e.nonce,
+        binding: e.binding,
+        receiptPath: e.receiptPath,
+      });
+      assert.equal(
+        result?.cleanup,
+        'CONFIRMED',
+        'Managed cleanup proof is missing/unresolved.',
+      );
+      assert.equal(result.witness.anchorPid, e.anchorPid);
+      assert.equal(result.witness.guardianPid, e.guardianPid);
+    }
+  }
+}
+
+export async function captureReviewedLocalCandidate(input) {
+  assert(
+    typeof input.observeSupervisor === 'function',
+    'Managed capture needs independently selected supervision.',
+  );
+  const admitted = await admitReviewedLocalCandidate(input);
+  id(input.nativeRunId);
+  assert.notEqual(input.nativeRunId.toLowerCase(), 'latest');
+  assert(DEFAULT_STAGES.includes(input.stage));
+  const root = join(admitted.spec.evidenceRoot, admitted.spec.runId);
+  await mkdir(root, { recursive: true });
+  const store = await FileChildTaskStore.create(join(root, 'children'));
+  const authorityId = `${admitted.spec.runId.slice(0, 55)}-${input.stage}-control-${objectDigest(binding(admitted, input.nativeRunId)).slice(0, 12)}`;
+  const controlRoot = join(root, 'execution-control');
+  await mkdir(controlRoot, { recursive: true });
+  const tasks = await FileTaskStore.create(admitted.spec.taskStoreRoot);
+  const observe = async () => {
+    const task = await tasks.load(admitted.spec.taskId);
+    const run = task?.runs.find((run) => run.runId === admitted.spec.runId);
+    return (
+      task?.currentRunId === admitted.spec.runId &&
+      run?.revision === admitted.spec.baseCommit &&
+      run?.nativeRef?.externalRunId === input.nativeRunId &&
+      !run.operations.some(
+        (operation) =>
+          operation.kind === 'cancel' && operation.state !== 'CONFIRMED',
+      ) &&
+      (!run.nativeSnapshot ||
+        ['QUEUED', 'RUNNING'].includes(run.nativeSnapshot.status)) &&
+      run?.planSha256 === admitted.planSha256 &&
+      run?.executionStoreRoot === join(root, 'children') &&
+      (await input.observeSupervisor())
+    );
+  };
+  if (await exists(join(input.artifacts, `${input.stage}.json`))) {
+    assert(await observe(), 'Native supervision ended; stage reuse refused.');
+    await assertStageCleanup(admitted, input.nativeRunId, input.stage);
+    return loadStage(admitted, input.artifacts, input.nativeRunId, input.stage);
+  }
+  // R1 reconciliation remains read-only: it cannot dispatch any owned operation.
+  if (input.stage === 'build' && input.reconcileIntentSha256) {
+    await assertStageCleanup(admitted, input.nativeRunId, input.stage);
+    const authority = await store.load(authorityId);
+    assert.equal(
+      authority?.status,
+      'SUCCEEDED',
+      'Reconciled build ownership/cleanup is unresolved.',
+    );
+    const readOnly = {
+      assertActive: async () =>
+        assert(await observe(), 'Native supervision ended.'),
+      options: { root: controlRoot, authorityId },
+      finish: async () => {},
+      run: async () => {
+        throw new Error('Reconciliation cannot dispatch.');
+      },
+    };
+    return captureOperation({ ...input, control: readOnly });
+  }
+  const checkCount =
+    input.stage === 'investigate'
+      ? admitted.spec.baselineChecks.length
+      : input.stage === 'verify'
+        ? admitted.spec.acceptanceChecks.length
+        : 0;
+  const processIds = Array.from(
+    { length: checkCount },
+    (_, i) => `${authorityId}-check-${i}`,
+  );
+  if (['investigate', 'build', 'review'].includes(input.stage))
+    processIds.push(`${authorityId}-worker`);
+  const control = new ManagedExecutionControl({
+    store,
+    adapter: createOwnedExecutionAdapter(),
+    runId: admitted.spec.runId,
+    revision: admitted.spec.baseCommit,
+    binding: canonical({
+      ...binding(admitted, input.nativeRunId),
+      stage: input.stage,
+    }),
+    root: controlRoot,
+    authorityId,
+    processIds,
+    observeSupervisor: observe,
+    signal: input.signal,
+  });
+  await control.start();
+  try {
+    return await captureOperation({
+      ...input,
+      signal: control.controller.signal,
+      control,
+    });
+  } catch (error) {
+    await control.stop(String(error));
+    throw error;
+  } finally {
+    await control.drain();
+  }
 }
 
 /** Independent readback: worker PASS and native success never suffice alone. */
@@ -1088,8 +1278,10 @@ export async function verifyReviewedLocalCandidate({
   });
   id(nativeRunId);
   const stages = [];
-  for (const stage of DEFAULT_STAGES)
+  for (const stage of DEFAULT_STAGES) {
     stages.push(await loadStage(admitted, artifacts, nativeRunId, stage));
+    await assertStageCleanup(admitted, nativeRunId, stage);
+  }
   for (let i = 1; i < stages.length; i++)
     assert(
       Date.parse(stages[i].startedAt) >= Date.parse(stages[i - 1].endedAt),
@@ -1131,10 +1323,16 @@ export async function verifyReviewedLocalCandidate({
       admitted.spec.runId,
       'checks-baseline',
     );
-    const workerRefs =
-      index === 0
-        ? stage.refs.filter((ref) => !inside(baselineChecksRoot, ref.path))
-        : stage.refs;
+    const controlRoot = join(
+      admitted.spec.evidenceRoot,
+      admitted.spec.runId,
+      'execution-control',
+    );
+    const workerRefs = stage.refs.filter(
+      (ref) =>
+        !inside(controlRoot, ref.path) &&
+        (index !== 0 || !inside(baselineChecksRoot, ref.path)),
+    );
     assert.deepEqual(
       workerRefs,
       observed.refs,
@@ -1215,7 +1413,8 @@ export async function verifyReviewedLocalCandidate({
   return { admitted, stages, candidate, workers };
 }
 
-export async function finalizeReviewedLocalCandidate(input) {
+async function finalizeOperation(input) {
+  await input.control.assertActive();
   const verified = await verifyReviewedLocalCandidate(input);
   const { admitted, stages, candidate, workers } = verified;
   const root = join(input.artifacts, 'reviewed-local-candidate');
@@ -1235,17 +1434,20 @@ export async function finalizeReviewedLocalCandidate(input) {
       ),
       store: receipts,
       stageEvidence: { store: evidence },
-      handler: (stage) => ({
-        status: 'PASS',
-        summary: `Archon-managed ${stage}; ${admitted.spec.profile}`,
-        evidence: [
-          {
-            name: 'managed-capture',
-            kind: 'verification',
-            content: JSON.stringify(stages[DEFAULT_STAGES.indexOf(stage)]),
-          },
-        ],
-      }),
+      handler: async (stage) => {
+        await input.control.assertActive();
+        return {
+          status: 'PASS',
+          summary: `Archon-managed ${stage}; ${admitted.spec.profile}`,
+          evidence: [
+            {
+              name: 'managed-capture',
+              kind: 'verification',
+              content: JSON.stringify(stages[DEFAULT_STAGES.indexOf(stage)]),
+            },
+          ],
+        };
+      },
     });
   assert.equal(receipt.status, 'PASS');
   assert.deepEqual(receipt.plan, admitted.spec.plan);
@@ -1275,6 +1477,9 @@ export async function finalizeReviewedLocalCandidate(input) {
     scope: 'reviewed-local-candidate-only',
     publication: 'denied',
   };
+  await input.control.assertActive();
+  await input.control.finish();
+  assert(!input.signal?.aborted, 'Cancelled closeout.');
   await sealed(join(root, 'completion.json'), completion);
   await sealed(join(input.artifacts, 'evidence.json'), {
     version: 1,
@@ -1282,6 +1487,79 @@ export async function finalizeReviewedLocalCandidate(input) {
     ...completion,
   });
   return completion;
+}
+
+export async function finalizeReviewedLocalCandidate(input) {
+  assert(
+    typeof input.observeSupervisor === 'function',
+    'Managed finalization needs independently selected supervision.',
+  );
+  const admitted = await admitReviewedLocalCandidate(input);
+  const root = join(admitted.spec.evidenceRoot, admitted.spec.runId);
+  const store = await FileChildTaskStore.create(join(root, 'children'));
+  const tasks = await FileTaskStore.create(admitted.spec.taskStoreRoot);
+  const observe = async () => {
+    const task = await tasks.load(admitted.spec.taskId);
+    const run = task?.runs.find((run) => run.runId === admitted.spec.runId);
+    return (
+      task?.currentRunId === admitted.spec.runId &&
+      run?.revision === admitted.spec.baseCommit &&
+      run?.nativeRef?.externalRunId === input.nativeRunId &&
+      !run.operations.some(
+        (operation) =>
+          operation.kind === 'cancel' && operation.state !== 'CONFIRMED',
+      ) &&
+      (!run.nativeSnapshot ||
+        ['QUEUED', 'RUNNING'].includes(run.nativeSnapshot.status)) &&
+      run?.planSha256 === admitted.planSha256 &&
+      run?.executionStoreRoot === join(root, 'children') &&
+      (await input.observeSupervisor())
+    );
+  };
+  if (
+    await exists(
+      join(input.artifacts, 'reviewed-local-candidate', 'completion.json'),
+    )
+  ) {
+    assert(
+      await observe(),
+      'Native supervision ended; closeout reuse refused.',
+    );
+    await assertStageCleanup(admitted, input.nativeRunId, 'finalize');
+    return finalizeOperation({
+      ...input,
+      control: {
+        assertActive: async () =>
+          assert(await observe(), 'Native supervision ended.'),
+        finish: async () => {},
+      },
+    });
+  }
+  const authorityId = `${admitted.spec.runId.slice(0, 55)}-finalize-control-${objectDigest(binding(admitted, input.nativeRunId)).slice(0, 12)}`;
+  const control = new ManagedExecutionControl({
+    store,
+    adapter: createOwnedExecutionAdapter(),
+    runId: admitted.spec.runId,
+    revision: admitted.spec.baseCommit,
+    root: join(root, 'execution-control'),
+    binding: canonical({
+      ...binding(admitted, input.nativeRunId),
+      stage: 'finalize',
+    }),
+    authorityId,
+    processIds: [],
+    observeSupervisor: observe,
+    signal: input.signal,
+  });
+  await control.start();
+  try {
+    return await finalizeOperation({ ...input, control });
+  } catch (error) {
+    await control.stop(String(error));
+    throw error;
+  } finally {
+    await control.drain();
+  }
 }
 
 async function main(args) {
@@ -1315,6 +1593,22 @@ async function main(args) {
   for (const event of ['SIGINT', 'SIGTERM'])
     process.once(event, () => controller.abort());
   input.signal = controller.signal;
+  if (command === 'capture' || command === 'finalize') {
+    const admitted = await admitReviewedLocalCandidate(input);
+    input.observeSupervisor = await createManagedArchonSupervisor({
+      executable: process.env.INPUTS_NATIVE_EXECUTABLE,
+      executableSha256: process.env.INPUTS_NATIVE_EXECUTABLE_SHA256,
+      home: process.env.INPUTS_NATIVE_HOME,
+      nativeRunId: input.nativeRunId,
+      runId: admitted.spec.runId,
+      revision: admitted.spec.baseCommit,
+      planSha256: admitted.planSha256,
+      requestSha256: admitted.requestSha256,
+      workspaceRoot: admitted.spec.repositoryRoot,
+    });
+    assert(await input.observeSupervisor(), 'Native supervision is not valid.');
+  }
+
   const result =
     command === 'capture'
       ? await captureReviewedLocalCandidate(input)

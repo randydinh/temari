@@ -107,3 +107,84 @@ quality, camera hardware, another provider/host, or installed bundle admission.
 Cancellation retains failures and terminates owned subprocess groups. A late
 cancel after an already completed capture reads that outcome without dispatch;
 route closeout still requires current native success and resolved controls.
+
+## Managed ownership and shutdown
+
+The source route uses the existing child store for stage authority and each owned
+worker/check operation. Runtime owns launch permission, supervision, cancellation,
+lease fencing and result acceptance. The POSIX host adapter owns live IPC handles,
+process groups, termination and cleanup evidence. Native status and cleanup are
+separate observations; FAILED or CANCELLED alone does not prove that work stopped.
+
+Prepare a **new** externally pinned request and run binding for this source revision.
+Add an existing absolute `taskStoreRoot` to the request. Before native dispatch,
+initialize the child store at `<evidenceRoot>/<runId>/children` and put that exact
+path in the selected `TaskRunBinding.executionStoreRoot`. The task must already
+select the request's run, revision and plan, and retain its exact native reference
+before useful work. This link lets the ordinary task store
+refuse replacement while owned work or cleanup is unresolved, and lets pickup
+show the same child records. Do not change a historical binding to add it.
+`startReviewedLocalCandidate` requires the selected instance's absolute
+`ARCHON_HOME`; it supplies native executable/hash/home workflow inputs. CLI
+capture/finalize independently query that exact native run and retained binding.
+Library callers must supply a separately selected `observeSupervisor` port.
+
+A process is gated behind durable PREPARED ownership and a live stage claim.
+The adapter prepares a guardian and an idle group anchor. Runtime retains their
+witness against the exact invocation, task, native run, stage, attempt and fencing
+epoch before permitting useful work. Known Codex and write-runner subprocesses
+inherit that owned group. A guardian IPC disconnect also closes the gate and
+cleans the owned group after a bridge SIGKILL, without requiring a signal handler
+in the bridge. A live TERM-resistant anchor preserves group ownership throughout
+the grace period; no recovered PID or process name is a signalling capability.
+
+| Boundary                    | Finite allowance                                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Independent supervision     | Poll every 1 second; native read command capped at 2 seconds; runtime observation capped at 3.5 seconds |
+| Child/stage lease           | 15 seconds; renew only after current task/native supervision validates                                  |
+| Unreleased launch gate      | 5 seconds                                                                                               |
+| Graceful group termination  | TERM, then 150 milliseconds before KILL                                                                 |
+| Group absence observation   | Up to 1.5 seconds after escalation                                                                      |
+| Adapter settlement fallback | Command timeout plus 10 seconds; unresolved completion stays fenced                                     |
+
+Explicit cancel, terminal native status, changed task binding, parent loss, failed
+observation or lease loss revokes new dispatch and late result acceptance. Queued
+work is cancelled; active child cancellation propagates into the transport.
+Cleanup receipts are hashed into stage evidence and independently reopened on
+replay and closeout. Finalize checks supervision for each canonical handler and
+before completion publication. These checks do not extend the 45-minute trial
+supervision deadline or change the existing native timeout table.
+
+For recovery, select the exact retained stage group from the existing child store
+and call `recoverManagedExecutionGroup(store, adapter, groupId)`. It reads matching
+nonce/binding/witness receipts, records CLEANED only after confirmed group absence,
+and settles the old cancellation under canonical leases. It never signals a
+recovered PID. Missing, changed or uncertain cleanup stays blocked; do not retry
+with a new owner, clear an intent, delete a store or overwrite evidence. A confirmed
+recovery permits a separately admitted replacement binding, while same-invocation
+worker replay remains denied. Accepted builder capture reconciliation remains a
+read-only R1 path and additionally requires completed ownership/cleanup.
+
+Local store locks now retain a unique owner record. After a crashed owner is
+observed absent, recovery claims that exact owner generation before releasing its
+lock. A reused live PID, missing owner publication, corrupt metadata or interrupted
+lock recovery stays uncertain. This is local-store recovery, not process control.
+
+The proved host is macOS POSIX, with Node and Bun synthetic transport checks.
+Windows is refused before any managed process launch. Linux uses the same POSIX
+mechanism but has not been exercised here; unreaped group members can correctly
+leave cleanup unresolved. Cleanup CONFIRMED means the owned process group is
+absent. Arbitrary subprocesses that deliberately daemonize, detach into another
+session/group or use another host are outside this capability. Direct launcher
+and owned operation subprocesses are forced to inherit the group; this is not a
+claim of OS containment for arbitrary Codex tool implementations. Unidentified
+native startup descendants, guardian destruction, simultaneous OS failure and
+unbounded filesystem stalls are not covered. Preserve uncertainty rather than
+promoting this into whole-host shutdown assurance.
+
+Run `pnpm exec nx run workflow-runtime:managed-shutdown-test` for model-free
+synthetic process, crash, race and recovery tests, and `managed-shutdown-typecheck`
+for the typed fixtures/operation entry. The existing `managed-candidate-test`
+retains the timeout, accepted-result binding and no-replay regressions. Set
+`WORKER_SHUTDOWN_FIXTURE_EVIDENCE_ROOT` to an absolute scratch directory to retain
+fixture ledgers and witnesses; those archived PIDs are evidence only.

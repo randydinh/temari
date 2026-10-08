@@ -1,3 +1,4 @@
+import { FileChildTaskStore } from './child-task-store.js';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
@@ -85,6 +86,8 @@ export interface TaskRunBinding {
   readonly evidenceRoot?: string;
   readonly sourceRefs?: readonly TaskSourceRef[];
   readonly childRefs?: readonly TaskChildRef[];
+  /** Source-managed route ownership; retains cleanup barriers across new run bindings. */
+  readonly executionStoreRoot?: string;
 }
 export interface TaskOperation {
   readonly commandId: string;
@@ -360,8 +363,10 @@ function binding(value: TaskRunBinding): void {
     'evidenceRoot',
     'sourceRefs',
     'childRefs',
+    'executionStoreRoot',
   ]);
   assertTaskId(value.runId);
+  if (value.executionStoreRoot !== undefined) path(value.executionStoreRoot);
   text(value.revision, 'revision');
   plan(value.plan);
   assert.equal(
@@ -1075,6 +1080,30 @@ export class FileTaskStore {
         request.expectedVersion,
         'Task version conflict; reload before updating.',
       );
+      if (copy.type === 'run-bound') {
+        const current = existing?.runs.find(
+          (run) => run.runId === existing.currentRunId,
+        );
+        if (current?.executionStoreRoot) {
+          // Missing/corrupt ownership is recovery work, never an empty-store success.
+          assert(
+            (await lstat(current.executionStoreRoot)).isDirectory(),
+            'Execution store is missing.',
+          );
+          const store = await FileChildTaskStore.create(
+            current.executionStoreRoot,
+          );
+          const records = await store.executionRecords(current.runId);
+          assert(
+            records.every(
+              (record) =>
+                !['QUEUED', 'RUNNING'].includes(record.status) &&
+                (!record.execution || record.execution.state === 'CLEANED'),
+            ),
+            'Managed execution cleanup is unresolved; replacement run binding refused.',
+          );
+        }
+      }
       const event: TaskEvent = {
         schema: 1,
         sequence: events.length + 1,

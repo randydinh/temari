@@ -20,6 +20,9 @@
     },
     {
       "path": "../../libs/contracts/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/archon-harness/tsconfig.lib.json"
     }
   ]
 }

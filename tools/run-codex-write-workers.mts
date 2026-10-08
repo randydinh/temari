@@ -5,6 +5,7 @@ import {
   preparePinnedDependencies,
   type PinnedDependencyPlan,
 } from './pinned-submodules.mjs';
+import { inOwnedProcessGroup } from '../libs/host-adapters/src/lib/owned-execution.js';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
@@ -353,7 +354,10 @@ export function parseWriteRunRequest(value: unknown): WriteRunRequest {
 function killGroup(pid: number | undefined): void {
   if (!pid) return;
   try {
-    process.kill(process.platform === 'win32' ? pid : -pid, 'SIGKILL');
+    process.kill(
+      process.platform === 'win32' || inOwnedProcessGroup() ? pid : -pid,
+      'SIGKILL',
+    );
   } catch {}
 }
 async function runBufferedSemanticCommand(
@@ -376,7 +380,7 @@ async function runBufferedSemanticCommand(
   const child = spawn(program, [...args], {
     cwd,
     shell: false,
-    detached: process.platform !== 'win32',
+    detached: process.platform !== 'win32' && !inOwnedProcessGroup(),
     stdio: ['pipe', 'pipe', 'pipe'],
     env: gitEnv,
   });

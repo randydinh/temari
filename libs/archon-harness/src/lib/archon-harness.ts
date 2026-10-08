@@ -491,6 +491,8 @@ export class ArchonHarness implements ExecutionHarness {
     const admitted = parseJson(admission.stdout, 'Managed candidate admission');
     if (admitted.requestSha256 !== paths.expectedRequestSha256 || admitted.planSha256 !== sha256(canonical(request.plan)))
       throw new Error('Managed candidate admission identity changed.');
+    if (!this.environment.ARCHON_HOME || !isAbsolute(this.environment.ARCHON_HOME))
+      throw new Error('Managed candidate supervision requires the exact ARCHON_HOME.');
     return this.start({
       ...request,
       recovery: 'required',
@@ -500,6 +502,9 @@ export class ArchonHarness implements ExecutionHarness {
         spec: paths.specPath,
         request_sha256: paths.expectedRequestSha256,
         bridge_sha256: paths.expectedBridgeSha256,
+        native_executable: this.options.runtime.executablePath,
+        native_executable_sha256: this.options.runtime.sha256,
+        native_home: this.environment.ARCHON_HOME,
       },
     });
   }

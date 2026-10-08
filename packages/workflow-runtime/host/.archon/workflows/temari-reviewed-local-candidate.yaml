@@ -11,6 +11,12 @@ inputs:
     required: true
   bridge_sha256:
     required: true
+  native_executable:
+    required: true
+  native_executable_sha256:
+    required: true
+  native_home:
+    required: true
 evidence_policy:
   required: true
 nodes:

@@ -642,6 +642,28 @@ export class TaskRuntime {
         issues.push(errorMessage(error));
       }
     }
+    if (run.executionStoreRoot) {
+      try {
+        assert(
+          (await lstat(run.executionStoreRoot)).isDirectory(),
+          'Execution store is missing.',
+        );
+        const store = await FileChildTaskStore.create(run.executionStoreRoot);
+        for (const child of await store.executionRecords(run.runId)) {
+          assert.equal(
+            child.revision,
+            run.revision,
+            'Execution revision mismatch.',
+          );
+          if (!children.some((existing) => existing.taskId === child.taskId))
+            children.push(child);
+          if (child.execution && child.execution.state !== 'CLEANED')
+            issues.push(`Execution cleanup unresolved: ${child.taskId}`);
+        }
+      } catch (error) {
+        issues.push(errorMessage(error));
+      }
+    }
     return {
       runId: run.runId,
       revision: run.revision,

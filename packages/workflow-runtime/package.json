@@ -179,6 +179,18 @@
       "managed-candidate-test": {
         "command": "node --import @swc-node/register/esm-register --test tools/reviewed-local-candidate.test.mjs",
         "cache": false
+      },
+      "managed-shutdown-test": {
+        "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 tools/managed-shutdown.test.mts",
+        "cache": false
+      },
+      "managed-shutdown-typecheck": {
+        "command": "tsc --ignoreConfig --noEmit --module nodenext --moduleResolution nodenext --target es2022 --types node --strict --skipLibCheck --allowImportingTsExtensions tools/managed-shutdown.test.mts tools/fixtures/managed-execution-controller.mts tools/managed-candidate-operation.mts tools/fixtures/owned-execution-bun.mts",
+        "cache": false
+      },
+      "managed-cancel-intent-test": {
+        "command": "node --import @swc-node/register/esm-register --test --test-name-pattern=\"parent cancel intent|worker lease loss\" tools/reviewed-local-candidate.test.mjs",
+        "cache": false
       }
     }
   },

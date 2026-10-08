@@ -134,8 +134,10 @@ export interface ExecuteRestartableParallelWorkersRequest {
     readonly maxAttempts: number;
   };
   readonly maxConcurrency?: number;
+  readonly signal?: AbortSignal;
   readonly handler: (
     assignment: WorkerAssignment,
+    context: { readonly signal: AbortSignal; readonly child: ChildTaskRecord },
   ) => Promise<WorkerResult> | WorkerResult;
   readonly now?: () => Date;
 }
@@ -1068,6 +1070,17 @@ async function executeClaimed(
   const lease = claimed.record.lease;
   assert(lease);
   const idempotencyKey = `complete:${claimed.record.taskId}:${claimed.record.attempt}:${lease.fencingEpoch}`;
+  const controller = new AbortController();
+  let cancellation: Promise<unknown> | undefined;
+  const abort = (): void => {
+    controller.abort();
+    if (renewalTimer) clearInterval(renewalTimer);
+    cancellation ??= request.childStore.cancel({
+      taskId: claimed.record.taskId,
+      actor: request.owner,
+      idempotencyKey: `signal-cancel:${claimed.record.taskId}:${claimed.record.attempt}`,
+    });
+  };
   let renewalError: unknown = null;
   let renewalSequence = 0;
   let renewalInFlight: Promise<void> | null = null;
@@ -1086,6 +1099,7 @@ async function executeClaimed(
       });
     } catch (error) {
       renewalError = error;
+      controller.abort(error);
       if (renewalTimer) clearInterval(renewalTimer);
     }
   };
@@ -1094,6 +1108,7 @@ async function executeClaimed(
     if (renewalInFlight) await renewalInFlight;
     renewalTimer = null;
     renewalInFlight = null;
+    if (cancellation) await cancellation;
   };
   const renewalIntervalMs = request.leaseRenewal?.intervalMs;
   if (renewalIntervalMs !== undefined) {
@@ -1104,12 +1119,17 @@ async function executeClaimed(
       });
     }, renewalIntervalMs);
   }
+  request.signal?.addEventListener('abort', abort, { once: true });
+  if (request.signal?.aborted) abort();
+  try {
   let result: WorkerResult | null = null;
   let failure: unknown = null;
   let failed = false;
   let failureDiagnostics: ChildFailureDiagnostics | undefined;
   try {
-    result = await request.handler(claimed.assignment);
+    assert(!controller.signal.aborted, 'Worker authority cancelled before dispatch.');
+    result = await request.handler(claimed.assignment, { signal: controller.signal, child: claimed.record });
+    assert(!controller.signal.aborted, 'Late worker result after authority loss.');
     assertWorkerResult(result);
     result = await publishWorkerEvidence(request, claimed.assignment, result);
     const saved = await persistWorkspaceManifest(
@@ -1120,6 +1140,8 @@ async function executeClaimed(
     );
     if (saved)
       result = { ...result, workspaceManifestId: claimed.record.taskId };
+    await stopRenewal();
+    assert(!controller.signal.aborted && !request.signal?.aborted, 'Late result after worker cancellation.');
   } catch (error) {
     failed = true;
     failure = error;
@@ -1232,6 +1254,10 @@ async function executeClaimed(
   } catch (completionError) {
     if (isLeaseLoss(completionError)) return true;
     throw completionError;
+  }
+  } finally {
+    request.signal?.removeEventListener('abort', abort);
+    if (cancellation) await cancellation;
   }
 }
 
