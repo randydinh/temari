@@ -143,6 +143,70 @@ observation validates it. The bridge never creates or adopts a reference. Replay
 later stages and finalize refuse a missing reference immediately; a previously
 published reference cannot reenter the startup wait.
 
+The selected native record can also be published as `pending` with
+`working_path: null` after the dispatch reference is returned. For a **new**
+source-pinned host launcher, call
+`ArchonHarness.waitForRunIdentityInitialization(reference, options)` only after
+`TaskRuntime.dispatch` has durably bound the reference and the launcher has retained
+its exact reference/readback. The adapter reads only `workflow get <exact ID>
+--json` through that selected harness, workspace and dedicated `ARCHON_HOME`.
+Every read first verifies the ID, workflow and all eight canonical binding fields.
+Only exact `pending` plus an explicitly null workspace may wait. READY requires
+`running`/`in_progress` and the existing absolute, real-path-equal workspace
+invariant on the same record. Contradictions, missing/malformed fields, unexpected
+or terminal states and command failure end the gate without another dispatch.
+
+The named startup default and hard maximum are 10 seconds; polling is 100 ms.
+Every read receives at most 2 seconds and the remaining window, and each read,
+delay, path validation and observation-retention callback shares the earlier of
+that monotonic limit and the caller's `deadlineAtMs`. Abort also interrupts a
+pending read; a late response cannot grant readiness. `onObservation` receives
+numbered PENDING/READY observations with native ID, status, workspace and elapsed
+time. Failure throws `ArchonIdentityInitializationError` retaining the exact
+reference and prior observations. The host retains these diagnostics and enters
+its existing exact-reference cleanup/fencing path. An uncooperative injected
+reader can outlive logical refusal; this gate is not native/process termination
+proof.
+
+This gate is one-shot per exact identity in the selected harness instance;
+changing `startedAt` does not reopen it. Strict successful verification also
+closes the initialization opportunity. `verifyRunIdentity` remains the default
+for later observations, recovery and cleanup and rejects a missing workspace
+immediately. Never put the initialization wait inside `start`, create a new
+harness to retry it or replace a reference after refusal. Runtime and the live
+managed bridge retain ownership, cancellation, claims and cleanup authority;
+this read-only host gate grants no child or worker rights.
+
+A separately reviewed **new frozen launcher** must wire the gate as follows.
+Its existing interruption and stop/deadline handlers must also abort the
+`readinessAbort` controller, created before dispatch. Preserve the launcher’s
+existing cleanup path and reserved cleanup budget:
+
+```js
+// Dispatch has returned, persisted nativeRef, and retained exact reference/readback.
+assertProgress();
+const remainingMs = Math.floor(budget.workRemaining());
+assert(remainingMs > 0);
+await workHarness.waitForRunIdentityInitialization(reference, {
+  timeoutMs: Math.min(10_000, remainingMs),
+  deadlineAtMs: Date.now() + remainingMs,
+  signal: readinessAbort.signal,
+  onObservation: (event) =>
+    retain(`native-readiness-${event.attempt}.json`, event),
+});
+assertProgress();
+verifiedReference = true;
+```
+
+On failure, keep `verifiedReference` false and preserve the already persisted
+reference for strict exact cleanup/reconciliation. Later observations must call
+strict `verifyRunIdentity(reference)` before reading status; recovery and cleanup
+continue using that strict port. This source addition does not update a released
+launcher or admit another trial. Refresh source manifests and independently pin
+new launcher bytes before any separately authorized release. Existing source
+TaskRuntime dispatch already persists before returning; its reconciliation and
+result readers use strict identity verification and need no startup exemption.
+
 A process is gated behind durable PREPARED ownership and a live stage claim.
 The adapter prepares a guardian and an idle group anchor. Runtime retains their
 witness against the exact invocation, task, native run, stage, attempt and fencing

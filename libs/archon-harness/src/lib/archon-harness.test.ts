@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdtemp, rm, writeFile, readFile, mkdir, cp } from 'node:fs/promises';
+import { join, basename } from 'node:path';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
 
 import { minimalPlan, type HarnessRunRef } from '@temari/contracts';
-import { ArchonHarness, type ArchonCommandRunner } from './archon-harness.js';
+import { ArchonHarness, ArchonIdentityInitializationError, type ArchonCommandRunner } from './archon-harness.js';
+import { FileTaskStore, FileChildTaskStore, TaskRuntime, taskDigest } from '@temari/runtime';
 import type { ManagedArchonRuntime } from './managed-runtime.js';
 
 const runtime: ManagedArchonRuntime = {
@@ -499,4 +500,678 @@ test('managed candidate admission is pinned and refuses missing capabilities bef
     await assert.rejects(harness.startReviewedLocalCandidate(request,{...paths,expectedBridgeSha256:'0'.repeat(64)}),/pin changed/);
     assert.equal(calls.length,1);
   } finally { await rm(root,{recursive:true,force:true}); }
+});
+
+test('retained pending-null pilot record reproduces strict identity refusal before its ready record', async () => {
+  const records = JSON.parse(
+    await readFile(
+      new URL(
+        './fixtures/native-identity-initialization.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  );
+  const binding = JSON.parse(records[0].metadata.inputs.temari_binding);
+  const reference: HarnessRunRef = {
+    ...binding,
+    externalRunId: records[0].id,
+    startedAt: new Date(0).toISOString(),
+  };
+  let record = records[0];
+  const harness = new ArchonHarness({
+    runtime,
+    commandRunner: {
+      async run() {
+        return { exitCode: 0, stdout: JSON.stringify(record), stderr: '' };
+      },
+    },
+  });
+  await assert.rejects(
+    harness.verifyRunIdentity(reference),
+    /native run identity does not match/,
+  );
+  // Exact pending bytes need no local path. Rebase only workspace fields for
+  // the ready positive control so the retained fixture remains portable.
+  const root = await mkdtemp(join(tmpdir(), 'archon-retained-ready-'));
+  try {
+    const readyBinding = { ...binding, workspaceRoot: root };
+    record = {
+      ...records[1],
+      working_path: root,
+      metadata: { inputs: { temari_binding: JSON.stringify(readyBinding) } },
+    };
+    await harness.verifyRunIdentity({ ...reference, workspaceRoot: root });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+async function initializationFixture(t: import('node:test').TestContext) {
+  const workspaceRoot = await mkdtemp(join(tmpdir(), 'archon-initialization-'));
+  t.after(async () => {
+    const destination = process.env.NATIVE_IDENTITY_FIXTURE_EVIDENCE_ROOT;
+    if (destination) {
+      await mkdir(destination, { recursive: true });
+      const target = join(destination, basename(workspaceRoot));
+      await writeFile(
+        join(workspaceRoot, 'fixture-native-records.json'),
+        JSON.stringify(
+          {
+            reference,
+            initialRecord: pending,
+            lastRecord: selected,
+            commands,
+            scope:
+              'Injected read/cancel responses only; no native command process',
+          },
+          null,
+          2,
+        ) + '\n',
+      );
+      await cp(workspaceRoot, target, {
+        recursive: true,
+        errorOnExist: true,
+        force: false,
+      });
+      await writeFile(
+        join(target, 'archive-origin.json'),
+        JSON.stringify(
+          {
+            test: t.name,
+            sourceRoot: workspaceRoot,
+            scope:
+              'Owned synthetic responses/ledgers only; no native command, model or recovered PID control.',
+          },
+          null,
+          2,
+        ) + '\n',
+      );
+    }
+    await rm(workspaceRoot, { recursive: true, force: true });
+  });
+  const records = JSON.parse(
+    await readFile(
+      new URL(
+        './fixtures/native-identity-initialization.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  );
+  const originalBinding = JSON.parse(records[0].metadata.inputs.temari_binding);
+  const binding = {
+    ...originalBinding,
+    workspaceRoot,
+    planSha256: taskDigest(minimalPlan('investigation')),
+  };
+  const reference: HarnessRunRef = {
+    ...binding,
+    externalRunId: records[0].id,
+    startedAt: new Date(0).toISOString(),
+  };
+  const pending = {
+    ...records[0],
+    metadata: { inputs: { temari_binding: JSON.stringify(binding) } },
+  };
+  const ready = {
+    ...records[1],
+    working_path: workspaceRoot,
+    metadata: pending.metadata,
+  };
+  let selected: Record<string, unknown> = pending;
+  let calls = 0;
+  const commands: Array<{ args: readonly string[]; timeoutMs: number }> = [];
+  const harness = new ArchonHarness({
+    runtime,
+    environment: { ARCHON_HOME: join(workspaceRoot, 'archon-home') },
+    commandRunner: {
+      async run(_exe, args, cwd, _env, timeoutMs) {
+        calls++;
+        commands.push({ args, timeoutMs });
+        assert.equal(cwd, workspaceRoot);
+        assert.equal(_env.ARCHON_HOME, join(workspaceRoot, 'archon-home'));
+        assert.equal(args[0], 'workflow');
+        assert.equal(args[2], reference.externalRunId);
+        assert(['get', 'cancel'].includes(args[1]!));
+        if (args[1] === 'cancel') selected = { ...ready, status: 'cancelled' };
+        return { exitCode: 0, stdout: JSON.stringify(selected), stderr: '' };
+      },
+    },
+  });
+  return {
+    harness,
+    reference,
+    pending,
+    ready,
+    commands,
+    set(record: Record<string, unknown>) {
+      selected = record;
+    },
+    get calls() {
+      return calls;
+    },
+  };
+}
+
+test('initialization observes pending-null then exact ready after caller durably retains the native reference', async (t) => {
+  const f = await initializationFixture(t);
+  // Host/runtime persistence happens before this adapter gate, including failures.
+  const retainedPath = join(
+    f.reference.workspaceRoot,
+    'retained-native-reference.json',
+  );
+  await writeFile(retainedPath, JSON.stringify(f.reference));
+  const seen: string[] = [];
+  const result = await f.harness.waitForRunIdentityInitialization(f.reference, {
+    onObservation(event) {
+      seen.push(event.state);
+      if (event.state === 'PENDING') f.set(f.ready);
+    },
+  });
+  assert.deepEqual(seen, ['PENDING', 'READY']);
+  assert.deepEqual(
+    result.map((x) => x.attempt),
+    [1, 2],
+  );
+  assert.deepEqual(
+    JSON.parse(await readFile(retainedPath, 'utf8')),
+    f.reference,
+  );
+  assert(
+    f.commands.every(
+      (c) =>
+        c.timeoutMs > 0 &&
+        c.timeoutMs <= 2000 &&
+        c.args.join(' ') === `workflow get ${f.reference.externalRunId} --json`,
+    ),
+  );
+  f.set(f.pending);
+  await assert.rejects(
+    f.harness.verifyRunIdentity(f.reference),
+    /identity does not match/,
+  );
+  const calls = f.calls;
+  await assert.rejects(
+    f.harness.waitForRunIdentityInitialization({
+      ...f.reference,
+      startedAt: new Date().toISOString(),
+    }),
+    /already attempted/,
+  );
+  assert.equal(f.calls, calls);
+});
+
+test('permanent pending initialization expires, retains the reference/observations, and cannot retry', async (t) => {
+  const f = await initializationFixture(t);
+  const start = performance.now();
+  let failure!: ArchonIdentityInitializationError;
+  await assert.rejects(
+    f.harness.waitForRunIdentityInitialization(f.reference),
+    (error) => {
+      assert(error instanceof ArchonIdentityInitializationError);
+      failure = error;
+      assert.deepEqual(error.reference, f.reference);
+      assert(
+        error.observations.length > 0 &&
+          error.observations.every((o) => o.state === 'PENDING'),
+      );
+      assert.match(error.message, /deadline expired/);
+      return true;
+    },
+  );
+  assert(
+    performance.now() - start >= 9900 && performance.now() - start < 14000,
+  );
+  assert(f.calls > 0 && f.calls <= 110);
+  assert(
+    f.commands.every(
+      (command) => command.timeoutMs > 0 && command.timeoutMs <= 2000,
+    ),
+  );
+  await writeFile(
+    join(f.reference.workspaceRoot, 'default-deadline-observation.json'),
+    JSON.stringify(
+      {
+        reason: failure.message,
+        reference: failure.reference,
+        observations: failure.observations,
+        elapsedMs: performance.now() - start,
+      },
+      null,
+      2,
+    ) + '\n',
+  );
+  await assert.rejects(
+    f.harness.waitForRunIdentityInitialization(f.reference),
+    /already attempted/,
+  );
+});
+
+test('initialization cancels while pending and obeys the earlier caller deadline', async (t) => {
+  const f = await initializationFixture(t);
+  const controller = new AbortController();
+  await assert.rejects(
+    f.harness.waitForRunIdentityInitialization(f.reference, {
+      signal: controller.signal,
+      onObservation() {
+        controller.abort();
+      },
+    }),
+    /cancelled/,
+  );
+  const g = await initializationFixture(t);
+  const start = performance.now();
+  await assert.rejects(
+    g.harness.waitForRunIdentityInitialization(g.reference, {
+      deadlineAtMs: Date.now() + 80,
+    }),
+    /deadline expired/,
+  );
+  assert(performance.now() - start < 1500);
+  const h = await initializationFixture(t);
+  await assert.rejects(
+    h.harness.waitForRunIdentityInitialization(h.reference, {
+      deadlineAtMs: Date.now() - 1,
+    }),
+    /deadline expired/,
+  );
+  assert.equal(h.calls, 0);
+});
+
+for (const kind of [
+  'wrong-id',
+  'wrong-binding',
+  'missing-binding',
+  'malformed-binding',
+  'wrong-workflow',
+  'wrong-workspace',
+  'pending-with-workspace',
+  'running-with-null',
+  'missing-workspace',
+  'unknown-status',
+  'cancelled',
+  'failed',
+  'completed',
+] as const) {
+  test(`initialization refuses ${kind} immediately without waiting or returning ready`, async (t) => {
+    const f = await initializationFixture(t);
+    let bad: Record<string, unknown> = structuredClone(f.pending);
+    if (kind === 'wrong-id') bad.id = 'foreign';
+    if (kind === 'wrong-workflow') bad.workflow_name = 'foreign';
+    if (kind === 'wrong-binding')
+      bad.metadata = {
+        inputs: {
+          temari_binding: JSON.stringify({
+            ...JSON.parse(f.pending.metadata.inputs.temari_binding),
+            runId: 'foreign',
+          }),
+        },
+      };
+    if (kind === 'missing-binding') bad.metadata = { inputs: {} };
+    if (kind === 'malformed-binding')
+      bad.metadata = { inputs: { temari_binding: '{' } };
+    if (kind === 'wrong-workspace') bad.working_path = tmpdir();
+    if (kind === 'pending-with-workspace')
+      bad.working_path = f.reference.workspaceRoot;
+    if (kind === 'running-with-null') bad.status = 'running';
+    if (kind === 'missing-workspace') delete bad.working_path;
+    if (kind === 'unknown-status') bad.status = 'unknown';
+    if (['cancelled', 'failed', 'completed'].includes(kind)) {
+      bad = { ...f.ready, status: kind };
+    }
+    f.set(bad);
+    let events = 0;
+    await assert.rejects(
+      f.harness.waitForRunIdentityInitialization(f.reference, {
+        onObservation() {
+          events++;
+        },
+      }),
+    );
+    assert.equal(f.calls, 1);
+    assert.equal(events, 0);
+  });
+}
+
+test('initialization refuses malformed responses and command failures without retry', async (t) => {
+  const f = await initializationFixture(t);
+  for (const result of [
+    { exitCode: 0, stdout: '{', stderr: '' },
+    { exitCode: 0, stdout: 'null', stderr: '' },
+    { exitCode: 7, stdout: '', stderr: 'fixture failure' },
+  ]) {
+    let calls = 0;
+    const harness = new ArchonHarness({
+      runtime,
+      commandRunner: {
+        async run() {
+          calls++;
+          return result;
+        },
+      },
+    });
+    await assert.rejects(harness.waitForRunIdentityInitialization(f.reference));
+    assert.equal(calls, 1);
+  }
+});
+
+test('initialization bounds a stalled reader and interrupted observation retention; no late ready is accepted', async (t) => {
+  const f = await initializationFixture(t);
+  let resolveRead!: (value: {
+    exitCode: number;
+    stdout: string;
+    stderr: string;
+  }) => void;
+  const harness = new ArchonHarness({
+    runtime,
+    commandRunner: {
+      run() {
+        return new Promise((resolve) => {
+          resolveRead = resolve;
+        });
+      },
+    },
+  });
+  await assert.rejects(
+    harness.waitForRunIdentityInitialization(f.reference, { timeoutMs: 60 }),
+    /deadline expired/,
+  );
+  resolveRead({ exitCode: 0, stdout: JSON.stringify(f.ready), stderr: '' });
+  await assert.rejects(
+    harness.waitForRunIdentityInitialization(f.reference),
+    /already attempted/,
+  );
+  const g = await initializationFixture(t);
+  g.set(g.ready);
+  await assert.rejects(
+    g.harness.waitForRunIdentityInitialization(g.reference, {
+      timeoutMs: 60,
+      onObservation() {
+        return new Promise(() => {});
+      },
+    }),
+    /deadline expired/,
+  );
+});
+
+test('initialization rejects invalid bounds and pre-aborted cancellation before a native read', async (t) => {
+  const f = await initializationFixture(t);
+  for (const timeoutMs of [0, -1, 10001, NaN])
+    await assert.rejects(
+      f.harness.waitForRunIdentityInitialization(f.reference, { timeoutMs }),
+      /Invalid.*bound/,
+    );
+  await assert.rejects(f.harness.waitForRunIdentityInitialization({ ...f.reference, externalRunId: 'LaTeSt' }), /exact native run ID/);
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(
+    f.harness.waitForRunIdentityInitialization(f.reference, {
+      signal: controller.signal,
+    }),
+    /cancelled/,
+  );
+  assert.equal(f.calls, 0);
+});
+
+test('ready first observation succeeds once; later default identity loss never waits', async (t) => {
+  const f = await initializationFixture(t);
+  f.set(f.ready);
+  const result = await f.harness.waitForRunIdentityInitialization(f.reference);
+  assert.deepEqual(
+    result.map((x) => x.state),
+    ['READY'],
+  );
+  assert.equal(f.calls, 1);
+  f.set(f.pending);
+  await assert.rejects(f.harness.verifyRunIdentity(f.reference));
+  assert.equal(f.calls, 2);
+  const g = await initializationFixture(t);
+  g.set(g.ready);
+  await g.harness.verifyRunIdentity(g.reference);
+  g.set(g.pending);
+  await assert.rejects(
+    g.harness.waitForRunIdentityInitialization(g.reference),
+    /already attempted/,
+  );
+  assert.equal(g.calls, 1);
+});
+
+test('abort during an outstanding initialization read rejects before its late ready response', async (t) => {
+  const f = await initializationFixture(t);
+  const controller = new AbortController();
+  let resolveRead!: (value: {
+    exitCode: number;
+    stdout: string;
+    stderr: string;
+  }) => void;
+  let entered!: () => void;
+  const reading = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const harness = new ArchonHarness({
+    runtime,
+    commandRunner: {
+      run() {
+        entered();
+        return new Promise((resolve) => {
+          resolveRead = resolve;
+        });
+      },
+    },
+  });
+  const waiting = assert.rejects(
+    harness.waitForRunIdentityInitialization(f.reference, {
+      signal: controller.signal,
+    }),
+    (error) => {
+      assert(error instanceof ArchonIdentityInitializationError);
+      assert.deepEqual(error.reference, f.reference);
+      assert.match(error.message, /cancelled/);
+      return true;
+    },
+  );
+  await reading;
+  controller.abort();
+  await waiting;
+  resolveRead({ exitCode: 0, stdout: JSON.stringify(f.ready), stderr: '' });
+  await assert.rejects(
+    harness.waitForRunIdentityInitialization(f.reference),
+    /already attempted/,
+  );
+});
+
+test('a contradictory binding or terminal transition after pending cannot be erased by later ready', async (t) => {
+  for (const change of [
+    { schema: 2 },
+    { runId: 'foreign' },
+    { revision: 'foreign' },
+    { planSha256: 'e'.repeat(64) },
+    { workspaceRoot: tmpdir() },
+    { entrypoint: 'foreign' },
+    { harnessId: 'foreign' },
+    { harnessVersion: '9.9.9' },
+    { extra: 'foreign' },
+  ]) {
+    const g = await initializationFixture(t);
+    g.set({
+      ...g.pending,
+      metadata: {
+        inputs: {
+          temari_binding: JSON.stringify({
+            ...JSON.parse(g.pending.metadata.inputs.temari_binding),
+            ...change,
+          }),
+        },
+      },
+    });
+    await assert.rejects(
+      g.harness.waitForRunIdentityInitialization(g.reference),
+    );
+    assert.equal(g.calls, 1);
+  }
+  for (const kind of ['terminal', 'binding']) {
+    const g = await initializationFixture(t);
+    const changed =
+      kind === 'terminal'
+        ? { ...g.ready, status: 'cancelled' }
+        : {
+            ...g.pending,
+            metadata: {
+              inputs: {
+                temari_binding: JSON.stringify({
+                  ...JSON.parse(g.pending.metadata.inputs.temari_binding),
+                  revision: 'foreign',
+                }),
+              },
+            },
+          };
+    let observations = 0;
+    await assert.rejects(
+      g.harness.waitForRunIdentityInitialization(g.reference, {
+        onObservation() {
+          observations++;
+          g.set(changed);
+        },
+      }),
+    );
+    assert.equal(observations, 1);
+    assert.equal(g.calls, 2);
+    g.set(g.ready);
+    await assert.rejects(
+      g.harness.waitForRunIdentityInitialization(g.reference),
+      /already attempted/,
+    );
+  }
+});
+
+test('ready workspace must be absolute and resolve to the exact selected workspace', async (t) => {
+  for (const working_path of [
+    'relative',
+    tmpdir(),
+    '/not-present-native-readiness-workspace',
+  ]) {
+    const f = await initializationFixture(t);
+    f.set({ ...f.ready, working_path });
+    await assert.rejects(
+      f.harness.waitForRunIdentityInitialization(f.reference),
+    );
+    assert.equal(f.calls, 1);
+  }
+});
+
+test('caller dispatch retains exact reference before readiness timeout and uses existing strict cleanup without redispatch', async (t) => {
+  const f = await initializationFixture(t);
+  const tasks = await FileTaskStore.create(
+    join(f.reference.workspaceRoot, 'tasks'),
+  );
+  const children = await FileChildTaskStore.create(
+    join(f.reference.workspaceRoot, 'children'),
+  );
+  let parent = await tasks.createTask({
+    taskId: 'parent',
+    title: 'fixture',
+    goal: 'fixture',
+    workspaceRoot: f.reference.workspaceRoot,
+    actor: 'fixture',
+    idempotencyKey: 'create',
+  });
+  const plan = minimalPlan('investigation');
+  parent = await tasks.bindRun({
+    taskId: 'parent',
+    actor: 'fixture',
+    idempotencyKey: 'bind',
+    expectedVersion: parent.version,
+    run: {
+      runId: f.reference.runId,
+      revision: f.reference.revision,
+      plan,
+      executionStoreRoot: join(f.reference.workspaceRoot, 'children'),
+    },
+  });
+  let dispatches = 0;
+  let usefulWork = 0;
+  const host = {
+    id: 'archon',
+    version: '0.10.1',
+    async start() {
+      dispatches++;
+      return f.reference;
+    },
+    status: (r: HarnessRunRef) => f.harness.status(r),
+    cancel: (r: HarnessRunRef) => f.harness.cancel(r),
+    verifyRunIdentity: (r: HarnessRunRef) => f.harness.verifyRunIdentity(r),
+    async resume(): Promise<never> {
+      throw new Error('No replay.');
+    },
+  };
+  const control = new TaskRuntime({
+    store: tasks,
+    selection: {
+      hostHarness: host,
+      configuredHarness: null,
+      managedDefault: null,
+    },
+  });
+  await control.dispatch({
+    taskId: 'parent',
+    runId: f.reference.runId,
+    actor: 'fixture',
+    idempotencyKey: 'dispatch',
+    expectedVersion: parent.version,
+    entrypoint: f.reference.entrypoint,
+    inputs: {},
+  });
+  const retained = (await tasks.load('parent'))!.runs[0]!.nativeRef!;
+  assert.deepEqual(retained, f.reference);
+  try {
+    await f.harness.waitForRunIdentityInitialization(retained, {
+      timeoutMs: 80,
+      onObservation: async () => {
+        assert.deepEqual(
+          (await tasks.load('parent'))!.runs[0]!.nativeRef,
+          retained,
+        );
+        assert.equal(usefulWork, 0);
+        assert.deepEqual(await children.executionRecords(retained.runId), []);
+      },
+    });
+    usefulWork++;
+  } catch (error) {
+    assert(error instanceof ArchonIdentityInitializationError);
+    assert.deepEqual(error.reference, retained);
+    await writeFile(
+      join(f.reference.workspaceRoot, 'readiness-failure.json'),
+      JSON.stringify(
+        {
+          reference: error.reference,
+          observations: error.observations,
+          reason: error.message,
+        },
+        null,
+        2,
+      ),
+    );
+    // Simulate later workspace publication; initial timeout remains a failure.
+    // Cleanup requires ordinary exact identity verification before native cancel.
+    f.set(f.ready);
+    await f.harness.verifyRunIdentity(retained);
+    const selected = (await tasks.load('parent'))!;
+    await control.cancel({
+      taskId: 'parent',
+      runId: retained.runId,
+      actor: 'fixture',
+      idempotencyKey: 'cleanup',
+      expectedVersion: selected.version,
+    });
+  }
+  assert.equal(usefulWork, 0);
+  assert.equal(dispatches, 1);
+  assert.deepEqual((await tasks.load('parent'))!.runs[0]!.nativeRef, retained);
+  assert.equal(
+    (await tasks.load('parent'))!.runs[0]!.nativeSnapshot?.status,
+    'CANCELLED',
+  );
+  assert.equal(f.commands.filter((c) => c.args[1] === 'cancel').length, 1);
+  assert.deepEqual(await children.executionRecords(retained.runId), []);
 });

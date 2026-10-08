@@ -41,6 +41,45 @@ export interface ArchonHarnessOptions {
   readonly timeoutMs?: number;
 }
 
+export const ARCHON_IDENTITY_INITIALIZATION_MAX_MS = 10_000;
+export const ARCHON_IDENTITY_INITIALIZATION_TIMEOUT_MS =
+  ARCHON_IDENTITY_INITIALIZATION_MAX_MS;
+export const ARCHON_IDENTITY_INITIALIZATION_POLL_MS = 100;
+
+export interface ArchonIdentityInitializationObservation {
+  readonly externalRunId: string;
+  readonly attempt: number;
+  readonly state: 'PENDING' | 'READY';
+  readonly nativeStatus: string;
+  readonly workingPath: string | null;
+  readonly elapsedMs: number;
+}
+
+/** Selected host controls, never values from an execution request. */
+export interface ArchonIdentityInitializationOptions {
+  readonly timeoutMs?: number;
+  readonly deadlineAtMs?: number;
+  readonly signal?: AbortSignal;
+  readonly onObservation?: (
+    observation: ArchonIdentityInitializationObservation,
+  ) => void | Promise<void>;
+}
+
+export class ArchonIdentityInitializationError extends Error {
+  readonly reference: HarnessRunRef;
+  readonly observations: readonly ArchonIdentityInitializationObservation[];
+  constructor(
+    reference: HarnessRunRef,
+    observations: readonly ArchonIdentityInitializationObservation[],
+    cause: unknown,
+  ) {
+    super(cause instanceof Error ? cause.message : String(cause), { cause });
+    this.name = 'ArchonIdentityInitializationError';
+    this.reference = Object.freeze({ ...reference });
+    this.observations = Object.freeze([...observations]);
+  }
+}
+
 export interface CanonicalArchonPaths {
   readonly specPath: string;
   readonly bridgePath: string;
@@ -220,6 +259,7 @@ export class ArchonHarness implements ExecutionHarness {
   private readonly environment: NodeJS.ProcessEnv;
   private readonly runner: ArchonCommandRunner;
   private readonly timeoutMs: number;
+  private readonly initializationAttempts = new Set<string>();
 
   constructor(private readonly options: ArchonHarnessOptions) {
     if (
@@ -509,6 +549,51 @@ export class ArchonHarness implements ExecutionHarness {
     });
   }
 
+  private verifyRetainedBinding(
+    reference: HarnessRunRef,
+    output: Record<string, unknown>,
+  ): void {
+    if (output.id !== reference.externalRunId) {
+      throw new Error('Archon returned a different native run ID.');
+    }
+    const metadata = output.metadata;
+    const inputs = isRecord(metadata) ? metadata.inputs : undefined;
+    const rawBinding = isRecord(inputs)
+      ? inputs[TEMARI_BINDING_INPUT]
+      : undefined;
+    if (typeof rawBinding !== 'string') {
+      throw new Error(
+        'Archon native run has no retained Temari identity binding; recovery is unavailable.',
+      );
+    }
+    const binding = parseJson(rawBinding, 'Archon retained Temari identity');
+    if (
+      canonical(binding) !== canonical(nativeBinding(reference)) ||
+      output.workflow_name !== reference.entrypoint
+    ) {
+      throw new Error(
+        'Archon native run identity does not match the Temari run, plan, workflow, or workspace.',
+      );
+    }
+  }
+
+  private async verifyRetainedWorkspace(
+    reference: HarnessRunRef,
+    output: Record<string, unknown>,
+  ): Promise<void> {
+    if (
+      typeof output.working_path !== 'string' ||
+      !isAbsolute(output.working_path) ||
+      (await realpath(output.working_path)) !==
+        (await realpath(reference.workspaceRoot))
+    ) {
+      throw new Error(
+        'Archon native run identity does not match the Temari run, plan, workflow, or workspace.',
+      );
+    }
+  }
+
+  /** Recovery and later reads are strict; missing workspace never becomes a wait. */
   async verifyRunIdentity(reference: HarnessRunRef): Promise<void> {
     assertReference(reference, this.options.runtime);
     const result = await this.execute(
@@ -516,24 +601,149 @@ export class ArchonHarness implements ExecutionHarness {
       reference.workspaceRoot,
     );
     const output = parseJson(result.stdout, 'Archon workflow identity');
-    if (output.id !== reference.externalRunId) {
-      throw new Error('Archon returned a different native run ID.');
-    }
-    const metadata = output.metadata;
-    const inputs = isRecord(metadata) ? metadata.inputs : undefined;
-    const rawBinding = isRecord(inputs) ? inputs[TEMARI_BINDING_INPUT] : undefined;
-    if (typeof rawBinding !== 'string') {
-      throw new Error('Archon native run has no retained Temari identity binding; recovery is unavailable.');
-    }
-    const binding = parseJson(rawBinding, 'Archon retained Temari identity');
-    if (
-      canonical(binding) !== canonical(nativeBinding(reference)) ||
-      output.workflow_name !== reference.entrypoint ||
-      typeof output.working_path !== 'string' ||
-      !isAbsolute(output.working_path) ||
-      (await realpath(output.working_path)) !== (await realpath(reference.workspaceRoot))
-    ) {
-      throw new Error('Archon native run identity does not match the Temari run, plan, workflow, or workspace.');
+    this.verifyRetainedBinding(reference, output);
+    await this.verifyRetainedWorkspace(reference, output);
+    this.initializationAttempts.add(
+      canonical({
+        ...nativeBinding(reference),
+        externalRunId: reference.externalRunId,
+      }),
+    );
+  }
+
+  /** Initial host admission only, AFTER the returned reference is durably bound.
+   * This read-only adapter gate grants no worker/cleanup authority and never runs
+   * from start(). Recovery uses strict verifyRunIdentity instead. */
+  async waitForRunIdentityInitialization(
+    reference: HarnessRunRef,
+    options: ArchonIdentityInitializationOptions = {},
+  ): Promise<readonly ArchonIdentityInitializationObservation[]> {
+    reference = Object.freeze({ ...reference });
+    options = Object.freeze({ ...options });
+    const observations: ArchonIdentityInitializationObservation[] = [];
+    const started = performance.now();
+    const timeoutMs =
+      options.timeoutMs ?? ARCHON_IDENTITY_INITIALIZATION_TIMEOUT_MS;
+    const key = canonical({
+      ...nativeBinding(reference),
+      externalRunId: reference.externalRunId,
+    });
+    const remaining = () =>
+      Math.min(
+        timeoutMs - (performance.now() - started),
+        options.deadlineAtMs === undefined
+          ? Infinity
+          : options.deadlineAtMs - Date.now(),
+      );
+    const check = () => {
+      if (options.signal?.aborted)
+        throw new Error('Archon identity initialization cancelled.');
+      if (remaining() <= 0)
+        throw new Error('Archon identity initialization deadline expired.');
+    };
+    const bounded = async <T>(read: () => Promise<T>): Promise<T> => {
+      check();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let abort: (() => void) | undefined;
+      try {
+        const value = await Promise.race([
+          read(),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(
+              () =>
+                reject(
+                  new Error('Archon identity initialization deadline expired.'),
+                ),
+              remaining(),
+            );
+            abort = () =>
+              reject(new Error('Archon identity initialization cancelled.'));
+            options.signal?.addEventListener('abort', abort, { once: true });
+            if (options.signal?.aborted) abort();
+          }),
+        ]);
+        check();
+        return value;
+      } finally {
+        clearTimeout(timer);
+        if (abort) options.signal?.removeEventListener('abort', abort);
+      }
+    };
+    try {
+      assertReference(reference, this.options.runtime);
+      if (reference.externalRunId.toLowerCase() === 'latest')
+        throw new Error('Archon identity initialization requires an exact native run ID.');
+      if (
+        !Number.isSafeInteger(timeoutMs) ||
+        timeoutMs <= 0 ||
+        timeoutMs > ARCHON_IDENTITY_INITIALIZATION_MAX_MS ||
+        (options.deadlineAtMs !== undefined &&
+          !Number.isFinite(options.deadlineAtMs))
+      ) {
+        throw new Error('Invalid Archon identity initialization bound.');
+      }
+      if (this.initializationAttempts.has(key))
+        throw new Error(
+          'Archon identity initialization already attempted; use strict identity verification.',
+        );
+      this.initializationAttempts.add(key);
+      for (;;) {
+        const readTimeoutMs = Math.min(this.timeoutMs, 2000, Math.floor(remaining()));
+        if (!(readTimeoutMs >= 1)) throw new Error('Archon identity initialization deadline expired.');
+        const result = await bounded(() =>
+          this.execute(
+            ['workflow', 'get', reference.externalRunId, '--json'],
+            reference.workspaceRoot,
+            readTimeoutMs,
+          ),
+        );
+        const output = parseJson(result.stdout, 'Archon workflow identity');
+        // Contradictions are never pending, regardless of native status.
+        this.verifyRetainedBinding(reference, output);
+        const pending =
+          output.status === 'pending' && output.working_path === null;
+        if (!pending) {
+          if (!['running', 'in_progress'].includes(String(output.status)))
+            throw new Error(
+              'Archon identity initialization is terminal, unknown or inconsistent.',
+            );
+          await bounded(() => this.verifyRetainedWorkspace(reference, output));
+        }
+        const observation: ArchonIdentityInitializationObservation =
+          Object.freeze({
+            externalRunId: reference.externalRunId,
+            attempt: observations.length + 1,
+            state: pending ? 'PENDING' : 'READY',
+            nativeStatus: String(output.status),
+            workingPath: pending ? null : String(output.working_path),
+            elapsedMs: performance.now() - started,
+          });
+        observations.push(observation);
+        if (options.onObservation)
+          await bounded(async () => {
+            await options.onObservation!(observation);
+          });
+        check();
+        if (!pending) return Object.freeze([...observations]);
+        await bounded(
+          () =>
+            new Promise((resolve) =>
+              setTimeout(
+                resolve,
+                Math.min(
+                  ARCHON_IDENTITY_INITIALIZATION_POLL_MS,
+                  Math.max(1, remaining()),
+                ),
+              ),
+            ),
+        );
+      }
+    } catch (cause) {
+      throw new ArchonIdentityInitializationError(
+        reference,
+        observations,
+        cause,
+      );
     }
   }
 
