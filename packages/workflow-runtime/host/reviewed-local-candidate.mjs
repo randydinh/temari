@@ -46,6 +46,37 @@ import {
 export const digest = (bytes) =>
   createHash('sha256').update(bytes).digest('hex');
 export const objectDigest = (value) => digest(canonical(value));
+// Numeric milliseconds, matched to the pinned native YAML by source regression.
+export const NATIVE_STAGE_TIMEOUTS_MS = Object.freeze({
+  investigate: 1800000,
+  plan: 180000,
+  build: 1800000,
+  review: 1080000,
+  verify: 900000,
+  deliver: 180000,
+  finalize: 300000,
+});
+export function nativeStageBudgetCoverage(spec) {
+  const sum = (commands) =>
+    commands.reduce((total, command) => total + command.timeoutMs, 0);
+  const requiredMs = {
+    investigate: sum(spec.baselineChecks) + spec.timeoutMs + 180000,
+    plan: 180000,
+    build: spec.timeoutMs + 900000,
+    review: spec.timeoutMs + 180000,
+    verify: sum(spec.acceptanceChecks) + 180000,
+    deliver: 180000,
+    finalize: 300000,
+  };
+  for (const [stage, required] of Object.entries(requiredMs))
+    assert(
+      Number.isSafeInteger(required) &&
+        required > 0 &&
+        required <= NATIVE_STAGE_TIMEOUTS_MS[stage],
+      `${stage} native timeout does not cover composed work.`,
+    );
+  return { nativeTimeoutsMs: NATIVE_STAGE_TIMEOUTS_MS, requiredMs };
+}
 function canonical(value) {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   if (value && typeof value === 'object')
@@ -275,6 +306,7 @@ export async function admitReviewedLocalCandidate({
       'Check bound invalid.',
     );
   }
+  const nativeBudgetCoverage = nativeStageBudgetCoverage(spec);
   pinned(spec.repositoryRoot, spec.baseCommit);
   const modelSelection = await observeCodexModelSelection(
     spec.providerSelection,
@@ -308,6 +340,7 @@ export async function admitReviewedLocalCandidate({
     spec,
     provider,
     modelSelection,
+    nativeBudgetCoverage,
     requestSha256: expectedSha256,
     policySha256: spec.policySha256,
     planSha256: objectDigest(spec.plan),
@@ -1302,6 +1335,7 @@ async function main(args) {
             policySha256: result.policySha256,
             planSha256: result.planSha256,
             provider: result.provider,
+            nativeBudgetCoverage: result.nativeBudgetCoverage,
           }
         : command === 'verify'
           ? {

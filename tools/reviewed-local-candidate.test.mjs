@@ -11,6 +11,7 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createRequire } from 'node:module';
 import {
   admitReviewedLocalCandidate,
   captureReviewedLocalCandidate,
@@ -18,6 +19,8 @@ import {
   verifyReviewedLocalCandidate,
   digest,
   objectDigest,
+  NATIVE_STAGE_TIMEOUTS_MS,
+  nativeStageBudgetCoverage,
 } from '../packages/workflow-runtime/host/reviewed-local-candidate.mjs';
 import {
   REVIEWED_LOCAL_CANDIDATE_POLICY,
@@ -238,6 +241,82 @@ let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{
   };
 }
 const stages = ['investigate', 'plan', 'build', 'review', 'verify', 'deliver'];
+test('native YAML budgets cover admitted stage composition instead of the 120-second default', async (t) => {
+  const { parse } = createRequire(import.meta.resolve('nx/package.json'))(
+    'yaml',
+  );
+  const workflow = parse(
+    await readFile(
+      new URL(
+        '../packages/workflow-runtime/host/.archon/workflows/temari-reviewed-local-candidate.yaml',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  );
+  assert.deepEqual(
+    workflow.nodes.map((node) => node.id),
+    [...stages, 'finalize'],
+  );
+  assert.deepEqual(
+    Object.fromEntries(workflow.nodes.map((node) => [node.id, node.timeout])),
+    NATIVE_STAGE_TIMEOUTS_MS,
+  );
+  for (const node of workflow.nodes) {
+    assert(
+      Number.isSafeInteger(node.timeout) &&
+        node.timeout > 120000 &&
+        node.timeout <= 1800000,
+    );
+    assert(node.bash && !node.retry);
+  }
+  const f = await fixture(t);
+  f.spec.timeoutMs = 900000;
+  f.spec.baselineChecks[0].timeoutMs = 600000;
+  f.spec.acceptanceChecks[0].timeoutMs = 600000;
+  const expectedSha256 = await f.save();
+  const admitted = await admitReviewedLocalCandidate({
+    ...f.input,
+    expectedSha256,
+  });
+  assert.deepEqual(
+    admitted.nativeBudgetCoverage,
+    nativeStageBudgetCoverage(f.spec),
+  );
+  for (const [stage, required] of Object.entries(
+    admitted.nativeBudgetCoverage.requiredMs,
+  ))
+    assert(
+      workflow.nodes.find((node) => node.id === stage).timeout >= required,
+    );
+  assert(
+    admitted.nativeBudgetCoverage.requiredMs.investigate >= 600000 + 900000,
+  );
+  assert(NATIVE_STAGE_TIMEOUTS_MS.investigate > 58000 + 202849);
+  await assert.rejects(readFile(f.counter), { code: 'ENOENT' });
+});
+
+test('summed protected-check limits exceeding native envelopes refuse before worker dispatch', async (t) => {
+  const f = await fixture(t);
+  f.spec.timeoutMs = 900000;
+  f.spec.baselineChecks[0].timeoutMs = 600000;
+  f.spec.acceptanceChecks[0].timeoutMs = 600000;
+  const baseline = structuredClone(f.spec.baselineChecks);
+  f.spec.baselineChecks.push(...baseline);
+  let expectedSha256 = await f.save();
+  await assert.rejects(
+    admitReviewedLocalCandidate({ ...f.input, expectedSha256 }),
+    /investigate native timeout does not cover composed work/,
+  );
+  f.spec.baselineChecks = baseline;
+  f.spec.acceptanceChecks.push(...structuredClone(f.spec.acceptanceChecks));
+  expectedSha256 = await f.save();
+  await assert.rejects(
+    admitReviewedLocalCandidate({ ...f.input, expectedSha256 }),
+    /verify native timeout does not cover composed work/,
+  );
+  await assert.rejects(readFile(f.counter), { code: 'ENOENT' });
+});
 async function acceptedChild(f, stage = 'build') {
   const root = join(f.spec.evidenceRoot, f.spec.runId);
   const runId = `${f.spec.runId}-${stage}`;

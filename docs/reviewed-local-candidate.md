@@ -16,6 +16,29 @@ then calls `capture` with the external request digest and exact native run ID.
 Archon retains native control. `TaskRuntime.dispatch` retains dispatch intent,
 and its exact native reconciliation and cancellation controls remain unchanged.
 
+The pinned Archon 0.10.1 Bash schema uses numeric `timeout` milliseconds; an
+omitted value defaults to 120,000 ms. Every node in this source workflow now
+declares a finite budget:
+
+| Node        | Native timeout | Composed allowance                                                                |
+| ----------- | -------------- | --------------------------------------------------------------------------------- |
+| investigate | 30 minutes     | Sum of baseline-check limits + worker limit + 3-minute admission/evidence reserve |
+| plan        | 3 minutes      | Admission and proposal/evidence readback                                          |
+| build       | 30 minutes     | Worker limit + 15-minute clone/integration/receipt reserve                        |
+| review      | 18 minutes     | Worker limit + 3-minute admission/evidence reserve                                |
+| verify      | 15 minutes     | Sum of acceptance-check limits + 3-minute admission/evidence reserve              |
+| deliver     | 3 minutes      | Admission and retained-candidate/evidence readback                                |
+| finalize    | 5 minutes      | Full semantic/canonical readback and persistence                                  |
+
+Admission refuses requests whose summed check/worker limits exceed those
+envelopes, and reports their coverage. The existing 900,000-ms worker maximum,
+600,000-ms per-check maximum, output limits and one-handler-attempt rule remain
+unchanged. The reserves are finite operational allowances, not a guarantee
+that arbitrary filesystem/Git delays will fit. The regression parses the actual
+native YAML and checks every node against these admitted limits. Node budgets
+do not extend the separately supervised 45-minute observation/progression
+deadline or prove termination of detached bridge/worker/check processes.
+
 The JSON request fixes profile, task/run identities, clean repository/base,
 disjoint existing evidence root, exact plan/policy digest, Codex executable
 selection (provider, version and SHA256), three required distinct worker briefs,
