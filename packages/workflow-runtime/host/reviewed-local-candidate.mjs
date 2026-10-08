@@ -28,6 +28,7 @@ import {
 } from '../../../libs/host-adapters/src/index.ts';
 import {
   ManagedExecutionControl,
+  createManagedTaskSupervisor,
   FileTaskStore,
   FileChildTaskStore,
   FileParallelWorkerReceiptStore,
@@ -1180,24 +1181,34 @@ export async function captureReviewedLocalCandidate(input) {
   const controlRoot = join(root, 'execution-control');
   await mkdir(controlRoot, { recursive: true });
   const tasks = await FileTaskStore.create(admitted.spec.taskStoreRoot);
-  const observe = async () => {
-    const task = await tasks.load(admitted.spec.taskId);
-    const run = task?.runs.find((run) => run.runId === admitted.spec.runId);
-    return (
-      task?.currentRunId === admitted.spec.runId &&
-      run?.revision === admitted.spec.baseCommit &&
-      run?.nativeRef?.externalRunId === input.nativeRunId &&
-      !run.operations.some(
-        (operation) =>
-          operation.kind === 'cancel' && operation.state !== 'CONFIRMED',
-      ) &&
-      (!run.nativeSnapshot ||
-        ['QUEUED', 'RUNNING'].includes(run.nativeSnapshot.status)) &&
-      run?.planSha256 === admitted.planSha256 &&
-      run?.executionStoreRoot === join(root, 'children') &&
-      (await input.observeSupervisor())
-    );
-  };
+  // Completed capture and accepted-builder reconciliation are read-only. Their
+  // prior caller-abort contract permits retrieval while retained authority still
+  // validates; external cancellation remains active for every new execution.
+  const readOnlyCapture =
+    (await exists(join(input.artifacts, `${input.stage}.json`))) ||
+    (input.stage === 'build' && !!input.reconcileIntentSha256);
+  const observe = await createManagedTaskSupervisor({
+    tasks,
+    taskId: admitted.spec.taskId,
+    executionStoreRoot: join(root, 'children'),
+    reference: {
+      schema: 1,
+      harnessId: 'archon',
+      harnessVersion: '0.10.1',
+      runId: admitted.spec.runId,
+      revision: admitted.spec.baseCommit,
+      planSha256: admitted.planSha256,
+      externalRunId: input.nativeRunId,
+      workspaceRoot: admitted.spec.repositoryRoot,
+      entrypoint: 'temari-reviewed-local-candidate',
+    },
+    observeNative: input.observeSupervisor,
+    signal: readOnlyCapture ? undefined : input.signal,
+    allowInitialPublication:
+      input.stage === 'investigate' &&
+      !(await exists(join(input.artifacts, 'investigate.intent.json'))) &&
+      !(await exists(join(input.artifacts, 'investigate.json'))),
+  });
   if (await exists(join(input.artifacts, `${input.stage}.json`))) {
     assert(await observe(), 'Native supervision ended; stage reuse refused.');
     await assertStageCleanup(admitted, input.nativeRunId, input.stage);
@@ -1498,24 +1509,25 @@ export async function finalizeReviewedLocalCandidate(input) {
   const root = join(admitted.spec.evidenceRoot, admitted.spec.runId);
   const store = await FileChildTaskStore.create(join(root, 'children'));
   const tasks = await FileTaskStore.create(admitted.spec.taskStoreRoot);
-  const observe = async () => {
-    const task = await tasks.load(admitted.spec.taskId);
-    const run = task?.runs.find((run) => run.runId === admitted.spec.runId);
-    return (
-      task?.currentRunId === admitted.spec.runId &&
-      run?.revision === admitted.spec.baseCommit &&
-      run?.nativeRef?.externalRunId === input.nativeRunId &&
-      !run.operations.some(
-        (operation) =>
-          operation.kind === 'cancel' && operation.state !== 'CONFIRMED',
-      ) &&
-      (!run.nativeSnapshot ||
-        ['QUEUED', 'RUNNING'].includes(run.nativeSnapshot.status)) &&
-      run?.planSha256 === admitted.planSha256 &&
-      run?.executionStoreRoot === join(root, 'children') &&
-      (await input.observeSupervisor())
-    );
-  };
+  const observe = await createManagedTaskSupervisor({
+    tasks,
+    taskId: admitted.spec.taskId,
+    executionStoreRoot: join(root, 'children'),
+    reference: {
+      schema: 1,
+      harnessId: 'archon',
+      harnessVersion: '0.10.1',
+      runId: admitted.spec.runId,
+      revision: admitted.spec.baseCommit,
+      planSha256: admitted.planSha256,
+      externalRunId: input.nativeRunId,
+      workspaceRoot: admitted.spec.repositoryRoot,
+      entrypoint: 'temari-reviewed-local-candidate',
+    },
+    observeNative: input.observeSupervisor,
+    signal: input.signal,
+    allowInitialPublication: false,
+  });
   if (
     await exists(
       join(input.artifacts, 'reviewed-local-candidate', 'completion.json'),

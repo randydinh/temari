@@ -31,3 +31,4 @@ export * from './lib/conversation-store.js';
 export * from './lib/git-dependencies.js';
 export * from './lib/reviewed-local-candidate.js';
 export * from './lib/managed-execution.js';
+export * from './lib/managed-native-publication.js';

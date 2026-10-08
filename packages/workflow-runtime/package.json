@@ -185,11 +185,15 @@
         "cache": false
       },
       "managed-shutdown-typecheck": {
-        "command": "tsc --ignoreConfig --noEmit --module nodenext --moduleResolution nodenext --target es2022 --types node --strict --skipLibCheck --allowImportingTsExtensions tools/managed-shutdown.test.mts tools/fixtures/managed-execution-controller.mts tools/managed-candidate-operation.mts tools/fixtures/owned-execution-bun.mts",
+        "command": "tsc --ignoreConfig --noEmit --module nodenext --moduleResolution nodenext --target es2022 --types node --strict --skipLibCheck --allowImportingTsExtensions tools/managed-shutdown.test.mts tools/fixtures/managed-execution-controller.mts tools/managed-candidate-operation.mts tools/fixtures/owned-execution-bun.mts tools/managed-shutdown-r1.test.mts",
         "cache": false
       },
       "managed-cancel-intent-test": {
         "command": "node --import @swc-node/register/esm-register --test --test-name-pattern=\"parent cancel intent|worker lease loss\" tools/reviewed-local-candidate.test.mjs",
+        "cache": false
+      },
+      "managed-shutdown-r1-test": {
+        "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 tools/managed-shutdown-r1.test.mts libs/runtime/src/lib/child-task-store.test.ts libs/runtime/src/lib/task-store.test.ts libs/runtime/src/lib/task-runtime.test.ts",
         "cache": false
       }
     }

@@ -123,11 +123,25 @@ path in the selected `TaskRunBinding.executionStoreRoot`. The task must already
 select the request's run, revision and plan, and retain its exact native reference
 before useful work. This link lets the ordinary task store
 refuse replacement while owned work or cleanup is unresolved, and lets pickup
-show the same child records. Do not change a historical binding to add it.
+show the same child records. Inspection reconciles the retained group rosters,
+state files, event logs and transaction sidecars under the existing store lock.
+Missing or corrupt retained members refuse replacement; valid interrupted
+transactions use the ordinary reconciliation path. Do not change a historical
+binding to add it.
 `startReviewedLocalCandidate` requires the selected instance's absolute
 `ARCHON_HOME`; it supplies native executable/hash/home workflow inputs. CLI
 capture/finalize independently query that exact native run and retained binding.
 Library callers must supply a separately selected `observeSupervisor` port.
+
+Initial investigate can start before the dispatch caller publishes its returned
+native reference. It waits at most 10 seconds, polling every 100 milliseconds,
+only for the existing matching pending dispatch and selected task/run, revision,
+plan and child-store binding. Cancellation, terminal native state, changed
+identity or failed observation ends the wait. No stage authority, worker or check
+starts before the caller publishes the exact reference and independent native
+observation validates it. The bridge never creates or adopts a reference. Replay,
+later stages and finalize refuse a missing reference immediately; a previously
+published reference cannot reenter the startup wait.
 
 A process is gated behind durable PREPARED ownership and a live stage claim.
 The adapter prepares a guardian and an idle group anchor. Runtime retains their
@@ -138,14 +152,15 @@ cleans the owned group after a bridge SIGKILL, without requiring a signal handle
 in the bridge. A live TERM-resistant anchor preserves group ownership throughout
 the grace period; no recovered PID or process name is a signalling capability.
 
-| Boundary                    | Finite allowance                                                                                        |
-| --------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Independent supervision     | Poll every 1 second; native read command capped at 2 seconds; runtime observation capped at 3.5 seconds |
-| Child/stage lease           | 15 seconds; renew only after current task/native supervision validates                                  |
-| Unreleased launch gate      | 5 seconds                                                                                               |
-| Graceful group termination  | TERM, then 150 milliseconds before KILL                                                                 |
-| Group absence observation   | Up to 1.5 seconds after escalation                                                                      |
-| Adapter settlement fallback | Command timeout plus 10 seconds; unresolved completion stays fenced                                     |
+| Boundary                      | Finite allowance                                                                                        |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Initial reference publication | At most 10 seconds; poll every 100 milliseconds; cancellation aware                                     |
+| Independent supervision       | Poll every 1 second; native read command capped at 2 seconds; runtime observation capped at 3.5 seconds |
+| Child/stage lease             | 15 seconds; renew only after current task/native supervision validates                                  |
+| Unreleased launch gate        | 5 seconds                                                                                               |
+| Graceful group termination    | TERM, then 150 milliseconds before KILL                                                                 |
+| Group absence observation     | Up to 1.5 seconds after escalation                                                                      |
+| Adapter settlement fallback   | Command timeout plus 10 seconds; unresolved completion stays fenced                                     |
 
 Explicit cancel, terminal native status, changed task binding, parent loss, failed
 observation or lease loss revokes new dispatch and late result acceptance. Queued

@@ -1724,16 +1724,71 @@ export class FileChildTaskStore implements ChildTaskStore {
 
   async executionRecords(runId: string): Promise<readonly ChildTaskRecord[]> {
     assertSafeId(runId, 'Run ID');
-    const names = (await readdir(this.root)).filter((name) =>
-      name.endsWith('.task.json'),
-    );
-    assert(names.length <= 4096, 'Execution store exceeds inspection bound.');
-    const records: ChildTaskRecord[] = [];
-    for (const name of names) {
-      const record = await this.load(name.slice(0, -'.task.json'.length));
-      if (record?.runId === runId) records.push(record);
-    }
-    return records;
+    // Inventory under the existing store lock, so registration cannot disappear
+    // between scanning group membership and reconciling its child records.
+    return this.withStoreLock(async () => {
+      const names = await readdir(this.root);
+      const taskIds = new Set<string>();
+      const membership = new Map<string, ChildTaskGroupRecord[]>();
+      for (const name of names) {
+        if (name.endsWith('.group.json')) {
+          const groupId = name.slice(0, -'.group.json'.length);
+          assertSafeId(groupId, 'Group ID');
+          const group = await this.loadGroup(groupId);
+          assert(group, 'Retained execution group is missing.');
+          assert.equal(
+            group.groupId,
+            groupId,
+            'Execution group filename identity changed.',
+          );
+          for (const taskId of group.taskIds) {
+            taskIds.add(taskId);
+            membership.set(taskId, [...(membership.get(taskId) ?? []), group]);
+          }
+        } else if (name.endsWith('.task.json'))
+          taskIds.add(name.slice(0, -'.task.json'.length));
+        else if (name.endsWith('.events.jsonl'))
+          taskIds.add(name.slice(0, -'.events.jsonl'.length));
+        else if (name.startsWith('.') && name.endsWith('.transaction.json'))
+          taskIds.add(name.slice(1, -'.transaction.json'.length));
+        assert(
+          taskIds.size <= 4096,
+          'Execution store exceeds inspection bound.',
+        );
+      }
+      const records: ChildTaskRecord[] = [];
+      for (const taskId of [...taskIds].sort()) {
+        // load reconciles a valid interrupted transaction and validates its log;
+        // retained logs or membership without a state are never an empty result.
+        const record = await this.load(taskId);
+        assert(record, `Execution member ${taskId} is missing its state.`);
+        assert.equal(
+          record.taskId,
+          taskId,
+          'Execution member filename identity changed.',
+        );
+        for (const group of membership.get(taskId) ?? []) {
+          assert.equal(
+            record.runId,
+            group.runId,
+            'Execution member run differs from its group.',
+          );
+          assert.equal(
+            record.revision,
+            group.revision,
+            'Execution member revision differs from its group.',
+          );
+        }
+        if (record.runId === runId) {
+          assert(
+            membership.has(taskId),
+            `Execution member ${taskId} is missing its group.`,
+          );
+          records.push(record);
+        }
+      }
+      return records;
+    });
   }
 
   async updateExecution(

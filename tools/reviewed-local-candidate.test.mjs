@@ -36,7 +36,7 @@ import {
   FileEvidenceStore,
 } from '../libs/runtime/src/index.ts';
 
-async function fixture(t, mode = 'pass') {
+async function fixture(t, mode = 'pass', options = {}) {
   const root = await realpath(
     await mkdtemp(join(tmpdir(), 'managed-candidate-')),
   );
@@ -285,34 +285,37 @@ let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{
       },
     )
   ).task;
-  await tasks.append(
-    {
-      taskId: spec.taskId,
-      actor: 'fixture',
-      idempotencyKey: 'native-link',
-      expectedVersion: boundTask.version,
-    },
-    {
-      type: 'native-bound',
-      runId: spec.runId,
-      operationId: 'native-launch',
-      reference: {
-        schema: 1,
-        harnessId: 'archon',
-        harnessVersion: '0.10.1',
-        runId: spec.runId,
-        revision: spec.baseCommit,
-        planSha256: objectDigest(spec.plan),
-        externalRunId: 'native-fixture',
-        workspaceRoot: candidate,
-        entrypoint: 'temari-reviewed-local-candidate',
-        startedAt: new Date().toISOString(),
+  const publishNative = async () =>
+    tasks.append(
+      {
+        taskId: spec.taskId,
+        actor: 'fixture',
+        idempotencyKey: 'native-link',
+        expectedVersion: (await tasks.load(spec.taskId)).version,
       },
-    },
-  );
+      {
+        type: 'native-bound',
+        runId: spec.runId,
+        operationId: 'native-launch',
+        reference: {
+          schema: 1,
+          harnessId: 'archon',
+          harnessVersion: '0.10.1',
+          runId: spec.runId,
+          revision: spec.baseCommit,
+          planSha256: objectDigest(spec.plan),
+          externalRunId: 'native-fixture',
+          workspaceRoot: candidate,
+          entrypoint: 'temari-reviewed-local-candidate',
+          startedAt: new Date().toISOString(),
+        },
+      },
+    );
+  if (!options.deferNativePublication) await publishNative();
   const expectedSha256 = await save();
   return {
     root,
+    publishNative,
     spec,
     save,
     control,
@@ -390,6 +393,37 @@ test('native YAML budgets cover admitted stage composition instead of the 120-se
   );
   assert(NATIVE_STAGE_TIMEOUTS_MS.investigate > 58000 + 202849);
   await assert.rejects(readFile(f.counter), { code: 'ENOENT' });
+});
+
+test('initial investigate waits for caller native publication before authority or useful work', async (t) => {
+  const f = await fixture(t, 'pass', { deferNativePublication: true });
+  let observed;
+  const firstNativeRead = new Promise((resolve) => {
+    observed = resolve;
+  });
+  const capture = captureReviewedLocalCandidate({
+    ...f.input,
+    stage: 'investigate',
+    observeSupervisor: async () => {
+      observed();
+      return true;
+    },
+  });
+  await Promise.race([
+    firstNativeRead,
+    capture.then(() => {
+      throw new Error('Capture completed before native publication.');
+    }),
+  ]);
+  await assert.rejects(readFile(f.counter), { code: 'ENOENT' });
+  const children = await FileChildTaskStore.create(
+    join(f.spec.evidenceRoot, f.spec.runId, 'children'),
+  );
+  assert.deepEqual(await children.executionRecords(f.spec.runId), []);
+  await f.publishNative();
+  const result = await capture;
+  assert.equal(result.status, 'PASS');
+  assert.equal((await readFile(f.counter, 'utf8')).trim(), 'architect');
 });
 
 test('summed protected-check limits exceeding native envelopes refuse before worker dispatch', async (t) => {
