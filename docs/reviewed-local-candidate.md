@@ -25,6 +25,13 @@ files are outside the candidate and hashed before execution and closeout.
 `{candidate}` and `{evidence}` substitutions are argv strings, never shell code.
 The host requires a pinned account-catalog snapshot for the selected CLI version,
 plus the actual inherited user config digest and requested model/reasoning. It
+matches a three-part release catalog version to either the same stable CLI
+version or an `alpha.N` CLI build of that release (for example,
+`codex-cli 0.162.0-alpha.2` with catalog `0.162.0`). The complete executable
+version and SHA256 remain exact pins; the retained catalog observation includes
+both versions. Different releases, leading zeros, build metadata, other
+prerelease forms and malformed versions are refused. This bounded compatibility
+rule establishes a version relationship, not model execution proof. The host
 parses that config with Python's TOML parser, refuses unsupported catalog models
 or reasoning, and refuses ambiguous profile/provider/project overrides. A cached
 catalog is a prerequisite, not server execution proof. The host preserves user

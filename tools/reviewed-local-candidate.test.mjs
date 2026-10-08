@@ -68,7 +68,7 @@ async function fixture(t, mode = 'pass') {
   await writeFile(
     catalogPath,
     JSON.stringify({
-      client_version: 'fixture',
+      client_version: '0.162.0',
       fetched_at: new Date().toISOString(),
       models: [
         {
@@ -100,7 +100,7 @@ async function fixture(t, mode = 'pass') {
   await writeFile(control, JSON.stringify({ mode }));
   const script = `#!${process.execPath}
 const fs=require('node:fs');const path=require('node:path');const a=process.argv.slice(2);
-if(a[0]==='--version'){console.log('codex-cli fixture');process.exit(0);}
+if(a[0]==='--version'){console.log('codex-cli 0.162.0');process.exit(0);}
 if(a.includes('--help')){console.log('--sandbox --output-schema --json');process.exit(0);}
 if(a[0]==='login'){console.log('Logged in using fixture');process.exit(0);}
 let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{
@@ -164,7 +164,7 @@ let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{
     providerSelection: {
       provider: 'codex',
       executableSha256: digest(await readFile(executable)),
-      executableVersion: 'codex-cli fixture',
+      executableVersion: 'codex-cli 0.162.0',
       model: 'fixture-model',
       reasoning: 'high',
     },
@@ -336,7 +336,7 @@ test('missing execution capabilities and binary drift refuse pre-dispatch', asyn
   const f = await fixture(t);
   await writeFile(
     f.spec.executable,
-    `#!${process.execPath}\nconsole.log(process.argv.includes('--version')?'codex-cli fixture':'unsupported');\n`,
+    `#!${process.execPath}\nconsole.log(process.argv.includes('--version')?'codex-cli 0.162.0':'unsupported');\n`,
     { mode: 0o700 },
   );
   await assert.rejects(admitReviewedLocalCandidate(f.input), /Evidence drift/);

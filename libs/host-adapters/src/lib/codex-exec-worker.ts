@@ -233,10 +233,21 @@ print(json.dumps({k:c.get(k) for k in ['model','model_reasoning_effort','model_p
       'Requested model/reasoning differs from inherited user settings; refusing silent override.',
     );
   const catalog = JSON.parse(catalogBytes.toString());
+  // The account catalog reports the release triplet for alpha CLI builds.
+  // This relation never replaces the exact executable version/hash pin.
+  const release = '(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)';
+  const cliVersion = new RegExp(
+    `^codex-cli (${release})(?:-alpha\\.(?:0|[1-9][0-9]*))?$`,
+  ).exec(selection.executableVersion);
   if (
-    catalog.client_version !==
-    selection.executableVersion.slice('codex-cli '.length)
+    !cliVersion ||
+    cliVersion[0] !== selection.executableVersion ||
+    typeof catalog.client_version !== 'string' ||
+    new RegExp(`^${release}$`).exec(catalog.client_version)?.[0] !==
+      catalog.client_version
   )
+    throw new Error('Unsupported CLI/catalog version format.');
+  if (catalog.client_version !== cliVersion[1])
     throw new Error('Model catalog belongs to a different CLI version.');
   const age = Date.now() - Date.parse(catalog.fetched_at);
   if (!Number.isFinite(age) || age < -60000 || age > 24 * 60 * 60 * 1000)
@@ -262,6 +273,7 @@ print(json.dumps({k:c.get(k) for k in ['model','model_reasoning_effort','model_p
       sha256: input.catalogSha256,
       fetchedAt: catalog.fetched_at,
       clientVersion: catalog.client_version,
+      executableVersion: selection.executableVersion,
     },
     scope: 'pinned-inherited-selection-and-cached-account-admission-only',
   };

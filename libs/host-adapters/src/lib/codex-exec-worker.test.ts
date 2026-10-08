@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import {
   chmod,
@@ -10,6 +11,8 @@ import {
   open,
   stat,
   rm,
+  mkdir,
+  realpath,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -17,6 +20,7 @@ import {
   runCodexExecWorker,
   runCodexExecWriteWorker,
   resolveCodexExecutable,
+  observeCodexModelSelection,
 } from './codex-exec-worker.js';
 import type { WorkerAssignment } from '@temari/contracts';
 
@@ -34,6 +38,129 @@ const assignment: WorkerAssignment = {
     forbiddenActions: ['Do not write files'],
   },
 };
+
+test('model admission matches only stable or alpha CLI releases to release-format catalogs', async (t) => {
+  const root = await realpath(
+    await mkdtemp(join(tmpdir(), 'temari-catalog-version-')),
+  );
+  const previousCodexHome = process.env.CODEX_HOME;
+  const configHome = join(root, 'user-config');
+  await mkdir(configHome);
+  process.env.CODEX_HOME = configHome;
+  t.after(async () => {
+    if (previousCodexHome === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = previousCodexHome;
+    await rm(root, { recursive: true, force: true });
+  });
+  const configPath = join(configHome, 'config.toml');
+  const catalogPath = join(root, 'catalog.json');
+  await writeFile(
+    configPath,
+    'model = "fixture-model"\nmodel_reasoning_effort = "high"\n',
+  );
+  let parserExecutable: string | undefined;
+  for (const command of ['python3', 'python3.11', 'python3.12']) {
+    try {
+      parserExecutable = await realpath(
+        execFileSync(
+          command,
+          ['-c', 'import sys,tomllib;print(sys.executable)'],
+          { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+        ).trim(),
+      );
+      break;
+    } catch {}
+  }
+  assert(
+    parserExecutable,
+    'A Python TOML parser is required for model admission tests.',
+  );
+  const sha = (bytes: Uint8Array) =>
+    createHash('sha256').update(bytes).digest('hex');
+  const cases = [
+    ['0.162.0', '0.162.0', true],
+    ['0.154.0', '0.154.0', true],
+    ['0.162.0-alpha.2', '0.162.0', true],
+    ['0.162.0-alpha.0', '0.162.0', true],
+    ['0.162.0-alpha.12', '0.162.0', true],
+    ['0.162.0-alpha.2', '0.154.0', false],
+    ['0.162.0-alpha.2', '0.162.1', false],
+    ['0.162.0-alpha.2', '0.163.0', false],
+    ['0.162.0-alpha.2', '1.162.0', false],
+    ['0.162.0', '0.161.0', false],
+    ['0.162.0-alpha.2', '0.162.0-alpha.2', false],
+    ['0.162.0-beta.2', '0.162.0', false],
+    ['0.162.0-rc.2', '0.162.0', false],
+    ['0.162.0-alpha', '0.162.0', false],
+    ['0.162.0-alpha.02', '0.162.0', false],
+    ['0.162.0-alpha.2.extra', '0.162.0', false],
+    ['0.162.0+build.2', '0.162.0', false],
+    ['0.162.0-alpha.2+build', '0.162.0', false],
+    ['00.162.0', '00.162.0', false],
+    ['0.162', '0.162', false],
+    ['fixture', 'fixture', false],
+    ['0.162.0 ', '0.162.0', false],
+    ['0.162.0\n', '0.162.0', false],
+    ['0.162.0-alpha.2\n', '0.162.0', false],
+    ['0.162.0', '0.162.0\n', false],
+    ['0.162.0', 'v0.162.0', false],
+    ['0.162.0', null, false],
+    ['0.162.0', 162, false],
+  ] as const;
+  for (const [cliVersion, catalogVersion, accepted] of cases) {
+    await t.test(
+      `${cliVersion} / ${catalogVersion}: ${accepted ? 'admit' : 'refuse'}`,
+      async () => {
+        await writeFile(
+          catalogPath,
+          JSON.stringify({
+            client_version: catalogVersion,
+            fetched_at: new Date().toISOString(),
+            models: [
+              {
+                slug: 'fixture-model',
+                supported_reasoning_levels: [{ effort: 'high' }],
+              },
+            ],
+          }),
+        );
+        const selection = {
+          provider: 'codex' as const,
+          executableSha256: 'a'.repeat(64),
+          executableVersion: `codex-cli ${cliVersion}`,
+          model: 'fixture-model',
+          reasoning: 'high',
+        };
+        const input = {
+          configPath,
+          configSha256: sha(await readFile(configPath)),
+          catalogPath,
+          catalogSha256: sha(await readFile(catalogPath)),
+          parserExecutable,
+          parserSha256: sha(await readFile(parserExecutable)),
+        };
+        if (accepted) {
+          const result = await observeCodexModelSelection(
+            selection,
+            input,
+            root,
+          );
+          assert.equal(result.catalog.clientVersion, catalogVersion);
+          assert.equal(
+            result.catalog.executableVersion,
+            selection.executableVersion,
+          );
+          assert.deepEqual(result.observed, { model: null, reasoning: null });
+        } else {
+          await assert.rejects(
+            () => observeCodexModelSelection(selection, input, root),
+            /different CLI version|Unsupported CLI\/catalog version format/,
+          );
+        }
+      },
+    );
+  }
+});
 
 test('uses argv and stdin without shell interpolation and validates the final response', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-worker-'));
