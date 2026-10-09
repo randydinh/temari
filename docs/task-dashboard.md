@@ -47,9 +47,9 @@ request recovery; source operations and task acceptance remain separate workflow
 
 ## Before you begin
 
-- Use the repository's supported Node/Bun environment and pnpm **11.25.0**.
-  Complete `pnpm temari:init` and `pnpm temari:doctor` from the repository root.
-  The source checkout's dependencies must be installed and `bun` must be on PATH.
+- Use Node.js 22 or newer and pnpm **11.25.0**. From the repository root, run
+  `pnpm temari:init` and then `pnpm temari:doctor`. Init installs managed Bun
+  and Archon 0.10.1. Bun does not need to be on `PATH`.
 - Select the root of a clean Git worktree. Verification and agent preparation
   pin its HEAD; uncommitted or untracked changes prevent preparation/start.
   Save your work through the usual workflow before selecting that candidate.
