@@ -1154,3 +1154,86 @@ test('scheduled prelude rejects a changed root alias before handler dispatch', a
   assert.equal(await f.checkpointStore.load(f.request.runId), null);
   assert.equal((await runStore.load(f.request.runId))?.status, 'FAILED');
 });
+
+for (const mutate of [false, true])
+  test(`Git candidate keeps dependency pins across canonical build and closeout (mutation=${mutate})`, async (t) => {
+    const f = await fixture(t, true);
+    const { execFileSync } = await import('node:child_process');
+    const git = (root: string, ...args: string[]) =>
+      execFileSync('git', ['-C', root, ...args], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }).trim();
+    git(f.scope.root, 'init', '-q');
+    git(f.scope.root, 'config', 'user.name', 'Test');
+    git(f.scope.root, 'config', 'user.email', 'test@localhost');
+    git(f.scope.root, 'add', '.');
+    git(f.scope.root, 'commit', '-qm', 'application');
+    const childSource = join(f.root, 'child');
+    await mkdir(childSource);
+    git(childSource, 'init', '-q');
+    git(childSource, 'config', 'user.name', 'Test');
+    git(childSource, 'config', 'user.email', 'test@localhost');
+    await writeFile(join(childSource, 'library.txt'), 'pinned');
+    git(childSource, 'add', '.');
+    git(childSource, 'commit', '-qm', 'dependency');
+    git(
+      f.scope.root,
+      '-c',
+      'protocol.file.allow=always',
+      'submodule',
+      'add',
+      '-q',
+      childSource,
+      'dependency',
+    );
+    git(f.scope.root, 'commit', '-qam', 'pin');
+    const scope = { ...f.scope, observation: 'git-tracked-files-v1' as const };
+    const initial = await observeCandidate(scope);
+    const request = {
+      ...f.request,
+      candidate: { ...f.request.candidate, scope, expectedInitial: initial },
+      handler: async (stage: WorkflowStageId) => {
+        if (stage === 'build') {
+          if (mutate)
+            await writeFile(
+              join(f.scope.root, 'dependency/library.txt'),
+              'changed',
+            );
+          else
+            await writeFile(
+              join(f.scope.root, '.git/description'),
+              'administration only',
+            );
+        }
+        return f.request.handler(stage);
+      },
+    };
+    if (mutate) {
+      try {
+        const receipt = await executeAndPersist(request);
+        assert.notEqual(receipt.status, 'PASS');
+      } catch (error) {
+        assert.match(String(error), /Dependency/);
+      }
+      return;
+    }
+    const receipt = await executeAndPersist(request);
+    assert.equal(receipt.status, 'PASS');
+    assert.equal(
+      receipt.candidateBinding?.initial.scope,
+      'git-tracked-files-v1',
+    );
+    const verified = await verifyCandidateCloseout({
+      ...f.reader(initial),
+      scope,
+    });
+    assert.equal(verified.scope, 'git-tracked-file-candidate-only');
+    await writeFile(
+      join(f.scope.root, 'dependency/library.txt'),
+      'late mutation',
+    );
+    await assert.rejects(
+      verifyCandidateCloseout({ ...f.reader(initial), scope }),
+    );
+  });

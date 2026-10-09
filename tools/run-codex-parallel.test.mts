@@ -220,3 +220,38 @@ test('CLI prints selected route and receipt, and exits nonzero for issues', asyn
     'ISSUES',
   );
 });
+
+test('write routing preserves a locally available pinned read-only dependency', async () => {
+  const f = await fixture();
+  const dependency = join(f.root, 'dependency');
+  git(f.root, 'clone', '-q', '--no-hardlinks', f.repo, dependency);
+  git(
+    f.repo,
+    '-c',
+    'protocol.file.allow=always',
+    'submodule',
+    'add',
+    '-q',
+    dependency,
+    'dependencies/library',
+  );
+  git(f.repo, 'commit', '-qam', 'pin');
+  const result = await runCodexParallelRequest({
+    ...writeRequest(f),
+    baseCommit: git(f.repo, 'rev-parse', 'HEAD'),
+  });
+  assert.equal(result.route, 'write');
+  assert.equal(result.status, 'PASS');
+  const receipt = JSON.parse(await readFile(result.receiptPath, 'utf8'));
+  assert.equal(
+    receipt.dependencies.dependencies[0].path,
+    'dependencies/library',
+  );
+  assert.equal(
+    await readFile(
+      join(receipt.integrationPath, 'dependencies/library/README.md'),
+      'utf8',
+    ),
+    'base\n',
+  );
+});

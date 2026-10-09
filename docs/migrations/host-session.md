@@ -212,10 +212,21 @@ Exiting the bridge does not cancel native host workers. This interface assumes
 one cooperative local parent and exclusive candidate ownership; it provides
 no scheduler, lease, automatic takeover, hostile filesystem race containment or
 multi-machine service. Candidate and stage roots must remain disjoint from
-stores, invocation files and the runtime. There is no Git-ignore filtering:
-do not point the experiment at an active checkout containing Git data, private
-files or dependencies. The [candidate boundary](./candidate-closeout.md) retains
-its regular-file limits and non-atomic scan assumptions.
+stores, invocation files and the runtime. Existing regular-file runs have no
+Git-ignore filtering: keep Git administration, private files and dependencies out
+of that scope. The [candidate boundary](./candidate-closeout.md) retains its
+regular-file semantics, limits and non-atomic scan assumptions.
+
+Newly admitted Git-backed feature runs explicitly select `git-tracked-files-v1`.
+This scope hashes application tracked regular-file bytes and executable modes,
+plus the verified frozen dependency paths, pins and tracked content. It excludes
+Git administration and ignored/private payloads; nonignored untracked application
+files must be staged before admission. Nested dependencies and symlinks are not
+supported. Stage workspace manifests still capture their complete regular-file
+scope. Retained `local-regular-files-v1` receipts and resume descriptors retain
+their original scope; they are never silently migrated or reinterpreted. Host
+proof revalidates original source and integration dependencies around each stage,
+resume and closeout. Dependency evidence is not a canonical completion receipt.
 
 ## Design decision
 

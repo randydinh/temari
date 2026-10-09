@@ -10,7 +10,14 @@ import {
 import { captureWorkspaceManifest } from './workspace-manifest.js';
 import type { StageWorkspaceBinding } from './runtime.js';
 
+import {
+  observeGitProduct,
+  type PinnedDependencyPlan,
+} from './git-dependencies.js';
+
 export interface LocalCandidateScope {
+  readonly observation?: CandidateIdentity['scope'];
+  readonly dependencies?: PinnedDependencyPlan;
   readonly scopeId: string;
   readonly root: string;
 }
@@ -29,6 +36,13 @@ export async function observeCandidate(
     typeof selected.scopeId === 'string' &&
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(selected.scopeId),
     'Invalid candidate scope ID.',
+  );
+  if (selected.observation === 'git-tracked-files-v1')
+    return observeGitProduct(selected.root, selected.dependencies);
+  assert(
+    selected.observation === undefined ||
+      selected.observation === 'local-regular-files-v1',
+    'Unsupported candidate scope.',
   );
   const manifest = await captureWorkspaceManifest({
     runId: 'candidate-observation',

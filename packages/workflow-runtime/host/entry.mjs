@@ -1,3 +1,4 @@
+import { verifyGitCandidate } from './git-candidate.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -268,17 +269,17 @@ async function featureStageResult(stage, result, proof) {
   const workerReport = await verifiedJson(
     proof.workers.reportPath,
     proof.workers.reportSha256,
-    64 * 1024,
+    4 * 1024 * 1024,
   );
   const builderObservation = await verifiedJson(
     workerReport.builder.observationPath,
     workerReport.builder.observationSha256,
-    64 * 1024,
+    4 * 1024 * 1024,
   );
   const reviewerObservation = await verifiedJson(
     workerReport.reviewer.observationPath,
     workerReport.reviewer.observationSha256,
-    64 * 1024,
+    4 * 1024 * 1024,
   );
   const builderReceipt = await verifiedJson(
     builderObservation.receipt.path,
@@ -490,7 +491,15 @@ async function main(session) {
       runDirectory,
       plan,
       capabilities,
-      expectedInitial: await runtime.observeCandidate(candidate),
+      expectedInitial: await runtime.observeCandidate({
+        ...candidate,
+        ...(featureProof
+          ? {
+              observation: 'git-tracked-files-v1',
+              dependencies: featureProof.dependencies,
+            }
+          : {}),
+      }),
       runtimeManifestSha256,
       ...(request.sourceProfile === undefined
         ? {}
@@ -732,20 +741,52 @@ async function main(session) {
           trackingFailure = error;
           throw error;
         }
+        if (featureProof) {
+          await verifyGitCandidate(
+            featureProof.source.root,
+            featureProof.source.baseCommit,
+            featureProof.dependencies,
+          );
+          await verifyGitCandidate(
+            input.candidate.root,
+            featureProof.integratedCommit,
+            featureProof.dependencies,
+          );
+        }
         const result = await session.stage(
           stage,
           paths.workspaceForStage(stage).root,
           input.candidate,
         );
+        if (featureProof) {
+          await verifyGitCandidate(
+            featureProof.source.root,
+            featureProof.source.baseCommit,
+            featureProof.dependencies,
+          );
+          await verifyGitCandidate(
+            input.candidate.root,
+            featureProof.integratedCommit,
+            featureProof.dependencies,
+          );
+        }
         if (!sourceContract || result.status !== 'PASS') return result;
-        return attachSourceClaims(
-          stage,
-          featureProof
-            ? await featureStageResult(stage, result, featureProof)
-            : result,
-          input,
-          sourceContract,
-        );
+        const verifiedResult = featureProof
+          ? await featureStageResult(stage, result, featureProof)
+          : result;
+        if (featureProof && stage === 'deliver') {
+          await verifyGitCandidate(
+            featureProof.source.root,
+            featureProof.source.baseCommit,
+            featureProof.dependencies,
+          );
+          await verifyGitCandidate(
+            input.candidate.root,
+            featureProof.integratedCommit,
+            featureProof.dependencies,
+          );
+        }
+        return attachSourceClaims(stage, verifiedResult, input, sourceContract);
       },
       onStageCheckpoint: async (checkpoint) => {
         await session.emit({

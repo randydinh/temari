@@ -37,6 +37,7 @@ const generatedFiles = [
   'bin/qa-temari-policy-semantic.mjs',
 ];
 const publicFiles = [
+  ['packages/workflow-runtime/host/git-candidate.mjs', 'host/git-candidate.mjs'],
   ['packages/workflow-runtime/public/policy.json', 'policy.json'],
   [
     'packages/workflow-runtime/public/.codex-plugin/plugin.json',

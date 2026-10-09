@@ -247,3 +247,13 @@ route during the architecture review. The earlier P-stack graph was navigation
 for legacy relationships and did not establish dashboard behavior. Design claims
 here were checked against the write runner, runtime and host review source. No
 bundled skill/playbook was changed for this documentation increment.
+
+### Pinned dependency integrity
+
+The shared write-runner boundaries also validate existing pinned read-only
+submodules for dashboard implementers. The frozen dependency plan is retained in
+patches and integration receipts; broad parent ownership cannot grant dependency
+writes. Exact-pin checks inspect child bytes/modes, index, HEAD and untracked files
+rather than relying on the parent's clean status or tree. Review uses the same
+shared candidate guard. See [supported layouts and recovery](codex-parallel-workers.md#existing-pinned-read-only-submodules).
+This does not promote a dashboard receipt to canonical feature completion.
