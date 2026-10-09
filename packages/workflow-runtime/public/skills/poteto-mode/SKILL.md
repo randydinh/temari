@@ -1,6 +1,6 @@
 ---
 name: poteto-mode
-description: Use the current Nx P-stack engineering workflow with pinned lightweight and host-proven feature admission.
+description: Use Poteto for software investigation, design, implementation, repair, review, and delivery, including small engineering requests. Compose needed evidence retrieval with the current Nx P-stack methods and admitted routes; research alone does not select an engineering profile.
 ---
 
 # Poteto mode
@@ -36,11 +36,20 @@ under the existing engineering authority and admission; triage supplies analysis
 not permission or proof of a fix. Keep full QA assignments and their evaluator
 obligations open when using triage as a supporting step.
 
-For work on an existing codebase, read the installed policy, then apply the
-[Temari bounded codebase-context intake](../temari/SKILL.md) within the admitted
-source scope before broad investigation. Registrar and graph results guide source
-selection; current candidate code and requirements establish behavior. Retain an
-explicit gap when a configured context source is unavailable or stale.
+For an engineering request, including a direct Poteto invocation, decide its
+evidence dependencies before substantial planning or dependent work. Use the
+bundled [Knowledge skill](../temari-knowledge/SKILL.md) and shared
+[evidence intake](../temari-knowledge/references/evidence-intake.md) when relevant
+supplied or reusable evidence leaves material source dependencies unresolved.
+Retain the decision and observed operations in existing local task context.
+Evidence retrieval supports the selected engineering method; it does not admit
+a profile or satisfy its verification and closeout obligations.
+
+For work on an existing codebase, read the installed policy, then apply
+[Temari's codebase intake](../temari/SKILL.md) within the admitted source scope
+before broad investigation. Registrar and graph results guide source selection;
+current candidate code and requirements establish behavior. Keep missing, stale
+or disabled-provider gaps explicit and use only permitted bounded fallbacks.
 
 1. Read `policy.json` from the installed bundle root. Follow Temari's route-visibility preference: briefly name the selected route when the user opted in; otherwise describe the next action in plain language.
 2. Admit the pinned `lightweight-engineering-v1` mapping only when every source route condition is true. A trusted `full-playbook`/`feature-v1` start requires host proof from a read-only architect, scoped builder, independent reviewer, and forge access. Preserve all six canonical stages.

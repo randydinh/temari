@@ -1,0 +1,5 @@
+{
+  "research": "For the Cobalt pilot, how should we handle a station that stops sending heartbeats when reporting uptime? Give the relevant project rule and any unresolved assumptions.",
+  "engineering": "Explain why station-report.js subtracts unknown minutes. Is that consistent with the Cobalt pilot policy? This is an explanation request; leave the product unchanged.",
+  "rewrite": "Rewrite this sentence to be clearer: \"Charging begins after the driver taps Start.\" Use only that sentence."
+}

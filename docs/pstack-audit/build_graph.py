@@ -143,6 +143,12 @@ edge("public-skill:qa-triage", "owner:poteto", "hands_off_authorized_repair", "d
 
 knowledge_public = public_root / "skills/temari-knowledge/SKILL.md"
 node("public-skill:temari-knowledge", "public-skill", "Temari Knowledge", source=relative(knowledge_public))
+evidence_intake = public_root / "skills/temari-knowledge/references/evidence-intake.md"
+node("public-reference:evidence-intake", "public-reference", "Bounded evidence intake", source=relative(evidence_intake))
+edge("public-skill:temari-knowledge", "public-reference:evidence-intake", "uses_evidence_decision", "source_reference", relative(knowledge_public))
+for entry_name in ("temari", "poteto-mode"):
+    edge(f"public-entry:{entry_name}", "public-skill:temari-knowledge", "invokes_supporting_skill", "documented", relative(public_root / "skills" / entry_name / "SKILL.md"))
+    edge(f"public-entry:{entry_name}", "public-reference:evidence-intake", "uses_evidence_decision", "source_reference", relative(public_root / "skills" / entry_name / "SKILL.md"))
 
 skill_files = sorted(SKILLS.glob("*/SKILL.md"))
 playbook_files = sorted(PLAYBOOKS.glob("*.md"))
@@ -249,7 +255,7 @@ for target in re.findall(r"\[[^\]]*\]\(([^)]+)\)", index.read_text()):
 graph = {
     "schemaVersion": 1,
     "scope": "Temari public entries and v4.1 bundled P-stack skills and playbooks, with adjacent ownership boundaries",
-    "reviewedAt": "2026-10-08",
+    "reviewedAt": "2026-10-09",
     "evidenceRule": "documented and source_reference edges describe checked source; review_recommendation edges are proposals, not current behavior",
     "nodes": sorted(nodes.values(), key=lambda item: item["id"]),
     "edges": sorted(edges.values(), key=lambda item: (item["from"], item["relation"], item["to"], item["basis"])),

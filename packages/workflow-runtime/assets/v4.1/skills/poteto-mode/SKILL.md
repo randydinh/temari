@@ -16,6 +16,7 @@ The Principles section below grounds every trigger. In your reply, name each pri
 
 Remaining triggers:
 
+- Source-dependent engineering -> decide evidence need before substantial planning or dependent work. Use bounded retrieval when relevant supplied or reusable evidence leaves material dependencies unresolved; keep actual operation references, revisions and gaps in existing local task context. Honor disabled providers, local-only/source-sharing policy and source scope. Navigation notes, hits and graph edges guide reads; current code and requirements establish behavior. Evidence gathering supports the engineering method without granting admission or closeout. Research alone remains outside engineering routing.
 - External service, API, MCP server, connector, plugin, or authenticated application dependency -> read `../temari/references/integration-discovery.md` and require its policy-derived action before route classification, planning, delegation, or implementation. This protects direct poteto-mode invocation without duplicating Temari's integration policy.
 - Every engineering request starts with route classification. Use **Lightweight engineering** only when every condition in `playbooks/lightweight-engineering.md` holds. Task size alone is not enough. If any condition fails or remains uncertain, select the matching full playbook.
 - Nontrivial change, architecture decision, or "are we sure?" → the **how** skill.
