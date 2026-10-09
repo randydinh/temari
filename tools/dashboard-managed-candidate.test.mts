@@ -52,6 +52,7 @@ import {
 } from './dashboard-managed-candidate.mjs';
 import { createDashboardTalkTaskBridge } from './task-continuity.mjs';
 import { createDashboardManagedObserver } from './dashboard-managed-observer.mjs';
+import { createDashboardTalk } from './dashboard-talk.mjs';
 const exec = promisify(execFile);
 const sha = (b: Uint8Array | string) =>
   createHash('sha256').update(b).digest('hex');
@@ -334,9 +335,9 @@ const fs=require('node:fs'),args=process.argv.slice(2);let input='';process.stdi
     runtime,
   });
   assert(bridge);
-  const intake = async () => {
+  const intake = async (requestId = 'accepted-goal') => {
     const { taskId } = await bridge.intake({
-      requestId: 'accepted-goal',
+      requestId,
       title: 'Literal change',
       goal: 'Change the literal file',
     });
@@ -353,8 +354,8 @@ const fs=require('node:fs'),args=process.argv.slice(2);let input='';process.stdi
     } while (Date.now() < deadline);
     throw new Error('Fixture planner did not settle');
   };
-  const prepare = async () => {
-    const { task, projection } = await intake();
+  const prepare = async (requestId = 'accepted-goal') => {
+    const { task, projection } = await intake(requestId);
     return controller.action(task.taskId, {
       action: 'prepare-plan',
       requestId: 'prepare',
@@ -1342,4 +1343,87 @@ test('tampered retained completion never projects a candidate ready state', asyn
     JSON.stringify(projection).includes('/private/unselected'),
     false,
   );
+});
+
+test('fresh manual/browser observe polling leaves unchanged task events and Talk attention stable', async (t) => {
+  const f = await fixture(t),
+    running = await startManaged(f);
+  const talk = await createDashboardTalk({
+    config: {
+      schema: 1,
+      root: join(f.root, 'conversations'),
+      workspaceRoot: f.config.workspaceRoot,
+      hostId: 'fixture-host',
+      workspaceId: 'fixture-workspace',
+      taskStoreId: 'fixture-tasks',
+    },
+    taskStore: f.store,
+    runtime: f.runtime,
+    taskBridge: f.bridge,
+  });
+  const created = await talk.create({
+    requestId: 'polling-topic',
+    title: 'Main',
+  });
+  await talk.link(created.topic.topicId, {
+    requestId: 'link-polling',
+    expectedVersion: created.topic.version,
+    taskId: running.taskId,
+  });
+  const before = await talk.topic(created.topic.topicId);
+  for (let index = 0; index < 5; index++) {
+    const current = await f.runtime.snapshot(running.taskId);
+    await f.controller.action(running.taskId, {
+      action: 'observe',
+      requestId: `browser-poll-${index}`,
+      expectedVersion: current.version,
+    });
+    const detail = await talk.topic(created.topic.topicId);
+    assert.equal(detail.topic.version, before.topic.version);
+    assert.deepEqual(detail.attention, before.attention);
+  }
+  const after = await f.runtime.snapshot(running.taskId);
+  assert.equal(after.version, running.version);
+  assert.deepEqual(after.events, running.events);
+  assert.equal(f.launches, 1);
+});
+
+test('observer failure for one task cannot change another managed task card', async (t) => {
+  const f = await fixture(t),
+    running = await startManaged(f);
+  const healthy = await f.prepare('healthy-goal');
+  f.identityDrift();
+  const observer = createDashboardManagedObserver(f.controller);
+  f.controller.setManagedObserverHealthProvider(observer.health);
+  observer.start();
+  await observer.stop();
+  const described = (await f.controller.describe()) as any;
+  assert.equal(described.managedObserver.issueCount, 1);
+  assert.equal(
+    described.controls[running.taskId].implementation.state,
+    'RECOVERY_REQUIRED',
+  );
+  assert.equal(
+    described.controls[healthy.taskId].implementation.state,
+    'PREPARED',
+  );
+  assert.equal(
+    described.controls[healthy.taskId].managedCandidate.observationIssue,
+    null,
+  );
+  assert.equal(
+    described.controls[healthy.taskId].actions.includes('implementation-start'),
+    true,
+  );
+  assert.equal(
+    (await f.runtime.snapshot(healthy.taskId)).version,
+    healthy.version,
+  );
+  const projection = await f.bridge.project({
+    taskId: healthy.taskId,
+    expectedVersion: healthy.version,
+  });
+  assert.equal(projection!.state, 'PREPARED');
+  assert.equal(projection!.action!.action, 'implementation-start');
+  assert.doesNotMatch(projection!.message!, /recovery|could not verify/i);
 });

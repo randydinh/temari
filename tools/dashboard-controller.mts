@@ -2646,8 +2646,7 @@ export class DashboardController implements TaskViewController {
     const pending = run.operations.find((op) => op.state !== 'CONFIRMED');
     if (
       !duplicate &&
-      (manualIdempotencyKey ||
-        pending ||
+      (pending ||
         taskDigest(semantic(run.nativeSnapshot)) !==
           taskDigest(semantic(observation)))
     ) {
@@ -2857,9 +2856,7 @@ export class DashboardController implements TaskViewController {
             actions.push('implementation-start');
           if (run.nativeRef) actions.push('observe');
           let result = null;
-          let observationIssue =
-            this.managedObservationIssues.get(task.taskId) ??
-            this.managedObserverHealth().message;
+          let observationIssue = this.managedObservationIssues.get(task.taskId) ?? null;
           const readiness = this.managedReadiness(task, managed.runId);
           const completionRetained = task.events.some(
             (event) => event.idempotencyKey === `managed-result-${managed.runId}`,
