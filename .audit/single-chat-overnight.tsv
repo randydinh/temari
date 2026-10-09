@@ -1,0 +1,4 @@
+timestamp_utc	phase	candidate	decision_or_result	next_action
+2026-10-09T00:00:00Z	admission	8d94cdb611dbaae14c818a91f5e163b8d20fd125	Integrate the Talk bridge and managed reviewed-local-candidate route locally; exclude push, PR, publication, live product changes, and live model calls.	Integrate 47485649 through 2a9235a5 on the current base.
+2026-10-09T10:06:00Z	integration	c0bca68f1b283eccb6ecc7093bb0c8687daf6a24	Nine managed-route commits replayed on the Talk bridge; merge diagnostics repaired; full runtime suite passed 311/311.	Complete independent review and repair any actionable finding.
+2026-10-09T10:06:00Z	review	ca31b99798b3137c8e2706da43867c5db53af4d4	Read-only Git routing finding repaired; focused adapter 62/62, managed candidate 50/50, typecheck and diff checks passed; independent re-review PASS.	Implement the trusted DashboardController launcher and fixture-only Talk-to-NEEDS_REVIEW journey.
