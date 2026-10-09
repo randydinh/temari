@@ -71,3 +71,24 @@ projection.
 The fixture proves source composition. Live admission still requires a frozen
 external host profile and source selection. Automatic observation, sustained
 supervision, and installed promotion remain follow-up work.
+
+## Automatic observation outcome
+
+Automatic managed observation is integrated through
+`ce6b5f7e6820f31e65c8162b971808886cb3f8a5`. A host-owned loop starts after the
+dashboard server listens, observes bounded batches without overlap, reuses exact
+native references after restart, and stops without cancelling native work.
+Unchanged native state does not append task events or Talk attention. A retained
+successful readiness event is required before any caller may finalize, while a
+readiness refusal permits status observation only.
+
+Native success remains visibly in verification until the exact managed result is
+retained and reopened; only then does the task project `COMPLETE`/candidate ready,
+while canonical completion remains `NEEDS_REVIEW`. Observer problems are bounded,
+sanitized, and scoped to the affected task. Independent review initially found
+four polling and projection defects; all were repaired and final re-review passed.
+
+The source candidate now proves the complete fixture-only single-chat path. A
+real use still needs an operator-selected frozen profile/source and an installed
+or source dashboard process. No live model/product run or external delivery was
+performed in this contract.
