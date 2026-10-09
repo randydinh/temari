@@ -1,4 +1,4 @@
-/** Server-side, shadow-only Decisions judgments over policy-admitted archive excerpts. */
+/** Server-side, shadow-only LLM judgments over policy-admitted archive excerpts. */
 import assert from 'node:assert/strict';
 import { canonical, hash, object, list } from './codec.js';
 import {
@@ -7,25 +7,26 @@ import {
   type CurrentJevSharingGuard,
 } from './current-jev-sharing.js';
 
-const ENDPOINT = 'https://api.openai.com/v1/decisions';
-const MODEL = 'gpt-6-luna';
+const ENDPOINT = 'https://api.openai.com/v1/responses';
 const RUBRIC = 'knowledge-candidate-v1';
 
-export interface OpenAIDecisionsShadowCandidate {
+export interface OpenAIResponsesShadowCandidate {
   readonly id: string;
   readonly evidenceIds: readonly string[];
   readonly excerpt: string;
   readonly required: boolean;
   readonly contrary: boolean;
 }
-export interface OpenAIDecisionsShadowRequest {
-  readonly provider: 'none' | 'openai-decisions';
+export interface OpenAIResponsesShadowRequest {
+  readonly provider: 'none' | 'openai-responses';
+  /** Exact Responses API model or snapshot selected by the caller. */
+  readonly model: string;
   readonly query: string;
   readonly hostedTextApproved: boolean;
   readonly denialReason?: 'local-only' | 'case-opt-out';
-  readonly candidates: readonly OpenAIDecisionsShadowCandidate[];
+  readonly candidates: readonly OpenAIResponsesShadowCandidate[];
 }
-export interface OpenAIDecisionsShadowOptions {
+export interface OpenAIResponsesShadowOptions {
   /** Server-side only. Only this explicit key or OPENAI_API_KEY is used. */
   readonly apiKey?: string;
   readonly fetcher?: typeof fetch;
@@ -35,7 +36,7 @@ export interface OpenAIDecisionsShadowOptions {
   readonly currentSharingGuard?: CurrentJevSharingGuard;
 }
 
-export interface OpenAIDecisionsShadowJudgment {
+export interface OpenAIResponsesShadowJudgment {
   readonly candidateId: string;
   readonly evidenceIds: readonly string[];
   readonly evidenceSha256: string;
@@ -56,6 +57,7 @@ export interface OpenAIDecisionsShadowJudgment {
   readonly gap:
     | 'provider-none'
     | 'refusal'
+    | 'incomplete'
     | 'approval-required'
     | 'local-only'
     | 'case-opt-out'
@@ -66,15 +68,15 @@ export interface OpenAIDecisionsShadowJudgment {
     | 'invalid-response'
     | null;
 }
-export interface OpenAIDecisionsShadowResult {
-  readonly provider: 'none' | 'openai-decisions';
+export interface OpenAIResponsesShadowResult {
+  readonly provider: 'none' | 'openai-responses';
   readonly mode: 'shadow';
-  readonly model: typeof MODEL;
+  readonly model: string;
   readonly rubric: typeof RUBRIC;
   readonly querySha256: string;
   readonly originalOrder: readonly string[];
   readonly suggestedOrder: readonly string[];
-  readonly judgments: readonly OpenAIDecisionsShadowJudgment[];
+  readonly judgments: readonly OpenAIResponsesShadowJudgment[];
   /** A later denial also covers all remaining candidates and retries. */
   readonly sharing: CurrentJevSharing | 'not-requested';
   /** POST attempts begun, including overloads before a later revocation. */
@@ -89,13 +91,21 @@ function boundedString(value: unknown, name: string, max: number): string {
   assert(!value.includes('\0'), `Invalid ${name}`);
   return value;
 }
+function boundedModel(value: unknown, name: string): string {
+  const model = boundedString(value, name, 128);
+  assert(
+    /^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(model),
+    `Invalid ${name}`,
+  );
+  return model;
+}
 function finiteProbability(value: unknown): number {
   assert(
     typeof value === 'number' &&
       Number.isFinite(value) &&
       value >= 0 &&
       value <= 1,
-    'Invalid Decisions probability',
+    'Invalid Responses probability',
   );
   return value;
 }
@@ -104,35 +114,37 @@ function usageCount(value: unknown): number {
     Number.isSafeInteger(value) &&
       (value as number) >= 0 &&
       (value as number) <= 1_000_000,
-    'Invalid Decisions usage',
+    'Invalid Responses usage',
   );
   return value as number;
 }
-function validateRequest(request: OpenAIDecisionsShadowRequest): void {
+function validateRequest(request: OpenAIResponsesShadowRequest): void {
   assert(
     Object.keys(request).every((k) =>
       [
         'provider',
+        'model',
         'query',
         'hostedTextApproved',
         'denialReason',
         'candidates',
       ].includes(k),
     ),
-    'Unknown Decisions request field',
+    'Unknown Responses request field',
   );
+  boundedModel(request.model, 'Responses model');
   boundedString(request.query, 'query', 512);
   assert(
     Array.isArray(request.candidates) &&
       request.candidates.length >= 0 &&
       request.candidates.length <= 16,
-    'Invalid Decisions shortlist',
+    'Invalid Responses shortlist',
   );
   const ids = new Set<string>();
   let total = 0;
   for (const c of request.candidates) {
     boundedString(c.id, 'candidate ID', 256);
-    assert(!ids.has(c.id), 'Duplicate Decisions candidate');
+    assert(!ids.has(c.id), 'Duplicate Responses candidate');
     ids.add(c.id);
     assert(
       Array.isArray(c.evidenceIds) &&
@@ -147,12 +159,12 @@ function validateRequest(request: OpenAIDecisionsShadowRequest): void {
     assert(typeof c.required === 'boolean' && typeof c.contrary === 'boolean');
     total += c.excerpt.length;
   }
-  assert(total <= 16_000, 'Decisions shortlist text exceeds bound');
+  assert(total <= 16_000, 'Responses shortlist text exceeds bound');
 }
 function unknown(
-  c: OpenAIDecisionsShadowCandidate,
-  gap: NonNullable<OpenAIDecisionsShadowJudgment['gap']>,
-): OpenAIDecisionsShadowJudgment {
+  c: OpenAIResponsesShadowCandidate,
+  gap: NonNullable<OpenAIResponsesShadowJudgment['gap']>,
+): OpenAIResponsesShadowJudgment {
   return {
     candidateId: c.id,
     evidenceIds: [...c.evidenceIds],
@@ -174,15 +186,7 @@ function unknown(
 }
 function parsedAnswer(body: unknown) {
   const r = object(body);
-  assert.equal(r['model'], MODEL);
-  const answers = list(r['answers']).map(object);
-  assert.equal(answers.length, 2);
-  assert.deepEqual(answers.map((a) => a['name']).sort(), [
-    'relevance',
-    'support',
-  ]);
-  const relevance = answers.find((a) => a['name'] === 'relevance')!;
-  const support = answers.find((a) => a['name'] === 'support')!;
+  const model = boundedModel(r['model'], 'Responses resolved model');
   const u = object(r['usage']);
   const usage = {
     inputTokens: usageCount(u['input_tokens']),
@@ -190,75 +194,116 @@ function parsedAnswer(body: unknown) {
     totalTokens: usageCount(u['total_tokens']),
   };
   assert.equal(usage.totalTokens, usage.inputTokens + usage.outputTokens);
-  if (relevance['type'] !== 'refusal') {
-    assert.equal(relevance['type'], 'predicate');
-    finiteProbability(relevance['probability']);
+  const status = r['status'];
+  assert(status === 'completed' || status === 'incomplete');
+  if (status === 'incomplete')
+    return {
+      gap: 'incomplete' as const,
+      usage,
+      model,
+      relevance: null,
+      support: 'unknown' as const,
+      confidence: null,
+    };
+  const messages = list(r['output'])
+    .map(object)
+    .filter((item) => item['type'] === 'message');
+  assert.equal(messages.length, 1);
+  const content = list(messages[0]['content']).map(object);
+  const refusals = content.filter((item) => item['type'] === 'refusal');
+  if (refusals.length > 0) {
+    assert.equal(refusals.length, 1);
+    boundedString(refusals[0]['refusal'], 'refusal', 4096);
+    return {
+      gap: 'refusal' as const,
+      usage,
+      model,
+      relevance: null,
+      support: 'unknown' as const,
+      confidence: null,
+    };
   }
-  if (support['type'] !== 'refusal') {
-    assert.equal(support['type'], 'choice');
-    assert.equal(typeof support['choice'], 'string', 'Invalid Decisions choice');
-    assert(
-      ['supported', 'contradicted', 'unknown'].includes(
-        support['choice'] as string,
-      ),
-    );
-    const probabilities = list(support['probabilities']).map(object);
-    assert.deepEqual(probabilities.map((p) => p['value']).sort(), [
-      'contradicted',
-      'supported',
-      'unknown',
-    ]);
-    assert(
-      Math.abs(
-        probabilities.reduce(
-          (sum, p) => sum + finiteProbability(p['probability']),
-          0,
-        ) - 1,
-      ) <= 0.000001,
-    );
-    finiteProbability(support['confidence']);
-  }
-  const refusal = answers.some((a) => a['type'] === 'refusal');
+  const outputs = content.filter((item) => item['type'] === 'output_text');
+  assert.equal(outputs.length, 1);
+  const answer = object(
+    JSON.parse(boundedString(outputs[0]['text'], 'output text', 16384)),
+  );
+  assert.deepEqual(Object.keys(answer).sort(), [
+    'confidence',
+    'relevance',
+    'support',
+  ]);
+  assert(
+    typeof answer['support'] === 'string' &&
+      ['supported', 'contradicted', 'unknown'].includes(answer['support']),
+    'Invalid Responses support',
+  );
   return {
-    refusal,
+    gap: null,
     usage,
-    relevance: refusal ? null : finiteProbability(relevance['probability']),
-    support: refusal
-      ? ('unknown' as const)
-      : (support['choice'] as OpenAIDecisionsShadowJudgment['support']),
-    confidence: refusal ? null : finiteProbability(support['confidence']),
+    model,
+    relevance: finiteProbability(answer['relevance']),
+    support: answer['support'] as OpenAIResponsesShadowJudgment['support'],
+    confidence: finiteProbability(answer['confidence']),
   };
 }
 
 async function evaluate(
-  c: OpenAIDecisionsShadowCandidate,
+  c: OpenAIResponsesShadowCandidate,
   query: string,
+  model: string,
   apiKey: string,
-  options: OpenAIDecisionsShadowOptions,
+  options: OpenAIResponsesShadowOptions,
   checkSharing: () => Promise<CurrentJevSharing>,
   markAttempt: () => void,
-): Promise<OpenAIDecisionsShadowJudgment> {
+): Promise<OpenAIResponsesShadowJudgment> {
   const payload = {
-    model: MODEL,
-    input: canonical({ query, candidate: { id: c.id, excerpt: c.excerpt } }),
-    questions: [
+    model,
+    store: false,
+    input: [
       {
-        type: 'predicate',
-        name: 'relevance',
-        instructions: 'Does the excerpt directly help answer the query?',
+        role: 'system',
+        content: [
+          {
+            type: 'input_text',
+            text: 'Judge only the supplied excerpt. Do not use outside knowledge. Relevance is 0 to 1. Support is supported only for explicit support, contradicted only for explicit contradiction, and unknown when the excerpt is insufficient or the query is not a proposition. Confidence is your confidence in the support label, from 0 to 1.',
+          },
+        ],
       },
       {
-        type: 'choice',
-        name: 'support',
-        instructions:
-          'Does the excerpt support or contradict the query proposition? Choose unknown if not established or query is not a proposition.',
-        choices: [
-          { value: 'supported', description: 'Explicit support' },
-          { value: 'contradicted', description: 'Explicit contradiction' },
-          { value: 'unknown', description: 'Neither established' },
+        role: 'user',
+        content: [
+          {
+            type: 'input_text',
+            text: canonical({
+              query,
+              candidate: { id: c.id, excerpt: c.excerpt },
+            }),
+          },
         ],
       },
     ],
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'knowledge_candidate_judgment',
+        strict: true,
+        schema: {
+          type: 'object',
+          properties: {
+            relevance: { type: 'number' },
+            support: {
+              type: 'string',
+              enum: ['supported', 'contradicted', 'unknown'],
+            },
+            confidence: { type: 'number' },
+          },
+          required: ['relevance', 'support', 'confidence'],
+          additionalProperties: false,
+        },
+      },
+    },
+    max_output_tokens: 256,
   };
   const requestSha256 = hash(canonical(payload));
   const timeoutMs = options.timeoutMs ?? 5000;
@@ -274,7 +319,7 @@ async function evaluate(
   const deadline = new Promise<never>((_resolve, reject) => {
     controller.signal.addEventListener(
       'abort',
-      () => reject(new Error('Decisions deadline exceeded')),
+      () => reject(new Error('Responses deadline exceeded')),
       { once: true },
     );
   });
@@ -344,12 +389,12 @@ async function evaluate(
       relevance: parsed.relevance,
       support: parsed.support,
       supportConfidence: parsed.confidence,
-      model: MODEL,
+      model: parsed.model,
       usage: parsed.usage,
       requestSha256,
       latencyMs: Math.max(0, Math.round(performance.now() - started)),
-      state: parsed.refusal ? 'unknown' : 'judged',
-      gap: parsed.refusal ? 'refusal' : null,
+      state: parsed.gap ? 'unknown' : 'judged',
+      gap: parsed.gap,
     };
   } catch {
     return unknown(c, response?.ok ? 'invalid-response' : 'unavailable');
@@ -360,29 +405,29 @@ async function evaluate(
 }
 
 /** Ranking advice only: all candidates and required/contrary flags survive intact. */
-export async function judgeOpenAIDecisionsShadow(
-  request: OpenAIDecisionsShadowRequest,
-  options: OpenAIDecisionsShadowOptions = {},
-): Promise<OpenAIDecisionsShadowResult> {
+export async function judgeOpenAIResponsesShadow(
+  request: OpenAIResponsesShadowRequest,
+  options: OpenAIResponsesShadowOptions = {},
+): Promise<OpenAIResponsesShadowResult> {
   // Snapshot before the first await: caller mutations cannot widen the grant,
   // shortlist or text after validation or alter the evidence hash in a receipt.
   const selected = JSON.parse(
     canonical(request),
-  ) as OpenAIDecisionsShadowRequest;
+  ) as OpenAIResponsesShadowRequest;
   validateRequest(selected);
   assert(
     selected.denialReason === undefined ||
       ['local-only', 'case-opt-out'].includes(selected.denialReason),
   );
-  assert(['none', 'openai-decisions'].includes(selected.provider));
+  assert(['none', 'openai-responses'].includes(selected.provider));
   assert.equal(typeof selected.hostedTextApproved, 'boolean');
   const grant =
-    selected.provider === 'openai-decisions' &&
+    selected.provider === 'openai-responses' &&
     selected.hostedTextApproved === true &&
     selected.candidates.length > 0;
   assert(
     !grant || selected.denialReason === undefined,
-    'Allowed Decisions request cannot have a denial reason',
+    'Allowed Responses request cannot have a denial reason',
   );
   const timeoutMs = options.timeoutMs ?? 5000;
   assert(Number.isInteger(timeoutMs) && timeoutMs >= 100 && timeoutMs <= 30000);
@@ -420,7 +465,7 @@ export async function judgeOpenAIDecisionsShadow(
         !/[\r\n\0]/.test(apiKey),
       'Invalid API key',
     );
-  const judgments: OpenAIDecisionsShadowJudgment[] = [];
+  const judgments: OpenAIResponsesShadowJudgment[] = [];
   let attemptedRequests = 0;
   for (const c of selected.candidates) {
     const judgment = !grant
@@ -440,6 +485,7 @@ export async function judgeOpenAIDecisionsShadow(
           : await evaluate(
               c,
               selected.query,
+              selected.model,
               apiKey,
               {
                 fetcher,
@@ -479,7 +525,7 @@ export async function judgeOpenAIDecisionsShadow(
   return {
     provider: selected.provider,
     mode: 'shadow',
-    model: MODEL,
+    model: selected.model,
     rubric: RUBRIC,
     querySha256: hash(canonical(selected.query)),
     originalOrder,

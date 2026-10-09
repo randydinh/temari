@@ -1,4 +1,4 @@
-/** One explicit shadow trial. Historical jobs and receipts remain independent. */
+/** One explicit Responses shadow trial. Historical jobs and receipts remain independent. */
 import assert from 'node:assert/strict';
 import { basename, dirname, join } from 'node:path';
 import type { KnowledgeCheck, KnowledgeEvidence } from '@temari/contracts';
@@ -23,19 +23,20 @@ import {
   checkCurrentJevSharing,
 } from './current-jev-sharing.js';
 import {
-  judgeOpenAIDecisionsShadow,
-  type OpenAIDecisionsShadowCandidate,
-  type OpenAIDecisionsShadowOptions,
-  type OpenAIDecisionsShadowResult,
-} from './openai-decisions.js';
+  judgeOpenAIResponsesShadow,
+  type OpenAIResponsesShadowCandidate,
+  type OpenAIResponsesShadowOptions,
+  type OpenAIResponsesShadowResult,
+} from './openai-responses.js';
 
-export interface OpenAIDecisionsTrialInput extends ArchiveQueryInput {
-  readonly provider: 'none' | 'openai-decisions';
+export interface OpenAIResponsesTrialInput extends ArchiveQueryInput {
+  readonly provider: 'none' | 'openai-responses';
+  readonly model: string;
   readonly hostedTextApproved: boolean;
 }
-export interface OpenAIDecisionsTrialReport {
+export interface OpenAIResponsesTrialReport {
   readonly schema: 1;
-  readonly kind: 'temari-openai-decisions-trial';
+  readonly kind: 'temari-openai-responses-trial';
   readonly id: string;
   readonly handoffPath: string;
   readonly task: ArchiveIntakeHandoff['task'];
@@ -43,14 +44,14 @@ export interface OpenAIDecisionsTrialReport {
   readonly baseQueryReportSha256: string;
   readonly retrievalCheckpointPath: string | null;
   readonly retrievalCheckpointSha256: string | null;
-  readonly result: OpenAIDecisionsShadowResult;
+  readonly result: OpenAIResponsesShadowResult;
   readonly gaps: readonly string[];
 }
-export async function runOpenAIDecisionsTrial(
-  input: OpenAIDecisionsTrialInput,
-  options: OpenAIDecisionsShadowOptions = {},
+export async function runOpenAIResponsesTrial(
+  input: OpenAIResponsesTrialInput,
+  options: OpenAIResponsesShadowOptions = {},
 ) {
-  const selected = JSON.parse(canonical(input)) as OpenAIDecisionsTrialInput;
+  const selected = JSON.parse(canonical(input)) as OpenAIResponsesTrialInput;
   assert.deepEqual(
     Object.keys(selected).sort(),
     [
@@ -61,14 +62,15 @@ export async function runOpenAIDecisionsTrial(
       'topK',
       'discoveryMode',
       'provider',
+      'model',
       'hostedTextApproved',
     ].sort(),
     'Unknown or missing trial field',
   );
-  assert(['none', 'openai-decisions'].includes(selected.provider));
+  assert(['none', 'openai-responses'].includes(selected.provider));
   assert.equal(typeof selected.hostedTextApproved, 'boolean');
   const handoff = await loadArchiveHandoff(selected.handoffPath);
-  const { provider: _provider, ...baseInput } = selected;
+  const { provider: _provider, model: _model, ...baseInput } = selected;
   const base = await runArchiveQuery({
     ...baseInput,
     hostedTextApproved: false,
@@ -84,7 +86,7 @@ export async function runOpenAIDecisionsTrial(
     readScope: 'source-root',
     discoveryMode: selected.discoveryMode,
   });
-  const candidates: OpenAIDecisionsShadowCandidate[] = [];
+  const candidates: OpenAIResponsesShadowCandidate[] = [];
   let checkpointSha256: string | null = null;
   const checkpointPath = base.report.query.retrievalCheckpointPath;
   if (checkpointPath) {
@@ -170,9 +172,10 @@ export async function runOpenAIDecisionsTrial(
     selectedPublications,
     selected.sourceIds,
   );
-  let result = await judgeOpenAIDecisionsShadow(
+  let result = await judgeOpenAIResponsesShadow(
     {
       provider: selected.provider,
+      model: selected.model,
       query: selected.query,
       hostedTextApproved: selected.hostedTextApproved && !localOnly,
       ...(!selected.hostedTextApproved || localOnly
@@ -207,7 +210,7 @@ export async function runOpenAIDecisionsTrial(
   );
   // Recheck immediately before publication, including changes after the last POST.
   if (
-    selected.provider === 'openai-decisions' &&
+    selected.provider === 'openai-responses' &&
     selected.hostedTextApproved &&
     !localOnly
   ) {
@@ -226,9 +229,9 @@ export async function runOpenAIDecisionsTrial(
         })),
       };
   }
-  const report: OpenAIDecisionsTrialReport = {
+  const report: OpenAIResponsesTrialReport = {
     schema: 1,
-    kind: 'temari-openai-decisions-trial',
+    kind: 'temari-openai-responses-trial',
     id: selected.id,
     handoffPath: selected.handoffPath,
     task: handoff.task,
@@ -244,7 +247,7 @@ export async function runOpenAIDecisionsTrial(
   };
   const reportPath = join(
     handoff.task.directory,
-    `openai-decisions-trial-${hash(canonical(report))}.json`,
+    `openai-responses-trial-${hash(canonical(report))}.json`,
   );
   await publishJson(reportPath, report);
   return { report, reportPath };

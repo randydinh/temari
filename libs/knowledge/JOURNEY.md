@@ -713,9 +713,9 @@ with gaps rather than claiming their contents were understood.
 The [bounded real-corpus pilot](../../docs/evidence/knowledge-system/real-corpus-pilot-2026-09-30.md)
 records the latest measured coverage and remaining format/relationship gaps.
 
-### Optional OpenAI Decisions trial
+### Optional OpenAI Responses trial
 
-For this company-specific trial, OpenAI Decisions supersedes the historical Jev
+For this company-specific trial, OpenAI Responses supersedes the historical Jev
 choice: Jev is not company approved. Historical examples, receipts and scheduled
 jobs above remain unchanged. This separate command is one explicit run; it does
 not install anything, schedule work, guarantee exactly-once billing, or promote
@@ -737,13 +737,14 @@ Save a strict JSON input file (unknown fields are rejected):
   "sourceIds": ["synthetic-source"],
   "topK": 2,
   "discoveryMode": "bm25",
-  "provider": "openai-decisions",
+  "provider": "openai-responses",
+  "model": "gpt-6-astra",
   "hostedTextApproved": true
 }
 ```
 
 ```sh
-pnpm exec nx run knowledge:demo -- journey-decisions-trial --input /absolute/trial.json
+pnpm exec nx run knowledge:demo -- journey-responses-trial --input /absolute/trial.json
 ```
 
 For a later authorized live trial, configure `OPENAI_API_KEY` server-side from a
@@ -752,11 +753,15 @@ or place it in the input JSON. There is no Keychain or TypeSafe credential
 fallback. No key is configured for this implementation: live verification is
 pending a credential, and missing-key receipts record zero attempted requests.
 
-The [official Decisions guide](https://developers.openai.com/api/docs/guides/decisions)
-contract supplied on 2026-10-08 uses the beta `gpt-6-luna` model at the fixed
-`POST https://api.openai.com/v1/decisions` endpoint. Synthetic injected transport
-tests verify named answers, unknown outcomes, and actual token accounting;
-they do not establish live availability or calibration parity with Jev.
-The durable `temari-openai-decisions-trial` report links the forced-local base
+The trial uses the standard
+[Responses API with Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
+at `POST https://api.openai.com/v1/responses`. The input pins an explicit model;
+`gpt-6-astra` is the documented starting model for new projects as of
+2026-10-09. Synthetic injected-transport tests verify the strict JSON Schema,
+refusal and incomplete outcomes, resolved model identity, and actual token
+accounting. The returned confidence is the model's self-report, not a calibrated
+probability. These tests do not establish live availability or calibration parity
+with Jev.
+The durable `temari-openai-responses-trial` report links the forced-local base
 query and verified checkpoint without embedding source text or credentials.
 No company documents should be sent in this trial.

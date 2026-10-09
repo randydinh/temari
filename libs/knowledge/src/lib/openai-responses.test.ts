@@ -11,7 +11,7 @@ import {
   type CurrentJevSharingGuard,
 } from './current-jev-sharing.js';
 import { publishJson } from './durable.js';
-import { judgeOpenAIDecisionsShadow } from './openai-decisions.js';
+import { judgeOpenAIResponsesShadow } from './openai-responses.js';
 
 let allowedGuard: CurrentJevSharingGuard;
 let policyPath: string;
@@ -137,7 +137,8 @@ after(async () => {
 });
 
 const request = {
-  provider: 'openai-decisions' as const,
+  provider: 'openai-responses' as const,
+  model: 'gpt-6-astra',
   query: 'Which document supports the deployment requirement?',
   hostedTextApproved: true as const,
   candidates: [
@@ -160,83 +161,103 @@ const request = {
 
 function body() {
   return {
-    model: 'gpt-6-luna',
-    answers: [
-      { type: 'predicate', name: 'relevance', probability: 0.9 },
+    model: 'gpt-6-astra-2026-10-01',
+    status: 'completed',
+    output: [
       {
-        type: 'choice',
-        name: 'support',
-        choice: 'supported',
-        probabilities: [
-          { value: 'supported', probability: 0.9 },
-          { value: 'contradicted', probability: 0.02 },
-          { value: 'unknown', probability: 0.08 },
+        type: 'message',
+        content: [
+          {
+            type: 'output_text',
+            text: JSON.stringify({
+              relevance: 0.9,
+              support: 'supported',
+              confidence: 0.8,
+            }),
+          },
         ],
-        confidence: 0.8,
       },
     ],
     usage: { input_tokens: 42, output_tokens: 0, total_tokens: 42 },
   };
 }
+function changeAnswer(
+  response: ReturnType<typeof body>,
+  mutate: (answer: Record<string, unknown>) => void,
+): void {
+  const content = response.output[0].content[0];
+  const answer = JSON.parse(content.text) as Record<string, unknown>;
+  mutate(answer);
+  content.text = JSON.stringify(answer);
+}
 const opts = () => ({ apiKey: 'synthetic', currentSharingGuard: allowedGuard });
-test('Decisions: named answers in either order, exact payload and unchanged evidence order', async () => {
-  for (const reverse of [false, true]) {
-    const b = body();
-    if (reverse) b.answers.reverse();
-    const result = await judgeOpenAIDecisionsShadow(request, {
-      ...opts(),
-      fetcher: async (url, init) => {
-        assert.equal(url, 'https://api.openai.com/v1/decisions');
-        const payload = JSON.parse(String(init?.body));
-        assert.equal(payload.model, 'gpt-6-luna');
-        assert.equal(typeof payload.input, 'string');
-        assert.equal(payload.questions[0].type, 'predicate');
-        assert.equal(payload.questions[1].choices.length, 3);
-        return Response.json(b);
-      },
-    });
-    assert.deepEqual(result.originalOrder, ['a', 'b']);
-    assert.deepEqual(result.suggestedOrder, ['a', 'b']);
-    assert.equal(result.judgments[0].required, true);
-    assert.equal(result.judgments[1].contrary, true);
-    assert.deepEqual(result.judgments[0].usage, {
-      inputTokens: 42,
-      outputTokens: 0,
-      totalTokens: 42,
-    });
-    assert.equal(result.judgments[0].state, 'judged');
-    assert.equal(result.attemptedRequests, 2);
-  }
+test('Responses: strict structured-output payload and unchanged evidence order', async () => {
+  const result = await judgeOpenAIResponsesShadow(request, {
+    ...opts(),
+    fetcher: async (url, init) => {
+      assert.equal(url, 'https://api.openai.com/v1/responses');
+      const payload = JSON.parse(String(init?.body));
+      assert.equal(payload.model, 'gpt-6-astra');
+      assert.equal(payload.store, false);
+      assert.equal(payload.input.length, 2);
+      assert.equal(payload.input[0].role, 'system');
+      const sent = JSON.parse(payload.input[1].content[0].text);
+      assert.equal(sent.query, request.query);
+      assert(sent.candidate.excerpt.includes('Deployment'));
+      assert.equal(payload.text.format.type, 'json_schema');
+      assert.equal(payload.text.format.strict, true);
+      assert.deepEqual(payload.text.format.schema.required.sort(), [
+        'confidence',
+        'relevance',
+        'support',
+      ]);
+      assert.equal(payload.max_output_tokens, 256);
+      return Response.json(body());
+    },
+  });
+  assert.equal(result.model, 'gpt-6-astra');
+  assert.deepEqual(result.originalOrder, ['a', 'b']);
+  assert.deepEqual(result.suggestedOrder, ['a', 'b']);
+  assert.equal(result.judgments[0].required, true);
+  assert.equal(result.judgments[1].contrary, true);
+  assert.equal(result.judgments[0].model, 'gpt-6-astra-2026-10-01');
+  assert.deepEqual(result.judgments[0].usage, {
+    inputTokens: 42,
+    outputTokens: 0,
+    totalTokens: 42,
+  });
+  assert.equal(result.judgments[0].state, 'judged');
+  assert.equal(result.attemptedRequests, 2);
 });
-test('Decisions: malformed named answers, probabilities and usage stay unknown', async () => {
+test('Responses: malformed structured outputs and usage stay unknown', async () => {
   const cases: ((b: any) => void)[] = [
-    (b) => b.answers.pop(),
-    (b) => b.answers.push(b.answers[0]),
-    (b) => (b.answers[1].name = 'relevance'),
-    (b) => (b.answers[1].name = 'unexpected'),
-    (b) => (b.answers[1].choice = ['supported']),
-    (b) => (b.answers[1].choice = { value: 'supported' }),
-    (b) => (b.answers[1].choice = null),
-    (b) => (b.answers[0].probability = '0.9'),
-    (b) => (b.answers[0].probability = 2),
-    (b) => (b.answers[0].probability = null),
-    (b) => (b.answers[1].confidence = '0.8'),
-    (b) => (b.answers[1].confidence = -0.1),
-    (b) => (b.answers[1].probabilities[0].probability = 0.5),
-    (b) => (b.answers[1].probabilities[0].probability = '0.9'),
-    (b) => (b.answers[1].probabilities[0].value = 'unknown'),
+    (b) => changeAnswer(b, (a) => delete a.support),
+    (b) => changeAnswer(b, (a) => (a.extra = true)),
+    (b) => changeAnswer(b, (a) => (a.support = ['supported'])),
+    (b) => changeAnswer(b, (a) => (a.support = { value: 'supported' })),
+    (b) => changeAnswer(b, (a) => (a.support = null)),
+    (b) => changeAnswer(b, (a) => (a.support = 'other')),
+    (b) => changeAnswer(b, (a) => (a.relevance = '0.9')),
+    (b) => changeAnswer(b, (a) => (a.relevance = 2)),
+    (b) => changeAnswer(b, (a) => (a.relevance = null)),
+    (b) => changeAnswer(b, (a) => (a.confidence = '0.8')),
+    (b) => changeAnswer(b, (a) => (a.confidence = -0.1)),
+    (b) => (b.output[0].content[0].text = '{'),
+    (b) => (b.output[0].content[0].type = 'other'),
+    (b) => b.output.push(b.output[0]),
     (b) => (b.usage.total_tokens = 43),
     (b) => delete b.usage.output_tokens,
     (b) => (b.usage.input_tokens = -1),
     (b) => (b.usage.input_tokens = 1.5),
     (b) => (b.usage.output_tokens = '0'),
     (b) => (b.usage.total_tokens = null),
-    (b) => (b.model = 'other'),
+    (b) => (b.status = 'other'),
+    (b) => (b.model = 'bad model'),
   ];
   for (const mutate of cases) {
     const b = body();
     mutate(b);
-    const r = await judgeOpenAIDecisionsShadow(request, {
+    const r = await judgeOpenAIResponsesShadow(request, {
       ...opts(),
       fetcher: async () => Response.json(b),
     });
@@ -247,26 +268,31 @@ test('Decisions: malformed named answers, probabilities and usage stay unknown',
     );
   }
   const b: any = body();
-  b.answers[0] = { name: 'relevance', type: 'refusal' };
-  const r = await judgeOpenAIDecisionsShadow(request, {
+  b.output[0].content = [{ type: 'refusal', refusal: 'synthetic refusal' }];
+  const r = await judgeOpenAIResponsesShadow(request, {
     ...opts(),
     fetcher: async () => Response.json(b),
   });
   assert.equal(r.judgments[0].gap, 'refusal');
   assert.equal(r.judgments[0].usage?.totalTokens, 42);
-  b.answers = [
-    { name: 'support', type: 'refusal' },
-    { name: 'relevance', type: 'predicate', probability: 0.9 },
-  ];
-  const supportRefusal = await judgeOpenAIDecisionsShadow(request, {
+  const incomplete = body();
+  incomplete.status = 'incomplete';
+  incomplete.output = [];
+  const incompleteResult = await judgeOpenAIResponsesShadow(request, {
     ...opts(),
-    fetcher: async () => Response.json(b),
+    fetcher: async () => Response.json(incomplete),
   });
-  assert(supportRefusal.judgments.every((j) =>
-    j.state === 'unknown' && j.support === 'unknown' && j.relevance === null,
-  ));
+  assert(
+    incompleteResult.judgments.every(
+      (j) =>
+        j.state === 'unknown' &&
+        j.gap === 'incomplete' &&
+        j.support === 'unknown' &&
+        j.relevance === null,
+    ),
+  );
 });
-test('Decisions: offline, opt-out, absent/forged guards never access key or network', async () => {
+test('Responses: offline, opt-out, absent/forged guards never access key or network', async () => {
   const options = {
     get apiKey(): string {
       throw Error('credential access');
@@ -275,8 +301,8 @@ test('Decisions: offline, opt-out, absent/forged guards never access key or netw
       throw Error('network');
     },
   };
-  for (const provider of ['none', 'openai-decisions'] as const) {
-    const r = await judgeOpenAIDecisionsShadow(
+  for (const provider of ['none', 'openai-responses'] as const) {
+    const r = await judgeOpenAIResponsesShadow(
       {
         ...request,
         provider,
@@ -291,13 +317,13 @@ test('Decisions: offline, opt-out, absent/forged guards never access key or netw
     undefined,
     { check: async () => 'allowed' } as unknown as CurrentJevSharingGuard,
   ]) {
-    const r = await judgeOpenAIDecisionsShadow(
+    const r = await judgeOpenAIResponsesShadow(
       request,
       Object.assign(optionsWithoutKey(), { currentSharingGuard: guard }),
     );
     assert.equal(r.judgments[0].gap, 'policy-unavailable');
   }
-  const r = await judgeOpenAIDecisionsShadow(request, {
+  const r = await judgeOpenAIResponsesShadow(request, {
     ...opts(),
     apiKey: '',
   });
@@ -314,16 +340,16 @@ function optionsWithoutKey() {
     },
   };
 }
-test('Decisions: current revocation before credentials, POST retry and final result', async () => {
+test('Responses: current revocation before credentials, POST retry and final result', async () => {
   await setCurrentRow({ sharing: 'local-only' });
-  const r = await judgeOpenAIDecisionsShadow(
+  const r = await judgeOpenAIResponsesShadow(
     request,
     Object.assign(optionsWithoutKey(), { currentSharingGuard: allowedGuard }),
   );
   assert.equal(r.judgments[0].gap, 'current-local-only');
   await setCurrentRow({ sharing: 'registered-sources' });
   let calls = 0;
-  const retried = await judgeOpenAIDecisionsShadow(request, {
+  const retried = await judgeOpenAIResponsesShadow(request, {
     ...opts(),
     sleep: async () => {},
     fetcher: async () => {
@@ -335,7 +361,7 @@ test('Decisions: current revocation before credentials, POST retry and final res
   assert.equal(calls, 1);
   assert.equal(retried.sharing, 'current-local-only');
   await setCurrentRow({ sharing: 'registered-sources' });
-  const last = await judgeOpenAIDecisionsShadow(
+  const last = await judgeOpenAIResponsesShadow(
     { ...request, candidates: request.candidates.slice(0, 1) },
     {
       ...opts(),
@@ -348,14 +374,14 @@ test('Decisions: current revocation before credentials, POST retry and final res
   assert.equal(last.judgments[0].state, 'unknown');
   await setCurrentRow({ sharing: 'registered-sources' });
 });
-test('Decisions: deadlines, streamed body cap and retry exhaustion', async () => {
+test('Responses: deadlines, streamed body cap and retry exhaustion', async () => {
   for (const fetcher of [
     async () => new Promise<Response>(() => {}),
     async () => new Response(new ReadableStream({ start() {} })),
     async () => new Response('x'.repeat(65537)),
     async () => new Response('', { status: 503 }),
   ]) {
-    const r = await judgeOpenAIDecisionsShadow(
+    const r = await judgeOpenAIResponsesShadow(
       { ...request, candidates: request.candidates.slice(0, 1) },
       { ...opts(), timeoutMs: 100, sleep: async () => {}, fetcher },
     );
@@ -363,7 +389,7 @@ test('Decisions: deadlines, streamed body cap and retry exhaustion', async () =>
     assert(r.attemptedRequests <= 3);
   }
   let posts = 0;
-  const exhausted = await judgeOpenAIDecisionsShadow(
+  const exhausted = await judgeOpenAIResponsesShadow(
     { ...request, candidates: request.candidates.slice(0, 1) },
     {
       ...opts(),
@@ -378,9 +404,9 @@ test('Decisions: deadlines, streamed body cap and retry exhaustion', async () =>
   assert.equal(exhausted.attemptedRequests, 3);
   assert.equal(exhausted.judgments[0].gap, 'unavailable');
 });
-test('Decisions: request snapshot and bounds before async admission', async () => {
+test('Responses: request snapshot and bounds before async admission', async () => {
   const mutable = structuredClone(request);
-  const pending = judgeOpenAIDecisionsShadow(mutable, {
+  const pending = judgeOpenAIResponsesShadow(mutable, {
     ...opts(),
     fetcher: async (_url, init) => {
       assert(!String(init?.body).includes('MUTATED'));
@@ -399,26 +425,37 @@ test('Decisions: request snapshot and bounds before async admission', async () =
     ),
   );
   await assert.rejects(
-    judgeOpenAIDecisionsShadow({ ...request, query: 'x'.repeat(513) }),
+    judgeOpenAIResponsesShadow({ ...request, query: 'x'.repeat(513) }),
   );
+  for (const model of ['', 'bad model', 'x'.repeat(129)]) {
+    await assert.rejects(judgeOpenAIResponsesShadow({ ...request, model }));
+  }
   await assert.rejects(
-    judgeOpenAIDecisionsShadow({
+    judgeOpenAIResponsesShadow({
       ...request,
       candidates: [{ ...request.candidates[0], excerpt: 'x'.repeat(4001) }],
     }),
   );
-  for (const [count, excerptLength] of [[17, 1], [5, 4000]]) {
-    await assert.rejects(judgeOpenAIDecisionsShadow({
-      ...request,
-      candidates: Array.from({ length: count }, (_, i) => ({
-        ...request.candidates[0],
-        id: `candidate-${i}`,
-        excerpt: 'x'.repeat(excerptLength),
-      })),
-    }, optionsWithoutKey()));
+  for (const [count, excerptLength] of [
+    [17, 1],
+    [5, 4000],
+  ]) {
+    await assert.rejects(
+      judgeOpenAIResponsesShadow(
+        {
+          ...request,
+          candidates: Array.from({ length: count }, (_, i) => ({
+            ...request.candidates[0],
+            id: `candidate-${i}`,
+            excerpt: 'x'.repeat(excerptLength),
+          })),
+        },
+        optionsWithoutKey(),
+      ),
+    );
   }
 });
-test('Decisions: only direct OpenAI environment lookup, never TypeSafe even when configured', async () => {
+test('Responses: only direct OpenAI environment lookup, never TypeSafe even when configured', async () => {
   const originalEnv = process.env;
   let openaiLookups = 0;
   let typesafeLookups = 0;
@@ -444,13 +481,13 @@ test('Decisions: only direct OpenAI environment lookup, never TypeSafe even when
         throw Error('No OpenAI key');
       },
     };
-    const offline = await judgeOpenAIDecisionsShadow(
+    const offline = await judgeOpenAIResponsesShadow(
       { ...request, provider: 'none' },
       options,
     );
     assert.equal(offline.attemptedRequests, 0);
     assert.equal(openaiLookups, 0);
-    const missing = await judgeOpenAIDecisionsShadow(request, options);
+    const missing = await judgeOpenAIResponsesShadow(request, options);
     assert.equal(missing.attemptedRequests, 0);
     assert(missing.judgments.every((j) => j.gap === 'missing-key'));
     assert.equal(openaiLookups, 1);
@@ -460,10 +497,10 @@ test('Decisions: only direct OpenAI environment lookup, never TypeSafe even when
     process.env = originalEnv;
   }
 });
-test('Decisions: revocation during key access prevents the first POST', async () => {
+test('Responses: revocation during key access prevents the first POST', async () => {
   const { writeFileSync } = await import('node:fs');
   let posts = 0;
-  const result = await judgeOpenAIDecisionsShadow(request, {
+  const result = await judgeOpenAIResponsesShadow(request, {
     currentSharingGuard: allowedGuard,
     get apiKey() {
       writeFileSync(

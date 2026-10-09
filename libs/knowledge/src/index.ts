@@ -48,5 +48,5 @@ export * from './lib/archive-source-cycle.js';
 export * from './lib/archive-source-lifecycle.js';
 export * from './lib/archive-recovery-dependency-plan.js';
 
-export * from './lib/openai-decisions.js';
-export * from './lib/openai-decisions-trial.js';
+export * from './lib/openai-responses.js';
+export * from './lib/openai-responses-trial.js';

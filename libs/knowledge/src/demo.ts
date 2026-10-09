@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { readJsonWithBytes } from './lib/durable.js';
 import {
-  runOpenAIDecisionsTrial,
-  type OpenAIDecisionsTrialInput,
-} from './lib/openai-decisions-trial.js';
+  runOpenAIResponsesTrial,
+  type OpenAIResponsesTrialInput,
+} from './lib/openai-responses-trial.js';
 import assert from 'node:assert/strict';
 import { lstat, readFile, realpath, writeFile } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
@@ -74,7 +74,7 @@ const help = `Knowledge demo (explicit local files; no model or semantic approva
   pnpm nx run knowledge:demo -- journey-intake --input /absolute/intake-plan.json
   pnpm nx run knowledge:demo -- journey-search --input /absolute/search-plan.json
   pnpm nx run knowledge:demo -- journey-query --input /absolute/query.json
-  pnpm nx run knowledge:demo -- journey-decisions-trial --input /absolute/trial.json
+  pnpm nx run knowledge:demo -- journey-responses-trial --input /absolute/trial.json
   pnpm nx run knowledge:demo -- journey-jobs-create --input /absolute/jobs-plan.json
   pnpm nx run knowledge:demo -- journey-jobs-tick --spec /absolute/archive-job-spec-HASH.json
   pnpm nx run knowledge:demo -- journey-gate --input /absolute/sealed-questions.json --sha256 QUESTION_SET_SHA256
@@ -133,11 +133,11 @@ async function main(): Promise<void> {
     );
     return;
   }
-  if (command === 'journey-decisions-trial') {
+  if (command === 'journey-responses-trial') {
     const input = (await readJsonWithBytes(arg('--input'), 65536))
-      .value as OpenAIDecisionsTrialInput;
+      .value as OpenAIResponsesTrialInput;
     process.stdout.write(
-      JSON.stringify(await runOpenAIDecisionsTrial(input), null, 2) + '\n',
+      JSON.stringify(await runOpenAIResponsesTrial(input), null, 2) + '\n',
     );
     return;
   }

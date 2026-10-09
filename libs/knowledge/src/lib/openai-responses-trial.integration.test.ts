@@ -4,15 +4,15 @@ import { join } from 'node:path';
 import { readFile, rm } from 'node:fs/promises';
 import { actualFixture } from '../support/fixtures.js';
 import { runArchiveIntake } from './archive-journey.js';
-import { runOpenAIDecisionsTrial } from './openai-decisions-trial.js';
+import { runOpenAIResponsesTrial } from './openai-responses-trial.js';
 import { canonical, hash } from './codec.js';
 import { publishJson } from './durable.js';
 
-test('ACTUAL Registrar: BM25 verified excerpts to synthetic Decisions and immutable separate trial receipt', async () => {
+test('ACTUAL Registrar: BM25 verified excerpts to synthetic Responses and immutable separate trial receipt', async () => {
   const f = await actualFixture();
   try {
     const task = {
-      id: 'decisions-trial',
+      id: 'responses-trial',
       directory: join(f.base, 'task'),
       authorityRef: 'synthetic-only',
     };
@@ -23,7 +23,7 @@ test('ACTUAL Registrar: BM25 verified excerpts to synthetic Decisions and immuta
           task,
           source: f.source,
           readScope: 'source-root',
-          requestKey: 'decisions-synthetic',
+          requestKey: 'responses-synthetic',
           transport: {
             python: f.config.python,
             registrarSource: f.config.registrarSource,
@@ -40,31 +40,40 @@ test('ACTUAL Registrar: BM25 verified excerpts to synthetic Decisions and immuta
       sourceIds: [f.source.id],
       topK: 2,
       discoveryMode: 'bm25' as const,
-      provider: 'openai-decisions' as const,
+      provider: 'openai-responses' as const,
+      model: 'gpt-6-astra',
       hostedTextApproved: true,
     };
     let calls = 0;
-    const result = await runOpenAIDecisionsTrial(input, {
+    const result = await runOpenAIResponsesTrial(input, {
       apiKey: 'synthetic',
       fetcher: async (url, init) => {
         calls++;
-        assert.equal(url, 'https://api.openai.com/v1/decisions');
+        assert.equal(url, 'https://api.openai.com/v1/responses');
         const sent = JSON.parse(String(init?.body));
-        assert(JSON.parse(sent.input).candidate.excerpt.includes('Proposal'));
+        assert.equal(sent.model, 'gpt-6-astra');
+        assert.equal(sent.text.format.type, 'json_schema');
+        assert(
+          JSON.parse(sent.input[1].content[0].text).candidate.excerpt.includes(
+            'Proposal',
+          ),
+        );
         return Response.json({
-          model: 'gpt-6-luna',
-          answers: [
-            { type: 'predicate', name: 'relevance', probability: 0.9 },
+          model: 'gpt-6-astra-2026-10-01',
+          status: 'completed',
+          output: [
             {
-              type: 'choice',
-              name: 'support',
-              choice: 'unknown',
-              probabilities: [
-                { value: 'supported', probability: 0.1 },
-                { value: 'contradicted', probability: 0.1 },
-                { value: 'unknown', probability: 0.8 },
+              type: 'message',
+              content: [
+                {
+                  type: 'output_text',
+                  text: JSON.stringify({
+                    relevance: 0.9,
+                    support: 'unknown',
+                    confidence: 0.8,
+                  }),
+                },
               ],
-              confidence: 0.8,
             },
           ],
           usage: { input_tokens: 42, output_tokens: 0, total_tokens: 42 },
@@ -86,13 +95,18 @@ test('ACTUAL Registrar: BM25 verified excerpts to synthetic Decisions and immuta
     const checkpointBytes = await readFile(
       result.report.retrievalCheckpointPath!,
     );
-    assert.equal(result.report.retrievalCheckpointSha256, hash(checkpointBytes));
+    assert.equal(
+      result.report.retrievalCheckpointSha256,
+      hash(checkpointBytes),
+    );
     const checkpoint = JSON.parse(checkpointBytes.toString('utf8'));
     const orderedEvidence = base.query.ranked.map(
       (rank: { sourceId: string; path: string; sha256: string }) =>
-        checkpoint.evidence.find((e: any) =>
-          e.document.source.id === rank.sourceId &&
-          e.document.path === rank.path && e.sha256 === rank.sha256,
+        checkpoint.evidence.find(
+          (e: any) =>
+            e.document.source.id === rank.sourceId &&
+            e.document.path === rank.path &&
+            e.sha256 === rank.sha256,
         ),
     );
     assert.deepEqual(
@@ -106,7 +120,8 @@ test('ACTUAL Registrar: BM25 verified excerpts to synthetic Decisions and immuta
     for (const [i, judgment] of result.report.result.judgments.entries()) {
       const e = orderedEvidence[i];
       assert.deepEqual(judgment.evidenceIds, [e.id]);
-      assert.equal(judgment.evidenceSha256,
+      assert.equal(
+        judgment.evidenceSha256,
         hash(canonical({ evidenceIds: [e.id], excerpt: e.excerpt })),
       );
       assert.equal(
@@ -119,14 +134,14 @@ test('ACTUAL Registrar: BM25 verified excerpts to synthetic Decisions and immuta
       hash(await readFile(result.report.baseQueryReportPath)),
     );
     await assert.rejects(publishJson(result.reportPath, { changed: true }));
-    const noKey = await runOpenAIDecisionsTrial(input, { apiKey: '' });
+    const noKey = await runOpenAIResponsesTrial(input, { apiKey: '' });
     assert(noKey.report.gaps.includes('missing-key'));
     assert.equal(noKey.report.result.attemptedRequests, 0);
     for (const overrides of [
       { provider: 'none' as const },
       { hostedTextApproved: false },
     ]) {
-      const offline = await runOpenAIDecisionsTrial(
+      const offline = await runOpenAIResponsesTrial(
         { ...input, ...overrides },
         {
           get apiKey(): string {
@@ -146,7 +161,7 @@ test('ACTUAL Registrar: BM25 verified excerpts to synthetic Decisions and immuta
       `archive-handoff-${hash(canonical(handoff))}.json`,
     );
     await publishJson(localPath, handoff);
-    const local = await runOpenAIDecisionsTrial(
+    const local = await runOpenAIResponsesTrial(
       { ...input, handoffPath: localPath },
       {
         get apiKey(): string {
@@ -156,10 +171,10 @@ test('ACTUAL Registrar: BM25 verified excerpts to synthetic Decisions and immuta
     );
     assert(local.report.gaps.includes('local-only'));
     await assert.rejects(
-      runOpenAIDecisionsTrial({ ...input, provider: 'jev' as never }),
+      runOpenAIResponsesTrial({ ...input, provider: 'jev' as never }),
     );
     await assert.rejects(
-      runOpenAIDecisionsTrial({ ...input, extra: true } as typeof input),
+      runOpenAIResponsesTrial({ ...input, extra: true } as typeof input),
     );
   } finally {
     await rm(f.base, { recursive: true, force: true });
