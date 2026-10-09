@@ -149,6 +149,14 @@ resolves `bun` through PATH. A changed digest, relative executable or path alias
 refuses effects. Older frozen launchers/requests need a new binding to adopt
 this source contract.
 
+Bridge admission and stage/closeout readback also require the current
+`process.execPath` to be canonical and to match that protected path and digest.
+Owned-operation subprocesses invoke that same absolute `process.execPath`;
+only their argv differs for Bun and Node. A request that pins a different
+runtime cannot grant work to the executing bridge, and omitted runtime pins
+are refused before effects. The Bun argv branch is covered by a synthetic
+PATH-shadow regression; this does not establish another live Bun model run.
+
 `TaskRuntime.dispatchReviewedLocalCandidate` records the protected inputs as
 dispatch intent and calls the managed harness admission port. Generic dispatch
 refuses this entrypoint. The managed dispatch reports whether this caller owns

@@ -51,6 +51,74 @@ import {
 export const digest = (bytes) =>
   createHash('sha256').update(bytes).digest('hex');
 export const objectDigest = (value) => digest(canonical(value));
+/** The executing bridge is the subprocess runtime authority. Bun only changes
+ * argv; PATH never selects another runtime. Call after runtime admission. */
+export function managedOperationCommand(
+  tool,
+  requestPath,
+  resultPath,
+  isBun = Boolean(process.versions.bun),
+) {
+  assert(
+    isAbsolute(process.execPath),
+    'Bridge process runtime must be absolute.',
+  );
+  return {
+    program: process.execPath,
+    args: isBun
+      ? [tool, requestPath, resultPath]
+      : [
+          '--import',
+          '@swc-node/register/esm-register',
+          tool,
+          requestPath,
+          resultPath,
+        ],
+  };
+}
+export async function assertManagedBridgeRuntime(spec) {
+  const runtime = spec.bridgeRuntime;
+  assert(
+    runtime && typeof runtime === 'object',
+    'Pinned bridge runtime required.',
+  );
+  assert(isAbsolute(runtime.executable));
+  assert.match(runtime.sha256, /^[a-f0-9]{64}$/);
+  assert.equal(
+    await realpath(runtime.executable),
+    runtime.executable,
+    'Bridge runtime alias refused.',
+  );
+  assert(
+    !inside(spec.repositoryRoot, runtime.executable),
+    'Bridge runtime must be protected outside candidate.',
+  );
+  assert(
+    spec.protectedInputs.some(
+      (ref) => ref.path === runtime.executable && ref.sha256 === runtime.sha256,
+    ),
+    'Bridge runtime protected input changed.',
+  );
+  assert(
+    isAbsolute(process.execPath),
+    'Bridge process runtime must be absolute.',
+  );
+  assert.equal(
+    await realpath(process.execPath),
+    process.execPath,
+    'Bridge process runtime alias refused.',
+  );
+  assert.equal(
+    process.execPath,
+    runtime.executable,
+    'Executing bridge runtime differs from the pinned request.',
+  );
+  assert.equal(
+    digest(await readFile(process.execPath)),
+    runtime.sha256,
+    'Executing bridge runtime digest changed.',
+  );
+}
 // Numeric milliseconds, matched to the pinned native YAML by source regression.
 export const NATIVE_STAGE_TIMEOUTS_MS = Object.freeze({
   investigate: 1800000,
@@ -181,27 +249,7 @@ async function checkRefs(refs) {
   }
 }
 async function checkProtectedInputs(spec) {
-  if (spec.bridgeRuntime !== undefined) {
-    const runtime = spec.bridgeRuntime;
-    assert(isAbsolute(runtime.executable));
-    assert.match(runtime.sha256, /^[a-f0-9]{64}$/);
-    assert.equal(
-      await realpath(runtime.executable),
-      runtime.executable,
-      'Bridge runtime alias refused.',
-    );
-    assert(
-      !inside(spec.repositoryRoot, runtime.executable),
-      'Bridge runtime must be protected outside candidate.',
-    );
-    assert(
-      spec.protectedInputs.some(
-        (ref) =>
-          ref.path === runtime.executable && ref.sha256 === runtime.sha256,
-      ),
-      'Bridge runtime protected input changed.',
-    );
-  }
+  await assertManagedBridgeRuntime(spec);
   const configRef = spec.protectedInputs.find(
     (ref) => ref.path === spec.modelAdmission.configPath,
   );
@@ -937,21 +985,12 @@ async function worker(
             import.meta.url,
           ),
         );
-        const node = process.versions.bun ? 'bun' : process.execPath;
-        const args = process.versions.bun
-          ? [tool, requestPath, resultPath]
-          : [
-              '--import',
-              '@swc-node/register/esm-register',
-              tool,
-              requestPath,
-              resultPath,
-            ];
+        await assertManagedBridgeRuntime(spec);
+        const command = managedOperationCommand(tool, requestPath, resultPath);
         await control.run(
           `${control.options.authorityId}-worker`,
           {
-            program: node,
-            args,
+            ...command,
             cwd: fileURLToPath(new URL('../../../', import.meta.url)),
             timeoutMs: spec.timeoutMs + (stage === 'build' ? 900000 : 180000),
           },

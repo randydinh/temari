@@ -22,6 +22,8 @@ import {
   objectDigest,
   NATIVE_STAGE_TIMEOUTS_MS,
   nativeStageBudgetCoverage,
+  managedOperationCommand,
+  assertManagedBridgeRuntime,
 } from '../packages/workflow-runtime/host/reviewed-local-candidate.mjs';
 import {
   REVIEWED_LOCAL_CANDIDATE_POLICY,
@@ -172,6 +174,13 @@ let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{
       sha256: digest(await readFile(path)),
     })),
   );
+  const bridgeRuntimeExecutable = await realpath(process.execPath);
+  const bridgeRuntimeSha256 = digest(await readFile(bridgeRuntimeExecutable));
+  if (!protectedInputs.some((ref) => ref.path === bridgeRuntimeExecutable))
+    protectedInputs.push({
+      path: bridgeRuntimeExecutable,
+      sha256: bridgeRuntimeSha256,
+    });
   const assignment = (id, role) => ({
     id,
     role,
@@ -189,6 +198,10 @@ let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{
   const spec = {
     schema: 1,
     profile: 'reviewed-local-candidate-v1',
+    bridgeRuntime: {
+      executable: bridgeRuntimeExecutable,
+      sha256: bridgeRuntimeSha256,
+    },
     runId: 'fixture-managed',
     taskId: 'fixture-task',
     taskStoreRoot: join(root, 'managed-tasks'),
@@ -342,17 +355,115 @@ let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{
   };
 }
 const stages = ['investigate', 'plan', 'build', 'review', 'verify', 'deliver'];
-test('new launcher request retains the bridge runtime as a protected canonical input',async t=>{
-  const f=await fixture(t);
-  f.spec.bridgeRuntime={executable:f.spec.executable,sha256:f.spec.providerSelection.executableSha256};
-  const input={...f.input,expectedSha256:await f.save()};
+test('Bun and Node operation argument shapes always invoke the admitted current process despite PATH shadowing', async (t) => {
+  const root = await realpath(
+    await mkdtemp(join(tmpdir(), 'managed-operation-runtime-')),
+  );
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const marker = join(root, 'owned-invocations'),
+    shadowMarker = join(root, 'shadow-invocations'),
+    tool = join(root, 'owned-tool.mjs'),
+    shadow = join(root, 'shadow');
+  const executable = process.execPath,
+    sha256 = digest(await readFile(executable));
+  const spec = {
+    repositoryRoot: join(root, 'candidate'),
+    bridgeRuntime: { executable, sha256 },
+    protectedInputs: [{ path: executable, sha256 }],
+  };
+  await assertManagedBridgeRuntime(spec);
+  await mkdir(shadow);
+  await writeFile(
+    tool,
+    `import fs from 'node:fs';fs.appendFileSync(${JSON.stringify(marker)},JSON.stringify(process.argv.slice(2))+'\\n');\n`,
+  );
+  await writeFile(
+    join(shadow, 'bun'),
+    `#!${executable}\nrequire('node:fs').writeFileSync(${JSON.stringify(shadowMarker)},'spoofed');\n`,
+    { mode: 0o700 },
+  );
+  const env = { ...process.env, PATH: shadow + ':' + process.env.PATH };
+  for (const isBun of [true, false]) {
+    const command = managedOperationCommand(
+      tool,
+      'fixture-request',
+      'fixture-result',
+      isBun,
+    );
+    assert.equal(command.program, process.execPath);
+    assert.deepEqual(
+      command.args,
+      isBun
+        ? [tool, 'fixture-request', 'fixture-result']
+        : [
+            '--import',
+            '@swc-node/register/esm-register',
+            tool,
+            'fixture-request',
+            'fixture-result',
+          ],
+    );
+    execFileSync(command.program, command.args, {
+      env,
+      timeout: 10000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  }
+  assert.deepEqual(
+    (await readFile(marker, 'utf8')).trim().split('\n').map(JSON.parse),
+    [
+      ['fixture-request', 'fixture-result'],
+      ['fixture-request', 'fixture-result'],
+    ],
+  );
+  await assert.rejects(
+    readFile(shadowMarker),
+    (error) => error.code === 'ENOENT',
+  );
+  await assert.rejects(
+    assertManagedBridgeRuntime({ ...spec, bridgeRuntime: undefined }),
+    /Pinned bridge runtime required/,
+  );
+  const badDigest = {
+    ...spec,
+    bridgeRuntime: { executable, sha256: '0'.repeat(64) },
+    protectedInputs: [{ path: executable, sha256: '0'.repeat(64) }],
+  };
+  await assert.rejects(
+    assertManagedBridgeRuntime(badDigest),
+    /Executing bridge runtime digest changed/,
+  );
+});
+test('a different protected runtime cannot admit stages executed by the current process', async (t) => {
+  const f = await fixture(t);
+  f.spec.bridgeRuntime = {
+    executable: f.spec.executable,
+    sha256: f.spec.providerSelection.executableSha256,
+  };
+  await assert.rejects(
+    admitReviewedLocalCandidate({ ...f.input, expectedSha256: await f.save() }),
+    /Executing bridge runtime differs/,
+  );
+  await assert.rejects(readFile(f.counter), (error) => error.code === 'ENOENT');
+});
+test('new launcher request retains the bridge runtime as a protected canonical input', async (t) => {
+  const f = await fixture(t);
+  const input = { ...f.input, expectedSha256: await f.save() };
   await admitReviewedLocalCandidate(input);
-  f.spec.bridgeRuntime.sha256='0'.repeat(64);
-  await assert.rejects(admitReviewedLocalCandidate({...input,expectedSha256:await f.save()}),/Bridge runtime protected input changed/);
-  f.spec.bridgeRuntime.sha256=f.spec.providerSelection.executableSha256;
-  f.spec.protectedInputs=f.spec.protectedInputs.filter(ref=>ref.path!==f.spec.executable);
-  await assert.rejects(admitReviewedLocalCandidate({...input,expectedSha256:await f.save()}),/Bridge runtime protected input changed/);
-  await assert.rejects(readFile(f.counter),error=>error.code==='ENOENT');
+  f.spec.bridgeRuntime.sha256 = '0'.repeat(64);
+  await assert.rejects(
+    admitReviewedLocalCandidate({ ...input, expectedSha256: await f.save() }),
+    /Bridge runtime protected input changed/,
+  );
+  f.spec.bridgeRuntime.sha256 = digest(await readFile(process.execPath));
+  f.spec.protectedInputs = f.spec.protectedInputs.filter(
+    (ref) => ref.path !== f.spec.bridgeRuntime.executable,
+  );
+  await assert.rejects(
+    admitReviewedLocalCandidate({ ...input, expectedSha256: await f.save() }),
+    /Bridge runtime protected input changed/,
+  );
+  await assert.rejects(readFile(f.counter), (error) => error.code === 'ENOENT');
 });
 test('native source nodes use the protected absolute bridge runtime and refuse runtime drift',async t=>{
   const {parse}=createRequire(import.meta.resolve('nx/package.json'))('yaml');
