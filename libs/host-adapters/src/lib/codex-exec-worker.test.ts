@@ -10,6 +10,8 @@ import {
   open,
   stat,
   rm,
+  mkdir,
+  realpath,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -17,6 +19,7 @@ import {
   runCodexExecWorker,
   runCodexExecWriteWorker,
   resolveCodexExecutable,
+  observeCodexModelSelection,
 } from './codex-exec-worker.js';
 import type { WorkerAssignment } from '@temari/contracts';
 
@@ -34,6 +37,149 @@ const assignment: WorkerAssignment = {
     forbiddenActions: ['Do not write files'],
   },
 };
+
+async function tomlParser(): Promise<string> {
+  for (const command of ['python3', 'python3.11', 'python3.12']) {
+    try {
+      return await realpath(
+        execFileSync(
+          command,
+          ['-c', 'import sys,tomllib;print(sys.executable)'],
+          { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+        ).trim(),
+      );
+    } catch {}
+  }
+  throw new Error(
+    'A Python TOML parser is required for model admission tests.',
+  );
+}
+
+const sha256 = (bytes: Uint8Array) =>
+  createHash('sha256').update(bytes).digest('hex');
+
+test('model admission matches only stable or alpha CLI releases to release-format catalogs', async (t) => {
+  const root = await realpath(
+    await mkdtemp(join(tmpdir(), 'temari-catalog-version-')),
+  );
+  const previousCodexHome = process.env.CODEX_HOME;
+  const configHome = join(root, 'user-config');
+  await mkdir(configHome);
+  process.env.CODEX_HOME = configHome;
+  t.after(async () => {
+    if (previousCodexHome === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = previousCodexHome;
+    await rm(root, { recursive: true, force: true });
+  });
+  const configPath = join(configHome, 'config.toml');
+  const catalogPath = join(root, 'catalog.json');
+  await writeFile(
+    configPath,
+    'model = "fixture-model"\nmodel_reasoning_effort = "high"\n',
+  );
+  let parserExecutable: string | undefined;
+  for (const command of ['python3', 'python3.11', 'python3.12']) {
+    try {
+      parserExecutable = await realpath(
+        execFileSync(
+          command,
+          ['-c', 'import sys,tomllib;print(sys.executable)'],
+          { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+        ).trim(),
+      );
+      break;
+    } catch {}
+  }
+  assert(
+    parserExecutable,
+    'A Python TOML parser is required for model admission tests.',
+  );
+  const sha = (bytes: Uint8Array) =>
+    createHash('sha256').update(bytes).digest('hex');
+  const cases = [
+    ['0.162.0', '0.162.0', true],
+    ['0.154.0', '0.154.0', true],
+    ['0.162.0-alpha.2', '0.162.0', true],
+    ['0.162.0-alpha.0', '0.162.0', true],
+    ['0.162.0-alpha.12', '0.162.0', true],
+    ['0.162.0-alpha.2', '0.154.0', false],
+    ['0.162.0-alpha.2', '0.162.1', false],
+    ['0.162.0-alpha.2', '0.163.0', false],
+    ['0.162.0-alpha.2', '1.162.0', false],
+    ['0.162.0', '0.161.0', false],
+    ['0.162.0-alpha.2', '0.162.0-alpha.2', false],
+    ['0.162.0-beta.2', '0.162.0', false],
+    ['0.162.0-rc.2', '0.162.0', false],
+    ['0.162.0-alpha', '0.162.0', false],
+    ['0.162.0-alpha.02', '0.162.0', false],
+    ['0.162.0-alpha.2.extra', '0.162.0', false],
+    ['0.162.0+build.2', '0.162.0', false],
+    ['0.162.0-alpha.2+build', '0.162.0', false],
+    ['00.162.0', '00.162.0', false],
+    ['0.162', '0.162', false],
+    ['fixture', 'fixture', false],
+    ['0.162.0 ', '0.162.0', false],
+    ['0.162.0\n', '0.162.0', false],
+    ['0.162.0-alpha.2\n', '0.162.0', false],
+    ['0.162.0', '0.162.0\n', false],
+    ['0.162.0', 'v0.162.0', false],
+    ['0.162.0', null, false],
+    ['0.162.0', 162, false],
+  ] as const;
+  for (const [cliVersion, catalogVersion, accepted] of cases) {
+    await t.test(
+      `${cliVersion} / ${catalogVersion}: ${accepted ? 'admit' : 'refuse'}`,
+      async () => {
+        await writeFile(
+          catalogPath,
+          JSON.stringify({
+            client_version: catalogVersion,
+            fetched_at: new Date().toISOString(),
+            models: [
+              {
+                slug: 'fixture-model',
+                supported_reasoning_levels: [{ effort: 'high' }],
+              },
+            ],
+          }),
+        );
+        const selection = {
+          provider: 'codex' as const,
+          executableSha256: 'a'.repeat(64),
+          executableVersion: `codex-cli ${cliVersion}`,
+          model: 'fixture-model',
+          reasoning: 'high',
+        };
+        const input = {
+          configPath,
+          configSha256: sha(await readFile(configPath)),
+          catalogPath,
+          catalogSha256: sha(await readFile(catalogPath)),
+          parserExecutable,
+          parserSha256: sha(await readFile(parserExecutable)),
+        };
+        if (accepted) {
+          const result = await observeCodexModelSelection(
+            selection,
+            input,
+            root,
+          );
+          assert.equal(result.catalog.clientVersion, catalogVersion);
+          assert.equal(
+            result.catalog.executableVersion,
+            selection.executableVersion,
+          );
+          assert.deepEqual(result.observed, { model: null, reasoning: null });
+        } else {
+          await assert.rejects(
+            () => observeCodexModelSelection(selection, input, root),
+            /different CLI version|Unsupported CLI\/catalog version format/,
+          );
+        }
+      },
+    );
+  }
+});
 
 test('uses argv and stdin without shell interpolation and validates the final response', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-worker-'));
@@ -72,6 +218,200 @@ process.stdin.on('end', () => {
     true,
   );
   await assert.rejects(() => readFile(join(root, 'injected')));
+});
+
+test('managed execution ignores live user config and passes the exact admitted selection', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-managed-worker-'));
+  const configHome = join(root, 'codex-home');
+  await mkdir(configHome);
+  await writeFile(
+    join(configHome, 'config.toml'),
+    'model = "unrelated-live-model"\nmodel_reasoning_effort = "low"\n',
+  );
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = configHome;
+  t.after(async () => {
+    if (previousCodexHome === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = previousCodexHome;
+    await rm(root, { recursive: true, force: true });
+  });
+  const executable = join(root, 'fake-codex');
+  await writeFile(
+    executable,
+    `#!${process.execPath}
+const fs=require('node:fs');const a=process.argv.slice(2);
+if(a[0]==='--version'){console.log('codex-cli 0.154.0');process.exit(0);}
+const expected=['exec','--ignore-user-config','--model','admitted-model','--config','model_provider="openai"','--config','model_reasoning_effort="high"'];
+if(JSON.stringify(a.slice(0,expected.length))!==JSON.stringify(expected))process.exit(12);
+if(process.env.CODEX_HOME!==${JSON.stringify(configHome)})process.exit(13);
+let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{console.log(JSON.stringify({type:'thread.started',thread_id:'managed-fixture-thread'}));process.stdout.write('x'.repeat(2*1024*1024));fs.writeFileSync(a[a.indexOf('--output-last-message')+1],JSON.stringify({status:'PASS',summary:'explicit selection'}));});`,
+    { mode: 0o700 },
+  );
+  const selection = {
+    provider: 'codex' as const,
+    executableSha256: sha256(await readFile(executable)),
+    executableVersion: 'codex-cli 0.154.0',
+    model: 'admitted-model',
+    reasoning: 'high',
+  };
+  const result = await runCodexExecWorker(assignment, {
+    executable,
+    workspaceRoot: root,
+    evidenceDirectory: join(root, 'evidence'),
+    timeoutMs: 1000,
+    providerSelection: selection,
+    finalResponseLimitBytes: 1024,
+    skipGitRepoCheck: true,
+  });
+  assert.equal(result.status, 'PASS');
+  const evidence = JSON.parse(
+    await readFile(join(root, 'evidence', 'process.json'), 'utf8'),
+  );
+  assert.equal(evidence.nativeThreadId, 'managed-fixture-thread');
+  assert.equal(evidence.captureComplete, true);
+  assert.equal(evidence.outputLimitExceeded, false);
+  assert(evidence.stdoutWrittenBytes > 2 * 1024 * 1024);
+  assert.deepEqual(evidence.argv.slice(0, 8), [
+    'exec',
+    '--ignore-user-config',
+    '--model',
+    'admitted-model',
+    '--config',
+    'model_provider="openai"',
+    '--config',
+    'model_reasoning_effort="high"',
+  ]);
+});
+
+test('raw config drift is diagnostic while execution-critical drift is refused', async (t) => {
+  const root = await realpath(
+    await mkdtemp(join(tmpdir(), 'temari-config-projection-')),
+  );
+  const configHome = join(root, 'codex-home');
+  await mkdir(configHome);
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = configHome;
+  t.after(async () => {
+    if (previousCodexHome === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = previousCodexHome;
+    await rm(root, { recursive: true, force: true });
+  });
+  const configPath = join(configHome, 'config.toml');
+  const catalogPath = join(root, 'catalog.json');
+  const parserExecutable = await tomlParser();
+  const initial =
+    'model = "fixture-model"\nmodel_reasoning_effort = "high"\nnotify = ["initial"]\n';
+  await writeFile(configPath, initial);
+  await writeFile(
+    catalogPath,
+    JSON.stringify({
+      client_version: '0.154.0',
+      fetched_at: new Date().toISOString(),
+      models: [
+        {
+          slug: 'fixture-model',
+          supported_reasoning_levels: [{ effort: 'high' }],
+        },
+      ],
+    }),
+  );
+  const selection = {
+    provider: 'codex' as const,
+    executableSha256: 'a'.repeat(64),
+    executableVersion: 'codex-cli 0.154.0',
+    model: 'fixture-model',
+    reasoning: 'high',
+  };
+  const admission = {
+    configPath,
+    configSha256: sha256(Buffer.from(initial)),
+    catalogPath,
+    catalogSha256: sha256(await readFile(catalogPath)),
+    parserExecutable,
+    parserSha256: sha256(await readFile(parserExecutable)),
+  };
+  await writeFile(
+    configPath,
+    'model = "fixture-model"\nmodel_reasoning_effort = "high"\nnotify = ["changed"]\n',
+  );
+  const diagnostic = await observeCodexModelSelection(
+    selection,
+    admission,
+    root,
+  );
+  assert.equal(diagnostic.config.initialSha256, admission.configSha256);
+  assert.equal(diagnostic.config.drifted, true);
+  assert.notEqual(diagnostic.config.currentSha256, admission.configSha256);
+  assert.equal(diagnostic.config.critical.model, 'fixture-model');
+
+  await writeFile(
+    configPath,
+    'model = "other-model"\nmodel_reasoning_effort = "high"\n',
+  );
+  await assert.rejects(
+    () => observeCodexModelSelection(selection, admission, root),
+    /differs from inherited user settings/,
+  );
+});
+
+test('model admission parses the exact config bytes that it hashes', async (t) => {
+  const root = await realpath(
+    await mkdtemp(join(tmpdir(), 'temari-config-bytes-')),
+  );
+  const configHome = join(root, 'codex-home');
+  await mkdir(configHome);
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = configHome;
+  t.after(async () => {
+    if (previousCodexHome === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = previousCodexHome;
+    await rm(root, { recursive: true, force: true });
+  });
+  const configPath = join(configHome, 'config.toml');
+  const initial = 'model = "fixture-model"\nmodel_reasoning_effort = "high"\n';
+  await writeFile(configPath, initial);
+  const catalogPath = join(root, 'catalog.json');
+  await writeFile(
+    catalogPath,
+    JSON.stringify({
+      client_version: '0.154.0',
+      fetched_at: new Date().toISOString(),
+      models: [
+        {
+          slug: 'fixture-model',
+          supported_reasoning_levels: [{ effort: 'high' }],
+        },
+      ],
+    }),
+  );
+  const parserExecutable = join(root, 'parser');
+  await writeFile(
+    parserExecutable,
+    `#!${process.execPath}
+const fs=require('node:fs');let input='';process.stdin.on('data',x=>input+=x);process.stdin.on('end',()=>{if(!input.includes('model = "fixture-model"'))process.exit(9);fs.writeFileSync(${JSON.stringify(configPath)},'model = "other-model"\\nmodel_reasoning_effort = "low"\\n');console.log(JSON.stringify({model:'fixture-model',model_reasoning_effort:'high',model_provider:null,profile:null,model_catalog_json:null}));});`,
+    { mode: 0o700 },
+  );
+  const result = await observeCodexModelSelection(
+    {
+      provider: 'codex',
+      executableSha256: 'a'.repeat(64),
+      executableVersion: 'codex-cli 0.154.0',
+      model: 'fixture-model',
+      reasoning: 'high',
+    },
+    {
+      configPath,
+      configSha256: sha256(Buffer.from(initial)),
+      catalogPath,
+      catalogSha256: sha256(await readFile(catalogPath)),
+      parserExecutable,
+      parserSha256: sha256(await readFile(parserExecutable)),
+    },
+    root,
+  );
+  assert.equal(result.config.currentSha256, sha256(Buffer.from(initial)));
+  assert.equal(result.config.critical.model, 'fixture-model');
+  assert.match(await readFile(configPath, 'utf8'), /other-model/);
 });
 
 test('missing executable fails before process launch', async () => {
@@ -131,6 +471,69 @@ const fs=require('node:fs'), args=process.argv.slice(2);process.stdin.resume();p
   );
   assert.equal(terminal.pid, start.pid);
   assert.equal(terminal.startedAt, start.startedAt);
+});
+
+test('read-only worker Git commands inspect the selected checkout despite inherited Git routing variables', async (t) => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'temari-read-env-')));
+  execFileSync('git', ['init', '-q', root]);
+  const executable = join(root, 'fake-codex');
+  await writeFile(
+    executable,
+    `#!${process.execPath}
+const fs=require('node:fs'),{execFileSync}=require('node:child_process'),args=process.argv.slice(2);
+process.stdin.resume();process.stdin.on('end',()=>{
+  if(args[args.indexOf('--sandbox')+1]!=='read-only')process.exit(8);
+  if(!process.env.PATH || process.env.GIT_ASKPASS!=='preserved-helper' || process.env.CODEX_HOME!==${JSON.stringify(join(root, 'codex-home'))})process.exit(9);
+  const inspected=execFileSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8'}).trim();
+  if(inspected!==${JSON.stringify(root)})process.exit(10);
+  fs.writeFileSync(args[args.indexOf('--output-last-message')+1],JSON.stringify({status:'PASS',summary:'inspected selected checkout'}));
+});
+`,
+    { mode: 0o700 },
+  );
+  const variables = {
+    GIT_DIR: join(root, 'nonexistent-git-dir'),
+    GIT_WORK_TREE: join(root, 'wrong-worktree'),
+    GIT_INDEX_FILE: join(root, 'wrong-index'),
+    GIT_CONFIG_COUNT: '1',
+    GIT_CONFIG_KEY_0: 'core.worktree',
+    GIT_CONFIG_VALUE_0: join(root, 'wrong-worktree'),
+    GIT_ASKPASS: 'preserved-helper',
+    CODEX_HOME: join(root, 'codex-home'),
+  };
+  const previous = Object.fromEntries(
+    Object.keys(variables).map((name) => [name, process.env[name]]),
+  );
+  Object.assign(process.env, variables);
+  try {
+    for (const [label, role] of [
+      ['architect', 'investigator'],
+      ['reviewer', 'reviewer'],
+    ] as const)
+      await t.test(label, async () => {
+        const result = await runCodexExecWorker(
+          { ...assignment, id: `read-${label}`, role },
+          {
+            executable,
+            workspaceRoot: root,
+            evidenceDirectory: join(root, label),
+            timeoutMs: 2000,
+          },
+        );
+        assert.equal(
+          result.status,
+          'PASS',
+          await readFile(join(root, label, 'stderr.log'), 'utf8'),
+        );
+        assert.equal(result.summary, 'inspected selected checkout');
+      });
+  } finally {
+    for (const [name, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test('write worker Git commands use its clone despite inherited Git routing variables', async () => {

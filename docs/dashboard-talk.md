@@ -15,13 +15,41 @@ inbox instead of entering the conversation you are reading.
 3. Link an existing task from that topic's workspace to include its current
    runtime status. Other workspaces have their own topics in the same surface.
 4. When Temari offers a task, review its title and goal and choose **Accept**.
-   This creates one durable, open task and links it to the topic.
-5. Open a linked task to use the existing planning, investigation, implementation
-   or verification controls. Return to Talk to continue the discussion.
+   This creates one durable task and links it to the topic. In the bounded
+   single-workspace setup described below, acceptance also starts the host's
+   only configured goal-planning policy.
+5. When the controller admits the next planning or implementation step, use the
+   single action shown on the linked task card. The topic and unfinished draft
+   stay selected while the existing task action API handles the mutation.
 
-Accepting a proposal saves a goal. The existing task workflow supplies the plan
-and execution controls. A conversational answer never accepts a run, marks work
-done, merges a change or closes a chat. Temari owns intent and routing, Poteto
+Accepting a proposal saves a goal. With schema1 Talk and controlled mode bound to
+the same canonical workspace, exactly one configured planning policy acts as the
+host-selected default. The acceptance request uses one stable task identity, and
+the controller starts only that already-configured bounded planner. If planning
+intake becomes uncertain, Talk retains the proposal as uncertain and requires an
+explicit proposal retry; controller recovery does not relaunch an uncertain model
+call. If there is no controller, the workspaces differ, or zero/multiple planning
+policies are configured, acceptance keeps the prior save-only behavior.
+
+Each linked card exposes at most one controller-admitted action: **Prepare
+implementation plan** after a validated proposal, or **Start implementation**
+after preparation. The card derives its compact phase, state and status message
+from that task's current controller projection, including blocked and
+recovery-required planning. A legacy task with no controller preparation makes
+no planner-progress claim. These actions post through the existing versioned,
+CSRF-protected task action endpoint with a fresh idempotency key. A stale response
+asks for refresh. After a lost implementation-start response, read-only refresh
+resolves uncertainty only when the task ledger contains that exact
+`ui-<requestId>` intent **and** the same task's controller has advanced from
+`PREPARED` to `STARTING`, `RUNNING`, `COMPLETE`, `FAILED`, `CANCELLED`, or
+`RECOVERY_REQUIRED`. Talk reports that observed state; the intent event alone
+does not prove the supervisor started. Without both facts, including an uncertain
+prepare-plan request, the outcome remains visibly unresolved. No uncertain
+mutation is automatically retried.
+
+A conversational answer never selects commands or routes, accepts a candidate,
+marks work done, applies source, publishes, merges, cancels, or closes a chat.
+Those boundaries remain explicit. Temari owns intent and routing, Poteto
 owns engineering method, and the runtime owns durable execution. Archon remains
 the replaceable native harness.
 
@@ -59,7 +87,10 @@ Without a transport, Talk supports topic organization, task links and attention;
 the composer explains that a model must be configured. This mode does not
 initialize Archon or read model credentials. Add `--control-config` and the
 native options from [the dashboard guide](task-dashboard.md) to enable the
-existing execution controls in the same service.
+existing execution controls in the same service. The proposal-to-planner bridge
+is enabled only for schema1 when that control config resolves to the same
+workspace and contains exactly one planning policy. Schema2 registries always
+report `canStartTask: false`; their proposal acceptance remains save-only.
 
 ### Several workspaces in one surface
 

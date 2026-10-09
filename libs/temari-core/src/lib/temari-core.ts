@@ -624,3 +624,30 @@ export function verificationMaintenanceDecision(
     nextDueAt: new Date(nextDueMs).toISOString(),
   };
 }
+
+/** Explicit local engineering operation; never a fallback for feature-v1. */
+export const REVIEWED_LOCAL_CANDIDATE_POLICY = Object.freeze({
+  schema: 1,
+  profile: 'reviewed-local-candidate-v1',
+  owner: 'temari',
+  method: 'poteto-mode',
+  harness: 'archon',
+  provider: 'codex',
+  builders: 1,
+  architect: 'read-only',
+  reviewer: 'independent-exact-candidate',
+  protectedChecks: 'required',
+  publication: 'denied',
+  maxAttempts: 1,
+} as const);
+
+export function createReviewedLocalCandidatePlan(): ExecutionPlan {
+  return createExecutionPlan({
+    workType: 'feature',
+    delegation: 'required',
+    review: 'independent',
+    evidence: 'revision-bound',
+    delivery: 'local',
+    parallelism: { maxConcurrency: 1 },
+  });
+}
