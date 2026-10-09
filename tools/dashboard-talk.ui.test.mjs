@@ -647,3 +647,22 @@ test('binding-scoped server capabilities govern send, link, proposal and attenti
   ui.submit(); await flush(); assert.equal(posts(ui).length, 0);
   assert.equal(ui.get('talk-new-topic').disabled, false, 'A host-admitted new-topic choice is independent of this child capability refusal.');
 });
+
+
+test('managed finalization and result recovery cards never render candidate ready', async () => {
+  for (const [state, message] of [
+    ['RUNNING', 'Native work succeeded. Exact result verification is still in progress; coordinator review follows verified completion.'],
+    ['RECOVERY_REQUIRED', 'The retained managed result could not be verified. Use host recovery to inspect the exact completion and evidence.'],
+  ]) {
+    const task = {taskId:'task-one',title:'Managed task',status:'NEEDS_REVIEW',version:8,currentRunId:'run-one',goal:'Implement it',nextAction:null,available:true,omittedFields:[],controller:{phase:'implementation',state,message,action:null}};
+    const ui = await harness(async ({path}) => path === '/api/topics'
+      ? response(listing([summary('topic-a')]))
+      : response(detail('topic-a',[],{linkedTasks:[task]})));
+    await ui.activate();
+    const text = ui.get('talk-linked-tasks').textContent;
+    assert.equal(text.includes(message), true);
+    assert.doesNotMatch(text, /Candidate ready|Implementation.*complete/i);
+    assert.equal(descendants(ui.get('talk-linked-tasks')).some(element=>element.dataset.taskAction),false);
+    assert.equal(ui.requests.some(request=>request.method==='POST'),false);
+  }
+});

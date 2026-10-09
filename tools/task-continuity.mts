@@ -519,6 +519,7 @@ export async function runTaskCommand(
     });
     const managedObserver = controller && dashboardConfig?.managedCandidate && selection
       ? createDashboardManagedObserver(controller) : undefined;
+    if (managedObserver) controller!.setManagedObserverHealthProvider(managedObserver.health);
     managedObserver?.start();
     if (scheduler)
       clock = setInterval(() => {

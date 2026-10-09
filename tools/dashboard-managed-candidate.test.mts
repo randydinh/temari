@@ -1178,3 +1178,168 @@ test('automatic observer does not finalize while launch readiness is in flight',
   assert.equal((await f.runtime.snapshot(task.taskId)).status, 'NEEDS_REVIEW');
   assert.equal(f.launches, 1);
 });
+
+test('manual observe is status-only during in-flight readiness', async (t) => {
+  const f = await fixture(t),
+    task = await f.prepare();
+  let entered!: () => void, release!: () => void;
+  const readinessEntered = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const readinessRelease = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const readiness = f.host.readiness;
+  f.host.readiness = async (ref, options) => {
+    entered();
+    await readinessRelease;
+    await readiness(ref, options);
+  };
+  const launching = f.controller.action(task.taskId, {
+    action: 'implementation-start',
+    requestId: 'start',
+    expectedVersion: task.version,
+  });
+  await readinessEntered;
+  await f.publish();
+  const before = await f.runtime.snapshot(task.taskId);
+  const observed = await f.controller.action(task.taskId, {
+    action: 'observe',
+    requestId: 'manual-during-readiness',
+    expectedVersion: before.version,
+  });
+  assert.equal(observed.runs[0]!.nativeSnapshot!.status, 'SUCCEEDED');
+  assert.equal(
+    observed.handoff?.contextRefs.some(
+      (ref) => ref.kind === 'reviewed-local-candidate-completion',
+    ) ?? false,
+    false,
+  );
+  const projection = await f.bridge.project({
+    taskId: task.taskId,
+    expectedVersion: observed.version,
+  });
+  assert.equal(projection!.state, 'RECOVERY_REQUIRED');
+  assert.match(projection!.message!, /readiness is unresolved/);
+  release();
+  await assert.rejects(launching, /Task version conflict/);
+});
+
+test('manual observe cannot bypass readiness refusal by clearing generic blocker', async (t) => {
+  const f = await fixture(t),
+    task = await f.prepare();
+  f.timeout();
+  await assert.rejects(
+    f.controller.action(task.taskId, {
+      action: 'implementation-start',
+      requestId: 'start',
+      expectedVersion: task.version,
+    }),
+    /Readiness timeout/,
+  );
+  let before = await f.runtime.snapshot(task.taskId);
+  await f.publish();
+  await f.store.updateTask({
+    taskId: task.taskId,
+    actor: 'fixture',
+    expectedVersion: before.version,
+    idempotencyKey: 'manual-clear-blocker',
+    blocker: null,
+  });
+  before = await f.runtime.snapshot(task.taskId);
+  const observed = await f.controller.action(task.taskId, {
+    action: 'observe',
+    requestId: 'manual-after-refusal',
+    expectedVersion: before.version,
+  });
+  assert.equal(
+    observed.handoff?.contextRefs.some(
+      (ref) => ref.kind === 'reviewed-local-candidate-completion',
+    ) ?? false,
+    false,
+  );
+  const projection = await f.bridge.project({
+    taskId: task.taskId,
+    expectedVersion: observed.version,
+  });
+  assert.equal(projection!.state, 'RECOVERY_REQUIRED');
+  assert.match(projection!.message!, /readiness is unresolved/);
+});
+
+test('native success stays finalizing until verified result and sanitized tick failures reach Talk', async (t) => {
+  const f = await fixture(t),
+    running = await startManaged(f);
+  f.setStatus('SUCCEEDED');
+  const before = await f.runtime.snapshot(running.taskId);
+  // Retain the native snapshot without finalization to exercise the pending projection.
+  await f.runtime.observeNative({
+    taskId: before.taskId,
+    runId: before.currentRunId!,
+    actor: 'fixture',
+    expectedVersion: before.version,
+    idempotencyKey: 'fixture-native-success',
+  });
+  let current = await f.runtime.snapshot(before.taskId);
+  let projection = await f.bridge.project({
+    taskId: current.taskId,
+    expectedVersion: current.version,
+  });
+  assert.equal(projection!.state, 'RUNNING');
+  assert.match(projection!.message!, /verification is still in progress/);
+  const observer = createDashboardManagedObserver(f.controller);
+  f.controller.setManagedObserverHealthProvider(observer.health);
+  observer.start();
+  await observer.stop();
+  assert.equal(observer.health().issues.length, 1);
+  current = await f.runtime.snapshot(before.taskId);
+  projection = await f.bridge.project({
+    taskId: current.taskId,
+    expectedVersion: current.version,
+  });
+  assert.equal(projection!.state, 'RECOVERY_REQUIRED');
+  assert.match(projection!.message!, /Use host recovery/);
+  const described = (await f.controller.describe()) as any;
+  assert.equal(described.managedObserver.issueCount, 1);
+  assert.equal(JSON.stringify(described).includes(f.artifacts), false);
+  assert.equal(JSON.stringify(described).includes('ENOENT'), false);
+  assert.equal(
+    JSON.stringify(described).includes('could not verify this run'),
+    true,
+  );
+  const version = current.version;
+  await f.controller.observeManagedCandidates();
+  assert.equal((await f.runtime.snapshot(current.taskId)).version, version);
+  await f.publish();
+  await f.controller.observeManagedCandidates();
+  current = await f.runtime.snapshot(current.taskId);
+  projection = await f.bridge.project({
+    taskId: current.taskId,
+    expectedVersion: current.version,
+  });
+  assert.equal(projection!.state, 'COMPLETE');
+});
+
+test('tampered retained completion never projects a candidate ready state', async (t) => {
+  const f = await fixture(t),
+    running = await startManaged(f);
+  await f.publish();
+  await f.controller.observeManagedCandidates();
+  await writeFile(
+    join(f.artifacts, 'reviewed-local-candidate', 'completion.json'),
+    'corrupt private result /private/unselected/path',
+  );
+  const current = await f.runtime.snapshot(running.taskId);
+  const projection = await f.bridge.project({
+    taskId: current.taskId,
+    expectedVersion: current.version,
+  });
+  assert.equal(projection!.state, 'RECOVERY_REQUIRED');
+  assert.match(
+    projection!.message!,
+    /retained managed result could not be verified/,
+  );
+  assert.equal(
+    JSON.stringify(projection).includes('/private/unselected'),
+    false,
+  );
+});
