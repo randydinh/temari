@@ -50,3 +50,24 @@ DashboardController launcher that materializes the one-builder managed profile,
 dispatches it through the reviewed-local-candidate path, and projects verified
 native state back to Talk without accepting executable inputs from the browser
 or model.
+
+## Trusted launcher outcome
+
+The trusted launcher is integrated through
+`58161aa4995772936d2b872780f0b19f3b31f811`. It keeps the ordinary 2–4 worker
+planner unchanged and adds a separate one-builder managed profile, immutable
+host-owned preparation, typed route dispatch, one-shot readiness, exact result
+verification, and same-task Talk projection to `NEEDS_REVIEW`.
+
+Two review rounds closed all actionable findings. Generic dispatch cannot start
+the protected route. The bridge runtime is an absolute, canonical, digest-pinned
+host input carried through preparation, durable intent, Archon admission, and all
+native nodes. Owned subprocesses execute the current absolute `process.execPath`;
+Bun and Node differ only in their argument shape. Model-free regressions cover
+PATH shadowing, missing or drifted runtime identities, duplicate and lost starts,
+readiness refusal, result drift, concurrent task edits, and exact completion
+projection.
+
+The fixture proves source composition. Live admission still requires a frozen
+external host profile and source selection. Automatic observation, sustained
+supervision, and installed promotion remain follow-up work.
