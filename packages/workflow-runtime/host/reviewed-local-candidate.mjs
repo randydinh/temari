@@ -181,6 +181,27 @@ async function checkRefs(refs) {
   }
 }
 async function checkProtectedInputs(spec) {
+  if (spec.bridgeRuntime !== undefined) {
+    const runtime = spec.bridgeRuntime;
+    assert(isAbsolute(runtime.executable));
+    assert.match(runtime.sha256, /^[a-f0-9]{64}$/);
+    assert.equal(
+      await realpath(runtime.executable),
+      runtime.executable,
+      'Bridge runtime alias refused.',
+    );
+    assert(
+      !inside(spec.repositoryRoot, runtime.executable),
+      'Bridge runtime must be protected outside candidate.',
+    );
+    assert(
+      spec.protectedInputs.some(
+        (ref) =>
+          ref.path === runtime.executable && ref.sha256 === runtime.sha256,
+      ),
+      'Bridge runtime protected input changed.',
+    );
+  }
   const configRef = spec.protectedInputs.find(
     (ref) => ref.path === spec.modelAdmission.configPath,
   );

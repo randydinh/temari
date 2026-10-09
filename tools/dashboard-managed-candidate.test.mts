@@ -45,6 +45,7 @@ import {
 import {
   validateManagedCandidateProfile,
   readManagedCandidatePreparation,
+  createManagedCandidateHost,
   type ManagedCandidateHost,
   type DashboardManagedCandidateProfile,
 } from './dashboard-managed-candidate.mjs';
@@ -125,6 +126,8 @@ const fs=require('node:fs'),args=process.argv.slice(2);let input='';process.stdi
     evidenceRoot,
     bridgePath,
     bridgeSha256: sha(await readFile(bridgePath)),
+    bridgeRuntimeExecutable: node,
+    bridgeRuntimeSha256: sha(await readFile(node)),
     executable,
     timeoutMs: 1000,
     providerSelection: {
@@ -688,23 +691,136 @@ test('concurrent duplicate start shares one native launch and one readiness gate
   assert.equal((await f.runtime.snapshot(task.taskId)).status, 'RUNNING');
 });
 
-test('aliased future child-store ancestor is refused before source effects',async t=>{
-  const f=await fixture(t),{task,projection}=await f.intake();
-  const snapshot=((await f.controller.describe())as any).controls[task.taskId].planning;
-  const runId=`run-goal-${taskDigest([snapshot.taskId,snapshot.requestId,snapshot.proposalSha256,snapshot.policySha256,snapshot.candidate]).slice(0,48)}`;
-  await symlink(f.config.workspaceRoot,join(f.profile.evidenceRoot,runId));
-  await assert.rejects(f.controller.action(task.taskId,{action:'prepare-plan',requestId:'prepare',expectedVersion:task.version,proposalSha256:projection.action!.proposalSha256}),/ancestor alias refused/);
-  await assert.rejects(readFile(join(f.config.workspaceRoot,'children')),(e:any)=>e.code==='ENOENT');
-  assert.equal(f.launches,0);
+test('aliased future child-store ancestor is refused before source effects', async (t) => {
+  const f = await fixture(t),
+    { task, projection } = await f.intake();
+  const snapshot = ((await f.controller.describe()) as any).controls[
+    task.taskId
+  ].planning;
+  const runId = `run-goal-${taskDigest([snapshot.taskId, snapshot.requestId, snapshot.proposalSha256, snapshot.policySha256, snapshot.candidate]).slice(0, 48)}`;
+  await symlink(f.config.workspaceRoot, join(f.profile.evidenceRoot, runId));
+  await assert.rejects(
+    f.controller.action(task.taskId, {
+      action: 'prepare-plan',
+      requestId: 'prepare',
+      expectedVersion: task.version,
+      proposalSha256: projection.action!.proposalSha256,
+    }),
+    /ancestor alias refused/,
+  );
+  await assert.rejects(
+    readFile(join(f.config.workspaceRoot, 'children')),
+    (e: any) => e.code === 'ENOENT',
+  );
+  assert.equal(f.launches, 0);
 });
 
-test('concurrent task change before dispatch launches zero native work and preserves metadata',async t=>{
-  const f=await fixture(t),task=await f.prepare(),admit=f.host.admit;
-  f.host.admit=async paths=>{
+test('controller materialization and result verification ignore a shadow bun on PATH', async (t) => {
+  const f = await fixture(t),
+    marker = join(f.root, 'bridge-invocations'),
+    shadowMarker = join(f.root, 'shadow-invocations');
+  const bridge = `import fs from 'node:fs';import path from 'node:path';import crypto from 'node:crypto';const args=process.argv.slice(2),command=args[0];fs.appendFileSync(${JSON.stringify(marker)},command+'\\n');if(command==='admit'){const spec=fs.readFileSync(args[args.indexOf('--spec')+1]);console.log(JSON.stringify({requestSha256:crypto.createHash('sha256').update(spec).digest('hex')}));}else{const artifacts=args[args.indexOf('--artifacts')+1],completion=JSON.parse(fs.readFileSync(path.join(artifacts,'reviewed-local-candidate','completion.json')));console.log(JSON.stringify({status:'evidence-verified',candidate:completion.candidate,workers:completion.workers}));}\n`;
+  await writeFile(f.profile.bridgePath, bridge);
+  f.profile.bridgeSha256 = sha(bridge);
+  f.config.managedCandidate!.bridgeSha256 = sha(bridge);
+  const shadowRoot = join(f.root, 'shadow');
+  await mkdir(shadowRoot);
+  await writeFile(
+    join(shadowRoot, 'bun'),
+    `#!${f.profile.bridgeRuntimeExecutable}\nrequire('node:fs').writeFileSync(${JSON.stringify(shadowMarker)},'spoofed');console.log('{}');\n`,
+    { mode: 0o700 },
+  );
+  const previousPath = process.env.PATH;
+  process.env.PATH = `${shadowRoot}:${previousPath ?? ''}`;
+  t.after(() => {
+    if (previousPath === undefined) delete process.env.PATH;
+    else process.env.PATH = previousPath;
+  });
+  const host = createManagedCandidateHost(f.profile, f.host.selection);
+  f.host.admit = host.admit;
+  f.host.verify = host.verify;
+  const task = await f.prepare();
+  const prepared = await readManagedCandidatePreparation({
+    task,
+    profile: f.profile,
+    preparationRoot: f.config.preparationRoot,
+  });
+  assert(prepared);
+  const spec = JSON.parse(await readFile(prepared.paths.specPath, 'utf8'));
+  assert.deepEqual(spec.bridgeRuntime, {
+    executable: f.profile.bridgeRuntimeExecutable,
+    sha256: f.profile.bridgeRuntimeSha256,
+  });
+  const running = await f.controller.action(task.taskId, {
+    action: 'implementation-start',
+    requestId: 'start',
+    expectedVersion: task.version,
+  });
+  await f.publish();
+  const reviewed = await f.controller.action(task.taskId, {
+    action: 'observe',
+    requestId: 'observe',
+    expectedVersion: running.version,
+  });
+  assert.equal(reviewed.status, 'NEEDS_REVIEW');
+  assert.equal(await readFile(marker, 'utf8'), 'admit\nadmit\nverify\n');
+  await assert.rejects(
+    readFile(shadowMarker),
+    (error: any) => error.code === 'ENOENT',
+  );
+  await assert.rejects(
+    host.admit({ ...prepared.paths, bridgeRuntimeExecutable: 'bun' }),
+    /strictly equal/,
+  );
+  await assert.rejects(
+    host.admit({ ...prepared.paths, bridgeRuntimeSha256: '0'.repeat(64) }),
+    /strictly equal/,
+  );
+  const alias = join(f.root, 'runtime-alias');
+  await symlink(f.profile.bridgeRuntimeExecutable, alias);
+  await assert.rejects(
+    validateManagedCandidateProfile(
+      { ...f.profile, bridgeRuntimeExecutable: alias },
+      f.config.workspaceRoot,
+      f.config.preparationRoot,
+    ),
+    /alias refused/,
+  );
+  await assert.rejects(
+    validateManagedCandidateProfile(
+      { ...f.profile, bridgeRuntimeSha256: '0'.repeat(64) },
+      f.config.workspaceRoot,
+      f.config.preparationRoot,
+    ),
+    /pin changed/,
+  );
+  assert.equal(await readFile(marker, 'utf8'), 'admit\nadmit\nverify\n');
+});
+
+test('concurrent task change before dispatch launches zero native work and preserves metadata', async (t) => {
+  const f = await fixture(t),
+    task = await f.prepare(),
+    admit = f.host.admit;
+  f.host.admit = async (paths) => {
     await admit(paths);
-    await f.store.updateTask({taskId:task.taskId,actor:'fixture',idempotencyKey:'changed-before-start',expectedVersion:task.version,nextAction:'Concurrent edit'});
+    await f.store.updateTask({
+      taskId: task.taskId,
+      actor: 'fixture',
+      idempotencyKey: 'changed-before-start',
+      expectedVersion: task.version,
+      nextAction: 'Concurrent edit',
+    });
   };
-  await assert.rejects(f.controller.action(task.taskId,{action:'implementation-start',requestId:'start',expectedVersion:task.version}),/version conflict/);
-  const current=await f.runtime.snapshot(task.taskId);
-  assert.equal(f.launches,0);assert.equal(current.nextAction,'Concurrent edit');assert.equal(current.blocker,null);
+  await assert.rejects(
+    f.controller.action(task.taskId, {
+      action: 'implementation-start',
+      requestId: 'start',
+      expectedVersion: task.version,
+    }),
+    /version conflict/,
+  );
+  const current = await f.runtime.snapshot(task.taskId);
+  assert.equal(f.launches, 0);
+  assert.equal(current.nextAction, 'Concurrent edit');
+  assert.equal(current.blocker, null);
 });

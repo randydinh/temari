@@ -307,7 +307,11 @@ export class TaskRuntime {
     },
   ): Promise<{ readonly task: TaskSnapshot; readonly dispatched: boolean }> {
     const paths = structuredClone(request.paths);
-    for (const pin of [paths.expectedRequestSha256, paths.expectedBridgeSha256])
+    for (const pin of [
+      paths.expectedRequestSha256,
+      paths.expectedBridgeSha256,
+      paths.bridgeRuntimeSha256,
+    ])
       assert.match(pin, /^[a-f0-9]{64}$/);
     return this.dispatchThrough(
       {
@@ -318,6 +322,8 @@ export class TaskRuntime {
           bridge: paths.bridgePath,
           request_sha256: paths.expectedRequestSha256,
           bridge_sha256: paths.expectedBridgeSha256,
+          bridge_runtime: paths.bridgeRuntimeExecutable,
+          bridge_runtime_sha256: paths.bridgeRuntimeSha256,
         },
       },
       (run, task) =>

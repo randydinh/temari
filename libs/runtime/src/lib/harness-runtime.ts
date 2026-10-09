@@ -53,6 +53,8 @@ export interface ReviewedLocalCandidatePaths {
   readonly bridgePath: string;
   readonly expectedRequestSha256: string;
   readonly expectedBridgeSha256: string;
+  readonly bridgeRuntimeExecutable: string;
+  readonly bridgeRuntimeSha256: string;
 }
 export interface ReviewedLocalCandidateHarness extends ExecutionHarness {
   startReviewedLocalCandidate(

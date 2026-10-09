@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { lstat, mkdir, open, readFile, realpath } from 'node:fs/promises';
+import {
+  access,
+  lstat,
+  mkdir,
+  open,
+  readFile,
+  realpath,
+} from 'node:fs/promises';
+import { constants } from 'node:fs';
 import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 import { promisify } from 'node:util';
 import type {
@@ -40,6 +48,8 @@ export interface DashboardManagedCandidateProfile {
   evidenceRoot: string;
   bridgePath: string;
   bridgeSha256: string;
+  bridgeRuntimeExecutable: string;
+  bridgeRuntimeSha256: string;
   executable: string;
   timeoutMs: number;
   providerSelection: {
@@ -114,11 +124,16 @@ async function canonicalDirectory(path: string) {
   assert.equal(await realpath(path), path, 'Managed root alias refused.');
   assert((await lstat(path)).isDirectory());
 }
-async function canonicalTarget(path:string):Promise<void> {
+async function canonicalTarget(path: string): Promise<void> {
   assert(isAbsolute(path));
-  try { assert.equal(await realpath(path),path,'Managed preparation ancestor alias refused.'); }
-  catch(error) {
-    if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;
+  try {
+    assert.equal(
+      await realpath(path),
+      path,
+      'Managed preparation ancestor alias refused.',
+    );
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     await canonicalTarget(dirname(path));
   }
 }
@@ -143,6 +158,8 @@ export async function validateManagedCandidateProfile(
     'evidenceRoot',
     'bridgePath',
     'bridgeSha256',
+    'bridgeRuntimeExecutable',
+    'bridgeRuntimeSha256',
     'executable',
     'timeoutMs',
     'providerSelection',
@@ -203,6 +220,7 @@ export async function validateManagedCandidateProfile(
   );
   for (const [path, digest] of [
     [p.bridgePath, p.bridgeSha256],
+    [p.bridgeRuntimeExecutable, p.bridgeRuntimeSha256],
     [p.executable, p.providerSelection.executableSha256],
     [p.modelAdmission.configPath, p.modelAdmission.configSha256],
     [p.modelAdmission.catalogPath, p.modelAdmission.catalogSha256],
@@ -214,6 +232,15 @@ export async function validateManagedCandidateProfile(
     );
     await pinnedFile(path!, digest!);
   }
+  await access(p.bridgeRuntimeExecutable, constants.X_OK);
+  assert(
+    p.protectedInputs.some(
+      (ref) =>
+        ref.path === p.bridgeRuntimeExecutable &&
+        ref.sha256 === p.bridgeRuntimeSha256,
+    ),
+    'Bridge runtime must be a protected external input.',
+  );
   assert(p.architect.role === 'investigator' && p.architect.required === true);
   for (const commands of [p.baselineChecks, p.acceptanceChecks]) {
     assert(
@@ -331,6 +358,10 @@ export async function prepareManagedCandidate(options: {
     timeoutMs: profile.timeoutMs,
     executable: profile.executable,
     providerSelection: profile.providerSelection,
+    bridgeRuntime: {
+      executable: profile.bridgeRuntimeExecutable,
+      sha256: profile.bridgeRuntimeSha256,
+    },
     modelAdmission: profile.modelAdmission,
     workers: {
       architect: profile.architect,
@@ -363,6 +394,8 @@ export async function prepareManagedCandidate(options: {
       bridgePath: profile.bridgePath,
       expectedRequestSha256,
       expectedBridgeSha256: profile.bridgeSha256,
+      bridgeRuntimeExecutable: profile.bridgeRuntimeExecutable,
+      bridgeRuntimeSha256: profile.bridgeRuntimeSha256,
     },
     childStoreRoot,
   };
@@ -428,6 +461,15 @@ export async function readManagedCandidatePreparation(options: {
   );
   assert.equal(prepared.paths.bridgePath, profile.bridgePath);
   assert.equal(prepared.paths.expectedBridgeSha256, profile.bridgeSha256);
+  assert.equal(
+    prepared.paths.bridgeRuntimeExecutable,
+    profile.bridgeRuntimeExecutable,
+  );
+  assert.equal(prepared.paths.bridgeRuntimeSha256, profile.bridgeRuntimeSha256);
+  await pinnedFile(
+    prepared.paths.bridgeRuntimeExecutable,
+    prepared.paths.bridgeRuntimeSha256,
+  );
   await pinnedFile(
     prepared.paths.specPath,
     prepared.paths.expectedRequestSha256,
@@ -454,10 +496,20 @@ export function createManagedCandidateHost(
   };
   const invoke = async (paths: ReviewedLocalCandidatePaths, args: string[]) => {
     assert.equal(paths.bridgePath, profile.bridgePath);
+    assert.equal(
+      paths.bridgeRuntimeExecutable,
+      profile.bridgeRuntimeExecutable,
+    );
+    assert.equal(paths.bridgeRuntimeSha256, profile.bridgeRuntimeSha256);
+    await pinnedFile(
+      profile.bridgeRuntimeExecutable,
+      profile.bridgeRuntimeSha256,
+    );
+    await access(profile.bridgeRuntimeExecutable, constants.X_OK);
     await pinnedFile(profile.bridgePath, profile.bridgeSha256);
     await pinnedFile(paths.specPath, paths.expectedRequestSha256);
     const output = await command(
-      'bun',
+      profile.bridgeRuntimeExecutable,
       [
         paths.bridgePath,
         ...args,

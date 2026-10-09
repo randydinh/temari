@@ -342,6 +342,39 @@ let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{
   };
 }
 const stages = ['investigate', 'plan', 'build', 'review', 'verify', 'deliver'];
+test('new launcher request retains the bridge runtime as a protected canonical input',async t=>{
+  const f=await fixture(t);
+  f.spec.bridgeRuntime={executable:f.spec.executable,sha256:f.spec.providerSelection.executableSha256};
+  const input={...f.input,expectedSha256:await f.save()};
+  await admitReviewedLocalCandidate(input);
+  f.spec.bridgeRuntime.sha256='0'.repeat(64);
+  await assert.rejects(admitReviewedLocalCandidate({...input,expectedSha256:await f.save()}),/Bridge runtime protected input changed/);
+  f.spec.bridgeRuntime.sha256=f.spec.providerSelection.executableSha256;
+  f.spec.protectedInputs=f.spec.protectedInputs.filter(ref=>ref.path!==f.spec.executable);
+  await assert.rejects(admitReviewedLocalCandidate({...input,expectedSha256:await f.save()}),/Bridge runtime protected input changed/);
+  await assert.rejects(readFile(f.counter),error=>error.code==='ENOENT');
+});
+test('native source nodes use the protected absolute bridge runtime and refuse runtime drift',async t=>{
+  const {parse}=createRequire(import.meta.resolve('nx/package.json'))('yaml');
+  const workflow=parse(await readFile(new URL('../packages/workflow-runtime/host/.archon/workflows/temari-reviewed-local-candidate.yaml',import.meta.url),'utf8'));
+  assert.equal(workflow.inputs.bridge_runtime.required,true);
+  assert.equal(workflow.inputs.bridge_runtime_sha256.required,true);
+  const root=await realpath(await mkdtemp(join(tmpdir(),'managed-native-runtime-')));
+  t.after(()=>rm(root,{recursive:true,force:true}));
+  const node=await realpath(process.execPath),marker=join(root,'invocations'),shadowMarker=join(root,'shadow-invocations');
+  const runtime=join(root,'bridge runtime'),bridge=join(root,'bridge.mjs'),shadow=join(root,'shadow');
+  await mkdir(shadow);await writeFile(bridge,'fixture');
+  await writeFile(runtime,`#!${node}\nrequire('node:fs').appendFileSync(${JSON.stringify(marker)},JSON.stringify(process.argv.slice(2))+'\\n');\n`,{mode:0o700});
+  await writeFile(join(shadow,'bun'),`#!${node}\nrequire('node:fs').writeFileSync(${JSON.stringify(shadowMarker)},'spoofed');\n`,{mode:0o700});
+  const env={...process.env,PATH:shadow+':'+process.env.PATH,INPUTS_BRIDGE:bridge,INPUTS_BRIDGE_SHA256:digest(await readFile(bridge)),INPUTS_BRIDGE_RUNTIME:runtime,INPUTS_BRIDGE_RUNTIME_SHA256:digest(await readFile(runtime)),INPUTS_SPEC:join(root,'spec.json'),INPUTS_REQUEST_SHA256:'a'.repeat(64),ARTIFACTS_DIR:join(root,'artifacts'),WORKFLOW_ID:'fixture-native'};
+  for(const entry of workflow.nodes)execFileSync('/bin/bash',['-c',entry.bash],{env,timeout:5000});
+  const calls=(await readFile(marker,'utf8')).trim().split('\n').map(JSON.parse);
+  assert.equal(calls.length,7);assert(calls.every(args=>args[0]===bridge));
+  assert.deepEqual(calls.map(args=>args[1]),[...stages.map(()=>'capture'),'finalize']);
+  await assert.rejects(readFile(shadowMarker),error=>error.code==='ENOENT');
+  assert.throws(()=>execFileSync('/bin/bash',['-c',workflow.nodes[0].bash],{env:{...env,INPUTS_BRIDGE_RUNTIME_SHA256:'0'.repeat(64)},timeout:5000}));
+  assert.equal((await readFile(marker,'utf8')).trim().split('\n').length,7);
+});
 test('native YAML budgets cover admitted stage composition instead of the 120-second default', async (t) => {
   const { parse } = createRequire(import.meta.resolve('nx/package.json'))(
     'yaml',
@@ -1089,10 +1122,19 @@ test('route-specific task closeout checks native identity, canonical evidence an
     },
   });
   let status = 'SUCCEEDED';
+  const bridgePath=await realpath(new URL('../packages/workflow-runtime/host/reviewed-local-candidate.mjs',import.meta.url));
+  const bridgeRuntimeExecutable=await realpath(process.execPath);
+  const paths={specPath:f.input.specPath,bridgePath,expectedRequestSha256:f.input.expectedSha256,expectedBridgeSha256:digest(await readFile(bridgePath)),bridgeRuntimeExecutable,bridgeRuntimeSha256:digest(await readFile(bridgeRuntimeExecutable))};
   const harness = {
     id: 'fixture',
     version: '1',
-    start: async (req) => ({
+    start:async()=>{throw new Error('Generic start cannot admit a managed candidate.');},
+    startReviewedLocalCandidate: async (req,selected) => {
+      assert.deepEqual(selected,paths);
+      assert.equal(digest(await readFile(selected.specPath)),selected.expectedRequestSha256);
+      assert.equal(digest(await readFile(selected.bridgePath)),selected.expectedBridgeSha256);
+      assert.equal(digest(await readFile(selected.bridgeRuntimeExecutable)),selected.bridgeRuntimeSha256);
+      return {
       schema: 1,
       harnessId: 'fixture',
       harnessVersion: '1',
@@ -1100,10 +1142,10 @@ test('route-specific task closeout checks native identity, canonical evidence an
       revision: req.revision,
       planSha256: objectDigest(req.plan),
       workspaceRoot: req.workspaceRoot,
-      entrypoint: req.entrypoint,
+      entrypoint: 'temari-reviewed-local-candidate',
       externalRunId: f.input.nativeRunId,
       startedAt: new Date().toISOString(),
-    }),
+    };},
     verifyRunIdentity: async (ref) =>
       assert.equal(ref.externalRunId, f.input.nativeRunId),
     status: async () => ({
@@ -1119,15 +1161,14 @@ test('route-specific task closeout checks native identity, canonical evidence an
     managedDefault: null,
   };
   const runtime = new TaskRuntime({ store, selection });
-  let snapshot = await runtime.dispatch({
+  let snapshot = (await runtime.dispatchReviewedLocalCandidate({
     taskId: f.spec.taskId,
     runId: f.spec.runId,
     actor: 'fixture',
     idempotencyKey: 'dispatch',
     expectedVersion: 2,
-    entrypoint: 'temari-reviewed-local-candidate',
-    inputs: {},
-  });
+    paths,
+  })).task;
   snapshot = await runtime.observeNative({
     taskId: f.spec.taskId,
     runId: f.spec.runId,

@@ -11,9 +11,9 @@ independent review, revision-bound evidence and concurrency of one. The source
 host bridge is `packages/workflow-runtime/host/reviewed-local-candidate.mjs`;
 `ArchonHarness.startReviewedLocalCandidate()` selects the separate source
 native workflow in the host directory. Run host `admit` before native dispatch with independently
-computed request and bridge hashes. Each native node checks the bridge hash,
+computed request, bridge and bridge-runtime hashes. Each native node checks the bridge and runtime hashes,
 then calls `capture` with the external request digest and exact native run ID.
-Archon retains native control. `TaskRuntime.dispatch` retains dispatch intent,
+Archon retains native control. `TaskRuntime.dispatchReviewedLocalCandidate` retains dispatch intent,
 and its exact native reconciliation and cancellation controls remain unchanged.
 
 The pinned Archon 0.10.1 Bash schema uses numeric `timeout` milliseconds; an
@@ -138,6 +138,16 @@ the request outside the source tree, records goal/proposal/planning-policy and
 managed-policy digests, initializes the exact child store and admits the request
 before binding a new run on the same task. Interrupted immutable preparation is
 retained for explicit recovery; it is never overwritten with another candidate.
+
+The host profile also fixes `bridgeRuntimeExecutable` and
+`bridgeRuntimeSha256`: an absolute canonical Bun executable and its exact bytes.
+It must be an external protected input. The immutable request, preparation and
+dispatch intent retain that identity. Controller admission/result verification
+and Archon admission invoke the absolute pinned runtime. Native capture/finalize
+nodes receive the same identity and check its digest before invocation; none
+resolves `bun` through PATH. A changed digest, relative executable or path alias
+refuses effects. Older frozen launchers/requests need a new binding to adopt
+this source contract.
 
 `TaskRuntime.dispatchReviewedLocalCandidate` records the protected inputs as
 dispatch intent and calls the managed harness admission port. Generic dispatch

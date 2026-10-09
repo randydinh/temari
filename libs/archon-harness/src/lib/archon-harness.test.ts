@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile, readFile, mkdir, cp } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, readFile, mkdir, cp, realpath, symlink } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { join, basename } from 'node:path';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
 
-import { minimalPlan, type HarnessRunRef } from '@temari/contracts';
+import { minimalPlan, reconcilePlan, type ExecutionPlan, type HarnessRunRef } from '@temari/contracts';
 import { ArchonHarness, ArchonIdentityInitializationError, type ArchonCommandRunner } from './archon-harness.js';
 import { FileTaskStore, FileChildTaskStore, TaskRuntime, taskDigest } from '@temari/runtime';
 import type { ManagedArchonRuntime } from './managed-runtime.js';
@@ -489,17 +490,48 @@ test('managed candidate admission is pinned and refuses missing capabilities bef
     await writeFile(join(workflowSource, '.archon/workflows/temari-reviewed-local-candidate.yaml'), 'fixture');
     const plan = reconcilePlan({workType:'feature',delegation:'required',review:'independent',evidence:'revision-bound',delivery:'local',parallelism:{maxConcurrency:1}});
     const specPath=join(root,'spec.json');const bridgePath=join(root,'bridge.mjs');
-    const spec=JSON.stringify({profile:'reviewed-local-candidate-v1',runId:'managed-run',baseCommit:'b'.repeat(40),repositoryRoot:root,plan});
+    const bridgeRuntimeExecutable=await realpath(process.execPath),bridgeRuntimeSha256=sha(await readFile(bridgeRuntimeExecutable));
+    const spec=JSON.stringify({profile:'reviewed-local-candidate-v1',runId:'managed-run',baseCommit:'b'.repeat(40),repositoryRoot:root,plan,bridgeRuntime:{executable:bridgeRuntimeExecutable,sha256:bridgeRuntimeSha256}});
     await writeFile(specPath,spec);await writeFile(bridgePath,'fixture');
-    const paths={specPath,bridgePath,expectedRequestSha256:sha(spec),expectedBridgeSha256:sha('fixture')};
+    const paths={specPath,bridgePath,expectedRequestSha256:sha(spec),expectedBridgeSha256:sha('fixture'),bridgeRuntimeExecutable,bridgeRuntimeSha256};
     const calls: Array<{args:readonly string[];cwd:string}>=[];
-    const harness=new ArchonHarness({runtime,workflowSource,commandRunner:{async run(executable,args,cwd){calls.push({args,cwd});assert.equal(executable,'bun');return {exitCode:1,stdout:'',stderr:'Missing supported coding transport'};}}});
+    const harness=new ArchonHarness({runtime,workflowSource,commandRunner:{async run(executable,args,cwd){calls.push({args,cwd});assert.equal(executable,bridgeRuntimeExecutable);return {exitCode:1,stdout:'',stderr:'Missing supported coding transport'};}}});
     const request={runId:'managed-run',revision:'b'.repeat(40),plan,workspaceRoot:root,recovery:'required' as const};
     await assert.rejects(harness.startReviewedLocalCandidate(request,paths),/before native dispatch/);
     assert.equal(calls.length,1);assert.equal(calls[0]!.args[1],'admit');
     await assert.rejects(harness.startReviewedLocalCandidate(request,{...paths,expectedBridgeSha256:'0'.repeat(64)}),/pin changed/);
     assert.equal(calls.length,1);
   } finally { await rm(root,{recursive:true,force:true}); }
+});
+
+test('managed Archon admission invokes the exact pinned runtime despite a shadow bun on PATH',async t=>{
+  const root=await realpath(await mkdtemp(join(tmpdir(),'archon-runtime-pin-')));
+  t.after(()=>rm(root,{recursive:true,force:true}));
+  const workflowSource=join(root,'source');
+  await mkdir(join(workflowSource,'.archon','workflows'),{recursive:true});
+  await writeFile(join(workflowSource,'.archon','workflows','temari-reviewed-local-candidate.yaml'),'fixture');
+  const node=await realpath(process.execPath),sha=(bytes:string|Uint8Array)=>createHash('sha256').update(bytes).digest('hex');
+  const runtimeMarker=join(root,'runtime-called'),shadowMarker=join(root,'shadow-called');
+  const bridgeRuntimeExecutable=join(root,'pinned-runtime');
+  await writeFile(bridgeRuntimeExecutable,`#!${node}\nrequire('node:fs').appendFileSync(${JSON.stringify(runtimeMarker)},'called\\n');console.error('Fixture admission refusal');process.exit(1);\n`,{mode:0o700});
+  const shadowRoot=join(root,'shadow');await mkdir(shadowRoot);
+  await writeFile(join(shadowRoot,'bun'),`#!${node}\nrequire('node:fs').writeFileSync(${JSON.stringify(shadowMarker)},'spoofed');console.log('{}');\n`,{mode:0o700});
+  const bridgeRuntimeSha256=sha(await readFile(bridgeRuntimeExecutable));
+  const plan=reconcilePlan({workType:'feature',delegation:'required',review:'independent',evidence:'revision-bound',delivery:'local',parallelism:{maxConcurrency:1}});
+  const specPath=join(root,'spec.json'),bridgePath=join(root,'bridge.mjs');
+  const spec=JSON.stringify({profile:'reviewed-local-candidate-v1',runId:'managed-run',baseCommit:'b'.repeat(40),repositoryRoot:root,plan,bridgeRuntime:{executable:bridgeRuntimeExecutable,sha256:bridgeRuntimeSha256}});
+  await writeFile(specPath,spec);await writeFile(bridgePath,'fixture');
+  const paths={specPath,bridgePath,expectedRequestSha256:sha(spec),expectedBridgeSha256:sha('fixture'),bridgeRuntimeExecutable,bridgeRuntimeSha256};
+  const harness=new ArchonHarness({runtime,workflowSource,environment:{PATH:shadowRoot}});
+  const request={runId:'managed-run',revision:'b'.repeat(40),workspaceRoot:root,plan,recovery:'required' as const};
+  await assert.rejects(harness.startReviewedLocalCandidate(request,paths),/Fixture admission refusal/);
+  assert.equal(await readFile(runtimeMarker,'utf8'),'called\n');
+  await assert.rejects(readFile(shadowMarker),(error:any)=>error.code==='ENOENT');
+  await assert.rejects(harness.startReviewedLocalCandidate(request,{...paths,bridgeRuntimeSha256:'0'.repeat(64)}),/runtime canonical identity\/pin changed/);
+  const alias=join(root,'runtime-alias');await symlink(bridgeRuntimeExecutable,alias);
+  await assert.rejects(harness.startReviewedLocalCandidate(request,{...paths,bridgeRuntimeExecutable:alias}),/runtime canonical identity\/pin changed/);
+  await assert.rejects(harness.startReviewedLocalCandidate(request,{...paths,bridgeRuntimeExecutable:'bun'}),/paths must be absolute/);
+  assert.equal(await readFile(runtimeMarker,'utf8'),'called\n');
 });
 
 test('retained pending-null pilot record reproduces strict identity refusal before its ready record', async () => {
@@ -547,7 +579,7 @@ test('retained pending-null pilot record reproduces strict identity refusal befo
   }
 });
 
-async function initializationFixture(t: import('node:test').TestContext) {
+async function initializationFixture(t: import('node:test').TestContext, plan:ExecutionPlan=minimalPlan('investigation')) {
   const workspaceRoot = await mkdtemp(join(tmpdir(), 'archon-initialization-'));
   t.after(async () => {
     const destination = process.env.NATIVE_IDENTITY_FIXTURE_EVIDENCE_ROOT;
@@ -603,7 +635,7 @@ async function initializationFixture(t: import('node:test').TestContext) {
   const binding = {
     ...originalBinding,
     workspaceRoot,
-    planSha256: taskDigest(minimalPlan('investigation')),
+    planSha256: taskDigest(plan),
   };
   const reference: HarnessRunRef = {
     ...binding,
@@ -1061,7 +1093,8 @@ test('ready workspace must be absolute and resolve to the exact selected workspa
 });
 
 test('caller dispatch retains exact reference before readiness timeout and uses existing strict cleanup without redispatch', async (t) => {
-  const f = await initializationFixture(t);
+  const plan = reconcilePlan({workType:'feature',delegation:'required',review:'independent',evidence:'revision-bound',delivery:'local',parallelism:{maxConcurrency:1}});
+  const f = await initializationFixture(t,plan);
   const tasks = await FileTaskStore.create(
     join(f.reference.workspaceRoot, 'tasks'),
   );
@@ -1076,7 +1109,6 @@ test('caller dispatch retains exact reference before readiness timeout and uses 
     actor: 'fixture',
     idempotencyKey: 'create',
   });
-  const plan = minimalPlan('investigation');
   parent = await tasks.bindRun({
     taskId: 'parent',
     actor: 'fixture',
@@ -1091,10 +1123,24 @@ test('caller dispatch retains exact reference before readiness timeout and uses 
   });
   let dispatches = 0;
   let usefulWork = 0;
+  const root=await realpath(f.reference.workspaceRoot);
+  const specPath=join(root,'managed-request.json'),bridgePath=join(root,'managed-bridge.mjs');
+  const bridgeRuntimeExecutable=await realpath(process.execPath);
+  const sha=(bytes:string|Uint8Array)=>createHash('sha256').update(bytes).digest('hex');
+  const bridgeRuntimeSha256=sha(await readFile(bridgeRuntimeExecutable));
+  const spec=JSON.stringify({profile:'reviewed-local-candidate-v1',runId:f.reference.runId,baseCommit:f.reference.revision,repositoryRoot:f.reference.workspaceRoot,plan,bridgeRuntime:{executable:bridgeRuntimeExecutable,sha256:bridgeRuntimeSha256}});
+  await writeFile(specPath,spec);await writeFile(bridgePath,'fixture');
+  const paths={specPath,bridgePath,expectedRequestSha256:sha(spec),expectedBridgeSha256:sha('fixture'),bridgeRuntimeExecutable,bridgeRuntimeSha256};
   const host = {
     id: 'archon',
     version: '0.10.1',
-    async start() {
+    async start():Promise<never> {throw new Error('Generic dispatch cannot admit a managed candidate.');},
+    async startReviewedLocalCandidate(request:Omit<import('@temari/contracts').HarnessRunRequest,'entrypoint'|'inputs'>,selected:typeof paths) {
+      assert.deepEqual(selected,paths);
+      assert.deepEqual(request.plan,plan);
+      assert.equal(sha(await readFile(selected.specPath)),selected.expectedRequestSha256);
+      assert.equal(sha(await readFile(selected.bridgePath)),selected.expectedBridgeSha256);
+      assert.equal(sha(await readFile(selected.bridgeRuntimeExecutable)),selected.bridgeRuntimeSha256);
       dispatches++;
       return f.reference;
     },
@@ -1113,14 +1159,13 @@ test('caller dispatch retains exact reference before readiness timeout and uses 
       managedDefault: null,
     },
   });
-  await control.dispatch({
+  await control.dispatchReviewedLocalCandidate({
     taskId: 'parent',
     runId: f.reference.runId,
     actor: 'fixture',
     idempotencyKey: 'dispatch',
     expectedVersion: parent.version,
-    entrypoint: f.reference.entrypoint,
-    inputs: {},
+    paths,
   });
   const retained = (await tasks.load('parent'))!.runs[0]!.nativeRef!;
   assert.deepEqual(retained, f.reference);

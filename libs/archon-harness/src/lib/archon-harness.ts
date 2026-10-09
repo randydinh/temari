@@ -471,6 +471,8 @@ export class ArchonHarness implements ExecutionHarness {
       readonly bridgePath: string;
       readonly expectedRequestSha256: string;
       readonly expectedBridgeSha256: string;
+      readonly bridgeRuntimeExecutable: string;
+      readonly bridgeRuntimeSha256: string;
     },
   ): Promise<HarnessRunRef> {
     if (
@@ -488,10 +490,24 @@ export class ArchonHarness implements ExecutionHarness {
         'temari-reviewed-local-candidate.yaml',
       ),
     );
-    for (const path of [paths.specPath, paths.bridgePath])
+    for (const path of [
+      paths.specPath,
+      paths.bridgePath,
+      paths.bridgeRuntimeExecutable,
+    ])
       if (!isAbsolute(path))
         throw new Error('Managed candidate paths must be absolute.');
     const bytes = await readFile(paths.specPath);
+    if (
+      !/^[a-f0-9]{64}$/.test(paths.bridgeRuntimeSha256) ||
+      (await realpath(paths.bridgeRuntimeExecutable)) !==
+        paths.bridgeRuntimeExecutable ||
+      !(await stat(paths.bridgeRuntimeExecutable)).isFile() ||
+      sha256(await readFile(paths.bridgeRuntimeExecutable)) !==
+        paths.bridgeRuntimeSha256
+    )
+      throw new Error('Managed bridge runtime canonical identity/pin changed.');
+    await access(paths.bridgeRuntimeExecutable, constants.X_OK);
     if (
       sha256(bytes) !== paths.expectedRequestSha256 ||
       sha256(await readFile(paths.bridgePath)) !== paths.expectedBridgeSha256
@@ -503,12 +519,15 @@ export class ArchonHarness implements ExecutionHarness {
       baseCommit?: unknown;
       repositoryRoot?: unknown;
       plan?: unknown;
+      bridgeRuntime?: { executable?: unknown; sha256?: unknown };
     };
     if (
       spec.profile !== 'reviewed-local-candidate-v1' ||
       spec.runId !== request.runId ||
       spec.baseCommit !== request.revision ||
       spec.repositoryRoot !== request.workspaceRoot ||
+      spec.bridgeRuntime?.executable !== paths.bridgeRuntimeExecutable ||
+      spec.bridgeRuntime?.sha256 !== paths.bridgeRuntimeSha256 ||
       canonical(spec.plan) !== canonical(request.plan) ||
       request.plan.delegation !== 'required' ||
       request.plan.review !== 'independent' ||
@@ -520,19 +539,36 @@ export class ArchonHarness implements ExecutionHarness {
         'Managed candidate request, baseline or obligations changed.',
       );
     const admission = await (this.options.commandRunner ?? defaultRunner()).run(
-      'bun',
-      [paths.bridgePath, 'admit', '--spec', paths.specPath, '--sha256', paths.expectedRequestSha256],
+      paths.bridgeRuntimeExecutable,
+      [
+        paths.bridgePath,
+        'admit',
+        '--spec',
+        paths.specPath,
+        '--sha256',
+        paths.expectedRequestSha256,
+      ],
       request.workspaceRoot,
       { ...process.env, ...this.options.environment },
       30_000,
     );
     if (admission.exitCode !== 0)
-      throw new Error(`Managed candidate admission refused before native dispatch: ${admission.stderr}`);
+      throw new Error(
+        `Managed candidate admission refused before native dispatch: ${admission.stderr}`,
+      );
     const admitted = parseJson(admission.stdout, 'Managed candidate admission');
-    if (admitted.requestSha256 !== paths.expectedRequestSha256 || admitted.planSha256 !== sha256(canonical(request.plan)))
+    if (
+      admitted.requestSha256 !== paths.expectedRequestSha256 ||
+      admitted.planSha256 !== sha256(canonical(request.plan))
+    )
       throw new Error('Managed candidate admission identity changed.');
-    if (!this.environment.ARCHON_HOME || !isAbsolute(this.environment.ARCHON_HOME))
-      throw new Error('Managed candidate supervision requires the exact ARCHON_HOME.');
+    if (
+      !this.environment.ARCHON_HOME ||
+      !isAbsolute(this.environment.ARCHON_HOME)
+    )
+      throw new Error(
+        'Managed candidate supervision requires the exact ARCHON_HOME.',
+      );
     return this.start({
       ...request,
       recovery: 'required',
@@ -542,6 +578,8 @@ export class ArchonHarness implements ExecutionHarness {
         spec: paths.specPath,
         request_sha256: paths.expectedRequestSha256,
         bridge_sha256: paths.expectedBridgeSha256,
+        bridge_runtime: paths.bridgeRuntimeExecutable,
+        bridge_runtime_sha256: paths.bridgeRuntimeSha256,
         native_executable: this.options.runtime.executablePath,
         native_executable_sha256: this.options.runtime.sha256,
         native_home: this.environment.ARCHON_HOME,
