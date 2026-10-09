@@ -92,3 +92,54 @@ The source candidate now proves the complete fixture-only single-chat path. A
 real use still needs an operator-selected frozen profile/source and an installed
 or source dashboard process. No live model/product run or external delivery was
 performed in this contract.
+
+## Real Codex-host product journey
+
+Later user authorization admitted a fresh live journey against the clean
+`Go to the Forest` SwiftUI product baseline at
+`b4d9d6c6a350d491f23314ae2fd4364daf805949`. The bounded request added a
+Forest Guardian completed-quest summary derived from persisted
+`journal.entries.count`. Its host policy owned only `DomainModels.swift`,
+`ContentView.swift`, and `QuestProgressTests.swift`.
+
+The current ChatGPT-bundled Codex CLI (`0.162.0-alpha.2`) produced the validated
+one-builder plan with `gpt-6.1-sol` at high reasoning. Managed preparation,
+Archon dispatch, automatic observation, the isolated builder, protected
+baseline/acceptance checks, and independent exact-candidate review all ran
+through the dashboard controller. All 12 retained child steps succeeded. The
+result is candidate `18216646f88d4f5bb43a49c131ddb12d0ec7616f`; the source
+checkout remained unchanged.
+
+Coordinator review found exactly 31 added lines in the three admitted files.
+The independent reviewer reported PASS. The protected Swift behavior contract
+and unsigned generic-simulator `build-for-testing` both passed. Task evidence is
+verified with canonical receipt SHA-256
+`6e42d7fa799ed827b3f75421ba3b65021fb21d448153a090799d311b45e7af90`.
+The task remains `NEEDS_REVIEW` by design because this managed route has no
+generic source-application or publication authority.
+
+The live journey exposed three bounded host gaps:
+
+1. Talk's protected Codex model adapter is pinned to `0.155.0-alpha.16.4` and a
+   separate API credential, so it cannot drive the current ChatGPT-authenticated
+   `0.162.0-alpha.2` host. This main Codex chat supplied the intent and drove the
+   same controller API instead.
+2. The inherited Codex user configuration must remain the actual host path,
+   while the mutable account model cache cannot serve as a stable protected
+   input across a model call. The successful run used the actual config and an
+   immutable snapshot of the admitted account catalog.
+3. Archon still probes Claude for optional title generation and warns when a
+   detached local clone lacks `origin/HEAD`. Both warnings were non-authoritative;
+   every admitted worker remained pinned to Codex and the managed candidate
+   completed.
+
+## Packaged Codex candidate
+
+Clean Temari source `66fcfd41033d9595861ee2e003762a0b644c06f0` produced a
+public plugin artifact with manifest SHA-256
+`a684e80dedc48ddd46ff248c0d74d0ea82523c17fa477fdaedf37f2acbdf9dbf`.
+The source artifact and the installed Codex cache copy both passed the strict
+external-manifest checker. Codex reports
+`temari@temari-single-chat-candidate` installed and enabled. The existing stable
+`temari@personal` install remains present, so this candidate installation does
+not silently replace the user's stable plugin selection.
