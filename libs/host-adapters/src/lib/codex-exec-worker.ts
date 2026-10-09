@@ -21,6 +21,7 @@ import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import {
   assertWorkerResult,
+  workerEfficiencyPolicy,
   type WorkerAssignment,
   type WorkerResult,
 } from '@temari/contracts';
@@ -437,6 +438,7 @@ function readOnlyPromptFor(assignment: WorkerAssignment): string {
   const { brief } = assignment;
   return [
     'You are a read-only Temari worker. Inspect the workspace and report findings. Do not edit files, run mutating commands, or send messages.',
+    workerEfficiencyPolicy.instructions,
     `Role: ${assignment.role}`,
     `Goal: ${brief.goal}`,
     `Context: ${brief.context}`,
@@ -787,6 +789,7 @@ export function runCodexExecWriteWorker(
     .join('\n');
   const prompt = [
     'You are a Temari implementer working in an isolated Git clone. Edit only your owned paths. Do not commit, switch branches, modify Git metadata, or send messages.',
+    workerEfficiencyPolicy.instructions,
     `Pinned base commit: ${options.baseCommit}`,
     `Owned paths:\n${ownership}`,
     `Goal: ${brief.goal}`,

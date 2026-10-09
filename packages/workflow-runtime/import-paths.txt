@@ -51,6 +51,7 @@ integrations/archon/privacy.ts
 integrations/archon/runtime-files.txt
 integrations/archon/smoke.ts
 integrations/archon/tsconfig.json
+integrations/archon/worker-efficiency.ts
 scripts/build-codex-plugin.sh
 scripts/check-skill-references.sh
 scripts/copy-archon-runtime.sh

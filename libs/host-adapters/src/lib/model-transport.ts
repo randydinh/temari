@@ -1,6 +1,7 @@
 import { constants } from 'node:fs';
 import { lstat, open, realpath } from 'node:fs/promises';
 import { isAbsolute, join, parse, sep } from 'node:path';
+import { workerEfficiencyPolicy } from '@temari/contracts';
 import {
   mask,
   assertJsonValue,
@@ -396,7 +397,7 @@ export function createProtectedModelTransport(
           : null;
         // One batch allows identities discovered in a file to mask the prompt too.
         const prepared = protect({
-          prompt: request.prompt,
+          prompt: `${workerEfficiencyPolicy.instructions}\n\n${request.prompt}`,
           context: await materialize(request.context ?? []),
           outputSchema,
           tools: tools.map(({ name, description, inputSchema }) => ({

@@ -18,6 +18,7 @@ import {
   type ModelDriver,
 } from './model-transport.js';
 import type { JsonValue } from '@temari/privacy';
+import { workerEfficiencyPolicy } from '@temari/contracts';
 
 test('masks prompt, file, screenshot text, schema descriptions and dynamic tool results before egress', async (t) => {
   const root = await realpath(
@@ -32,6 +33,10 @@ test('masks prompt, file, screenshot text, schema descriptions and dynamic tool 
   const sent: string[] = [];
   const driver: ModelDriver = {
     async complete(request, callTool) {
+      const prompt = JSON.parse(request.prompt).prompt;
+      assert.match(prompt, /temari-worker-efficiency\/v1/);
+      assert.match(prompt, /Help /);
+      assert.match(prompt, /task constraints take priority/);
       sent.push(JSON.stringify(request));
       assert.deepEqual(request.outputSchema, {
         type: 'object',
@@ -622,7 +627,13 @@ for (const [label, literal] of [
         {
           async complete(request) {
             calls++;
-            const token = JSON.parse(request.prompt).prompt;
+            const prompt = JSON.parse(request.prompt).prompt as string;
+            assert(
+              prompt.startsWith(workerEfficiencyPolicy.instructions + '\n\n'),
+            );
+            const token = prompt.slice(
+              workerEfficiencyPolicy.instructions.length + 2,
+            );
             assert.notEqual(token, literal);
             const expected = {
               ...schema,
@@ -677,15 +688,23 @@ test('schema leaves reuse identities discovered in the same initial context batc
     {
       async complete(request) {
         const prompt = JSON.parse(request.prompt);
-        assert.notEqual(prompt.prompt, identity);
-        assert.equal(prompt.context[0].value.fullname, prompt.prompt);
+        assert(
+          prompt.prompt.startsWith(
+            workerEfficiencyPolicy.instructions + '\n\n',
+          ),
+        );
+        const token = prompt.prompt.slice(
+          workerEfficiencyPolicy.instructions.length + 2,
+        );
+        assert.notEqual(token, identity);
+        assert.equal(prompt.context[0].value.fullname, token);
         assert.deepEqual(request.outputSchema, {
           ...schema,
-          description: prompt.prompt,
+          description: token,
         });
         assert.deepEqual(request.tools[0].inputSchema, request.outputSchema);
         checked = true;
-        return JSON.stringify(prompt.prompt);
+        return JSON.stringify(token);
       },
     },
     {

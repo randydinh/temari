@@ -362,7 +362,7 @@ test('Bun and Node operation argument shapes always invoke the admitted current 
   t.after(() => rm(root, { recursive: true, force: true }));
   const marker = join(root, 'owned-invocations'),
     shadowMarker = join(root, 'shadow-invocations'),
-    tool = join(root, 'owned-tool.mjs'),
+    tool = join(root, 'owned-tool.mts'),
     shadow = join(root, 'shadow');
   const executable = process.execPath,
     sha256 = digest(await readFile(executable));
@@ -409,9 +409,27 @@ test('Bun and Node operation argument shapes always invoke the admitted current 
       stdio: ['ignore', 'pipe', 'pipe'],
     });
   }
-  assert.deepEqual(managedOperationCommand(join(root,'owned-tool.mts'),'fixture-request','fixture-result',false).args,[
-    '--import','@swc-node/register/esm-register',join(root,'owned-tool.mts'),'fixture-request','fixture-result',
-  ]);
+  assert.deepEqual(
+    managedOperationCommand(
+      join(root, 'owned-tool.mts'),
+      'fixture-request',
+      'fixture-result',
+      false,
+    ).args,
+    [
+      '--import',
+      '@swc-node/register/esm-register',
+      join(root, 'owned-tool.mts'),
+      'fixture-request',
+      'fixture-result',
+    ],
+  );
+  const compiledTool = join(root, 'compiled-tool.mjs');
+  await writeFile(compiledTool, '');
+  assert.deepEqual(managedOperationCommand(compiledTool, 'in', 'out', false), {
+    program: process.execPath,
+    args: [compiledTool, 'in', 'out'],
+  });
   assert.deepEqual(
     (await readFile(marker, 'utf8')).trim().split('\n').map(JSON.parse),
     [

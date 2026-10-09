@@ -172,18 +172,34 @@ async function materializeControl(
   const managed = control.managedCandidate as Record<string, any> | undefined;
   if (!managed || managed.bridge !== 'packaged') return control;
   assert(!('bridgePath' in managed) && !('bridgeSha256' in managed));
-  const bridgePath = join(
-    host.managedWorkflowSource,
-    'reviewed-local-candidate.mjs',
+  const resourcePaths = [
+    join(host.managedWorkflowSource, 'reviewed-local-candidate.mjs'),
+    join(host.managedWorkflowSource, 'managed-candidate-operation.mjs'),
+    join(
+      host.managedWorkflowSource,
+      '.archon',
+      'workflows',
+      'temari-reviewed-local-candidate.yaml',
+    ),
+    join(host.managedWorkflowSource, 'owned-process', 'guardian.mjs'),
+    join(host.managedWorkflowSource, 'owned-process', 'anchor.mjs'),
+  ];
+  const resourceRefs = await Promise.all(
+    resourcePaths.map(async (path) => ({
+      path,
+      sha256: digest(await readFile(path)),
+    })),
   );
-  const bridgeSha256 = digest(await readFile(bridgePath));
+  const [bridge] = resourceRefs;
   assert(Array.isArray(managed.protectedInputs));
   delete managed.bridge;
-  managed.bridgePath = bridgePath;
-  managed.bridgeSha256 = bridgeSha256;
+  managed.bridgePath = bridge.path;
+  managed.bridgeSha256 = bridge.sha256;
   managed.protectedInputs = [
-    ...managed.protectedInputs.filter((item: any) => item?.path !== bridgePath),
-    { path: bridgePath, sha256: bridgeSha256 },
+    ...managed.protectedInputs.filter(
+      (item: any) => !resourcePaths.includes(item?.path),
+    ),
+    ...resourceRefs,
   ];
   return control;
 }

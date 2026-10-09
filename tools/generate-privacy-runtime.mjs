@@ -18,6 +18,10 @@ const provenancePath = `${packagePath}/provenance.json`;
 const importPathsPath = `${packagePath}/import-paths.txt`;
 const archon = 'integrations/archon/';
 const generated = new Map([
+  [
+    `${archon}worker-efficiency.ts`,
+    'libs/contracts/src/lib/worker-efficiency.ts',
+  ],
   [`${archon}privacy.ts`, 'libs/privacy/src/lib/privacy.ts'],
   [
     `${archon}model-transport.ts`,
@@ -33,6 +37,7 @@ const generated = new Map([
   ],
 ]);
 const rewrites = new Map([
+  ['@temari/contracts', './worker-efficiency.ts'],
   ['@temari/privacy', './privacy.ts'],
   ['./model-transport.js', './model-transport.ts'],
 ]);
@@ -51,11 +56,11 @@ const legacyChanges = new Map([
   ],
   [
     `${archon}lifecycle.ts`,
-    'Include privacy.ts, model-transport.ts, codex-model-driver.ts and openai-responses-driver.ts in the standalone installation payload.',
+    'Include worker-efficiency.ts, privacy.ts, model-transport.ts, codex-model-driver.ts and openai-responses-driver.ts in the standalone installation payload.',
   ],
   [
     `${archon}runtime-files.txt`,
-    'Include privacy.ts, model-transport.ts, codex-model-driver.ts and openai-responses-driver.ts in the runtime file inventory.',
+    'Include worker-efficiency.ts, privacy.ts, model-transport.ts, codex-model-driver.ts and openai-responses-driver.ts in the runtime file inventory.',
   ],
 ]);
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');

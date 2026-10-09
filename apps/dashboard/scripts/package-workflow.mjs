@@ -18,6 +18,7 @@ export async function packageManagedWorkflow(output) {
       format: 'esm',
       target: 'node22',
       sourcemap: false,
+      define: { TEMARI_PACKAGED_MANAGED_RESOURCES: 'true' },
     }),
     build({
       entryPoints: ['tools/managed-candidate-operation.mts'],
