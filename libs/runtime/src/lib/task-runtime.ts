@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict';
 import { lstat } from 'node:fs/promises';
+import {
+  TaskRepairs,
+  type TaskRepairHost,
+  type TaskRepairReport,
+  type RepairVerificationSelection,
+  type TaskRepairSnapshot,
+} from './task-repair.js';
 import type {
   HarnessRunRef,
   HarnessRunSnapshot,
@@ -69,6 +76,7 @@ export interface TaskSnapshot extends TaskRecord {
   readonly evidence: TaskEvidenceSnapshot;
   readonly semanticAcceptance: boolean;
   readonly runSnapshots: readonly TaskRunSnapshot[];
+  readonly repairSnapshots: readonly TaskRepairSnapshot[];
 }
 export type TaskRunCommand = TaskCommand & { readonly runId: string };
 const missingEvidence: TaskEvidenceSnapshot = {
@@ -104,12 +112,15 @@ function closeoutEligibility(run: TaskRun): void {
 export class TaskRuntime {
   private readonly store: FileTaskStore;
   private readonly selection: HarnessSelection | undefined;
+  private readonly repairs: TaskRepairs;
   constructor(options: {
     readonly store: FileTaskStore;
     readonly selection?: HarnessSelection;
+    readonly repairHost?: TaskRepairHost;
   }) {
     this.store = options.store;
     this.selection = options.selection;
+    this.repairs = new TaskRepairs(options.store, options.repairHost);
   }
 
   async snapshot(taskId: string): Promise<TaskSnapshot> {
@@ -117,11 +128,45 @@ export class TaskRuntime {
     const runSnapshots = await Promise.all(
       task.runs.map((run) => this.inspectRun(run)),
     );
-    return this.projectSnapshot(task, runSnapshots);
+    return this.projectSnapshot(
+      task,
+      runSnapshots,
+      await this.repairs.snapshots(task),
+    );
+  }
+  async initiateRepair(
+    input: TaskCommand & { readonly report: TaskRepairReport },
+  ): Promise<TaskSnapshot> {
+    await this.repairs.initiate(input);
+    return this.snapshot(input.taskId);
+  }
+  async reconcileRepair(input: {
+    readonly taskId: string;
+    readonly repairId: string;
+  }): Promise<TaskSnapshot> {
+    await this.repairs.reconcile(input.taskId, input.repairId);
+    return this.snapshot(input.taskId);
+  }
+  async readmitRepair(
+    input: TaskCommand & { readonly report: TaskRepairReport },
+  ): Promise<TaskSnapshot> {
+    await this.repairs.initiate(input, true);
+    return this.snapshot(input.taskId);
+  }
+  async acceptRepair(
+    input: TaskCommand & {
+      readonly repairId: string;
+      readonly selection: RepairVerificationSelection;
+      readonly reason: string;
+    },
+  ): Promise<TaskSnapshot> {
+    await this.repairs.accept(input);
+    return this.snapshot(input.taskId);
   }
   private projectSnapshot(
     task: TaskRecord,
     runSnapshots: readonly TaskRunSnapshot[],
+    repairSnapshots: readonly TaskRepairSnapshot[],
   ): TaskSnapshot {
     const run = task.runs.find((r) => r.runId === task.currentRunId);
     const observed = runSnapshots.find((r) => r.runId === task.currentRunId);
@@ -136,7 +181,7 @@ export class TaskRuntime {
         /* Present verified evidence for review while stronger route proof is unavailable. */
       }
     }
-    const accepted = Boolean(
+    const parentAccepted = Boolean(
       task.acceptance &&
       task.acceptance.runId === run?.runId &&
       task.acceptance.receiptSha256 === evidence.receiptSha256 &&
@@ -155,7 +200,7 @@ export class TaskRuntime {
       (observed && run
         ? (run.plan.stages[observed.stages.length] ?? null)
         : null);
-    if (accepted && !task.blocker) status = 'DONE';
+    if (parentAccepted && !task.blocker) status = 'DONE';
     else if (pending) {
       status = 'BLOCKED';
       blocker ??=
@@ -227,6 +272,21 @@ export class TaskRuntime {
       nextAction ??= run
         ? 'Execute the bound plan and retain its canonical receipt and evidence.'
         : 'Bind the first execution plan to this task.';
+    const unresolved = repairSnapshots.find(
+      (repair) => repair.state !== 'RESOLVED',
+    );
+    if (
+      unresolved &&
+      (!run || status === 'DONE' || status === 'NEEDS_REVIEW')
+    ) {
+      status = ['RUNNING', 'STARTING'].includes(unresolved.state)
+        ? 'RUNNING'
+        : unresolved.state === 'NEEDS_REVIEW'
+          ? 'NEEDS_REVIEW'
+          : 'BLOCKED';
+      blocker ??= unresolved.issues[0] ?? null;
+      nextAction ??= `Review required repair ${unresolved.repairId} before closing this task.`;
+    }
     return {
       ...task,
       status,
@@ -234,8 +294,9 @@ export class TaskRuntime {
       blocker,
       currentStage,
       evidence,
-      semanticAcceptance: accepted,
+      semanticAcceptance: parentAccepted && !unresolved,
       runSnapshots,
+      repairSnapshots,
     };
   }
   async listSnapshots(): Promise<readonly TaskSnapshot[]> {
@@ -263,6 +324,7 @@ export class TaskRuntime {
     const refreshed = this.projectSnapshot(
       task,
       run ? [await this.inspectRun(run)] : [],
+      await this.repairs.snapshots(task),
     );
     return {
       schema: 1,

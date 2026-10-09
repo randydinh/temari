@@ -194,6 +194,9 @@ UI and execution value while targeting the user's actual loss of task continuity
 
 ## Where to go next
 
+- For bounded same-task discrepancy repair, its admission boundary and process
+  recovery proof, read [systemic repair](systemic-repair-design.md).
+
 - For the implemented inbox, task commands, recovery and proof limits, read
   [task continuity](task-continuity.md).
 

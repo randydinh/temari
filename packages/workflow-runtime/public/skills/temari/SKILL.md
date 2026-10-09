@@ -186,6 +186,40 @@ Select the task explicitly, preserve its current version, and keep tracking outs
 the execution request. Feature tracking uses the original project scope while
 the host verifies the integration checkout. A handoff never establishes completion.
 
+When a correction or observed counterexample confirms a systemic discrepancy,
+Temari owns the decision to repair it and the required route. Preserve the failing
+case and expected invariant, then promptly initiate one bounded repair under the
+same logical task when its independently selected existing authority admits it.
+Use `bin/temari.mjs repair start --request ABS_JSON --expected-request-sha256 HEX
+--expected-manifest-sha256 HEX --task-selection ABS_JSON
+--expected-task-selection-sha256 HEX`. The report names `repairId`, counterexample,
+affected surface, invariant, pinned evidence, requested scopes, regression contract
+and `requiredRoute`; it cannot nominate an executable or commands. Keep task/host
+selection and its externally supplied digest separate from the report. The selection
+pins the owning public invocation and existing bounded host profile. A handoff is
+only a continuity link. Reopen actual prior host proof for a feature owner; a
+lightweight owner cannot authorize a shared boundary, defect, migration or other
+full-route repair. Record the precise missing-authority blocker instead of
+self-authoring a wider profile or relabeling the work.
+
+After the actual repair worker is observed, continue compatible original work;
+the repair never replaces the parent run or requires a new chat. Use the same flag
+pairs with `repair status` to recover the exact retained launch. Repeat reports,
+restarts, missing heartbeat or expired lease never authorize another launch.
+Worker PASS means `NEEDS_REVIEW`. Select the exact candidate/artifact and reopened
+independent-review plus failing-baseline/fresh-install regression evidence before
+`repair accept` records coordinator resolution. Missing or changed evidence reopens
+the obligation. Repair acceptance grants no parent completion or publication.
+
+For a never-launched BLOCKED report, obtain the missing independently proven
+authority and use `repair readmit` with the same report, a fresh key and current
+task version. Preserve the original refusal in history. Ordinary repeat `start`
+cannot admit it, and readmission never retries a launched or uncertain process.
+The host freezes the admitted source before dispatch; compatible parent edits
+outside repair ownership do not disturb that isolated candidate. Reopen the
+pinned counterexample and helper/input byte identities alongside result evidence
+before maintaining resolution.
+
 For QA, pass a versioned full assignment, review draft, canonical evidence root, and canonical invocation to `bin/temari.mjs qa` with the same external request and artifact digest flags. The result retains a QA disposition and evaluator evidence. A caller-supplied evaluator ID, round, context claim, or capability list is rejected. The route never writes to external systems.
 
 The QA request may pin `review.intentSources` as requirement reference, revision, authority reference, and expected outcome. It may select `review.projectVerifierId: "temari-public-v1"` only for a matching Temari workspace candidate. The installed entry loads the ticket acceptance playbook, QA evidence skill, and selected verifier text into a digest-bound handoff; `guidance.execution: "not-observed"` means no verifier was run by that loading step. The bundled local worker checks procedural evidence but has no independent product-intent or assertion-adequacy assessor, so it cannot produce a full QA pass. Retain the `BlockedOrIncomplete` result until a trusted semantic evaluator and the applicable project control actually run.

@@ -21,6 +21,14 @@
       "type:runtime"
     ],
     "targets": {
+      "repair-test": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 libs/runtime/src/lib/task-repair.test.ts libs/host-adapters/src/lib/codex-exec-worker.test.ts tools/task-repair-installed.test.mjs",
+          "cwd": "{workspaceRoot}"
+        }
+      },
       "dashboard-managed-candidate-test": {
         "executor": "nx:run-commands",
         "cache": false,
