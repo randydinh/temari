@@ -28,8 +28,12 @@ is evaluated separately; matching skill wording cannot prove invocation.
 - The three public skill folders passed the skill-creator validator using the
   existing Registrar Python environment. The default system Python lacked PyYAML.
 - Independent read-only source/package review found no actionable defects.
-- Release checks initially refused the uncommitted source, as required. Their
-  clean-candidate rerun is retained in the task handoff and subsequent update.
+- Release checks initially refused the uncommitted source, as required. On clean
+  source commit `df940f75137b46ef8017a934b4e1ce69eec69b87`, Nx
+  `workflow-runtime:knowledge-release-test` passed 11 cases and skipped one
+  externally pinned historical-archive case because its fixture was unavailable.
+  Generated historical/current shape and inner-provenance checks did run; the
+  missing original release archive remains an explicit compatibility-evidence gap.
 
 ## Neutral prompt trials
 
