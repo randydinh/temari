@@ -36,6 +36,13 @@ const revision = 'a'.repeat(40);
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const sources = new Map([
   [
+    'worker-efficiency.ts',
+    [
+      'libs/contracts/src/lib/worker-efficiency.ts',
+      'export const workerEfficiencyPolicy = { instructions: "bounded reads" };\n',
+    ],
+  ],
+  [
     'privacy.ts',
     [
       'libs/privacy/src/lib/privacy.ts',
@@ -46,7 +53,7 @@ const sources = new Map([
     'model-transport.ts',
     [
       'libs/host-adapters/src/lib/model-transport.ts',
-      "import { mask } from '@temari/privacy';\n// Keep '@temari/privacy' in commentary.\nexport const description = '@temari/privacy';\nexport const complete = (text: string) => mask(text);\n",
+      "import { workerEfficiencyPolicy } from '@temari/contracts';\nimport { mask } from '@temari/privacy';\n// Keep '@temari/privacy' in commentary.\nexport const description = '@temari/privacy';\nexport const complete = (text: string) => mask(workerEfficiencyPolicy.instructions + text);\n",
     ],
   ],
   [
@@ -199,6 +206,7 @@ test('generates the standalone sources and two manifests reproducibly', async (t
     const entry = manifest.files.find((file) => file.path === path);
     const output = await readFile(join(root, assets, path));
     const expectedText = text
+      .replace("from '@temari/contracts'", "from './worker-efficiency.ts'")
       .replace("from '@temari/privacy'", "from './privacy.ts'")
       .replace('from "./model-transport.js"', 'from "./model-transport.ts"');
     assert.equal(output.toString(), expectedText);

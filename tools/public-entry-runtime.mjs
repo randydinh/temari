@@ -35,9 +35,32 @@ const generatedFiles = [
   'bin/qa-evaluator-worker.mjs',
   'bin/qa-product-policy-control.mjs',
   'bin/qa-temari-policy-semantic.mjs',
+  'host/reviewed-local-candidate.mjs',
+  'host/managed-candidate-operation.mjs',
+  'host/dashboard-managed-candidate.mjs',
+  'host/dashboard-planner.mjs',
 ];
 const publicFiles = [
-  ['packages/workflow-runtime/host/git-candidate.mjs', 'host/git-candidate.mjs'],
+  [
+    'packages/workflow-runtime/public/managed-resources.md',
+    'managed-resources.md',
+  ],
+  [
+    'libs/host-adapters/src/lib/owned-process/guardian.mjs',
+    'host/owned-process/guardian.mjs',
+  ],
+  [
+    'libs/host-adapters/src/lib/owned-process/anchor.mjs',
+    'host/owned-process/anchor.mjs',
+  ],
+  [
+    'packages/workflow-runtime/host/.archon/workflows/temari-reviewed-local-candidate.yaml',
+    'host/.archon/workflows/temari-reviewed-local-candidate.yaml',
+  ],
+  [
+    'packages/workflow-runtime/host/git-candidate.mjs',
+    'host/git-candidate.mjs',
+  ],
   ['packages/workflow-runtime/public/policy.json', 'policy.json'],
   [
     'packages/workflow-runtime/public/.codex-plugin/plugin.json',
@@ -480,6 +503,13 @@ export async function packagePublicEntries(
       ['tools/qa-evaluator-worker.mjs', generatedFiles[2]],
       ['tools/qa-product-policy-control.mjs', generatedFiles[3]],
       ['tools/qa-temari-policy-semantic.mjs', generatedFiles[4]],
+      [
+        'packages/workflow-runtime/host/reviewed-local-candidate.mjs',
+        generatedFiles[5],
+      ],
+      ['tools/managed-candidate-operation.mts', generatedFiles[6]],
+      ['tools/dashboard-managed-candidate.mts', generatedFiles[7]],
+      ['tools/dashboard-planner.mts', generatedFiles[8]],
     ];
     for (const [source, destination] of bundles) {
       const bundle = join(staging, destination);
@@ -491,6 +521,12 @@ export async function packagePublicEntries(
           '--target=node',
           '--format=esm',
           '--reject-unresolved',
+          ...(destination.startsWith('host/')
+            ? ['--define=TEMARI_PACKAGED_MANAGED_RESOURCES=true']
+            : []),
+          ...(destination === 'host/dashboard-managed-candidate.mjs'
+            ? ['--external=./dashboard-planner.mjs']
+            : []),
           `--metafile=${metafile}`,
           `--outfile=${bundle}`,
           source,

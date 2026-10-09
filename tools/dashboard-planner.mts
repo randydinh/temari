@@ -979,8 +979,9 @@ export async function startGoalPlan(
     const child = spawn(
       process.execPath,
       [
-        '--import',
-        '@swc-node/register/esm-register',
+        ...(script.endsWith('.mjs')
+          ? []
+          : ['--import', '@swc-node/register/esm-register']),
         script,
         '--supervise',
         handle.requestPath,

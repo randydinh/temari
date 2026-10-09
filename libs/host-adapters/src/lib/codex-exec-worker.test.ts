@@ -194,6 +194,7 @@ const schema = args[args.indexOf('--output-schema') + 1];
 let prompt = '';
 process.stdin.on('data', chunk => prompt += chunk);
 process.stdin.on('end', () => {
+  if (!prompt.includes('temari-worker-efficiency/v1') || !prompt.includes('Do not write files')) process.exit(7);
   if (args[0] !== 'exec' || !args.includes('--ignore-user-config') || !args.includes('--ephemeral') || args[args.indexOf('--sandbox') + 1] !== 'read-only' || !args.includes('--json') || args.at(-1) !== '-') process.exit(9);
   if (!JSON.parse(fs.readFileSync(schema, 'utf8')).required.includes('summary')) process.exit(8);
   fs.writeFileSync(final, JSON.stringify({status:'PASS',summary:prompt.includes('Inspect the code') ? 'inspected' : 'missing prompt'}));
@@ -547,8 +548,10 @@ const fs = require('node:fs');
 const { execFileSync } = require('node:child_process');
 const args = process.argv.slice(2);
 const final = args[args.indexOf('--output-last-message') + 1];
-process.stdin.resume();
+let prompt = '';
+process.stdin.on('data', chunk => prompt += chunk);
 process.stdin.on('end', () => {
+  if (!prompt.includes('temari-worker-efficiency/v1') || !prompt.includes('Owned paths:') || !prompt.includes('Pinned base commit: test-base')) process.exit(7);
   if (args[args.indexOf('--sandbox') + 1] !== 'workspace-write') process.exit(8);
   if (!process.env.PATH || process.env.GIT_ASKPASS !== 'preserved-helper') process.exit(9);
   fs.writeFileSync('owned.txt', 'worker change\\n');
