@@ -47,9 +47,9 @@ request recovery; source operations and task acceptance remain separate workflow
 
 ## Before you begin
 
-- Use the repository's supported Node/Bun environment and pnpm **11.25.0**.
-  Complete `pnpm temari:init` and `pnpm temari:doctor` from the repository root.
-  The source checkout's dependencies must be installed and `bun` must be on PATH.
+- Use Node.js 22 or newer and pnpm **11.25.0**. From the repository root, run
+  `pnpm temari:init` and then `pnpm temari:doctor`. Init installs managed Bun
+  and Archon 0.10.1. Bun does not need to be on `PATH`.
 - Select the root of a clean Git worktree. Verification and agent preparation
   pin its HEAD; uncommitted or untracked changes prevent preparation/start.
   Save your work through the usual workflow before selecting that candidate.
@@ -212,7 +212,7 @@ concurrency within the host's limit. A setting of 1 runs the batch serially;
 settings above 1 permit actual parallel processes.
 
 The task retains each agent's status, attempt, findings and evidence. Process
-stdout/stderr is retained when an attempt exits; the UI does not promise a live
+stdout/stderr is streamed in full to private files and retained when an attempt exits; the UI does not promise a live
 token stream. Successful siblings are preserved during the runtime's bounded
 mechanical retries. Semantic findings such as Issues or Blocked are not retried
 as process failures.
@@ -299,8 +299,17 @@ are rejected.
 | Plan `prepare` / `verify`                     | Explicit arrays of at most 10 commands each; `prepare: []` is allowed, `verify` must be nonempty.                                                |
 | Implementation command                        | Exactly `{program, args, timeoutMs}`. `program` is an existing absolute executable; `args` is a string array; timeout is 1–1,800,000 ms.         |
 
-Combined swarm stdout/stderr is bounded to 1 MiB per worker attempt. The runtime allows at most two
-mechanical attempts per child; these are implementation limits, not additional
+Swarm and implementation raw stdout/stderr have no retention byte cap. Full
+private diagnostics remain available after nonzero exits, timeout and
+cancellation; capture/archival failure is explicit. Dashboard inspection
+verifies portable and linked artifact identities without loading raw logs into
+browser summaries.
+
+Prior failed-attempt references remain verifiable after retry. Ordinary failure
+summaries expose a controlled message and hash, with full causes in private
+evidence.
+
+The runtime allows at most two mechanical attempts per child; these are implementation limits, not additional
 control-file fields. With four workers this permits at most eight attempts.
 The timeout is per attempt, not a whole-task deadline or provider spend limit.
 

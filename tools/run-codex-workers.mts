@@ -26,6 +26,7 @@ export interface CodexWorkersRequest {
   readonly executable: string;
   readonly timeoutMs: number;
   readonly outputLimitBytes?: number;
+  readonly finalResponseLimitBytes?: number;
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -121,6 +122,20 @@ export function parseCodexWorkersRequest(value: unknown): CodexWorkersRequest {
           'outputLimitBytes',
           16 * 1024 * 1024,
         );
+  const finalResponseLimitBytes =
+    input.finalResponseLimitBytes === undefined
+      ? undefined
+      : positiveInteger(
+          input.finalResponseLimitBytes,
+          'finalResponseLimitBytes',
+          16 * 1024 * 1024,
+        );
+  if (
+    outputLimitBytes !== undefined &&
+    finalResponseLimitBytes !== undefined &&
+    outputLimitBytes !== finalResponseLimitBytes
+  )
+    throw new Error('outputLimitBytes and finalResponseLimitBytes conflict.');
   if (
     typeof input.executable !== 'string' ||
     !input.executable.trim() ||
@@ -142,6 +157,9 @@ export function parseCodexWorkersRequest(value: unknown): CodexWorkersRequest {
     executable: input.executable,
     timeoutMs,
     outputLimitBytes,
+    ...(finalResponseLimitBytes === undefined
+      ? {}
+      : { finalResponseLimitBytes }),
   };
 }
 
@@ -204,6 +222,7 @@ export async function runCodexWorkersRequest(
         evidenceDirectory: join(runDirectory, assignment.id),
         timeoutMs: request.timeoutMs,
         outputLimitBytes: request.outputLimitBytes,
+        finalResponseLimitBytes: request.finalResponseLimitBytes,
         signal,
       }),
   });

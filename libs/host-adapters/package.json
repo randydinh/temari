@@ -24,7 +24,7 @@
       "test": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "node --import @swc-node/register/esm-register --test libs/host-adapters/src/lib/host-adapters.test.ts libs/host-adapters/src/lib/codex-exec-worker.test.ts libs/host-adapters/src/lib/live-doctor.test.ts libs/host-adapters/src/lib/codex-model-driver.test.ts libs/host-adapters/src/lib/model-transport.test.ts libs/host-adapters/src/lib/openai-responses-driver.test.ts libs/host-adapters/src/lib/ollama-model-driver.test.ts libs/host-adapters/src/lib/git-reconciliation-observer.test.ts tools/run-codex-workers.test.mts tools/run-codex-write-workers.test.mts tools/run-codex-parallel.test.mts tools/run-qa-benny-local.test.mjs libs/host-adapters/src/lib/privacy-decision-host.test.ts",
+          "command": "node --import @swc-node/register/esm-register --test libs/host-adapters/src/lib/host-adapters.test.ts libs/host-adapters/src/lib/codex-exec-worker.test.ts libs/host-adapters/src/lib/live-doctor.test.ts libs/host-adapters/src/lib/codex-model-driver.test.ts libs/host-adapters/src/lib/model-transport.test.ts libs/host-adapters/src/lib/openai-responses-driver.test.ts libs/host-adapters/src/lib/ollama-model-driver.test.ts libs/host-adapters/src/lib/git-reconciliation-observer.test.ts tools/run-codex-workers.test.mts tools/run-codex-write-workers.test.mts tools/pinned-submodules.test.mts tools/run-codex-parallel.test.mts tools/run-qa-benny-local.test.mjs libs/host-adapters/src/lib/privacy-decision-host.test.ts libs/host-adapters/src/lib/process-capture.test.ts",
           "cwd": "{workspaceRoot}"
         }
       },
@@ -33,6 +33,14 @@
         "cache": false,
         "options": {
           "command": "node --import @swc-node/register/esm-register tools/ollama-protected-canary.mjs",
+          "cwd": "{workspaceRoot}"
+        }
+      },
+      "diagnostics-test": {
+        "executor": "nx:run-commands",
+        "cache": false,
+        "options": {
+          "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 libs/host-adapters/src/lib/process-capture.test.ts libs/host-adapters/src/lib/codex-exec-worker.test.ts tools/run-codex-workers.test.mts tools/run-codex-write-workers.test.mts",
           "cwd": "{workspaceRoot}"
         }
       }

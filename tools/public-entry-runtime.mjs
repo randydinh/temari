@@ -37,6 +37,7 @@ const generatedFiles = [
   'bin/qa-temari-policy-semantic.mjs',
 ];
 const publicFiles = [
+  ['packages/workflow-runtime/host/git-candidate.mjs', 'host/git-candidate.mjs'],
   ['packages/workflow-runtime/public/policy.json', 'policy.json'],
   [
     'packages/workflow-runtime/public/.codex-plugin/plugin.json',
@@ -133,6 +134,14 @@ const publicFiles = [
   ].map((path) => [
     `packages/workflow-runtime/public/skills/qa-review-verification/${path}`,
     `skills/qa-review-verification/${path}`,
+  ]),
+  ...[
+    'SKILL.md',
+    'references/issue-triage-v1.md',
+    'assets/triage-note.md',
+  ].map((path) => [
+    `packages/workflow-runtime/public/skills/qa-triage/${path}`,
+    `skills/qa-triage/${path}`,
   ]),
   ...REGISTRAR_PAYLOAD_FILES.map((path) => [
     `packages/workflow-runtime/registrar/${path}`,
@@ -503,7 +512,7 @@ export async function packagePublicEntries(
       schemaVersion: 1,
       source: {
         revision: git('rev-parse', 'HEAD'),
-        dirty: git('status', '--porcelain=v1', '--untracked-files=all') !== '',
+        dirty: git('status', '--porcelain=v1', '--untracked-files=normal') !== '',
         files: sortedRecords(sourceFiles),
       },
       build: {

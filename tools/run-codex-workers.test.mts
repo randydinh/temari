@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { test } from 'node:test';
 import {
@@ -8,8 +9,12 @@ import {
   readdir,
   stat,
   writeFile,
+  open,
+  rm,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import fsPromises from 'node:fs/promises';
+import { syncBuiltinESMExports } from 'node:module';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -35,6 +40,7 @@ process.stdin.on('end', () => {
   const id = match?.[1] ?? 'unknown';
   const delay = id.startsWith('hang') ? 30000 : id === 'slow' ? 450 : 90;
   fs.writeFileSync('started-' + id, String(process.pid));
+  if (id.startsWith('large-')) { const emit=async(stream,value,prefix)=>{await new Promise((d,r)=>stream.write(prefix,e=>e?r(e):d()));const chunk=Buffer.alloc(65536,value);for(let n=0;n<256;n++)await new Promise((d,r)=>stream.write(chunk,e=>e?r(e):d()));await new Promise((d,r)=>stream.write('!',e=>e?r(e):d()));}; fs.writeFileSync(final,JSON.stringify({status:'PASS',summary:'known result'}));Promise.all([emit(process.stdout,97,'PRIVATE_STDOUT_SENTINEL:'),emit(process.stderr,122,'PRIVATE_STDERR_SENTINEL:')]).then(()=>process.exit(id==='large-exit'?7:0));return; }
   setTimeout(() => {
     console.log(id === 'flood' ? 'x'.repeat(4096) : JSON.stringify({type:'worker',id}));
     if (id === 'exit') process.exit(7);
@@ -180,18 +186,15 @@ test('malformed JSON, exit failure, and timeout retain sibling evidence', async 
   }
 });
 
-test('excessive output is bounded and retained as a blocked result', async () => {
+test('legacy output limit bounds only final JSON and never kills or truncates raw output', async () => {
   const { root, executable } = await fixture();
   const result = await runCodexWorkersRequest({
     ...request(root, executable, ['flood', 'fast'], 'limit'),
     outputLimitBytes: 1024,
   });
-  assert.equal(result.status, 'BLOCKED');
+  assert.equal(result.status, 'PASS');
   const receipt = JSON.parse(await readFile(result.receiptPath, 'utf8'));
-  assert.match(
-    receipt.outcomes[0].result.summary,
-    /exceeded 1024 output bytes/,
-  );
+  assert.equal(receipt.outcomes[0].result.summary, 'flood done');
   assert.equal(receipt.outcomes[1].result.status, 'PASS');
   const processEvidence = JSON.parse(
     await readFile(
@@ -206,11 +209,12 @@ test('excessive output is bounded and retained as a blocked result', async () =>
       'utf8',
     ),
   );
-  assert.equal(processEvidence.outputLimitExceeded, true);
+  assert.equal(processEvidence.outputLimitExceeded, false);
+  assert.equal(processEvidence.finalResponseLimitBytes, 1024);
   const retained = await readFile(
     join(root, 'evidence', 'run-limit', 'revision-1', 'flood', 'stdout.jsonl'),
   );
-  assert(retained.length <= 1024);
+  assert.equal(retained.length, 4097);
 });
 
 test('oversized final response is blocked before parsing and retains diagnostics', async () => {
@@ -223,7 +227,7 @@ test('oversized final response is blocked before parsing and retains diagnostics
   const receipt = JSON.parse(await readFile(result.receiptPath, 'utf8'));
   assert.match(
     receipt.outcomes[0].result.summary,
-    /final response exceeds 1024 bytes/,
+    /invalid or exceeds its semantic byte limit/,
   );
   assert.equal(receipt.outcomes[1].result.status, 'PASS');
   const finalPath = join(
@@ -473,4 +477,198 @@ test('public CLI accepts a request file and prints receipt path', async () => {
     JSON.parse(await readFile(result.receiptPath, 'utf8')).outcomes.length,
     1,
   );
+});
+
+const diagnosticStdoutPrefix = 'PRIVATE_STDOUT_SENTINEL:';
+const diagnosticStderrPrefix = 'PRIVATE_STDERR_SENTINEL:';
+function diagnosticHash(prefix: string, value: number): string {
+  const hashing = createHash('sha256').update(prefix);
+  const chunk = Buffer.alloc(65_536, value);
+  for (let index = 0; index < 256; index++) hashing.update(chunk);
+  return hashing.update('!').digest('hex');
+}
+async function actualDiagnosticHash(path: string): Promise<string> {
+  const hashing = createHash('sha256');
+  const file = await open(path, 'r');
+  try {
+    for await (const chunk of file.createReadStream({ autoClose: false }))
+      hashing.update(chunk);
+  } finally {
+    await file.close();
+  }
+  return hashing.digest('hex');
+}
+async function assertLargeDiagnostic(
+  path: string,
+  stderr = false,
+): Promise<void> {
+  const prefix = stderr ? diagnosticStderrPrefix : diagnosticStdoutPrefix;
+  assert.equal((await stat(path)).size, 16_777_217 + Buffer.byteLength(prefix));
+  assert.equal(
+    await actualDiagnosticHash(path),
+    diagnosticHash(prefix, stderr ? 122 : 97),
+  );
+}
+
+test('read worker runner retains full large pipes on normal and nonzero exits with concise receipts', async (t) => {
+  for (const failed of [false, true])
+    await t.test(failed ? 'nonzero' : 'normal', async () => {
+      const f = await fixture();
+      try {
+        const goal = failed ? 'large-exit' : 'large-pass';
+        const result = await runCodexWorkersRequest({
+          ...request(f.root, f.executable, [goal, 'fast'], 'large'),
+          timeoutMs: 10000,
+          finalResponseLimitBytes: 1024,
+        });
+        assert.equal(result.status, failed ? 'BLOCKED' : 'PASS');
+        const directory = join(
+          f.root,
+          'evidence',
+          'run-large',
+          'revision-1',
+          goal,
+        );
+        await assertLargeDiagnostic(join(directory, 'stdout.jsonl'));
+        await assertLargeDiagnostic(join(directory, 'stderr.log'), true);
+        assert(
+          !(await readFile(result.receiptPath, 'utf8')).includes('PRIVATE_STD'),
+        );
+      } finally {
+        await rm(f.root, { recursive: true, force: true });
+      }
+    });
+});
+
+test('read runner retains private full schema and terminal metadata publication causes with controlled linked results', async (t) => {
+  for (const name of ['output-schema.json', 'process.json'])
+    await t.test(name, async (t) => {
+      const f = await fixture(),
+        cause =
+          'PRIVATE_METADATA_CAUSE_SENTINEL:' + 'm'.repeat(16 * 1024 * 1024 + 1),
+        originalWrite = fsPromises.writeFile;
+      const patched = t.mock.method(
+        fsPromises,
+        'writeFile',
+        async (...args: Parameters<typeof writeFile>) => {
+          if (String(args[0]).endsWith('/' + name)) throw cause;
+          return originalWrite(...args);
+        },
+      );
+      syncBuiltinESMExports();
+      let result: Awaited<ReturnType<typeof runCodexWorkersRequest>>;
+      try {
+        result = await runCodexWorkersRequest(
+          request(f.root, f.executable, ['fast'], 'metadata'),
+        );
+      } finally {
+        patched.mock.restore();
+        syncBuiltinESMExports();
+      }
+      const receipt = JSON.parse(await readFile(result!.receiptPath, 'utf8'));
+      assert.equal(receipt.status, 'BLOCKED');
+      assert.equal(receipt.outcomes[0].error, null);
+      const worker = receipt.outcomes[0].result;
+      assert(worker);
+      assert.equal(worker.status, 'BLOCKED');
+      assert(
+        !JSON.stringify(receipt).includes('PRIVATE_METADATA_CAUSE_SENTINEL'),
+      );
+      const path = worker.evidencePaths.find((path: string) =>
+        path.includes('/adapter-'),
+      );
+      assert(path);
+      assert.equal(await readFile(path, 'utf8'), cause);
+      if (name === 'process.json') {
+        assert(
+          worker.evidencePaths.some((path: string) =>
+            path.endsWith('/stdout.jsonl'),
+          ),
+        );
+        assert(
+          worker.evidencePaths.some((path: string) =>
+            path.endsWith('/stderr.log'),
+          ),
+        );
+        assert(
+          !worker.evidencePaths.some((path: string) =>
+            path.endsWith('/process.json'),
+          ),
+        );
+      } else
+        assert(
+          !worker.evidencePaths.some((path: string) =>
+            path.endsWith('/stdout.jsonl'),
+          ),
+        );
+    });
+});
+
+test('read runner capture setup open failure retains full private cause and available prelaunch sources', async (t) => {
+  for (const name of ['stdout.jsonl', 'stderr.log'])
+    await t.test(name, async (t) => {
+      const f = await fixture(),
+        cause =
+          'PRIVATE_CAPTURE_SETUP_SENTINEL:' + 's'.repeat(16 * 1024 * 1024 + 1),
+        originalOpen = fsPromises.open;
+      const patched = t.mock.method(
+        fsPromises,
+        'open',
+        async (...args: Parameters<typeof open>) => {
+          if (String(args[0]).endsWith('/' + name)) throw cause;
+          return originalOpen(...args);
+        },
+      );
+      syncBuiltinESMExports();
+      let result: Awaited<ReturnType<typeof runCodexWorkersRequest>>;
+      try {
+        result = await runCodexWorkersRequest(
+          request(f.root, f.executable, ['fast'], 'setup'),
+        );
+      } finally {
+        patched.mock.restore();
+        syncBuiltinESMExports();
+      }
+      const receipt = JSON.parse(await readFile(result!.receiptPath, 'utf8'));
+      assert.equal(receipt.status, 'BLOCKED');
+      const outcome = receipt.outcomes[0];
+      assert(
+        Boolean(outcome.result && outcome.error === null),
+        'Setup error must become a controlled result with linked private sources.',
+      );
+      assert(
+        !JSON.stringify(receipt).includes('PRIVATE_CAPTURE_SETUP_SENTINEL'),
+      );
+      const paths = outcome.result.evidencePaths;
+      assert(
+        paths.some((path: string) => path.endsWith('/output-schema.json')),
+      );
+      assert.equal(
+        await readFile(
+          paths.find((path: string) => path.includes('/capture-diagnostic-')),
+          'utf8',
+        ),
+        cause,
+      );
+      if (name === 'stderr.log')
+        assert.equal(
+          await readFile(
+            paths.find((path: string) => path.endsWith('/stdout.jsonl')),
+            'utf8',
+          ),
+          '',
+        );
+      const metadata = JSON.parse(
+        await readFile(
+          paths.find((path: string) => path.endsWith('/process.json')),
+          'utf8',
+        ),
+      );
+      assert.equal(metadata.captureComplete, false);
+      assert.equal(metadata.pid, null);
+      assert.equal(
+        await stat(join(f.root, 'started-fast')).catch(() => null),
+        null,
+      );
+    });
 });

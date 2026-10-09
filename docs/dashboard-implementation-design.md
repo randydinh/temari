@@ -19,14 +19,14 @@ maintainers and agents extending the route.
 
 ## Owners and execution flow
 
-| Owner | Responsibility |
-| --- | --- |
-| Operator / Temari coordinator | Select the plan and goal, review the prepared scopes/checks, assess the final candidate and choose the next action. |
-| Dashboard controller | Validate configuration and request, freeze the resolved briefs and base revision, bind both child groups, expose only supported controls. |
-| Runtime | Own child identities, claims, leases, fencing, durable outcomes, bounded concurrency and receipts. |
+| Owner                              | Responsibility                                                                                                                                 |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Operator / Temari coordinator      | Select the plan and goal, review the prepared scopes/checks, assess the final candidate and choose the next action.                            |
+| Dashboard controller               | Validate configuration and request, freeze the resolved briefs and base revision, bind both child groups, expose only supported controls.      |
+| Runtime                            | Own child identities, claims, leases, fencing, durable outcomes, bounded concurrency and receipts.                                             |
 | Detached implementation supervisor | Invoke the existing write-worker mechanics through runtime-owned children, sequence integration/checks/review, and observe cancellation drain. |
-| Implementer | Edit only assigned paths in its isolated clone and return a bounded report. |
-| Independent reviewer | Inspect the exact clean integration commit and its checks without editing. |
+| Implementer                        | Edit only assigned paths in its isolated clone and return a bounded report.                                                                    |
+| Independent reviewer               | Inspect the exact clean integration commit and its checks without editing.                                                                     |
 
 The workflow is:
 
@@ -185,14 +185,15 @@ to do with it.
 
 ## Integrity and recovery
 
-| Retained boundary | Required behavior |
-| --- | --- |
-| Manifest and task binding | Pin goal, resolved briefs, ownership, checks, limits, source revision and both child groups. |
-| Worker patch | Bind assignment, attempt, base, snapshot commit, changed paths and hash to retained bytes. Recheck before application. |
-| Integration result | Preserve assignment order and verify the committed tree matches the checked candidate. |
-| Independent review | Bind the actual reviewer process to the exact clean integration commit; recheck it after review. |
-| Supervisor | Preserve launch nonce, heartbeat and ownership. Dashboard restart reopens state; ambiguous ownership never authorizes another launch. |
-| Cancellation | Retain intent, stop eligible children, and observe bounded process drain before reporting cancellation. Preserve completed siblings and partial evidence. |
+| Retained boundary         | Required behavior                                                                                                                                                                                                                                         |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest and task binding | Pin goal, resolved briefs, ownership, checks, limits, source revision and both child groups.                                                                                                                                                              |
+| Worker patch              | Bind assignment, attempt, base, snapshot commit, changed paths and hash to retained bytes. Recheck before application.                                                                                                                                    |
+| Diagnostic evidence       | Stream full worker/reviewer pipes, verification transcripts and operational causes into private files and the existing evidence store. Reopen portable and linked identities; retain current and historical failure references without rerunning workers. |
+| Integration result        | Preserve assignment order and verify the committed tree matches the checked candidate.                                                                                                                                                                    |
+| Independent review        | Bind the actual reviewer process to the exact clean integration commit; recheck it after review.                                                                                                                                                          |
+| Supervisor                | Preserve launch nonce, heartbeat and ownership. Dashboard restart reopens state; ambiguous ownership never authorizes another launch.                                                                                                                     |
+| Cancellation              | Retain intent, stop eligible children, and observe bounded process drain before reporting cancellation. Preserve completed siblings and partial evidence.                                                                                                 |
 
 Lost response, missing heartbeat and expired lease are not proof that a process
 has stopped. Do not delete launch records to retry. Do not reuse old patches for
@@ -206,16 +207,17 @@ parallel processes, durable ownership and shared write-runner behavior require
 runtime evidence. Existing write-runner tests cover useful mechanics, but do not
 by themselves prove the new dashboard/supervisor composition.
 
-| Promised outcome | Main risk | Existing coverage to retain | Minimum verification level and proof |
-| --- | --- | --- | --- |
-| Start only the reviewed plan | Serialized config or browser input changes scopes/commands | Controller admission and task idempotency tests | **Focused integration:** malformed/unknown fields, changed pinned goal/plan/base, duplicate Start and concurrent requests refuse or reuse one launch; no worker starts on refusal. |
-| Keep source unchanged and edits scoped | Concurrent writes escape ownership or contaminate source | Write-runner overlap, dirty-base, rename, symlink and unowned-change cases | **Broader regression within the write runner:** retain all existing ownership/isolation cases after extraction; compare source HEAD/status before and after dashboard execution. |
-| Integrate exactly the accepted patches | Partial state, altered patches or assignment order yields a different tree | Tampered patch and integration failure cases | **Focused integration:** two distinct patches combine; tampered bytes, wrong binding and conflicting application block without a valid integration result. |
-| Check and review the same candidate | Verification changes files or reviewer examines another commit | Verification mutation/abort cases and exact-commit host reviewer pattern | **Focused integration:** failing/mutating verification blocks review; passing checks produce a matching commit/tree; a distinct reviewer observes that commit; candidate tampering invalidates integrity. |
-| Preserve work through dashboard restart | Duplicate supervisor or lost ownership starts more writes | Read-only supervisor restart/recovery tests | **Focused integration:** reconnect after dashboard restart to the same active supervisor/groups; ambiguous ownership refuses takeover; completed children are retained. |
-| Stop execution truthfully | Cancellation races worker completion, integration or review | Existing worker abort and supervisor drain cases | **Focused integration:** cancel during building, verification and review; retain partial artifacts; require observed drain; never manufacture cancellation from a stale heartbeat. |
-| Present a reviewable result | Process PASS is mistaken for feature acceptance | Task acceptance refusal for parallel routes | **Focused integration plus browser smoke:** render worker/integration/review evidence and Needs review; no generic Accept/apply/push; a failed review remains actionable. |
-| Actually run coding agents in parallel | Fixtures prove only process plumbing | Existing deterministic isolated-clone overlap fixture | **Live smoke:** one bounded two-implementer run with distinct overlapping process evidence, passing combined checks, a subsequent reviewer and unchanged source. Retain the exact revision and artifacts. |
+| Promised outcome                        | Main risk                                                                  | Existing coverage to retain                                                                                                                                                                             | Minimum verification level and proof                                                                                                                                                                      |
+| --------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Start only the reviewed plan            | Serialized config or browser input changes scopes/commands                 | Controller admission and task idempotency tests                                                                                                                                                         | **Focused integration:** malformed/unknown fields, changed pinned goal/plan/base, duplicate Start and concurrent requests refuse or reuse one launch; no worker starts on refusal.                        |
+| Retain full failure output              | Raw capture is truncated or buffered; archive causes are lost              | Exact-byte fixtures above 16 MiB per stream on the adapter, both runners and both dashboards; normal/nonzero verification; timeout/cancel/sink failure; source/portable tamper and replay without rerun | **Focused integration:** verify full private identities and honest incomplete capture, while semantic bounds remain enforced.                                                                             |
+| Keep source unchanged and edits scoped  | Concurrent writes escape ownership or contaminate source                   | Write-runner overlap, dirty-base, rename, symlink and unowned-change cases                                                                                                                              | **Broader regression within the write runner:** retain all existing ownership/isolation cases after extraction; compare source HEAD/status before and after dashboard execution.                          |
+| Integrate exactly the accepted patches  | Partial state, altered patches or assignment order yields a different tree | Tampered patch and integration failure cases                                                                                                                                                            | **Focused integration:** two distinct patches combine; tampered bytes, wrong binding and conflicting application block without a valid integration result.                                                |
+| Check and review the same candidate     | Verification changes files or reviewer examines another commit             | Verification mutation/abort cases and exact-commit host reviewer pattern                                                                                                                                | **Focused integration:** failing/mutating verification blocks review; passing checks produce a matching commit/tree; a distinct reviewer observes that commit; candidate tampering invalidates integrity. |
+| Preserve work through dashboard restart | Duplicate supervisor or lost ownership starts more writes                  | Read-only supervisor restart/recovery tests                                                                                                                                                             | **Focused integration:** reconnect after dashboard restart to the same active supervisor/groups; ambiguous ownership refuses takeover; completed children are retained.                                   |
+| Stop execution truthfully               | Cancellation races worker completion, integration or review                | Existing worker abort and supervisor drain cases                                                                                                                                                        | **Focused integration:** cancel during building, verification and review; retain partial artifacts; require observed drain; never manufacture cancellation from a stale heartbeat.                        |
+| Present a reviewable result             | Process PASS is mistaken for feature acceptance                            | Task acceptance refusal for parallel routes                                                                                                                                                             | **Focused integration plus browser smoke:** render worker/integration/review evidence and Needs review; no generic Accept/apply/push; a failed review remains actionable.                                 |
+| Actually run coding agents in parallel  | Fixtures prove only process plumbing                                       | Existing deterministic isolated-clone overlap fixture                                                                                                                                                   | **Live smoke:** one bounded two-implementer run with distinct overlapping process evidence, passing combined checks, a subsequent reviewer and unchanged source. Retain the exact revision and artifacts. |
 
 ### Required before claiming the complete route
 
@@ -245,3 +247,13 @@ route during the architecture review. The earlier P-stack graph was navigation
 for legacy relationships and did not establish dashboard behavior. Design claims
 here were checked against the write runner, runtime and host review source. No
 bundled skill/playbook was changed for this documentation increment.
+
+### Pinned dependency integrity
+
+The shared write-runner boundaries also validate existing pinned read-only
+submodules for dashboard implementers. The frozen dependency plan is retained in
+patches and integration receipts; broad parent ownership cannot grant dependency
+writes. Exact-pin checks inspect child bytes/modes, index, HEAD and untracked files
+rather than relying on the parent's clean status or tree. Review uses the same
+shared candidate guard. See [supported layouts and recovery](codex-parallel-workers.md#existing-pinned-read-only-submodules).
+This does not promote a dashboard receipt to canonical feature completion.

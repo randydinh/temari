@@ -691,6 +691,7 @@ test('ACTUAL CLI: graph one-hop trial recovers a lexical miss from a pinned rela
           PATH: '/usr/bin:/bin',
           PYTHONPATH: join(registrarSource, 'src'),
           PYTHONNOUSERSITE: '1',
+          PYTHONDONTWRITEBYTECODE: '1',
         },
       },
     );

@@ -7,7 +7,7 @@ export type StageEvidenceProfile =
   'stage-evidence-v1' | 'candidate-stage-evidence-v1';
 
 export interface CandidateIdentity {
-  readonly scope: 'local-regular-files-v1';
+  readonly scope: 'local-regular-files-v1' | 'git-tracked-files-v1';
   readonly sha256: string;
 }
 
@@ -25,7 +25,8 @@ export function assertCandidateIdentity(
     Array.isArray(value) ||
     Object.keys(value).sort().join(',') !== 'scope,sha256' ||
     !('scope' in value) ||
-    value.scope !== 'local-regular-files-v1' ||
+    (value.scope !== 'local-regular-files-v1' &&
+      value.scope !== 'git-tracked-files-v1') ||
     !('sha256' in value) ||
     typeof value.sha256 !== 'string' ||
     !/^[0-9a-f]{64}$/.test(value.sha256)

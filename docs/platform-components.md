@@ -247,6 +247,24 @@ completion boundary without claiming to kill an in-flight handler. Complete
 cancellation policy and external notifications remain policy work. The
 dispatcher should be deterministic. It is not an LLM scheduler agent.
 
+### Scheduling development workstreams
+
+For multi-step Temari development, assign bounded workstreams to separate chats
+when they can proceed independently or need distinct histories. Give each chat
+an owner, file scope, dependencies, and completion evidence. Check the current
+base revision and active work before launch; use isolated worktrees for
+concurrent writes. Start dependent work only after its required artifact or
+proof is available. The [cutover plan](temari-nx-cutover-plan.md#spawn-owners)
+records the work-package order for that program.
+
+Separate chats each repeat some repository setup and context. Running the same
+chats simultaneously instead of sequentially does not remove that base cost;
+overlapping investigation, stale baselines, and conflicting edits can increase
+total token use. Use waves to gain parallel time where work is independent,
+then reconcile each result before admitting downstream work. This is a
+maintainer coordination rule. Runtime worker concurrency remains governed by
+the `ExecutionPlan` and proven host capabilities.
+
 ### Scheduling path
 
 ```mermaid

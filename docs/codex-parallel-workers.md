@@ -56,7 +56,48 @@ node --import @swc-node/register/esm-register tools/run-codex-workers.mts /absol
 
 The command prints JSON containing `status` and `receiptPath`. It exits nonzero for a blocked or otherwise nonpassing receipt. The receipt is stored at `<evidenceRoot>/<runId>/<revision>/receipt.json`; each assignment has its own directory beside it containing `stdout.jsonl`, `stderr.log`, `process.json`, the output schema, and `final.json` when Codex writes one. `process.json` records the PID and start/end times so actual process overlap can be checked. A failed worker still retains its transcript and process evidence, and the other workers' outcomes remain in the receipt. Run and worker directories use mode `0700`; schema, transcript, process, final-response, and receipt files use mode `0600` on POSIX. Store `evidenceRoot` outside the repository to avoid accidentally staging private transcripts.
 
-The request validates all assignments and resolves the executable before launching workers. Roles are limited to `investigator` and `reviewer`, and briefs must request JSON reports. `maxConcurrency` is capped at 16, `timeoutMs` at 30 minutes, and optional `outputLimitBytes` at 16 MiB (4 MiB by default). This byte limit applies to the combined stream output and separately to `final.json`. A repeated run ID and revision is rejected to keep prior evidence intact. On SIGINT or SIGTERM, the runner kills active worker process groups, records queued work as blocked, and writes a blocked receipt before exiting. An uncatchable termination such as SIGKILL cannot provide that cleanup. The declared parallelism capability remains unproven until a successful real Codex run confirms process overlap; the fake-executable tests prove only the local transport. This command does not resume external processes after interruption or use native chat subagents. It does not provide remote execution or write-capable worker isolation.
+The request validates all assignments and resolves the executable before
+launching workers. Roles are limited to `investigator` and `reviewer`, and
+briefs must request JSON reports. `maxConcurrency` is capped at 16, `timeoutMs`
+at 30 minutes, and optional `finalResponseLimitBytes` at 16 MiB (4 MiB by
+default). This bounds only parsing of `final.json`; the complete final file
+remains retained if parsing is rejected.
+
+`outputLimitBytes` is a deprecated alias for that same semantic limit, and
+conflicting alias/new values are rejected. Raw stdout/stderr and verification
+transcripts stream to private files without a retention byte cap or
+output-volume kill.
+
+A repeated run ID and revision is rejected to keep prior evidence intact. On SIGINT or SIGTERM, the runner kills active worker process groups, records queued work as blocked, and writes a blocked receipt before exiting. An uncatchable termination such as SIGKILL cannot provide that cleanup. The declared parallelism capability remains unproven until a successful real Codex run confirms process overlap; the fake-executable tests prove only the local transport. This command does not resume external processes after interruption or use native chat subagents. It does not provide remote execution or write-capable worker isolation.
+
+Raw capture finishes after the process closes, both pipes drain, and their files
+are synced and closed. Timeout and cancellation still terminate processes and
+retain every delivered byte. Sink, launch, start-observation, input, and
+finalization errors have controlled summaries and full private diagnostic files;
+incomplete capture is explicit. Setup failures launch no process. Each raw
+stream reports whether its owned file is available; receipts and dashboard
+sealing include only available spools and private cause files.
+
+Schema or terminal metadata publication failure returns a controlled blocked
+result with available capture paths and a full private cause. Missing terminal
+metadata prevents transport success; dashboard archival still retains the
+adapter-returned sources.
+
+`process.json` includes received/written byte counts, hashes, capture status,
+and diagnostic source identities. The actual-spawn observation remains
+`process-start.json`, bound to the same PID/start timestamp as the terminal
+record. POSIX process-group behavior is covered by the local fixtures; Windows
+process-tree parity remains unverified.
+
+Restartable dashboard routes publish these sources through the existing evidence
+store and verify them without buffering. Failed children retain typed `retained`
+or `archive-failed` diagnostics, with complete available secondary causes and
+partial references on archive failure. Terminal/retry events preserve canonical
+references plus digests; cancellation binds requested versus effective
+diagnostics. Replay rechecks current and historical references without invoking
+workers. Legacy children without this optional field remain readable and make no
+complete-retention claim. Required routes reject stores lacking both streaming
+ports before claiming children.
 
 ## Write-capable workers
 
@@ -95,7 +136,7 @@ The request validates all assignments and resolves the executable before launchi
 }
 ```
 
-Run `node --import @swc-node/register/esm-register tools/run-codex-write-workers.mts /absolute/path/to/request.json`. The JSON response contains the status, receipt path, integration checkout path, and integrated commit ID when successful. The integration checkout and per-worker clones remain under `<evidenceRoot>/<runId>` for review. A required worker failure blocks integration; an optional worker failure is recorded as a degradation and its patch is omitted. Failed verification leaves the integration checkout for inspection and produces no integration commit. The command rejects submodules, symlink edits, dirty or moved bases, overlapping ownership, and paths that target Git metadata. It does not resume interrupted external processes, apply changes back to the source checkout, or claim a real Codex smoke from fake-process tests.
+Run `node --import @swc-node/register/esm-register tools/run-codex-write-workers.mts /absolute/path/to/request.json`. The JSON response contains the status, receipt path, integration checkout path, and integrated commit ID when successful. The integration checkout and per-worker clones remain under `<evidenceRoot>/<runId>` for review. A required worker failure blocks integration; an optional worker failure is recorded as a degradation and its patch is omitted. Failed verification leaves the integration checkout for inspection and produces no integration commit. The command supports the pinned read-only submodules described below and rejects symlink edits, dirty or moved bases, overlapping ownership, and paths that target Git metadata. It does not resume interrupted external processes, apply changes back to the source checkout, or claim a real Codex smoke from fake-process tests.
 
 ## Repo-local batch routing
 
@@ -131,3 +172,53 @@ This command is a standalone host worker bridge, separate from `start`/`resume`.
 The public `start` entry admits a trusted `full-playbook`/`feature-v1` request when the host proves three distinct local Codex workers and forge push access. The architect investigates the pinned source checkout read-only. The builder works in an isolated clone with owned paths and verification commands. A separate reviewer examines the integration commit read-only. The host binds the observations, process receipts, verified commit, and forge identity to the request and retains them for `resume` and `closeout verify`.
 
 The request includes `schemaVersion: 1`, `entry`, `route: "full-playbook"`, `profile: "feature-v1"`, `obligations` equal to `policy.feature.obligations`, `invocation: { runId, revision, candidate: { scopeId, root }, runDirectory }`, and `featureWorkers: { evidenceRoot, baseCommit, timeoutMs, architect, builder, owns, verify, reviewer }`. The assignment and ownership shapes are in the bundled worker guide. `prepare` is optional. The source checkout must be clean and pinned at `baseCommit`. Run and evidence directories must be outside it. The host selects `codex` and rejects caller-supplied proof paths. Stage results still flow through the six-stage canonical runtime. Deliver requires an open pull request in the selected repository whose head matches the verified integration commit. Publish remains gated by operator approval.
+
+Verification keeps the existing `verify-N.log` combined transcript and adds
+typed raw capture identities to each new verification receipt entry. Dashboard
+sealing includes the transcript, raw pipes, and available operational-cause
+sources.
+
+Receipt/manifest/final JSON, Git status and binary patch inputs remain bounded
+semantic/control data. The legacy buffered evidence APIs retain their 16 MiB
+materialization bound, and stage attestations retain their
+32-payload/16-MiB aggregate input bounds. These limits do not truncate raw retained
+diagnostics.
+
+## Existing pinned read-only submodules
+
+Application-only edits support initialized, clean first-level submodules already
+recorded as gitlinks and uniquely mapped by tracked `.gitmodules` at the pinned
+parent commit. Each dependency must be at that exact commit and contain tracked
+regular files only. Working-tree bytes must equal stored blobs; checkout filters
+and line-ending transformations are unsupported. Ordinary `.git` files into the parent's Git administration
+and independent `.git` directories are supported. Nested dependencies, symlinks,
+unsafe or case-colliding paths, shallow/borrowed object databases, missing objects,
+uninitialized checkouts and coordinated dependency edits are refused. Dependency
+capture is bounded to 10,000 files, 64 MiB of tracked content and 1 MiB of compact
+plan evidence. Application Git capture has its own 10,000-file/64-MiB bound.
+
+The runner freezes `pinned-readonly-dependencies-v1` evidence containing each
+path, commit and tracked file's mode, size and SHA-256, plus `.gitmodules` identity.
+Worker patches and integration receipts retain this plan. Preparation copies local
+Git objects into independent repositories, checks out the exact pins, and never
+fetches remotes or copies ignored/private worktree payloads. Verification that needs
+ignored configuration must supply it separately through the existing preparation
+contract. Dependency identity excludes Git administration and ignored payloads;
+it does not attest to those payloads or their influence on commands.
+
+Owning a parent directory does not authorize changing its dependencies. Changes to
+child bytes, modes, index, HEAD, nonignored untracked files, parent gitlinks or
+`.gitmodules` block integration. Recursive checks explicitly override
+`ignore-submodules`, inspect tracked bytes even under assume-unchanged flags, and
+run around preparation, patch capture/application, verification and source checks.
+The feature host repeats the same typed checks around independent review, stages,
+resume, forge proof and trusted closeout. A parent Git tree or worker PASS alone is
+insufficient; the six-stage canonical receipt and exact-commit PR remain required.
+
+For a refusal, retain the failed receipt and logs. Restore the intended clean,
+initialized dependency at the recorded pin through your normal repository workflow,
+then start a fresh run with a newly reviewed request. The runner does not fetch,
+repair, advance dependencies, rewrite evidence or apply integration changes to the
+source. Rebuild the public package from TypeScript to obtain this behavior; never
+edit an installed cache. Synthetic fixtures prove mechanics, not live worker or
+Sports Analyst compatibility.

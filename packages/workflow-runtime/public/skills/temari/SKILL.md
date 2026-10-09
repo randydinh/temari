@@ -76,14 +76,12 @@ tracker before inspecting or reporting on tickets.
 A request to survey an upcoming sprint can ask for requirement understanding,
 test-plan review, and proposed scenarios before execution. Keep planning findings
 and unrun scenarios distinct from an executed QA disposition. QA Triage instead
-investigates a reported defect: classify and reproduce the symptom, establish
-actual versus expected behavior and exact reproduction steps, split conflated
-issues into distinct proposed reports, and identify a supported root cause or
-mark it unresolved. When applicable, check the upcoming release build for a
-production report and production for a release-build report. Preserve observed,
-reported, and inferred claims separately. Use a dedicated triage playbook only
-when that route is actually admitted; do not claim ticket acceptance or a QA
-evaluator result from triage notes alone.
+investigates a reported defect using the bundled
+[QA Triage skill and ordered playbook](../qa-triage/SKILL.md). This is available
+analytical guidance, not a newly admitted executable route. Use it for bounded
+investigation and an actionable handoff; do not claim ticket acceptance or a QA
+evaluator result from triage notes. Keep full QA Review obligations intact when
+triage is used to investigate one of its failures.
 
 Across these workflows, derive expected behavior from the applicable product or
 business decision. Current code, prior behavior, and a developer's or Temari's

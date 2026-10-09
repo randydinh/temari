@@ -16,5 +16,8 @@ export function invocationScope(input) {
       .update(JSON.stringify(canonical(input)))
       .digest('hex')}`,
     root: input.candidate.root,
+    ...(input.expectedInitial?.scope === 'git-tracked-files-v1'
+      ? { observation: 'git-tracked-files-v1' }
+      : {}),
   };
 }

@@ -1,0 +1,43 @@
+{
+  "summary": "Seeded only owned pilot files and target from the retained implementation; repaired execution/plan bindings, incremental durable capture and signal cleanup, and strict started/completed turn ID consistency. No live benchmark run.",
+  "decisions": [
+    "Freeze matched sources and prompts; explicit identical model/reasoning; six fresh serial read-only ephemeral CLI workers.",
+    "Count completed-turn usage only; reject invalid captures; require independent review with corrections and human time before aggregate comparison.",
+    "Keep pilot separate from public runtime and existing worker harness.",
+    "Version 2 plans pin exact argument templates; report validates executed prompts, arguments, run/version metadata and launch/startup records.",
+    "Sync bounded raw chunks during execution; retain process identity before waiting, terminate groups on SIGINT/SIGTERM, and stop serial execution.",
+    "Document SIGKILL/power-loss orphan and spawn-record-window limits; retain incomplete attempts without auto-retry."
+  ],
+  "verification": {
+    "command": "NX_DAEMON=false NX_ISOLATE_PLUGINS=false pnpm exec nx run runtime:token-pilot-test",
+    "passed": 16,
+    "failed": 0,
+    "modelCalls": 0,
+    "additional": [
+      "Node syntax checks for runner and tests",
+      "--help smoke",
+      "git diff --check",
+      "Nx resolved 25 runtime targets including existing tasks and new token-pilot-test",
+      "Synthetic signal tests cover SIGINT, SIGTERM, SIGKILL, descendant cleanup and serial interruption",
+      "Synthetic accepted-review report refuses prompt/model/reasoning/config/startup/run/version mismatches"
+    ]
+  },
+  "tracking": "Workspace-scoped pickup returned empty; no task was selected or created. This owned-path handoff is local context for the coordinator, not completion authority.",
+  "nextAction": "Coordinator reviews source, fixtures and controls, then prepares a fresh plan with its selected model/reasoning and reviews exact prompts before invoking run.",
+  "nextCommand": "node tools/token-waste-pilot.mjs prepare --out /private/tmp/token-pilot-prepared --model YOUR_MODEL --reasoning medium",
+  "blocker": null,
+  "limitations": [
+    "CLI-only pilot; synthetic QA/revision",
+    "Shared cache/order effects and unexposed server inference settings",
+    "Read-only sandbox does not confine reads; explicit raw-event source-access review required",
+    "No live token savings or human quality acceptance claimed",
+    "Hard kill cannot execute cleanup; manual identity-checked survivor recovery required; hashes are consistency checks, not authenticated records"
+  ],
+  "contextRefs": [
+    "evaluations/token-waste-pilot/README.md",
+    "evaluations/token-waste-pilot/tasks.json",
+    "evaluations/token-waste-pilot/gold.md",
+    "tools/token-waste-pilot.mjs",
+    "tools/token-waste-pilot.test.mjs"
+  ]
+}

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
 import {
   chmod,
@@ -7,13 +8,18 @@ import {
   readFile,
   stat,
   writeFile,
+  open,
+  rm,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import fsPromises from 'node:fs/promises';
+import { syncBuiltinESMExports } from 'node:module';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import {
   runCodexWriteWorkersRequest,
+  verificationEvidencePaths,
   type WriteRunRequest,
 } from './run-codex-write-workers.mjs';
 
@@ -52,7 +58,7 @@ process.stdin.on('end', () => {
     if (id === 'rename') { fs.renameSync('README.md','renamed.md'); require('node:child_process').execFileSync('git',['add','-A']); }
     else fs.writeFileSync(file, id + '\\n');
     fs.writeFileSync(final, JSON.stringify({status:'PASS',summary:id+' done'}));
-    console.log(JSON.stringify({id}));
+    if(id.startsWith('large-')){ const emit=async(stream,value,prefix)=>{await new Promise((d,r)=>stream.write(prefix,e=>e?r(e):d()));const chunk=Buffer.alloc(65536,value);for(let n=0;n<256;n++)await new Promise((d,r)=>stream.write(chunk,e=>e?r(e):d()));await new Promise((d,r)=>stream.write('!',e=>e?r(e):d()));}; Promise.all([emit(process.stdout,97,'PRIVATE_STDOUT_SENTINEL:'),emit(process.stderr,122,'PRIVATE_STDERR_SENTINEL:')]).then(()=>process.exit(id==='large-exit'?7:0)); }else console.log(JSON.stringify({id}));
   }, id === 'slow' ? 1000 : id === 'alpha' ? 280 : 100);
 });
 `,
@@ -109,7 +115,11 @@ test('disjoint write workers overlap in separate clones and join into one verifi
   const f = await fixture();
   const result = await runCodexWriteWorkersRequest(request(f, 'integrate'));
   const receipt = JSON.parse(await readFile(result.receiptPath, 'utf8'));
-  assert.equal(result.status, 'PASS', JSON.stringify({ reason: receipt.reason, receiptPath: result.receiptPath }));
+  assert.equal(
+    result.status,
+    'PASS',
+    JSON.stringify({ reason: receipt.reason, receiptPath: result.receiptPath }),
+  );
   assert.equal(git(f.repo, 'rev-parse', 'HEAD'), f.baseCommit);
   assert.equal(
     git(result.integrationPath, 'rev-parse', 'HEAD'),
@@ -457,4 +467,410 @@ test('overlapping ownership and evidence inside source reject before work', asyn
   };
   await assert.rejects(() => runCodexWriteWorkersRequest(internal), /external/);
   await assert.rejects(() => stat(join(f.repo, 'private-evidence')));
+});
+
+const diagnosticStdoutPrefix = 'PRIVATE_STDOUT_SENTINEL:';
+const diagnosticStderrPrefix = 'PRIVATE_STDERR_SENTINEL:';
+function diagnosticHash(prefix: string, value: number): string {
+  const hashing = createHash('sha256').update(prefix);
+  const chunk = Buffer.alloc(65_536, value);
+  for (let index = 0; index < 256; index++) hashing.update(chunk);
+  return hashing.update('!').digest('hex');
+}
+async function actualDiagnosticHash(path: string): Promise<string> {
+  const hashing = createHash('sha256');
+  const file = await open(path, 'r');
+  try {
+    for await (const chunk of file.createReadStream({ autoClose: false }))
+      hashing.update(chunk);
+  } finally {
+    await file.close();
+  }
+  return hashing.digest('hex');
+}
+async function assertLargeDiagnostic(
+  path: string,
+  stderr = false,
+): Promise<void> {
+  const prefix = stderr ? diagnosticStderrPrefix : diagnosticStdoutPrefix;
+  assert.equal((await stat(path)).size, 16_777_217 + Buffer.byteLength(prefix));
+  assert.equal(
+    await actualDiagnosticHash(path),
+    diagnosticHash(prefix, stderr ? 122 : 97),
+  );
+}
+
+test('write worker runner retains full large pipes on normal and nonzero worker exits', async (t) => {
+  for (const failed of [false, true])
+    await t.test(failed ? 'nonzero' : 'normal', async () => {
+      const f = await fixture();
+      try {
+        const goal = failed ? 'large-exit' : 'large-pass';
+        const result = await runCodexWriteWorkersRequest({
+          ...request(f, 'large', [goal]),
+          verify: [
+            { program: process.execPath, args: ['-e', 'process.exit(0)'] },
+          ],
+          finalResponseLimitBytes: 1024,
+        });
+        assert.equal(result.status, failed ? 'BLOCKED' : 'PASS');
+        const directory = join(f.root, 'evidence', 'large', `evidence-${goal}`);
+        await assertLargeDiagnostic(join(directory, 'stdout.jsonl'));
+        await assertLargeDiagnostic(join(directory, 'stderr.log'), true);
+        assert(
+          !(await readFile(result.receiptPath, 'utf8')).includes('PRIVATE_STD'),
+        );
+      } finally {
+        await rm(f.root, { recursive: true, force: true });
+      }
+    });
+});
+
+test('write verification streams exact full transcripts beyond 16 MiB for normal and nonzero exits', async (t) => {
+  for (const code of [0, 7])
+    await t.test(`exit ${code}`, async () => {
+      const f = await fixture();
+      try {
+        const emitter =
+          "const emit=async(stream,value,prefix)=>{await new Promise((d,r)=>stream.write(prefix,e=>e?r(e):d()));const chunk=Buffer.alloc(65536,value);for(let n=0;n<256;n++)await new Promise((d,r)=>stream.write(chunk,e=>e?r(e):d()));await new Promise((d,r)=>stream.write('!',e=>e?r(e):d()));};";
+        const program =
+          emitter +
+          `Promise.all([emit(process.stdout,97,'PRIVATE_STDOUT_SENTINEL:'),emit(process.stderr,122,'PRIVATE_STDERR_SENTINEL:')]).then(()=>process.exit(${code}));`;
+        const result = await runCodexWriteWorkersRequest({
+          ...request(f, 'large-verify'),
+          verify: [{ program: process.execPath, args: ['-e', program] }],
+        });
+        assert.equal(result.status, code === 0 ? 'PASS' : 'BLOCKED');
+        const receipt = JSON.parse(await readFile(result.receiptPath, 'utf8'));
+        const path = receipt.verification[0].logPath;
+        assert.equal(receipt.verification[0].code, code);
+        const hashing = createHash('sha256').update(diagnosticStdoutPrefix);
+        for (let n = 0; n < 256; n++) hashing.update(Buffer.alloc(65536, 97));
+        hashing.update('!\n--- stderr ---\n').update(diagnosticStderrPrefix);
+        for (let n = 0; n < 256; n++) hashing.update(Buffer.alloc(65536, 122));
+        hashing.update('!');
+        assert.equal(await actualDiagnosticHash(path), hashing.digest('hex'));
+        assert.equal(
+          (await stat(path)).size,
+          2 * 16_777_217 +
+            Buffer.byteLength(
+              diagnosticStdoutPrefix +
+                diagnosticStderrPrefix +
+                '\n--- stderr ---\n',
+            ),
+        );
+        assert(!String(receipt.reason).includes('PRIVATE_STD'));
+      } finally {
+        await rm(f.root, { recursive: true, force: true });
+      }
+    });
+});
+
+test('transcript write failure preserves typed raw pipes and the full private assembly cause', async (t) => {
+  const f = await fixture(),
+    cause =
+      'PRIVATE_TRANSCRIPT_ASSEMBLY_SENTINEL:' +
+      'q'.repeat(16 * 1024 * 1024 + 1),
+    originalOpen = fsPromises.open;
+  const patched = t.mock.method(
+    fsPromises,
+    'open',
+    async (...args: Parameters<typeof open>) => {
+      const file = await originalOpen(...args);
+      if (String(args[0]).endsWith('/verify-0.log'))
+        t.mock.method(file, 'writeFile', async () => {
+          throw cause;
+        });
+      return file;
+    },
+  );
+  syncBuiltinESMExports();
+  let result: Awaited<ReturnType<typeof runCodexWriteWorkersRequest>>;
+  try {
+    result = await runCodexWriteWorkersRequest({
+      ...request(f, 'transcript-failure'),
+      verify: [
+        {
+          program: process.execPath,
+          args: [
+            '-e',
+            "process.stdout.write('original stdout');process.stderr.write('original stderr');",
+          ],
+        },
+      ],
+    });
+  } finally {
+    patched.mock.restore();
+    syncBuiltinESMExports();
+  }
+  const receipt = JSON.parse(await readFile(result!.receiptPath, 'utf8'));
+  assert.equal(receipt.status, 'BLOCKED');
+  assert.equal(receipt.integratedCommit, null);
+  assert.equal(
+    receipt.reason,
+    'Verification command 0 transcript capture failed.',
+  );
+  assert.equal(receipt.verification.length, 1);
+  const capture = receipt.verification[0].capture;
+  assert.equal(capture.complete, false);
+  assert.equal(capture.transcript.status, 'capture-failed');
+  assert.equal(capture.transcript.bytes, 0);
+  assert.equal(await readFile(capture.stdout.path, 'utf8'), 'original stdout');
+  assert.equal(await readFile(capture.stderr.path, 'utf8'), 'original stderr');
+  const diagnostic = capture.diagnostics.find(
+    (d: { category: string }) => d.category === 'verification-transcript',
+  );
+  assert(diagnostic);
+  assert(capture.evidencePaths.includes(diagnostic.path));
+  assert.equal(await readFile(diagnostic.path, 'utf8'), cause);
+  assert.equal(diagnostic.bytes, Buffer.byteLength(cause));
+  assert.equal(
+    diagnostic.sha256,
+    createHash('sha256').update(cause).digest('hex'),
+  );
+  assert(
+    !JSON.stringify(receipt).includes('PRIVATE_TRANSCRIPT_ASSEMBLY_SENTINEL'),
+  );
+  assert.equal(git(f.repo, 'rev-parse', 'HEAD'), f.baseCommit);
+});
+
+test('write runner terminal metadata publication failure keeps linked captures and full private cause without integration', async (t) => {
+  const f = await fixture(),
+    cause =
+      'PRIVATE_WRITE_METADATA_SENTINEL:' + 'm'.repeat(16 * 1024 * 1024 + 1),
+    originalWrite = fsPromises.writeFile;
+  const patched = t.mock.method(
+    fsPromises,
+    'writeFile',
+    async (...args: Parameters<typeof writeFile>) => {
+      if (String(args[0]).endsWith('/process.json')) throw cause;
+      return originalWrite(...args);
+    },
+  );
+  syncBuiltinESMExports();
+  let result: Awaited<ReturnType<typeof runCodexWriteWorkersRequest>>;
+  try {
+    result = await runCodexWriteWorkersRequest(request(f, 'metadata-failure'));
+  } finally {
+    patched.mock.restore();
+    syncBuiltinESMExports();
+  }
+  const receipt = JSON.parse(await readFile(result!.receiptPath, 'utf8'));
+  assert.equal(receipt.status, 'BLOCKED');
+  assert.equal(receipt.integratedCommit, null);
+  assert(!JSON.stringify(receipt).includes('PRIVATE_WRITE_METADATA_SENTINEL'));
+  for (const outcome of receipt.workerReceipt.outcomes) {
+    assert.equal(outcome.error, null);
+    assert.equal(outcome.result.status, 'BLOCKED');
+    const paths = outcome.result.evidencePaths;
+    assert(paths.some((path: string) => path.endsWith('/stdout.jsonl')));
+    assert(paths.some((path: string) => path.endsWith('/stderr.log')));
+    assert.equal(
+      await readFile(
+        paths.find((path: string) => path.includes('/adapter-metadata-')),
+        'utf8',
+      ),
+      cause,
+    );
+  }
+  assert.equal(git(f.repo, 'rev-parse', 'HEAD'), f.baseCommit);
+});
+
+test('write verification setup failure retains the empty owned stdout and full private cause without nonexistent seal members', async (t) => {
+  const f = await fixture(),
+    cause = 'PRIVATE_VERIFICATION_SETUP:' + 'x'.repeat(16_777_217),
+    original = fsPromises.open;
+  const patch = t.mock.method(
+    fsPromises,
+    'open',
+    async (...args: Parameters<typeof open>) => {
+      if (String(args[0]).endsWith('/verify-0.stderr.log')) throw cause;
+      return original(...args);
+    },
+  );
+  syncBuiltinESMExports();
+  let result: Awaited<ReturnType<typeof runCodexWriteWorkersRequest>>;
+  try {
+    result = await runCodexWriteWorkersRequest({
+      ...request(f, 'verification-bootstrap'),
+      verify: [
+        {
+          program: process.execPath,
+          args: [
+            '-e',
+            "process.stdout.write('retained stdout');process.stderr.write('retained stderr');",
+          ],
+        },
+      ],
+    });
+  } finally {
+    patch.mock.restore();
+    syncBuiltinESMExports();
+  }
+  const receipt = JSON.parse(await readFile(result!.receiptPath, 'utf8'));
+  assert.equal(receipt.status, 'BLOCKED');
+  assert.equal(receipt.integratedCommit, null);
+  assert.equal(receipt.reason, 'Verification command 0 capture setup failed.');
+  assert.equal(receipt.verification.length, 1);
+  const entry = receipt.verification[0],
+    capture = entry.capture;
+  assert.equal(entry.code, null);
+  assert.equal(capture.complete, false);
+  assert.equal(capture.transcript, null);
+  assert.equal(capture.stdout.available, true);
+  assert.equal(capture.stdout.bytes, 0);
+  assert.equal(capture.stderr.available, false);
+  assert.equal(capture.stderr.status, 'capture-failed');
+  assert.equal(await readFile(capture.stdout.path, 'utf8'), '');
+  assert.equal(await stat(capture.stderr.path).catch(() => null), null);
+  assert.equal(await stat(entry.logPath).catch(() => null), null);
+  const diagnostic = capture.diagnostics.find(
+    (d: { category: string }) => d.category === 'launch',
+  );
+  assert(diagnostic);
+  assert.equal(await readFile(diagnostic.path, 'utf8'), cause);
+  assert.equal(diagnostic.bytes, Buffer.byteLength(cause));
+  assert.equal(
+    diagnostic.sha256,
+    createHash('sha256').update(cause).digest('hex'),
+  );
+  assert.deepEqual(verificationEvidencePaths(receipt), [
+    capture.stdout.path,
+    diagnostic.path,
+  ]);
+  assert(!JSON.stringify(receipt).includes('PRIVATE_VERIFICATION_SETUP'));
+  assert.equal(git(f.repo, 'rev-parse', 'HEAD'), f.baseCommit);
+});
+
+async function submoduleFixture() {
+  const f = await fixture();
+  const childSource = join(f.root, 'dependency');
+  git(f.root, 'init', '-q', childSource);
+  git(childSource, 'config', 'user.name', 'Test');
+  git(childSource, 'config', 'user.email', 'test@localhost');
+  await writeFile(join(childSource, 'library.txt'), 'pinned\n');
+  await writeFile(join(childSource, '.gitignore'), 'private.txt\n');
+  git(childSource, 'add', '.');
+  git(childSource, 'commit', '-qm', 'dependency');
+  git(
+    f.repo,
+    '-c',
+    'protocol.file.allow=always',
+    'submodule',
+    'add',
+    '-q',
+    childSource,
+    'app/dependencies/privacy',
+  );
+  git(f.repo, 'commit', '-qam', 'pin');
+  git(f.repo, 'config', 'submodule.app/dependencies/privacy.ignore', 'all');
+  await writeFile(
+    join(f.repo, 'app/dependencies/privacy/private.txt'),
+    'private',
+  );
+  return { ...f, baseCommit: git(f.repo, 'rev-parse', 'HEAD') };
+}
+
+test('application-only workers preserve pinned dependencies and retain portable dependency evidence', async () => {
+  const f = await submoduleFixture();
+  const result = await runCodexWriteWorkersRequest(request(f, 'pins'));
+  const receipt = JSON.parse(await readFile(result.receiptPath, 'utf8'));
+  assert.equal(result.status, 'PASS', receipt.reason);
+  assert.equal(receipt.dependencies.schema, 'pinned-readonly-dependencies-v1');
+  assert.equal(
+    receipt.dependencies.dependencies[0].path,
+    'app/dependencies/privacy',
+  );
+  assert.deepEqual(receipt.patches[0].dependencies, receipt.dependencies);
+  assert.equal(
+    await readFile(
+      join(result.integrationPath, 'app/dependencies/privacy/library.txt'),
+      'utf8',
+    ),
+    'pinned\n',
+  );
+  await assert.rejects(
+    readFile(
+      join(result.integrationPath, 'app/dependencies/privacy/private.txt'),
+    ),
+    /ENOENT/,
+  );
+  assert.equal(git(f.repo, 'rev-parse', 'HEAD'), f.baseCommit);
+  assert.equal(
+    git(f.repo, 'status', '--porcelain', '--ignore-submodules=none'),
+    '',
+  );
+});
+
+for (const phase of ['prepare', 'verify', 'worker']) {
+  for (const mutation of [
+    'tracked',
+    'untracked',
+    'mode',
+    'gitmodules',
+    'gitlink',
+  ]) {
+    test(`${phase} dependency ${mutation} mutation cannot publish an integration commit`, async () => {
+      const f = await submoduleFixture();
+      const code =
+        `const fs=require('node:fs');const cp=require('node:child_process');cp.execFileSync('git',['config','submodule.app/dependencies/privacy.ignore','all']);` +
+        {
+          tracked: `cp.execFileSync('git',['-C','app/dependencies/privacy','update-index','--assume-unchanged','library.txt']);fs.writeFileSync('app/dependencies/privacy/library.txt','mutated');`,
+          untracked: `fs.writeFileSync('app/dependencies/privacy/new.txt','mutated');`,
+          mode: `cp.execFileSync('git',['-C','app/dependencies/privacy','config','core.filemode','false']);fs.chmodSync('app/dependencies/privacy/library.txt',0o755);`,
+          gitmodules: `fs.appendFileSync('.gitmodules','\\n# mutated');`,
+          gitlink: `cp.execFileSync('git',['update-index','--force-remove','app/dependencies/privacy']);`,
+        }[mutation];
+      const input = {
+        ...request(f, `${phase}-${mutation}`, ['alpha']),
+        assignments: [
+          {
+            ...assignment('alpha'),
+            owns: [
+              { kind: 'file' as const, path: 'alpha.txt' },
+              { kind: 'directory' as const, path: 'app' },
+            ],
+          },
+        ],
+      };
+      if (phase === 'worker') {
+        const original = await readFile(f.executable, 'utf8');
+        await writeFile(
+          f.executable,
+          original.replace(
+            "else fs.writeFileSync(file, id + '\\n');",
+            `else { ${code} fs.writeFileSync(file, id + '\\n'); }`,
+          ),
+        );
+        // A broad parent scope still cannot grant permission to the dependency.
+      }
+      const result = await runCodexWriteWorkersRequest({
+        ...input,
+        ...(phase === 'worker'
+          ? {}
+          : { [phase]: [{ program: process.execPath, args: ['-e', code] }] }),
+      });
+      assert.notEqual(result.status, 'PASS');
+      assert.equal(result.integratedCommit, null);
+      assert.equal(git(f.repo, 'rev-parse', 'HEAD'), f.baseCommit);
+      assert.equal(
+        await readFile(
+          join(f.repo, 'app/dependencies/privacy/library.txt'),
+          'utf8',
+        ),
+        'pinned\n',
+      );
+    });
+  }
+}
+
+test('verification cannot hide an original-source dependency mutation', async () => {
+  const f = await submoduleFixture();
+  const target = join(f.repo, 'app/dependencies/privacy/library.txt');
+  const result = await runCodexWriteWorkersRequest({ ...request(f, 'source-mutation', ['alpha']), verify: [{ program: process.execPath, args: ['-e', `require('fs').writeFileSync(${JSON.stringify(target)},'mutated source');`] }] });
+  assert.equal(result.status, 'BLOCKED');
+  assert.equal(result.integratedCommit, null);
+  const receipt = JSON.parse(await readFile(result.receiptPath, 'utf8'));
+  assert.match(receipt.reason, /Dependency tracked bytes changed/);
+  assert.equal(receipt.verification.length, 1, 'Retain logs even when post-verification dependency checks fail.');
 });

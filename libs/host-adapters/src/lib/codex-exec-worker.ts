@@ -1,4 +1,8 @@
-import { spawn } from 'node:child_process';
+import {
+  runProcessToFiles,
+  retainProcessDiagnostic,
+  type CapturedProcessDiagnostic,
+} from './process-capture.js';
 import { constants } from 'node:fs';
 import {
   access,
@@ -54,7 +58,9 @@ export interface CodexExecWorkerOptions {
   readonly workspaceRoot: string;
   readonly evidenceDirectory: string;
   readonly timeoutMs: number;
+  /** @deprecated Alias for finalResponseLimitBytes; raw capture is uncapped. */
   readonly outputLimitBytes?: number;
+  readonly finalResponseLimitBytes?: number;
   readonly signal?: AbortSignal;
   /** For isolated synthetic read-only probes outside a Git checkout. */
   readonly skipGitRepoCheck?: boolean;
@@ -71,8 +77,18 @@ interface ProcessEvidence {
   readonly cancelled: boolean;
   readonly outputLimitExceeded: boolean;
   readonly error: string | null;
+  readonly stdoutAvailable: boolean;
+  readonly stderrAvailable: boolean;
   readonly stdoutBytes: number;
   readonly stderrBytes: number;
+  readonly captureComplete: boolean;
+  readonly stdoutWrittenBytes: number;
+  readonly stderrWrittenBytes: number;
+  readonly stdoutSha256: string;
+  readonly stderrSha256: string;
+  readonly captureError: string | null;
+  readonly finalResponseLimitBytes: number;
+  readonly diagnostics: readonly CapturedProcessDiagnostic[];
 }
 
 export async function resolveCodexExecutable(
@@ -115,16 +131,6 @@ function readOnlyPromptFor(assignment: WorkerAssignment): string {
   ].join('\n\n');
 }
 
-function terminateProcess(pid: number | undefined): void {
-  if (!pid) return;
-  try {
-    if (process.platform !== 'win32') process.kill(-pid, 'SIGKILL');
-    else process.kill(pid, 'SIGKILL');
-  } catch {
-    // It may have exited already.
-  }
-}
-
 async function executeCodexExecWorker(
   assignment: WorkerAssignment,
   options: CodexExecWorkerOptions,
@@ -142,9 +148,18 @@ async function executeCodexExecWorker(
   if (!Number.isSafeInteger(options.timeoutMs) || options.timeoutMs < 1) {
     throw new Error('timeoutMs must be a positive integer.');
   }
-  const limit = options.outputLimitBytes ?? 4 * 1024 * 1024;
+  if (
+    options.outputLimitBytes !== undefined &&
+    options.finalResponseLimitBytes !== undefined &&
+    options.outputLimitBytes !== options.finalResponseLimitBytes
+  )
+    throw new Error('outputLimitBytes and finalResponseLimitBytes conflict.');
+  const limit =
+    options.finalResponseLimitBytes ??
+    options.outputLimitBytes ??
+    4 * 1024 * 1024;
   if (!Number.isSafeInteger(limit) || limit < 1) {
-    throw new Error('outputLimitBytes must be a positive integer.');
+    throw new Error('finalResponseLimitBytes must be a positive integer.');
   }
   await mkdir(options.evidenceDirectory, { recursive: true, mode: 0o700 });
   const schemaPath = join(options.evidenceDirectory, 'output-schema.json');
@@ -152,9 +167,63 @@ async function executeCodexExecWorker(
   const stdoutPath = join(options.evidenceDirectory, 'stdout.jsonl');
   const stderrPath = join(options.evidenceDirectory, 'stderr.log');
   const processPath = join(options.evidenceDirectory, 'process.json');
-  await writeFile(schemaPath, `${JSON.stringify(OUTPUT_SCHEMA, null, 2)}\n`, {
-    mode: 0o600,
-  });
+  const startPath = join(options.evidenceDirectory, 'process-start.json');
+  const adapterDiagnostics: CapturedProcessDiagnostic[] = [];
+  const retainAdapterCause = async (
+    category: CapturedProcessDiagnostic['category'],
+    cause: unknown,
+  ): Promise<void> => {
+    adapterDiagnostics.push(
+      await retainProcessDiagnostic(
+        join(
+          options.evidenceDirectory,
+          `adapter-${category}-${adapterDiagnostics.length}.log`,
+        ),
+        category,
+        cause,
+      ),
+    );
+  };
+  const failedAdapterResult = async (
+    summary: string,
+    category: CapturedProcessDiagnostic['category'],
+    cause: unknown,
+    capturedDiagnostics: readonly CapturedProcessDiagnostic[] = [],
+  ): Promise<WorkerResult> => {
+    await retainAdapterCause(category, cause);
+    const paths: string[] = [];
+    for (const path of [
+      stdoutPath,
+      stderrPath,
+      processPath,
+      schemaPath,
+      finalPath,
+      startPath,
+      ...capturedDiagnostics.map((item) => item.path),
+      ...adapterDiagnostics.map((item) => item.path),
+    ]) {
+      try {
+        if ((await stat(path)).isFile()) paths.push(path);
+      } catch {}
+    }
+    return {
+      status: 'BLOCKED',
+      summary,
+      evidencePaths: paths,
+      rawLogPath: paths.includes(stdoutPath) ? stdoutPath : null,
+    };
+  };
+  try {
+    await writeFile(schemaPath, `${JSON.stringify(OUTPUT_SCHEMA, null, 2)}\n`, {
+      mode: 0o600,
+    });
+  } catch (cause) {
+    return failedAdapterResult(
+      'Codex output schema publication failed; available evidence retained.',
+      'schema',
+      cause,
+    );
+  }
   const args = [
     'exec',
     '--ignore-user-config',
@@ -171,127 +240,85 @@ async function executeCodexExecWorker(
     '--json',
     '-',
   ];
-  const startedAt = new Date().toISOString();
-  if (options.signal?.aborted) {
-    const evidence: ProcessEvidence = {
-      schema: 1,
-      pid: null,
-      startedAt,
-      endedAt: new Date().toISOString(),
-      exitCode: null,
-      signal: null,
-      timedOut: false,
-      cancelled: true,
-      outputLimitExceeded: false,
-      error: null,
-      stdoutBytes: 0,
-      stderrBytes: 0,
-    };
-    await Promise.all([
-      writeFile(stdoutPath, '', { mode: 0o600 }),
-      writeFile(stderrPath, '', { mode: 0o600 }),
-      writeFile(processPath, `${JSON.stringify(evidence, null, 2)}\n`, {
-        mode: 0o600,
-      }),
-    ]);
-    const result: WorkerResult = {
-      status: 'BLOCKED',
-      summary: 'Codex worker cancelled before start.',
-      evidencePaths: [stdoutPath, stderrPath, processPath, schemaPath],
-      rawLogPath: stdoutPath,
-    };
-    assertWorkerResult(result);
-    return result;
+  let capture: Awaited<ReturnType<typeof runProcessToFiles>>;
+  try {
+    capture = await runProcessToFiles({
+      program: options.executable,
+      args,
+      cwd: options.workspaceRoot,
+      env:
+        sandbox === 'workspace-write' ? writeWorkerEnvironment() : process.env,
+      stdin: prompt,
+      stdoutPath,
+      stderrPath,
+      timeoutMs: options.timeoutMs,
+      signal: options.signal,
+      onStarted: async ({ pid, startedAt }) => {
+        await writeFile(
+          startPath,
+          `${JSON.stringify({ schema: 1, pid, startedAt, executable: options.executable, workspaceRoot: options.workspaceRoot, assignmentId: assignment.id, sandbox })}\n`,
+          { flag: 'wx', mode: 0o600 },
+        );
+      },
+    });
+  } catch (cause) {
+    return failedAdapterResult(
+      'Codex diagnostic capture setup failed; available evidence retained.',
+      'launch',
+      cause,
+    );
   }
-  let stdoutBytes = 0;
-  let stderrBytes = 0;
-  let retainedBytes = 0;
-  let timedOut = false;
-  let cancelled = false;
-  let outputLimitExceeded = false;
-  let spawnError: string | null = null;
-  const stdoutChunks: Buffer[] = [];
-  const stderrChunks: Buffer[] = [];
-  const child = spawn(options.executable, args, {
-    cwd: options.workspaceRoot,
-    shell: false,
-    detached: process.platform !== 'win32',
-    stdio: ['pipe', 'pipe', 'pipe'],
-    env: sandbox === 'workspace-write' ? writeWorkerEnvironment() : process.env,
-  });
-  const pid = child.pid ?? null;
-  const onAbort = (): void => {
-    cancelled = true;
-    terminateProcess(pid ?? undefined);
-  };
-  options.signal?.addEventListener('abort', onAbort, { once: true });
-  if (options.signal?.aborted) onAbort();
-  const timeout = setTimeout(() => {
-    timedOut = true;
-    terminateProcess(pid ?? undefined);
-  }, options.timeoutMs);
-  const collect = (chunk: Buffer, stream: 'stdout' | 'stderr'): void => {
-    const length = chunk.length;
-    if (stream === 'stdout') stdoutBytes += length;
-    else stderrBytes += length;
-    if (retainedBytes < limit) {
-      const slice = chunk.subarray(0, Math.min(length, limit - retainedBytes));
-      retainedBytes += slice.length;
-      if (stream === 'stdout') stdoutChunks.push(slice);
-      else stderrChunks.push(slice);
-    }
-    if (stdoutBytes + stderrBytes > limit && !outputLimitExceeded) {
-      outputLimitExceeded = true;
-      terminateProcess(pid ?? undefined);
-    }
-  };
-  child.stdout.on('data', (chunk: Buffer) => collect(chunk, 'stdout'));
-  child.stderr.on('data', (chunk: Buffer) => collect(chunk, 'stderr'));
-  child.on('error', (error) => {
-    spawnError = error.message;
-  });
-  child.stdin.on('error', () => {
-    /* Process may exit before consuming input. */
-  });
-  child.stdin.end(prompt);
-  const exit = await new Promise<{
-    code: number | null;
-    signal: NodeJS.Signals | null;
-  }>((resolve) => {
-    child.on('close', (code, signal) => resolve({ code, signal }));
-  });
-  clearTimeout(timeout);
-  options.signal?.removeEventListener('abort', onAbort);
   const evidence: ProcessEvidence = {
     schema: 1,
-    pid,
-    startedAt,
-    endedAt: new Date().toISOString(),
-    exitCode: exit.code,
-    signal: exit.signal,
-    timedOut,
-    cancelled,
-    outputLimitExceeded,
-    error: spawnError,
-    stdoutBytes,
-    stderrBytes,
+    pid: capture.pid,
+    startedAt: capture.startedAt,
+    endedAt: capture.endedAt,
+    exitCode: capture.code,
+    signal: capture.signal,
+    timedOut: capture.timedOut,
+    cancelled: capture.cancelled,
+    outputLimitExceeded: false,
+    error: capture.error,
+    stdoutAvailable: capture.stdout.available,
+    stderrAvailable: capture.stderr.available,
+    stdoutBytes: capture.stdout.receivedBytes,
+    stderrBytes: capture.stderr.receivedBytes,
+    captureComplete: capture.captureComplete,
+    stdoutWrittenBytes: capture.stdout.bytes,
+    stderrWrittenBytes: capture.stderr.bytes,
+    stdoutSha256: capture.stdout.sha256,
+    stderrSha256: capture.stderr.sha256,
+    captureError: capture.stdout.error ?? capture.stderr.error,
+    finalResponseLimitBytes: limit,
+    diagnostics: capture.diagnostics,
   };
-  await Promise.all([
-    writeFile(stdoutPath, Buffer.concat(stdoutChunks), { mode: 0o600 }),
-    writeFile(stderrPath, Buffer.concat(stderrChunks), { mode: 0o600 }),
-    writeFile(processPath, `${JSON.stringify(evidence, null, 2)}\n`, {
+  try {
+    await writeFile(processPath, `${JSON.stringify(evidence, null, 2)}\n`, {
       mode: 0o600,
-    }),
-  ]);
-
+    });
+  } catch (cause) {
+    return failedAdapterResult(
+      'Codex process metadata publication failed; available capture retained.',
+      'metadata',
+      cause,
+      capture.diagnostics,
+    );
+  }
+  const { cancelled, timedOut } = capture;
+  const spawnError = capture.error;
+  const exit = { code: capture.code, signal: capture.signal };
   let status: WorkerResult['status'] = 'BLOCKED';
   let summary: string;
-  if (cancelled) summary = 'Codex worker cancelled by interrupt.';
+  if (cancelled)
+    summary =
+      capture.pid === null
+        ? 'Codex worker cancelled before start.'
+        : 'Codex worker cancelled by interrupt.';
+  else if (!capture.captureComplete)
+    summary = 'Codex diagnostic capture failed; available bytes retained.';
   else if (spawnError) summary = `Codex process failed to start: ${spawnError}`;
   else if (timedOut)
     summary = `Codex process exceeded ${options.timeoutMs} ms.`;
-  else if (outputLimitExceeded)
-    summary = `Codex process exceeded ${limit} output bytes.`;
   else if (exit.code !== 0)
     summary = `Codex process exited with code ${exit.code}, signal ${exit.signal ?? 'none'}.`;
   else {
@@ -318,25 +345,51 @@ async function executeCodexExecWorker(
       status = value.status as WorkerResult['status'];
       summary = value.summary;
     } catch (error) {
-      summary = `Codex final response is invalid: ${error instanceof Error ? error.message : String(error)}`;
+      await retainAdapterCause('final-response', error);
+      summary =
+        'Codex final response is invalid or exceeds its semantic byte limit.';
     }
   }
   let finalExists = false;
   try {
     finalExists = (await stat(finalPath)).isFile();
     if (finalExists) await chmod(finalPath, 0o600);
-  } catch {}
+  } catch (cause) {
+    let missing = false;
+    try {
+      missing = Boolean(
+        cause &&
+        typeof cause === 'object' &&
+        'code' in cause &&
+        cause.code === 'ENOENT',
+      );
+    } catch {}
+    if (!missing) {
+      await retainAdapterCause('final-response', cause);
+      status = 'BLOCKED';
+      summary =
+        'Codex final response publication failed; available evidence retained.';
+    }
+  }
+  const diagnosticPaths: string[] = [];
+  for (const diagnostic of [...capture.diagnostics, ...adapterDiagnostics]) {
+    try {
+      if ((await stat(diagnostic.path)).isFile())
+        diagnosticPaths.push(diagnostic.path);
+    } catch {}
+  }
   const result: WorkerResult = {
     status,
     summary,
     evidencePaths: [
-      stdoutPath,
-      stderrPath,
+      ...(capture.stdout.available ? [stdoutPath] : []),
+      ...(capture.stderr.available ? [stderrPath] : []),
       processPath,
       schemaPath,
+      ...diagnosticPaths,
       ...(finalExists ? [finalPath] : []),
     ],
-    rawLogPath: stdoutPath,
+    rawLogPath: capture.stdout.available ? stdoutPath : null,
   };
   assertWorkerResult(result);
   return result;

@@ -1,3 +1,10 @@
+import {
+  observePinnedDependencies,
+  verifyPinnedDependencies,
+  assertDependencyOwnership,
+  preparePinnedDependencies,
+  type PinnedDependencyPlan,
+} from './pinned-submodules.mjs';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
@@ -9,6 +16,7 @@ import {
   realpath,
   stat,
   writeFile,
+  open,
 } from 'node:fs/promises';
 import {
   basename,
@@ -28,14 +36,22 @@ import {
 } from '../libs/contracts/src/index.js';
 import {
   resolveCodexExecutable,
+  runProcessToFiles,
+  retainProcessDiagnostic,
   runCodexExecWriteWorker,
   type CodexWriteOwnedPath,
+  type CapturedStream,
+  type CapturedProcessDiagnostic,
 } from '../libs/host-adapters/src/index.js';
 import {
   preflightParallelWorkers,
   runParallelWorkers,
   type ParallelWorkerReceipt,
 } from '../libs/workflow-engine/src/index.js';
+import {
+  WorkerExecutionFailure,
+  streamEvidenceFile,
+} from '../libs/runtime/src/index.js';
 
 export type OwnedPath = CodexWriteOwnedPath;
 export interface WriteAssignment {
@@ -56,11 +72,13 @@ export interface WriteRunRequest {
   readonly executable: string;
   readonly timeoutMs: number;
   readonly outputLimitBytes?: number;
+  readonly finalResponseLimitBytes?: number;
   readonly prepare?: readonly CommandSpec[];
   readonly verify: readonly CommandSpec[];
   readonly assignments: readonly WriteAssignment[];
 }
 export interface WorkerPatch {
+  readonly dependencies?: PinnedDependencyPlan;
   readonly assignmentId: string;
   readonly baseCommit: string;
   readonly snapshotCommit: string;
@@ -77,6 +95,7 @@ interface CommandResult {
   readonly outputLimitExceeded: boolean;
 }
 export interface WriteRunReceipt {
+  readonly dependencies?: PinnedDependencyPlan;
   readonly schema: 1;
   readonly runId: string;
   readonly baseCommit: string;
@@ -91,7 +110,39 @@ export interface WriteRunReceipt {
     args: readonly string[];
     code: number | null;
     logPath: string;
+    capture?: {
+      readonly complete: boolean;
+      readonly error: string | null;
+      readonly stdout: CapturedStream;
+      readonly stderr: CapturedStream;
+      readonly diagnostics: readonly CapturedProcessDiagnostic[];
+      readonly evidencePaths: readonly string[];
+      readonly transcript?: CapturedProcessDiagnostic | null;
+    };
   }[];
+}
+/** Legacy receipts carry only their combined transcript; new captures also
+ * identify available raw and operational sources without parsing error prose. */
+export function verificationEvidencePaths(
+  receipt: WriteRunReceipt,
+): readonly string[] {
+  return receipt.verification.flatMap((command) => [
+    ...(command.capture && 'transcript' in command.capture
+      ? command.capture.transcript
+        ? [command.logPath]
+        : []
+      : [command.logPath]),
+    ...(command.capture?.evidencePaths ?? []),
+  ]);
+}
+const plans = new WeakMap<WriteRunRequest, PinnedDependencyPlan>();
+function dependencyPlan(request: WriteRunRequest): PinnedDependencyPlan {
+  let plan = plans.get(request);
+  if (!plan) {
+    plan = observePinnedDependencies(request.sourceRepo, request.baseCommit);
+    plans.set(request, plan);
+  }
+  return plan;
 }
 const gitEnv = {
   ...Object.fromEntries(
@@ -102,6 +153,11 @@ const gitEnv = {
   GIT_COMMITTER_NAME: 'Temari',
   GIT_COMMITTER_EMAIL: 'temari@localhost',
   GIT_CONFIG_NOSYSTEM: '1',
+  GIT_CONFIG_GLOBAL: '/dev/null',
+  GIT_OPTIONAL_LOCKS: '0',
+  GIT_NO_LAZY_FETCH: '1',
+  GIT_NO_REPLACE_OBJECTS: '1',
+  GIT_ALLOW_PROTOCOL: 'file',
 };
 
 function object(value: unknown): Record<string, unknown> {
@@ -218,6 +274,20 @@ export function parseWriteRunRequest(value: unknown): WriteRunRequest {
     item.outputLimitBytes === undefined
       ? undefined
       : numberIn(item.outputLimitBytes, 'outputLimitBytes', 16 * 1024 * 1024);
+  const finalResponseLimitBytes =
+    item.finalResponseLimitBytes === undefined
+      ? undefined
+      : numberIn(
+          item.finalResponseLimitBytes,
+          'finalResponseLimitBytes',
+          16 * 1024 * 1024,
+        );
+  if (
+    outputLimitBytes !== undefined &&
+    finalResponseLimitBytes !== undefined &&
+    outputLimitBytes !== finalResponseLimitBytes
+  )
+    throw new Error('outputLimitBytes and finalResponseLimitBytes conflict.');
   if (
     typeof item.executable !== 'string' ||
     !item.executable.trim() ||
@@ -264,6 +334,9 @@ export function parseWriteRunRequest(value: unknown): WriteRunRequest {
     timeoutMs,
     executable: item.executable,
     outputLimitBytes,
+    ...(finalResponseLimitBytes === undefined
+      ? {}
+      : { finalResponseLimitBytes }),
     prepare: (item.prepare ?? []).map(command),
     verify: item.verify.map(command),
     assignments,
@@ -275,7 +348,7 @@ function killGroup(pid: number | undefined): void {
     process.kill(process.platform === 'win32' ? pid : -pid, 'SIGKILL');
   } catch {}
 }
-async function runArgv(
+async function runBufferedSemanticCommand(
   program: string,
   args: readonly string[],
   cwd: string,
@@ -352,7 +425,14 @@ async function checked(
   signal?: AbortSignal,
   input?: Buffer,
 ): Promise<Buffer> {
-  const result = await runArgv(program, args, cwd, timeoutMs, signal, input);
+  const result = await runBufferedSemanticCommand(
+    program,
+    args,
+    cwd,
+    timeoutMs,
+    signal,
+    input,
+  );
   if (
     result.code !== 0 ||
     result.timedOut ||
@@ -370,7 +450,14 @@ async function git(
   signal?: AbortSignal,
   input?: Buffer,
 ): Promise<Buffer> {
-  return checked('git', args, cwd, 120000, signal, input);
+  return checked(
+    'git',
+    ['-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', ...args],
+    cwd,
+    120000,
+    signal,
+    input,
+  );
 }
 function inside(parent: string, child: string): boolean {
   const rel = relative(parent, child);
@@ -391,7 +478,13 @@ async function ensureNoSymlinkPath(root: string, path: string): Promise<void> {
 }
 async function changedPaths(cwd: string): Promise<string[]> {
   const raw = await git(
-    ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+    [
+      'status',
+      '--porcelain=v1',
+      '-z',
+      '--untracked-files=all',
+      '--ignore-submodules=none',
+    ],
     cwd,
   );
   const entries = raw.toString('utf8').split('\0');
@@ -445,17 +538,23 @@ async function preflight(request: WriteRunRequest): Promise<string> {
   if (
     (
       await git(
-        ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+        [
+          'status',
+          '--porcelain=v1',
+          '-z',
+          '--untracked-files=all',
+          '--ignore-submodules=none',
+        ],
         source,
       )
     ).length
   )
     throw new Error('Source checkout must be clean.');
-  const submodules = (await git(['ls-files', '--stage', '-z'], source))
-    .toString('utf8')
-    .split('\0')
-    .filter((line) => line.startsWith('160000 '));
-  if (submodules.length) throw new Error('Submodules are not supported.');
+  const plan = dependencyPlan(request);
+  assertDependencyOwnership(
+    plan,
+    request.assignments.flatMap((entry) => entry.owns),
+  );
   for (const assignment of request.assignments)
     for (const scope of assignment.owns)
       await ensureNoSymlinkPath(source, scope.path);
@@ -473,6 +572,7 @@ async function clone(
   path: string,
   signal?: AbortSignal,
 ): Promise<void> {
+  const plan = observePinnedDependencies(source, base);
   await checked(
     'git',
     ['clone', '--local', '--no-hardlinks', '--no-checkout', source, path],
@@ -481,6 +581,7 @@ async function clone(
     signal,
   );
   await git(['checkout', '--detach', base], path, signal);
+  preparePinnedDependencies(source, path, plan);
 }
 async function prepare(
   path: string,
@@ -488,7 +589,9 @@ async function prepare(
   baseCommit: string,
   signal?: AbortSignal,
 ): Promise<void> {
-  for (const command of commands)
+  const plan = observePinnedDependencies(path, baseCommit);
+  for (const command of commands) {
+    verifyPinnedDependencies(path, plan);
     await checked(
       command.program,
       command.args,
@@ -496,6 +599,8 @@ async function prepare(
       command.timeoutMs,
       signal,
     );
+    verifyPinnedDependencies(path, plan);
+  }
   if (
     (await git(['rev-parse', 'HEAD'], path)).toString('utf8').trim() !==
     baseCommit
@@ -504,7 +609,13 @@ async function prepare(
   if (
     (
       await git(
-        ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+        [
+          'status',
+          '--porcelain=v1',
+          '-z',
+          '--untracked-files=all',
+          '--ignore-submodules=none',
+        ],
         path,
       )
     ).length
@@ -519,6 +630,9 @@ async function patchFor(
   result: WorkerResult,
 ): Promise<{ result: WorkerResult; patch?: WorkerPatch }> {
   if (result.status !== 'PASS') return { result };
+  const dependencies = dependencyPlan(request);
+  verifyPinnedDependencies(request.sourceRepo, dependencies);
+  verifyPinnedDependencies(clonePath, dependencies);
   const head = (await git(['rev-parse', 'HEAD'], clonePath))
     .toString('utf8')
     .trim();
@@ -543,6 +657,10 @@ async function patchFor(
         summary: 'Worker changed too many paths.',
       },
     };
+  assertDependencyOwnership(
+    dependencies,
+    paths.map((path) => ({ path })),
+  );
   for (const path of paths) {
     if (!owned(path, assignment.owns))
       return {
@@ -596,7 +714,9 @@ async function patchFor(
   )
     .toString('utf8')
     .trim();
+  verifyPinnedDependencies(clonePath, dependencies);
   const patch: WorkerPatch = {
+    dependencies,
     assignmentId: assignment.worker.id,
     baseCommit: request.baseCommit,
     snapshotCommit,
@@ -619,6 +739,7 @@ export async function integrateWriteWorkerPatches(
   onPhase?: (phase: 'integrating' | 'verifying') => Promise<void>,
 ): Promise<WriteRunReceipt> {
   const source = request.sourceRepo;
+  const dependencies = dependencyPlan(request);
   const integrationPath = join(runPath, 'integration');
   const patches = new Map(
     patchList.map((patch) => [patch.assignmentId, patch]),
@@ -640,7 +761,13 @@ export async function integrateWriteWorkerPatches(
         sourceHead !== request.baseCommit ||
         (
           await git(
-            ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+            [
+              'status',
+              '--porcelain=v1',
+              '-z',
+              '--untracked-files=all',
+              '--ignore-submodules=none',
+            ],
             source,
           )
         ).length
@@ -648,6 +775,8 @@ export async function integrateWriteWorkerPatches(
         throw new Error(
           'Source checkout moved or became dirty during worker run.',
         );
+      verifyPinnedDependencies(source, dependencies);
+      verifyPinnedDependencies(integrationPath, dependencies);
       await onPhase?.('integrating');
       for (const entry of request.assignments) {
         const patch = patches.get(entry.worker.id);
@@ -658,6 +787,17 @@ export async function integrateWriteWorkerPatches(
             );
           continue;
         }
+        if (
+          dependencies.dependencies.length &&
+          JSON.stringify(patch.dependencies) !== JSON.stringify(dependencies)
+        )
+          throw new Error('Patch dependency evidence differs.');
+        assertDependencyOwnership(
+          dependencies,
+          patch.changedPaths.map((path) => ({ path })),
+        );
+        verifyPinnedDependencies(source, dependencies);
+        verifyPinnedDependencies(integrationPath, dependencies);
         const patchBytes = await readFile(patch.patchPath);
         if (
           createHash('sha256').update(patchBytes).digest('hex') !== patch.sha256
@@ -675,9 +815,17 @@ export async function integrateWriteWorkerPatches(
           signal,
           patchBytes,
         );
+        verifyPinnedDependencies(integrationPath, dependencies);
       }
+      verifyPinnedDependencies(integrationPath, dependencies);
       const before = await git(
-        ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+        [
+          'status',
+          '--porcelain=v1',
+          '-z',
+          '--untracked-files=all',
+          '--ignore-submodules=none',
+        ],
         integrationPath,
       );
       const verifiedTree = (await git(['write-tree'], integrationPath))
@@ -695,39 +843,194 @@ export async function integrateWriteWorkerPatches(
         throw new Error('Integration candidate contains untracked files.');
       await onPhase?.('verifying');
       for (const [index, command] of request.verify.entries()) {
-        const output = await runArgv(
-          command.program,
-          command.args,
-          integrationPath,
-          command.timeoutMs ?? 120000,
-          signal,
-        );
+        verifyPinnedDependencies(source, dependencies);
+        verifyPinnedDependencies(integrationPath, dependencies);
         const logPath = join(runPath, `verify-${index}.log`);
-        await writeFile(
-          logPath,
-          Buffer.concat([
-            output.stdout,
-            Buffer.from('\n--- stderr ---\n'),
-            output.stderr,
-          ]),
-          { mode: 0o600 },
-        );
-        verification.push({
+        const stdoutPath = join(runPath, `verify-${index}.stdout.log`);
+        const stderrPath = join(runPath, `verify-${index}.stderr.log`);
+        const output = await runProcessToFiles({
+          program: command.program,
+          args: command.args,
+          cwd: integrationPath,
+          timeoutMs: command.timeoutMs ?? 120000,
+          signal,
+          stdoutPath,
+          stderrPath,
+          env: gitEnv,
+        });
+        const diagnosticPaths: string[] = [];
+        for (const diagnostic of output.diagnostics) {
+          try {
+            if ((await lstat(diagnostic.path)).isFile())
+              diagnosticPaths.push(diagnostic.path);
+          } catch {}
+        }
+        const evidencePaths = [
+          ...(output.stdout.available ? [stdoutPath] : []),
+          ...(output.stderr.available ? [stderrPath] : []),
+          ...diagnosticPaths,
+        ];
+        const entry: WriteRunReceipt['verification'][number] = {
           program: command.program,
           args: command.args,
           code: output.code,
           logPath,
-        });
+          capture: {
+            complete: output.captureComplete,
+            error: output.error,
+            stdout: output.stdout,
+            stderr: output.stderr,
+            diagnostics: output.diagnostics,
+            evidencePaths,
+            transcript: null,
+          },
+        };
+        verification.push(entry);
+        if (!output.stdout.available || !output.stderr.available)
+          throw new WorkerExecutionFailure(
+            `Verification command ${index} capture setup failed.`,
+            {
+              complete: false,
+              reason: 'Verification capture setup was incomplete.',
+              evidence: evidencePaths.map((path) => ({
+                source: 'stream',
+                kind: 'verification',
+                content: streamEvidenceFile(path, runPath),
+              })),
+            },
+          );
+        const assemblyCauses: unknown[] = [];
+        let transcript: Awaited<ReturnType<typeof open>> | undefined;
+        try {
+          transcript = await open(logPath, 'wx', 0o600);
+          for (const path of [stdoutPath, stderrPath]) {
+            if (path === stderrPath)
+              await transcript.writeFile('\n--- stderr ---\n');
+            const source = await open(path, 'r');
+            try {
+              for await (const chunk of source.createReadStream({
+                autoClose: false,
+              }))
+                await transcript.writeFile(chunk);
+            } catch (cause) {
+              assemblyCauses.push(cause);
+            } finally {
+              try {
+                await source.close();
+              } catch (cause) {
+                assemblyCauses.push(cause);
+              }
+            }
+            if (assemblyCauses.length) break;
+          }
+          await transcript.sync();
+        } catch (cause) {
+          assemblyCauses.push(cause);
+        } finally {
+          if (transcript) {
+            try {
+              await transcript.close();
+            } catch (cause) {
+              assemblyCauses.push(cause);
+            }
+          }
+        }
+        let transcriptIdentity: CapturedProcessDiagnostic | null = null;
+        try {
+          if ((await lstat(logPath)).isFile()) {
+            const hash = createHash('sha256');
+            let bytes = 0;
+            for await (const chunk of streamEvidenceFile(logPath, runPath)) {
+              bytes += chunk.byteLength;
+              hash.update(chunk);
+            }
+            transcriptIdentity = {
+              category: 'verification-transcript',
+              path: logPath,
+              status: assemblyCauses.length ? 'capture-failed' : 'complete',
+              bytes,
+              sha256: hash.digest('hex'),
+              error: assemblyCauses.length
+                ? 'Verification transcript capture failed.'
+                : null,
+            };
+          }
+        } catch (cause) {
+          assemblyCauses.push(cause);
+        }
+        const assemblyDiagnostics: CapturedProcessDiagnostic[] = [];
+        for (const [causeIndex, cause] of assemblyCauses.entries()) {
+          const diagnostic = await retainProcessDiagnostic(
+            join(
+              runPath,
+              `verify-${index}.transcript-failure-${causeIndex}.log`,
+            ),
+            'verification-transcript',
+            cause,
+          );
+          assemblyDiagnostics.push(diagnostic);
+          try {
+            if ((await lstat(diagnostic.path)).isFile())
+              evidencePaths.push(diagnostic.path);
+          } catch {}
+        }
+        entry.capture = {
+          ...entry.capture!,
+          complete: output.captureComplete && assemblyCauses.length === 0,
+          error: assemblyCauses.length
+            ? 'Verification transcript capture failed.'
+            : output.error,
+          diagnostics: [...output.diagnostics, ...assemblyDiagnostics],
+          transcript: transcriptIdentity,
+        };
+        if (assemblyCauses.length)
+          throw new WorkerExecutionFailure(
+            `Verification command ${index} transcript capture failed.`,
+            {
+              complete: false,
+              reason: 'Verification transcript capture was incomplete.',
+              evidence: [
+                ...(transcriptIdentity ? [logPath] : []),
+                ...evidencePaths,
+              ].map((path) => ({
+                source: 'stream',
+                kind: 'verification',
+                content: streamEvidenceFile(path, runPath),
+              })),
+            },
+          );
+        verifyPinnedDependencies(source, dependencies);
+        verifyPinnedDependencies(integrationPath, dependencies);
         if (
           output.code !== 0 ||
           output.timedOut ||
           output.cancelled ||
-          output.outputLimitExceeded
+          !output.captureComplete ||
+          output.error
         )
-          throw new Error(`Verification command ${index} failed.`);
+          throw new WorkerExecutionFailure(
+            `Verification command ${index} failed (exit=${output.code}, timeout=${output.timedOut}, capture=${output.captureComplete}).`,
+            {
+              complete: output.captureComplete,
+              reason: output.captureComplete
+                ? undefined
+                : 'Verification diagnostic capture was incomplete.',
+              evidence: [logPath, ...evidencePaths].map((path) => ({
+                source: 'stream',
+                kind: 'verification',
+                content: streamEvidenceFile(path, runPath),
+              })),
+            },
+          );
       }
       const after = await git(
-        ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+        [
+          'status',
+          '--porcelain=v1',
+          '-z',
+          '--untracked-files=all',
+          '--ignore-submodules=none',
+        ],
         integrationPath,
       );
       const afterHead = (await git(['rev-parse', 'HEAD'], integrationPath))
@@ -759,7 +1062,13 @@ export async function integrateWriteWorkerPatches(
         finalSourceHead !== request.baseCommit ||
         (
           await git(
-            ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+            [
+              'status',
+              '--porcelain=v1',
+              '-z',
+              '--untracked-files=all',
+              '--ignore-submodules=none',
+            ],
             source,
           )
         ).length
@@ -796,6 +1105,8 @@ export async function integrateWriteWorkerPatches(
         throw new Error(
           'Integration commit does not match the verified candidate.',
         );
+      verifyPinnedDependencies(source, dependencies);
+      verifyPinnedDependencies(integrationPath, dependencies);
       status = 'PASS';
     }
   } catch (error) {
@@ -803,6 +1114,7 @@ export async function integrateWriteWorkerPatches(
     reason = error instanceof Error ? error.message : String(error);
   }
   const receipt: WriteRunReceipt = {
+    dependencies: dependencyPlan(request),
     schema: 1,
     runId: request.runId,
     baseCommit: request.baseCommit,
@@ -834,6 +1146,7 @@ export async function assertWriteCandidate(
   path: string,
   revision: string,
 ): Promise<void> {
+  observePinnedDependencies(path, revision);
   if (
     (await git(['rev-parse', 'HEAD'], path)).toString('utf8').trim() !==
     revision
@@ -842,7 +1155,13 @@ export async function assertWriteCandidate(
   if (
     (
       await git(
-        ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+        [
+          'status',
+          '--porcelain=v1',
+          '-z',
+          '--untracked-files=all',
+          '--ignore-submodules=none',
+        ],
         path,
       )
     ).length
@@ -874,6 +1193,7 @@ export async function runCodexWriteWorkersRequest(
   let integratedCommit: string | null = null;
   try {
     await clone(source, request.baseCommit, integrationPath, signal);
+    verifyPinnedDependencies(source, dependencyPlan(request));
     await prepare(
       integrationPath,
       request.prepare ?? [],
@@ -890,6 +1210,8 @@ export async function runCodexWriteWorkersRequest(
       const path = workerPaths.get(entry.worker.id)!;
       await clone(source, request.baseCommit, path, signal);
       await prepare(path, request.prepare ?? [], request.baseCommit, signal);
+      verifyPinnedDependencies(source, dependencyPlan(request));
+      verifyPinnedDependencies(path, dependencyPlan(request));
     }
     const plan = reconcilePlan({
       workType: 'feature',
@@ -930,6 +1252,7 @@ export async function runCodexWriteWorkersRequest(
           evidenceDirectory: evidenceDir,
           timeoutMs: request.timeoutMs,
           outputLimitBytes: request.outputLimitBytes,
+          finalResponseLimitBytes: request.finalResponseLimitBytes,
           signal,
           baseCommit: request.baseCommit,
           owns: entry.owns,
@@ -961,6 +1284,7 @@ export async function runCodexWriteWorkersRequest(
     reason = error instanceof Error ? error.message : String(error);
   }
   const receipt: WriteRunReceipt = {
+    dependencies: dependencyPlan(request),
     schema: 1,
     runId: request.runId,
     baseCommit: request.baseCommit,

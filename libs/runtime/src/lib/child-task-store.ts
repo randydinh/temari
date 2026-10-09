@@ -13,7 +13,11 @@ import {
 } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 
-import { assertWorkerResult, type WorkerResult } from '@temari/contracts';
+import {
+  assertWorkerResult,
+  type WorkerResult,
+  type WorkerEvidenceReference,
+} from '@temari/contracts';
 
 export type ChildTaskStatus =
   | 'QUEUED'
@@ -33,6 +37,22 @@ export interface ChildTaskLease {
   readonly expiresAt: string;
 }
 
+export type ChildFailureDiagnostics =
+  | {
+      readonly schema: 1;
+      readonly status: 'retained';
+      readonly references: readonly [
+        WorkerEvidenceReference,
+        ...WorkerEvidenceReference[],
+      ];
+    }
+  | {
+      readonly schema: 1;
+      readonly status: 'archive-failed';
+      readonly references: readonly WorkerEvidenceReference[];
+      readonly message: string;
+    };
+
 export interface ChildTaskRecord {
   readonly schema: 1;
   readonly taskId: string;
@@ -46,6 +66,7 @@ export interface ChildTaskRecord {
   readonly lease: ChildTaskLease | null;
   readonly result: WorkerResult | null;
   readonly error: string | null;
+  readonly failureDiagnostics?: ChildFailureDiagnostics;
 }
 
 export interface ChildTaskGroupRecord {
@@ -151,6 +172,7 @@ export interface CompleteChildTaskRequest {
   readonly idempotencyKey: string;
   readonly result?: WorkerResult | null;
   readonly error?: string | null;
+  readonly failureDiagnostics?: ChildFailureDiagnostics;
   readonly now?: Date;
 }
 
@@ -368,6 +390,133 @@ function assertCompletionPayload(
   );
 }
 
+function parseFailureDiagnostics(
+  value: unknown,
+  runId: string,
+  revision: string,
+): ChildFailureDiagnostics {
+  assert(
+    value && typeof value === 'object' && !Array.isArray(value),
+    'Failure diagnostics are invalid.',
+  );
+  const diagnostics = value as ChildFailureDiagnostics;
+  assert.equal(diagnostics.schema, 1);
+  assert(
+    diagnostics.status === 'retained' ||
+      diagnostics.status === 'archive-failed',
+    'Failure diagnostics status is invalid.',
+  );
+  assert.deepEqual(
+    Object.keys(diagnostics).sort(),
+    (diagnostics.status === 'retained'
+      ? ['schema', 'status', 'references']
+      : ['schema', 'status', 'references', 'message']
+    ).sort(),
+    'Failure diagnostics fields are invalid.',
+  );
+  assert(
+    Array.isArray(diagnostics.references),
+    'Failure diagnostic references must be an array.',
+  );
+  if (diagnostics.status === 'retained')
+    assert(
+      diagnostics.references.length > 0,
+      'Retained failure diagnostics require evidence.',
+    );
+  else {
+    assert(typeof diagnostics.message === 'string');
+    assertError(diagnostics.message);
+  }
+  for (const reference of diagnostics.references) {
+    assert(
+      reference && typeof reference === 'object',
+      'Failure diagnostic reference is invalid.',
+    );
+    assert.deepEqual(
+      Object.keys(reference).sort(),
+      ['schema', 'runId', 'revision', 'kind', 'sha256', 'bytes'].sort(),
+      'Failure diagnostic reference fields are invalid.',
+    );
+    assert.equal(reference.schema, 1);
+    assert.equal(reference.runId, runId, 'Failure diagnostic run changed.');
+    assert.equal(
+      reference.revision,
+      revision,
+      'Failure diagnostic revision changed.',
+    );
+    assert(
+      ['stdout', 'stderr', 'worker-result', 'verification', 'other'].includes(
+        reference.kind,
+      ),
+      'Failure diagnostic kind is invalid.',
+    );
+    assertDigest(reference.sha256, 'Failure diagnostic hash');
+    assert(
+      Number.isSafeInteger(reference.bytes) && reference.bytes >= 0,
+      'Failure diagnostic byte count is invalid.',
+    );
+  }
+  return diagnostics;
+}
+
+function diagnosticsPayload(
+  diagnostics: ChildFailureDiagnostics | undefined,
+  prefix = 'failureDiagnostics',
+): ChildTaskEventPayload {
+  return diagnostics === undefined
+    ? {}
+    : {
+        [prefix]: canonical(diagnostics),
+        [`${prefix}Digest`]: digest(diagnostics),
+      };
+}
+
+/** Recover independently validated values from immutable attempt history. */
+export function childFailureDiagnosticsFromEvent(
+  event: ChildTaskEvent,
+  prefix = 'failureDiagnostics',
+): ChildFailureDiagnostics | undefined {
+  const serialized = event.payload[prefix];
+  const expectedDigest = event.payload[`${prefix}Digest`];
+  if (serialized === undefined && expectedDigest === undefined)
+    return undefined;
+  assert(
+    typeof serialized === 'string',
+    'Failure diagnostic history value is missing.',
+  );
+  assertDigest(expectedDigest, 'Failure diagnostic history digest');
+  assert(
+    event.type === 'task-completed' || event.type === 'task-retried',
+    'Failure diagnostics require terminal attempt history.',
+  );
+  assert(
+    Number.isInteger(event.payload.attempt) &&
+      (event.payload.attempt as number) > 0,
+    'Failure diagnostic attempt is invalid.',
+  );
+  assert(
+    Number.isInteger(event.payload.fencingEpoch) &&
+      (event.payload.fencingEpoch as number) > 0,
+    'Failure diagnostic fencing epoch is invalid.',
+  );
+  const diagnostics = parseFailureDiagnostics(
+    JSON.parse(serialized),
+    event.runId,
+    event.revision,
+  );
+  assert.equal(
+    serialized,
+    canonical(diagnostics),
+    'Failure diagnostic history is not canonical.',
+  );
+  assert.equal(
+    expectedDigest,
+    digest(diagnostics),
+    'Failure diagnostic history digest changed.',
+  );
+  return diagnostics;
+}
+
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -431,6 +580,18 @@ function parseRecord(value: unknown): ChildTaskRecord {
   const result = (record.result ?? null) as WorkerResult | null;
   const error = (record.error ?? null) as string | null;
   assertError(error);
+  if (record.failureDiagnostics !== undefined) {
+    assert.equal(
+      record.status,
+      'FAILED',
+      'Only failed tasks may retain failure diagnostics.',
+    );
+    parseFailureDiagnostics(
+      record.failureDiagnostics,
+      record.runId,
+      record.revision,
+    );
+  }
   if (record.status === 'QUEUED' || record.status === 'RUNNING') {
     assert(result === null, `${record.status} tasks cannot retain a result.`);
     assert(error === null, `${record.status} tasks cannot retain an error.`);
@@ -590,6 +751,23 @@ function assertEventHistory(
   let latestTerminal: ChildTaskEvent | null = null;
   let cancellationRequested = false;
   for (const event of events.slice(1)) {
+    const diagnostics = childFailureDiagnosticsFromEvent(event);
+    const requestedDiagnostics = childFailureDiagnosticsFromEvent(
+      event,
+      'requestFailureDiagnostics',
+    );
+    if (diagnostics) {
+      assert(
+        event.type === 'task-retried' || event.payload.to === 'FAILED',
+        'Only failed attempts may retain diagnostics.',
+      );
+    }
+    if (requestedDiagnostics) {
+      assert.equal(event.type, 'task-completed');
+      assert.equal(event.payload.cancellationRequested, true);
+      assert.equal(event.payload.requestedStatus, 'FAILED');
+      assert.equal(event.payload.to, 'CANCELLED');
+    }
     if (event.type === 'task-claimed') {
       assert(status === 'QUEUED' || status === 'RUNNING');
       assert(
@@ -646,6 +824,10 @@ function assertEventHistory(
           isTerminal(event.payload.to as ChildTaskStatus),
       );
       assert.equal(event.payload.attempt, attempts);
+      assert.equal(
+        event.payload.fencingEpoch,
+        latestClaim?.payload.fencingEpoch,
+      );
       status = event.payload.to as ChildTaskStatus;
       terminalEvents += 1;
       latestTerminal = event;
@@ -656,6 +838,19 @@ function assertEventHistory(
       assert.equal(event.payload.from, 'FAILED');
       assert.equal(event.payload.to, 'QUEUED');
       assert.equal(event.payload.attempt, attempts);
+      assert.equal(
+        event.payload.fencingEpoch ?? latestTerminal?.payload.fencingEpoch,
+        latestTerminal?.payload.fencingEpoch,
+      );
+      assert.equal(
+        canonical(diagnostics),
+        canonical(
+          latestTerminal
+            ? childFailureDiagnosticsFromEvent(latestTerminal)
+            : undefined,
+        ),
+        'Retry diagnostic history changed.',
+      );
       status = 'QUEUED';
       retries += 1;
       continue;
@@ -708,6 +903,11 @@ function assertEventHistory(
     if (latestTerminal.type === 'task-completed') {
       assert.equal(latestTerminal.payload.resultDigest, digest(record.result));
       assert.equal(latestTerminal.payload.error, record.error);
+      assert.equal(
+        canonical(childFailureDiagnosticsFromEvent(latestTerminal)),
+        canonical(record.failureDiagnostics),
+        'Completed failure diagnostics changed.',
+      );
     } else {
       assert.equal(latestTerminal.type, 'task-cancelled');
       assert.equal(latestTerminal.payload.resultDigest, digest(null));
@@ -1267,6 +1467,15 @@ export class FileChildTaskStore implements ChildTaskStore {
           (event) => event.idempotencyKey === request.idempotencyKey,
         );
         const resultDigest = digest(result);
+        const diagnostics = request.failureDiagnostics;
+        if (diagnostics !== undefined) {
+          assert.equal(
+            request.status,
+            'FAILED',
+            'Only failed tasks may retain failure diagnostics.',
+          );
+          parseFailureDiagnostics(diagnostics, record.runId, record.revision);
+        }
         if (existing) {
           assert.equal(existing.type, 'task-completed');
           const cancelledAtCompletion =
@@ -1276,6 +1485,14 @@ export class FileChildTaskStore implements ChildTaskStore {
             : request.status;
           const effectiveResult = cancelledAtCompletion ? null : result;
           const effectiveError = cancelledAtCompletion ? null : error;
+          const effectiveDiagnostics = cancelledAtCompletion
+            ? undefined
+            : diagnostics;
+          assert.equal(
+            canonical(childFailureDiagnosticsFromEvent(existing)),
+            canonical(effectiveDiagnostics),
+            'Idempotency key failure diagnostics changed.',
+          );
           if (cancelledAtCompletion) {
             assert.equal(existing.payload.requestedStatus, request.status);
             assert.equal(
@@ -1284,6 +1501,16 @@ export class FileChildTaskStore implements ChildTaskStore {
               'Idempotency key completion request result changed.',
             );
             assert.equal(existing.payload.requestErrorDigest, digest(error));
+            assert.equal(
+              canonical(
+                childFailureDiagnosticsFromEvent(
+                  existing,
+                  'requestFailureDiagnostics',
+                ),
+              ),
+              canonical(diagnostics),
+              'Idempotency key requested failure diagnostics changed.',
+            );
           }
           assert.equal(
             existing.payload.to,
@@ -1332,6 +1559,11 @@ export class FileChildTaskStore implements ChildTaskStore {
             effectiveError,
             'Completed task error changed.',
           );
+          assert.equal(
+            canonical(record.failureDiagnostics),
+            canonical(effectiveDiagnostics),
+            'Completed failure diagnostics changed.',
+          );
           return record;
         }
         const now = request.now ?? new Date();
@@ -1369,6 +1601,9 @@ export class FileChildTaskStore implements ChildTaskStore {
           : request.status;
         const effectiveResult = cancelledAtCompletion ? null : result;
         const effectiveError = cancelledAtCompletion ? null : error;
+        const effectiveDiagnostics = cancelledAtCompletion
+          ? undefined
+          : diagnostics;
         const next: ChildTaskRecord = {
           ...record,
           status: effectiveStatus,
@@ -1376,6 +1611,9 @@ export class FileChildTaskStore implements ChildTaskStore {
           lease: null,
           result: effectiveResult,
           error: effectiveError,
+          ...(effectiveDiagnostics === undefined
+            ? {}
+            : { failureDiagnostics: effectiveDiagnostics }),
         };
         const event = this.createEvent({
           taskId: request.taskId,
@@ -1392,6 +1630,7 @@ export class FileChildTaskStore implements ChildTaskStore {
             fencingEpoch: request.fencingEpoch,
             resultDigest: digest(effectiveResult),
             error: effectiveError,
+            ...diagnosticsPayload(effectiveDiagnostics),
             leaseTokenDigest: digest(request.leaseToken),
             ...(cancelledAtCompletion
               ? {
@@ -1399,6 +1638,10 @@ export class FileChildTaskStore implements ChildTaskStore {
                   requestedStatus: request.status,
                   requestResultDigest: resultDigest,
                   requestErrorDigest: digest(error),
+                  ...diagnosticsPayload(
+                    diagnostics,
+                    'requestFailureDiagnostics',
+                  ),
                 }
               : {}),
           },
@@ -1441,8 +1684,9 @@ export class FileChildTaskStore implements ChildTaskStore {
         assert(record.error, 'Failed child task error is missing.');
         const now = request.now ?? new Date();
         assertDate(now);
+        const { failureDiagnostics: priorDiagnostics, ...priorRecord } = record;
         const next: ChildTaskRecord = {
-          ...record,
+          ...priorRecord,
           status: 'QUEUED',
           updatedAt: now.toISOString(),
           lease: null,
@@ -1461,7 +1705,13 @@ export class FileChildTaskStore implements ChildTaskStore {
             from: 'FAILED',
             to: 'QUEUED',
             attempt: record.attempt,
+            fencingEpoch:
+              [...events]
+                .reverse()
+                .find((event) => event.type === 'task-completed')?.payload
+                .fencingEpoch ?? null,
             error: record.error,
+            ...diagnosticsPayload(priorDiagnostics),
           },
           now,
         });

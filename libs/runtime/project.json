@@ -1,0 +1,12 @@
+{
+  "targets": {
+    "token-pilot-test": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "node --test tools/token-waste-pilot.test.mjs",
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  }
+}
