@@ -180,6 +180,10 @@
         "command": "node --import @swc-node/register/esm-register --test tools/reviewed-local-candidate.test.mjs",
         "cache": false
       },
+      "managed-resource-test": {
+        "command": "node --test --test-name-pattern=\"packages an isolated relocated outer bundle|relocated managed resources\" tools/public-entry-runtime.test.mjs",
+        "cache": false
+      },
       "managed-shutdown-test": {
         "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 tools/managed-shutdown.test.mts",
         "cache": false
