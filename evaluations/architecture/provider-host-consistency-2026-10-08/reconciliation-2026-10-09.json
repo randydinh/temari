@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-09",
+  "sourceThreadId": "01a11a4d-15e4-7ba3-aac6-e6578eb6f066",
+  "sourceThreadTitle": "Temari \u2014 Main coordination",
+  "retainedEvaluatedRevision": "e63ca84e265bfc85df9a87bae7e43b7d1a482e0d",
+  "logsMatchOriginalManifest": true,
+  "assessmentSha256": "20049404ae879c695abd0c03b009f0219ec6d77e111db510ce68e27d4ea70876",
+  "originalManifestAssessmentSha256": "facb207df6f0e01dd6e5ff5ce4adf69408e77c4783d8c5b4bc977e3a8b21f968",
+  "assessmentDigestMatchesOriginalManifest": false,
+  "disposition": "Preserve the latest source evaluation as historical context. The original assessment digest is stale; all three original log hashes and sizes match. This retention does not establish current-head or live provider parity.",
+  "latestPilotContext": {
+    "nativeRun": "7fbfab0ad6ce5b75b8ae406fb65ea458",
+    "sourceCommit": "33814fe3357276de84b63208629a23843dd398a7",
+    "productCandidate": "0daf2f9c8cab7b370e7895c928203660e1680722",
+    "status": "failed at review admission on configuration drift; candidate remains unreviewed and unaccepted",
+    "sourceHandoff": "/Users/randydinh/Documents/Codex/2026-10-08/temari-managed-live-proof/outputs/STARTUP-SUPERVISED-LIVE-FAILURE-AND-HANDOFF.md"
+  }
+}
