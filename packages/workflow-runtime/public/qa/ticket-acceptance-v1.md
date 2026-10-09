@@ -22,3 +22,9 @@ does not establish execution of that product profile.
 6. Report the QA disposition at its proven scope. A blocked evaluator, uncovered required outcome, or green command without a discriminating observation cannot produce a full pass.
 
 The installed local worker currently checks evidence structure and incomplete scenarios. Until a trusted semantic evaluator and applicable project verifier are exercised, its result remains bounded and cannot establish a full product pass.
+
+For an unexplained failure in step 4, optionally use the
+[QA Triage skill and ordered playbook](../skills/qa-triage/SKILL.md). Carry its
+analysis back into this assignment; it does not replace required scenarios,
+independent evaluation, or the full QA disposition, and admits no new execution
+profile. Keep blocked checks distinct from useful investigation that can continue.

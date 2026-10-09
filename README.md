@@ -158,5 +158,12 @@ satisfy its independent review requirements. Changes to the writer have a versio
 [changelog](packages/workflow-runtime/public/skills/qa-review-verification/CHANGELOG.md)
 and retained [trial records](evaluations/qa-review-verification/README.md).
 
+For reported defects or uncertain QA failures, Temari and Poteto use the bundled
+[QA Triage skill](packages/workflow-runtime/public/skills/qa-triage/SKILL.md), its
+[ordered playbook](packages/workflow-runtime/public/skills/qa-triage/references/issue-triage-v1.md)
+and compact analytical handoff. It separates evidence, causal confidence, impact
+and next action. This is guidance, not a new executable profile or QA signoff;
+the existing writer handles reports and Poteto handles authorized repair.
+
 The [facilities uptime walkthrough](docs/demos/facilities-uptime.md) shows the
 same engine applied to a synthetic hospital site-operations incident.

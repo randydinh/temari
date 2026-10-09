@@ -112,7 +112,7 @@ if set(policy["entries"]) != {"temari", "poteto-mode", "closeout"}:
     raise ValueError("reviewed public policy entries changed")
 public_skill_files = sorted((public_root / "skills").glob("*/SKILL.md"))
 if {path.parent.name for path in public_skill_files} != {
-    "temari", "poteto-mode", "closeout", "qa-review-verification", "temari-knowledge"
+    "temari", "poteto-mode", "closeout", "qa-review-verification", "temari-knowledge", "qa-triage"
 }:
     raise ValueError("reviewed public skill inventory changed")
 node("public:policy", "admission", "Public admission policy", source=relative(public_root / "policy.json"))
@@ -124,6 +124,23 @@ for entry_name in ("temari", "poteto-mode", "closeout"):
 qa_public = public_root / "skills/qa-review-verification/SKILL.md"
 node("public-skill:qa-review-verification", "public-skill", "QA verification", source=relative(qa_public))
 edge("public-entry:temari", "public-skill:qa-review-verification", "invokes_supporting_skill", "documented", relative(public_root / "skills/temari/SKILL.md"))
+triage_public = public_root / "skills/qa-triage/SKILL.md"
+triage_playbook = public_root / "skills/qa-triage/references/issue-triage-v1.md"
+triage_note = public_root / "skills/qa-triage/assets/triage-note.md"
+acceptance_public = public_root / "qa/ticket-acceptance-v1.md"
+node("public-skill:qa-triage", "public-skill", "QA Triage", source=relative(triage_public))
+node("public-playbook:issue-triage-v1", "public-playbook", "Issue triage v1", source=relative(triage_playbook))
+node("public-template:triage-note", "template", "Compact triage handoff", source=relative(triage_note))
+node("public-playbook:ticket-acceptance-v1", "public-playbook", "Ticket acceptance QA v1", source=relative(acceptance_public))
+for entry_name in ("temari", "poteto-mode"):
+    edge(f"public-entry:{entry_name}", "public-skill:qa-triage", "invokes_supporting_skill", "documented", relative(public_root / "skills" / entry_name / "SKILL.md"))
+edge("public-skill:qa-triage", "public-playbook:issue-triage-v1", "uses_playbook", "source_reference", relative(triage_public))
+edge("public-playbook:issue-triage-v1", "public-template:triage-note", "produces_handoff", "source_reference", relative(triage_playbook))
+edge("public-playbook:ticket-acceptance-v1", "public-skill:qa-triage", "optional_failure_analysis", "source_reference", relative(acceptance_public))
+edge("public-skill:qa-triage", "public-skill:qa-review-verification", "hands_off_reporting", "source_reference", relative(triage_public))
+edge("public-skill:qa-triage", "owner:temari", "intent_authority_lifecycle", "documented", relative(triage_public))
+edge("public-skill:qa-triage", "owner:poteto", "hands_off_authorized_repair", "documented", relative(triage_public))
+
 knowledge_public = public_root / "skills/temari-knowledge/SKILL.md"
 node("public-skill:temari-knowledge", "public-skill", "Temari Knowledge", source=relative(knowledge_public))
 
@@ -232,7 +249,7 @@ for target in re.findall(r"\[[^\]]*\]\(([^)]+)\)", index.read_text()):
 graph = {
     "schemaVersion": 1,
     "scope": "Temari public entries and v4.1 bundled P-stack skills and playbooks, with adjacent ownership boundaries",
-    "reviewedAt": "2026-10-03",
+    "reviewedAt": "2026-10-08",
     "evidenceRule": "documented and source_reference edges describe checked source; review_recommendation edges are proposals, not current behavior",
     "nodes": sorted(nodes.values(), key=lambda item: item["id"]),
     "edges": sorted(edges.values(), key=lambda item: (item["from"], item["relation"], item["to"], item["basis"])),
