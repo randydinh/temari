@@ -12,6 +12,12 @@ import {
 import { constants } from 'node:fs';
 import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 import { promisify } from 'node:util';
+import { fileURLToPath } from 'node:url';
+// The public packager sets this constant; source development stays compatible.
+declare const TEMARI_PACKAGED_MANAGED_RESOURCES: boolean;
+const packagedManagedResources =
+  typeof TEMARI_PACKAGED_MANAGED_RESOURCES !== 'undefined' &&
+  TEMARI_PACKAGED_MANAGED_RESOURCES === true;
 import type {
   HarnessRunRef,
   WorkerAssignment,
@@ -218,6 +224,25 @@ export async function validateManagedCandidateProfile(
     new Set(p.protectedInputs.map((x) => x.path)).size,
     p.protectedInputs.length,
   );
+  if (packagedManagedResources) {
+    for (const path of [
+      p.bridgePath,
+      join(dirname(p.bridgePath), 'managed-candidate-operation.mjs'),
+      join(
+        dirname(p.bridgePath),
+        '.archon/workflows/temari-reviewed-local-candidate.yaml',
+      ),
+      join(dirname(p.bridgePath), 'owned-process/guardian.mjs'),
+      join(dirname(p.bridgePath), 'owned-process/anchor.mjs'),
+      fileURLToPath(import.meta.url),
+      fileURLToPath(new URL('./dashboard-planner.mjs', import.meta.url)),
+    ]) {
+      assert(
+        p.protectedInputs.some((ref) => ref.path === path),
+        'Packaged managed resource must be a protected external input.',
+      );
+    }
+  }
   for (const [path, digest] of [
     [p.bridgePath, p.bridgeSha256],
     [p.bridgeRuntimeExecutable, p.bridgeRuntimeSha256],

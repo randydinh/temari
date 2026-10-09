@@ -78,7 +78,7 @@ test('canonical artifact contains only compiled production packages and verifies
       !/\.test\.|\/demo\/|\/fixtures\/|\.map$|tsbuildinfo/.test(file.path),
       file.path,
     );
-    assert(/\.(?:js|d\.ts|json|py)$/.test(file.path), file.path);
+    assert(/\.(?:m?js|d\.ts|json|py)$/.test(file.path), file.path);
     const text = await readFile(join(artifact, file.path), 'utf8');
     assert(!text.includes(repository), file.path);
     assert(!text.includes('@swc-node/register'), file.path);
@@ -89,6 +89,10 @@ test('canonical artifact contains only compiled production packages and verifies
     'workflow-engine',
     'runtime',
     'knowledge',
+    'privacy',
+    'host-adapters',
+    'plan-draft',
+    'archon-harness',
   ]) {
     const pkg = JSON.parse(
       await readFile(
@@ -153,6 +157,49 @@ test('relocated knowledge API and CLI run with stock Node and no workspace loade
   assert.match(cli.stdout, /journey-intake --input/);
   assert.match(cli.stdout, /journey-query --input/);
   assert.match(cli.stdout, /journey-jobs-tick --spec/);
+});
+
+test('relocated managed APIs preserve the shared policy and privacy without source access', async (t) => {
+  const { artifact } = await relocated(t);
+  const env = { ...process.env, NODE_OPTIONS: '', NODE_PATH: '' };
+  const result = await child(
+    [
+      '--permission',
+      `--allow-fs-read=${artifact}`,
+      '--input-type=module',
+      '-e',
+      `import assert from 'node:assert/strict';
+     import {workerEfficiencyPolicy} from '@temari/contracts';
+     import {createProtectedModelTransport,runCodexExecWorker} from '@temari/host-adapters';
+     import {createCommandJudgments} from '@temari/plan-draft';
+     import {ArchonHarness} from '@temari/archon-harness';
+     import {assessmentPolicy,proposalPolicy,reviewPolicy} from './node_modules/@temari/plan-draft/src/lib/judgment-policy.js';
+     assert.equal(typeof runCodexExecWorker,'function');
+     assert.equal(typeof createCommandJudgments,'function');
+     assert.equal(typeof ArchonHarness,'function');
+     for(const policy of [assessmentPolicy,proposalPolicy,reviewPolicy]) {
+       assert.equal(policy.revision,2);
+       assert(policy.instructions.includes(workerEfficiencyPolicy.instructions));
+       assert(policy.instructions.includes('Do not execute tools'));
+     }
+     let sent;
+     const transport=createProtectedModelTransport({async complete(request){sent=request.prompt;return 'Checked';}}, {
+       policy:{literals:[{value:'synthetic@example.invalid',kind:'EMAIL'},{value:'fixture-secret',kind:'CREDENTIAL'}]},
+     });
+     const reply=await transport.complete({prompt:'Inspect synthetic@example.invalid. password=fixture-secret'});
+     assert(sent.includes(workerEfficiencyPolicy.id));
+     assert(!sent.includes('synthetic@example.invalid'));
+     assert(!sent.includes('fixture-secret'));
+     assert.equal(reply.text,'Checked');reply.dispose();
+     console.log(JSON.stringify({policy:workerEfficiencyPolicy.id,privacy:'masked',knowledgePolicies:3}));`,
+    ],
+    { cwd: artifact, env },
+  );
+  assert.deepEqual(JSON.parse(result.stdout), {
+    policy: 'temari-worker-efficiency/v1',
+    privacy: 'masked',
+    knowledgePolicies: 3,
+  });
 });
 
 test('relocated knowledge prepare command finds its packaged helper', async (t) => {

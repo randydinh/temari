@@ -51,6 +51,59 @@ import {
 export const digest = (bytes) =>
   createHash('sha256').update(bytes).digest('hex');
 export const objectDigest = (value) => digest(canonical(value));
+// Replaced by the public packager; source invocations retain their TS loader.
+const packagedManagedResources =
+  typeof TEMARI_PACKAGED_MANAGED_RESOURCES !== 'undefined' &&
+  TEMARI_PACKAGED_MANAGED_RESOURCES === true;
+
+export function managedCandidateResources() {
+  return {
+    bridge: fileURLToPath(import.meta.url),
+    operation: fileURLToPath(
+      new URL(
+        packagedManagedResources
+          ? './managed-candidate-operation.mjs'
+          : '../../../tools/managed-candidate-operation.mts',
+        import.meta.url,
+      ),
+    ),
+    workflow: fileURLToPath(
+      new URL(
+        './.archon/workflows/temari-reviewed-local-candidate.yaml',
+        import.meta.url,
+      ),
+    ),
+    cwd: fileURLToPath(
+      new URL(packagedManagedResources ? './' : '../../../', import.meta.url),
+    ),
+  };
+}
+
+/** The bridge digest alone cannot bind separately launched packaged resources. */
+export async function assertManagedResourceBindings(spec) {
+  if (!packagedManagedResources) return;
+  const { bridge, operation, workflow } = managedCandidateResources();
+  for (const path of [
+    bridge,
+    operation,
+    workflow,
+    fileURLToPath(new URL('./owned-process/guardian.mjs', import.meta.url)),
+    fileURLToPath(new URL('./owned-process/anchor.mjs', import.meta.url)),
+  ]) {
+    assert.equal(await realpath(path), path, 'Managed resource alias refused.');
+    assert(
+      !inside(spec.repositoryRoot, path),
+      'Managed resource must be protected outside candidate.',
+    );
+    const ref = spec.protectedInputs.find((entry) => entry.path === path);
+    assert(ref, 'Packaged managed resource protected input missing.');
+    assert.equal(
+      digest(await readFile(path)),
+      ref.sha256,
+      'Packaged managed resource digest changed.',
+    );
+  }
+}
 /** The executing bridge is the subprocess runtime authority. Bun only changes
  * argv; PATH never selects another runtime. Call after runtime admission. */
 export function managedOperationCommand(
@@ -65,15 +118,16 @@ export function managedOperationCommand(
   );
   return {
     program: process.execPath,
-    args: isBun
-      ? [tool, requestPath, resultPath]
-      : [
-          '--import',
-          '@swc-node/register/esm-register',
-          tool,
-          requestPath,
-          resultPath,
-        ],
+    args:
+      isBun || tool.endsWith('.mjs')
+        ? [tool, requestPath, resultPath]
+        : [
+            '--import',
+            '@swc-node/register/esm-register',
+            tool,
+            requestPath,
+            resultPath,
+          ],
   };
 }
 export async function assertManagedBridgeRuntime(spec) {
@@ -250,6 +304,7 @@ async function checkRefs(refs) {
 }
 async function checkProtectedInputs(spec) {
   await assertManagedBridgeRuntime(spec);
+  await assertManagedResourceBindings(spec);
   const configRef = spec.protectedInputs.find(
     (ref) => ref.path === spec.modelAdmission.configPath,
   );
@@ -979,19 +1034,19 @@ async function worker(
         const requestPath = join(workerRoot, 'owned-operation-input.json');
         const resultPath = join(workerRoot, 'owned-operation-output.json');
         await sealed(requestPath, { stage, request });
-        const tool = fileURLToPath(
-          new URL(
-            '../../../tools/managed-candidate-operation.mts',
-            import.meta.url,
-          ),
-        );
+        const resources = managedCandidateResources();
         await assertManagedBridgeRuntime(spec);
-        const command = managedOperationCommand(tool, requestPath, resultPath);
+        await assertManagedResourceBindings(spec);
+        const command = managedOperationCommand(
+          resources.operation,
+          requestPath,
+          resultPath,
+        );
         await control.run(
           `${control.options.authorityId}-worker`,
           {
             ...command,
-            cwd: fileURLToPath(new URL('../../../', import.meta.url)),
+            cwd: resources.cwd,
             timeoutMs: spec.timeoutMs + (stage === 'build' ? 900000 : 180000),
           },
           {
