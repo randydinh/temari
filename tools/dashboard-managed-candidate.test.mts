@@ -25,6 +25,7 @@ import {
 } from '../libs/temari-core/src/index.js';
 import {
   FileTaskStore,
+  FileChildTaskStore,
   TaskRuntime,
   taskDigest,
   FileWorkflowReceiptStore,
@@ -50,6 +51,7 @@ import {
   type DashboardManagedCandidateProfile,
 } from './dashboard-managed-candidate.mjs';
 import { createDashboardTalkTaskBridge } from './task-continuity.mjs';
+import { createDashboardManagedObserver } from './dashboard-managed-observer.mjs';
 const exec = promisify(execFile);
 const sha = (b: Uint8Array | string) =>
   createHash('sha256').update(b).digest('hex');
@@ -185,7 +187,9 @@ const fs=require('node:fs'),args=process.argv.slice(2);let input='';process.stdi
     loseResponse = false,
     readinessMode: 'ready' | 'timeout' | 'pending-ready' = 'ready',
     verifyDrift = false,
-    concurrent = false;
+    concurrent = false,
+    identityDrift = false;
+  let onStatus: (() => Promise<void>) | undefined;
   const harness: ReviewedLocalCandidateHarness = {
     id: 'fixture',
     version: '1',
@@ -224,6 +228,11 @@ const fs=require('node:fs'),args=process.argv.slice(2);let input='';process.stdi
     },
     async status(ref) {
       assert.deepEqual(ref, nativeRef);
+      if (onStatus) {
+        const callback = onStatus;
+        onStatus = undefined;
+        await callback();
+      }
       return {
         status,
         summary: status,
@@ -309,7 +318,7 @@ const fs=require('node:fs'),args=process.argv.slice(2);let input='';process.stdi
     readNative: async (ref) => {
       const { externalRunId, startedAt, ...binding } = ref;
       return {
-        id: externalRunId,
+        id: identityDrift ? 'wrong-native' : externalRunId,
         workflow_name: ref.entrypoint,
         working_path: workspaceRoot,
         status,
@@ -436,6 +445,36 @@ const fs=require('node:fs'),args=process.argv.slice(2);let input='';process.stdi
     publish,
     artifacts,
     host,
+    setStatus(value: HarnessRunStatus) {
+      status = value;
+    },
+    identityDrift() {
+      identityDrift = true;
+    },
+    onStatus(callback: () => Promise<void>) {
+      onStatus = callback;
+    },
+    restart() {
+      return new DashboardController({
+        config,
+        store,
+        runtime,
+        bridgePath,
+        finalizerPath: bridgePath,
+        archonHome,
+        managedCandidateHost: host,
+        readNative: async (ref) => {
+          const { externalRunId, startedAt, ...binding } = ref;
+          return {
+            id: externalRunId,
+            workflow_name: ref.entrypoint,
+            working_path: workspaceRoot,
+            output_root: outputRoot,
+            metadata: { inputs: { temari_binding: JSON.stringify(binding) } },
+          };
+        },
+      });
+    },
     get launches() {
       return launches;
     },
@@ -823,4 +862,319 @@ test('concurrent task change before dispatch launches zero native work and prese
   assert.equal(f.launches, 0);
   assert.equal(current.nextAction, 'Concurrent edit');
   assert.equal(current.blocker, null);
+});
+
+async function startManaged(f: Awaited<ReturnType<typeof fixture>>) {
+  const task = await f.prepare();
+  return f.controller.action(task.taskId, {
+    action: 'implementation-start',
+    requestId: 'start',
+    expectedVersion: task.version,
+  });
+}
+
+test('automatic host ticks settle a single launch and unchanged/replayed ticks do not append', async (t) => {
+  const f = await fixture(t),
+    running = await startManaged(f);
+  for (let i = 0; i < 3; i++)
+    assert.deepEqual(await f.controller.observeManagedCandidates(), {
+      scanned: 1,
+      issues: [],
+    });
+  assert.equal(
+    (await f.runtime.snapshot(running.taskId)).version,
+    running.version,
+  );
+  assert.equal(
+    (await f.runtime.snapshot(running.taskId)).events.length,
+    running.events.length,
+  );
+  await f.publish();
+  const observer = createDashboardManagedObserver(f.controller);
+  observer.start();
+  await observer.stop();
+  assert.deepEqual(observer.health().issues, []);
+  const done = await f.runtime.snapshot(running.taskId);
+  assert.equal(done.status, 'NEEDS_REVIEW');
+  assert.equal(done.semanticAcceptance, false);
+  assert.match(done.handoff!.summary, /cccc/);
+  assert.deepEqual(await f.controller.observeManagedCandidates(), {
+    scanned: 1,
+    issues: [],
+  });
+  assert.equal(
+    (await f.runtime.snapshot(running.taskId)).version,
+    done.version,
+  );
+  assert.equal(f.launches, 1);
+});
+
+test('observer restart uses the exact retained reference and never relaunches', async (t) => {
+  const f = await fixture(t),
+    running = await startManaged(f);
+  const restarted = f.restart();
+  await f.publish();
+  assert.deepEqual(await restarted.observeManagedCandidates(), {
+    scanned: 1,
+    issues: [],
+  });
+  assert.equal(
+    (await f.runtime.snapshot(running.taskId)).status,
+    'NEEDS_REVIEW',
+  );
+  assert.equal(f.launches, 1);
+});
+
+test('uncertain dispatch without a reference stays explicit recovery', async (t) => {
+  const f = await fixture(t),
+    task = await f.prepare();
+  f.lost();
+  await assert.rejects(
+    f.controller.action(task.taskId, {
+      action: 'implementation-start',
+      requestId: 'start',
+      expectedVersion: task.version,
+    }),
+    /Lost managed response/,
+  );
+  const before = await f.runtime.snapshot(task.taskId);
+  assert.equal(before.runs[0]!.nativeRef, null);
+  assert.deepEqual(await f.controller.observeManagedCandidates(), {
+    scanned: 1,
+    issues: [],
+  });
+  const after = await f.runtime.snapshot(task.taskId);
+  assert.equal(after.version, before.version);
+  assert.equal(after.blocker, before.blocker);
+  assert.equal(f.launches, 1);
+});
+
+test('identity drift is an observation issue without task mutation', async (t) => {
+  const f = await fixture(t),
+    running = await startManaged(f);
+  f.identityDrift();
+  const tick = await f.controller.observeManagedCandidates();
+  assert.match(tick.issues[0]!, /Native identity changed/);
+  assert.equal(
+    (await f.runtime.snapshot(running.taskId)).version,
+    running.version,
+  );
+});
+
+test('concurrent metadata edit defers an observation and converges next tick', async (t) => {
+  const f = await fixture(t),
+    running = await startManaged(f);
+  f.setStatus('FAILED');
+  f.onStatus(async () => {
+    await f.store.updateTask({
+      taskId: running.taskId,
+      actor: 'fixture',
+      expectedVersion: running.version,
+      idempotencyKey: 'tick-edit',
+      nextAction: 'Concurrent edit',
+    });
+  });
+  assert.deepEqual(await f.controller.observeManagedCandidates(), {
+    scanned: 1,
+    issues: [],
+  });
+  assert.equal(
+    (await f.runtime.snapshot(running.taskId)).runs[0]!.nativeSnapshot!.status,
+    'RUNNING',
+  );
+  assert.deepEqual(await f.controller.observeManagedCandidates(), {
+    scanned: 1,
+    issues: [],
+  });
+  const failed = await f.runtime.snapshot(running.taskId);
+  assert.equal(failed.runs[0]!.nativeSnapshot!.status, 'FAILED');
+  assert.equal(failed.nextAction, 'Concurrent edit');
+});
+
+for (const terminal of ['FAILED', 'CANCELLED'] as const)
+  test(`automatic ${terminal} writes once without result verification`, async (t) => {
+    const f = await fixture(t),
+      running = await startManaged(f);
+    f.setStatus(terminal);
+    let verifies = 0;
+    f.host.verify = async () => {
+      verifies++;
+      throw new Error('must not verify');
+    };
+    await f.controller.observeManagedCandidates();
+    const after = await f.runtime.snapshot(running.taskId);
+    await f.controller.observeManagedCandidates();
+    assert.equal(
+      (await f.runtime.snapshot(running.taskId)).version,
+      after.version,
+    );
+    assert.equal(after.runs[0]!.nativeSnapshot!.status, terminal);
+    assert.equal(verifies, 0);
+  });
+
+test('automatic progress projects compact child counts without native output', async (t) => {
+  const f = await fixture(t),
+    running = await startManaged(f),
+    run = running.runs[0]!;
+  const children = await FileChildTaskStore.create(run.executionStoreRoot!);
+  await children.create({
+    taskId: 'child-progress',
+    runId: run.runId,
+    revision: run.revision,
+    dependsOn: [],
+    actor: 'fixture',
+  });
+  await children.ensureGroup({
+    groupId: 'progress',
+    runId: run.runId,
+    revision: run.revision,
+    taskIds: ['child-progress'],
+    assignmentIds: ['builder'],
+  });
+  await children.claim({
+    taskId: 'child-progress',
+    owner: 'worker',
+    leaseMs: 60000,
+  });
+  await f.controller.observeManagedCandidates();
+  const described = (await f.controller.describe()) as any;
+  assert.deepEqual(
+    described.controls[running.taskId].managedCandidate.progress,
+    [{ status: 'RUNNING', count: 1 }],
+  );
+  assert.match(
+    described.controls[running.taskId].message,
+    /Children: 1 running/,
+  );
+  assert.equal(
+    (await f.runtime.snapshot(running.taskId)).version,
+    running.version,
+  );
+});
+
+test('host lifecycle starts immediately, avoids overlap, and stop awaits read without cancellation', async () => {
+  let release!: () => void,
+    calls = 0;
+  const read = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const observer = createDashboardManagedObserver({
+    async observeManagedCandidates() {
+      calls++;
+      await read;
+      return { scanned: 2, issues: [] };
+    },
+  });
+  observer.start();
+  observer.start();
+  assert.equal(calls, 1);
+  await new Promise((resolve) => setTimeout(resolve, 1100));
+  assert.equal(calls, 1);
+  let stopped = false;
+  const stopping = observer.stop().then(() => {
+    stopped = true;
+  });
+  await Promise.resolve();
+  assert.equal(stopped, false);
+  release();
+  await stopping;
+  assert.equal(calls, 1);
+  assert.equal(observer.health().scanned, 2);
+});
+
+test('readiness refusal remains a blocker even when native work later succeeds', async (t) => {
+  const f = await fixture(t),
+    task = await f.prepare();
+  f.timeout();
+  await assert.rejects(
+    f.controller.action(task.taskId, {
+      action: 'implementation-start',
+      requestId: 'start',
+      expectedVersion: task.version,
+    }),
+    /Readiness timeout/,
+  );
+  const before = await f.runtime.snapshot(task.taskId);
+  await f.publish();
+  const tick = await f.controller.observeManagedCandidates();
+  assert.deepEqual(tick.issues, []);
+  const after = await f.runtime.snapshot(task.taskId);
+  assert.equal(after.blocker, before.blocker);
+  assert.equal(
+    after.handoff?.contextRefs.some(
+      (ref) => ref.kind === 'reviewed-local-candidate-completion',
+    ) ?? false,
+    false,
+  );
+  await f.store.updateTask({
+    taskId: task.taskId,
+    actor: 'fixture',
+    expectedVersion: after.version,
+    idempotencyKey: 'clear-readiness-text',
+    blocker: null,
+  });
+  await f.controller.observeManagedCandidates();
+  assert.equal(
+    (await f.runtime.snapshot(task.taskId)).handoff?.contextRefs.some(
+      (ref) => ref.kind === 'reviewed-local-candidate-completion',
+    ) ?? false,
+    false,
+  );
+});
+
+test('result verification version conflict defers then converges idempotently', async (t) => {
+  const f = await fixture(t),
+    running = await startManaged(f);
+  await f.publish();
+  f.concurrent();
+  const tick = await f.controller.observeManagedCandidates();
+  assert.deepEqual(tick.issues, []);
+  assert.equal(
+    (await f.runtime.snapshot(running.taskId)).handoff?.contextRefs.some(
+      (ref) => ref.kind === 'reviewed-local-candidate-completion',
+    ) ?? false,
+    false,
+  );
+  await f.controller.observeManagedCandidates();
+  const after = await f.runtime.snapshot(running.taskId);
+  assert.equal(after.status, 'NEEDS_REVIEW');
+  assert.match(after.handoff!.summary, /cccc/);
+  await f.controller.observeManagedCandidates();
+  assert.equal(
+    (await f.runtime.snapshot(running.taskId)).version,
+    after.version,
+  );
+});
+
+test('automatic observer does not finalize while launch readiness is in flight', async (t) => {
+  const f = await fixture(t),
+    task = await f.prepare();
+  let entered!: () => void, release!: () => void;
+  const readinessEntered = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const readinessRelease = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const readiness = f.host.readiness;
+  f.host.readiness = async (ref, options) => {
+    entered();
+    await readinessRelease;
+    await readiness(ref, options);
+  };
+  const launching = f.controller.action(task.taskId, {
+    action: 'implementation-start',
+    requestId: 'start',
+    expectedVersion: task.version,
+  });
+  await readinessEntered;
+  await f.publish();
+  const before = await f.runtime.snapshot(task.taskId);
+  await f.controller.observeManagedCandidates();
+  assert.equal((await f.runtime.snapshot(task.taskId)).version, before.version);
+  release();
+  await launching;
+  await f.controller.observeManagedCandidates();
+  assert.equal((await f.runtime.snapshot(task.taskId)).status, 'NEEDS_REVIEW');
+  assert.equal(f.launches, 1);
 });

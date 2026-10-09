@@ -17,6 +17,7 @@ import {
 import { platformInfo } from '../packages/initializer/src/lib/platform.js';
 import { createOpenWorkReader } from './dashboard-open-work.mjs';
 import { createManagedCandidateHost } from './dashboard-managed-candidate.mjs';
+import { createDashboardManagedObserver } from './dashboard-managed-observer.mjs';
 import { startTaskViewServer } from './task-view.mjs';
 import {
   DashboardController,
@@ -516,6 +517,9 @@ export async function runTaskCommand(
       archonBaseUrl: values['archon-url'] ?? 'http://127.0.0.1:3091',
       port: values.port ? Number(values.port) : 3092,
     });
+    const managedObserver = controller && dashboardConfig?.managedCandidate && selection
+      ? createDashboardManagedObserver(controller) : undefined;
+    managedObserver?.start();
     if (scheduler)
       clock = setInterval(() => {
         void tick();
@@ -523,11 +527,15 @@ export async function runTaskCommand(
     for (const signal of ['SIGINT', 'SIGTERM'] as const)
       process.once(signal, () => {
         if (clock) clearInterval(clock);
-        server.closeAllConnections();
-        server.close();
+        void (async () => {
+          await managedObserver?.stop();
+          server.closeAllConnections();
+          server.close();
+        })();
       });
     server.once('close', () => {
       if (clock) clearInterval(clock);
+      void managedObserver?.stop();
     });
     const port = (server.address() as { port: number }).port;
     return {

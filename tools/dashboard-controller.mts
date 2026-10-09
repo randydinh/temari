@@ -29,6 +29,8 @@ import {
   verifyPersistedStageEvidence,
   TaskRuntime,
   taskDigest,
+  getExecutionHarnessStatus,
+  verifyExecutionHarnessRunIdentity,
   type TaskSnapshot,
 } from '../libs/runtime/src/index.js';
 import type { TaskViewController } from './task-view.mjs';
@@ -71,6 +73,7 @@ import {
   retainManagedDiagnostic,
   type DashboardManagedCandidateProfile,
   type ManagedCandidateHost,
+  type ManagedCandidatePreparation,
 } from './dashboard-managed-candidate.mjs';
 import {
   parseDashboardKnowledgeOptions,
@@ -2259,39 +2262,7 @@ export class DashboardController implements TaskViewController {
           run.nativeRef,
           'Managed launch requires exact host recovery before control.',
         );
-        await this.nativeIdentity(task);
-        task = await this.options.runtime.observeNative(runCommand);
-        const observed = task.runs.find((r) => r.runId === managed.runId)!;
-        if (observed.nativeSnapshot?.status !== 'SUCCEEDED') return task;
-        const record = await this.nativeIdentity(task);
-        assert(
-          typeof record.output_root === 'string',
-          'Managed native artifacts are unavailable.',
-        );
-        const outputRoot = await realpath(record.output_root);
-        assert(
-          within(await realpath(this.options.archonHome), outputRoot),
-          'Managed output lies outside selected Archon home.',
-        );
-        const artifacts = join(
-          outputRoot,
-          'artifacts',
-          'runs',
-          run.nativeRef.externalRunId,
-        );
-        assert.equal(
-          await realpath(artifacts),
-          artifacts,
-          'Managed artifacts alias refused.',
-        );
-        return readManagedCandidateResult({
-          store: this.options.store,
-          runtime: this.options.runtime,
-          host,
-          task,
-          prepared: managed,
-          artifacts,
-        });
+        return this.observeManagedCandidate(task, managed, command.idempotencyKey);
       }
       const implementation = await this.implementationPreparation(task);
       if (implementation) {
@@ -2511,6 +2482,195 @@ export class DashboardController implements TaskViewController {
     });
   }
 
+  private managedObservationCursor = 0;
+
+  /** Host-only observation. It cannot dispatch, resume, cancel or reconcile. */
+  async observeManagedCandidates(): Promise<{
+    scanned: number;
+    issues: string[];
+  }> {
+    if (
+      !this.options.config.managedCandidate ||
+      !this.options.managedCandidateHost
+    )
+      return { scanned: 0, issues: [] };
+    const tasks = (await this.options.store.list())
+      .filter(
+        (task) =>
+          task.workspaceRoot === this.options.config.workspaceRoot &&
+          task.runs.some(
+            (run) =>
+              run.runId === task.currentRunId &&
+              run.sourceRefs?.some(
+                (ref) => ref.sourceId === 'dashboard-managed-candidate',
+              ),
+          ),
+      )
+      .sort((a, b) => a.taskId.localeCompare(b.taskId));
+    const issues: string[] = [];
+    const count = Math.min(2, tasks.length);
+    for (let offset = 0; offset < count; offset++) {
+      const retained =
+        tasks[(this.managedObservationCursor + offset) % tasks.length]!;
+      try {
+        const task = await this.task(retained.taskId);
+        const prepared = await readManagedCandidatePreparation({
+          task,
+          profile: this.options.config.managedCandidate,
+          preparationRoot: this.options.config.preparationRoot,
+        });
+        const run = task.runs.find((run) => run.runId === prepared?.runId);
+        // Lost dispatch without a reference remains an explicit host recovery.
+        const readinessPassed =
+          prepared &&
+          task.events.some(
+            (event) =>
+              event.change.type === 'native-observed' &&
+              event.change.runId === prepared.runId &&
+              event.idempotencyKey.startsWith('ready-'),
+          );
+        const readinessRefused =
+          prepared &&
+          task.events.some(
+            (event) =>
+              event.idempotencyKey ===
+              `managed-readiness-refused-${prepared.runId}`,
+          );
+        if (prepared && run?.nativeRef && (readinessPassed || readinessRefused))
+          await this.observeManagedCandidate(
+            task,
+            prepared,
+            undefined,
+            Boolean(readinessPassed),
+          );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        // Optimistic version conflicts converge on the next tick.
+        if (
+          !/Task version conflict|Task changed during candidate closeout/.test(
+            message,
+          )
+        )
+          issues.push(`${retained.taskId}: ${message}`.slice(0, 256));
+      }
+    }
+    if (tasks.length)
+      this.managedObservationCursor =
+        (this.managedObservationCursor + count) % tasks.length;
+    return { scanned: count, issues };
+  }
+
+  private async observeManagedCandidate(
+    task: TaskSnapshot,
+    managed: ManagedCandidatePreparation,
+    manualIdempotencyKey?: string,
+    allowFinalization = true,
+  ): Promise<TaskSnapshot> {
+    const host = this.options.managedCandidateHost;
+    assert(host, 'Managed candidate host is unavailable.');
+    const run = task.runs.find((run) => run.runId === managed.runId)!;
+    assert(
+      run.nativeRef,
+      'Managed launch requires exact host recovery before control.',
+    );
+    const record = await this.nativeIdentity(task);
+    await verifyExecutionHarnessRunIdentity(host.selection, run.nativeRef);
+    const duplicate = manualIdempotencyKey
+      ? task.events.find(
+          (event) => event.idempotencyKey === manualIdempotencyKey,
+        )
+      : undefined;
+    if (duplicate) {
+      assert.equal(duplicate.actor, actor, 'Idempotency actor conflict.');
+      assert.equal(
+        duplicate.change.type,
+        'native-observed',
+        'Idempotency command conflict.',
+      );
+      assert(duplicate.change.type === 'native-observed');
+      assert.equal(
+        duplicate.change.runId,
+        managed.runId,
+        'Idempotency run binding conflict.',
+      );
+    }
+    const observation = duplicate
+      ? run.nativeSnapshot!
+      : await getExecutionHarnessStatus(host.selection, run.nativeRef);
+    const semantic = (snapshot: typeof observation | null) =>
+      snapshot && {
+        status: snapshot.status,
+        summary: snapshot.summary,
+        rawLogPath: snapshot.rawLogPath,
+        ...(snapshot.nativeProjectId
+          ? { nativeProjectId: snapshot.nativeProjectId }
+          : {}),
+      };
+    const pending = run.operations.find((op) => op.state !== 'CONFIRMED');
+    if (
+      !duplicate &&
+      (manualIdempotencyKey ||
+        pending ||
+        taskDigest(semantic(run.nativeSnapshot)) !==
+          taskDigest(semantic(observation)))
+    ) {
+      await this.options.store.append(
+        {
+          taskId: task.taskId,
+          actor,
+          expectedVersion: task.version,
+          idempotencyKey:
+            manualIdempotencyKey ??
+            `managed-observe-${managed.runId}-${task.version}-${taskDigest(semantic(observation))}`,
+        },
+        {
+          type: 'native-observed',
+          runId: managed.runId,
+          snapshot: observation,
+          ...(pending ? { operationId: pending.commandId } : {}),
+        },
+      );
+      task = await this.options.runtime.snapshot(task.taskId);
+    }
+    if (
+      !allowFinalization ||
+      observation.status !== 'SUCCEEDED' ||
+      task.blocker ||
+      task.events.some(
+        (event) => event.idempotencyKey === `managed-result-${managed.runId}`,
+      )
+    )
+      return task;
+    assert(
+      typeof record.output_root === 'string',
+      'Managed native artifacts are unavailable.',
+    );
+    const outputRoot = await realpath(record.output_root);
+    assert(
+      within(await realpath(this.options.archonHome), outputRoot),
+      'Managed output lies outside selected Archon home.',
+    );
+    const artifacts = join(
+      outputRoot,
+      'artifacts',
+      'runs',
+      run.nativeRef.externalRunId,
+    );
+    assert.equal(
+      await realpath(artifacts),
+      artifacts,
+      'Managed artifacts alias refused.',
+    );
+    return readManagedCandidateResult({
+      store: this.options.store,
+      runtime: this.options.runtime,
+      host,
+      task,
+      prepared: managed,
+      artifacts,
+    });
+  }
+
   /** Refresh only the exact scheduled execution; leave evidence acceptance to review. */
   async inspectScheduledTask(
     taskId: string,
@@ -2669,6 +2829,20 @@ export class DashboardController implements TaskViewController {
             assert.equal(await realpath(artifacts),artifacts);
             result=await inspectManagedCandidateCompletion({store:this.options.store,host:this.options.managedCandidateHost,task,prepared:managed,artifacts});
           }
+          const children =
+            task.runSnapshots.find(
+              (snapshot) => snapshot.runId === managed.runId,
+            )?.children ?? [];
+          const counts = new Map<string, number>();
+          for (const child of children)
+            counts.set(child.status, (counts.get(child.status) ?? 0) + 1);
+          const childProgress = [...counts]
+            .sort(([a], [b]) => a.localeCompare(b))
+            .slice(0, 8)
+            .map(([status, count]) => ({ status, count }));
+          const childSummary = children.length
+            ? ` Children: ${childProgress.map((entry) => `${entry.count} ${entry.status.toLowerCase()}`).join(', ')}.`
+            : '';
           controls[task.taskId] = {
             actions,
             implementation: { state },
@@ -2676,6 +2850,7 @@ export class DashboardController implements TaskViewController {
               profile: 'reviewed-local-candidate-v1',
               runId: managed.runId,
               result,
+              progress: childProgress,
             },
             ...(planning ? { planning, policyCurrent } : {}),
             candidateCurrent,
@@ -2686,7 +2861,7 @@ export class DashboardController implements TaskViewController {
                 ? 'Managed candidate awaits exact result verification and coordinator review.'
                 : state === 'RECOVERY_REQUIRED'
                   ? 'Reconcile the retained exact native reference before proceeding.'
-                  : `Managed local candidate ${state.toLowerCase()}.`,
+                  : `Managed local candidate ${state.toLowerCase()}.${childSummary}`,
           };
           return;
         }
