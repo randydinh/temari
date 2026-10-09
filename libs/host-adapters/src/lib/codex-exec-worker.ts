@@ -40,7 +40,7 @@ const GIT_ROUTING_VARIABLES = new Set([
   'GIT_PREFIX',
 ]);
 
-function writeWorkerEnvironment(): NodeJS.ProcessEnv {
+function workerEnvironment(): NodeJS.ProcessEnv {
   return Object.fromEntries(
     Object.entries(process.env).filter(
       ([name]) =>
@@ -568,8 +568,7 @@ async function executeCodexExecWorker(
       program: provider?.executable ?? options.executable,
       args,
       cwd: options.workspaceRoot,
-      env:
-        sandbox === 'workspace-write' ? writeWorkerEnvironment() : process.env,
+      env: workerEnvironment(),
       stdin: prompt,
       stdoutPath,
       stderrPath,

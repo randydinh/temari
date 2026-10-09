@@ -473,6 +473,69 @@ const fs=require('node:fs'), args=process.argv.slice(2);process.stdin.resume();p
   assert.equal(terminal.startedAt, start.startedAt);
 });
 
+test('read-only worker Git commands inspect the selected checkout despite inherited Git routing variables', async (t) => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'temari-read-env-')));
+  execFileSync('git', ['init', '-q', root]);
+  const executable = join(root, 'fake-codex');
+  await writeFile(
+    executable,
+    `#!${process.execPath}
+const fs=require('node:fs'),{execFileSync}=require('node:child_process'),args=process.argv.slice(2);
+process.stdin.resume();process.stdin.on('end',()=>{
+  if(args[args.indexOf('--sandbox')+1]!=='read-only')process.exit(8);
+  if(!process.env.PATH || process.env.GIT_ASKPASS!=='preserved-helper' || process.env.CODEX_HOME!==${JSON.stringify(join(root, 'codex-home'))})process.exit(9);
+  const inspected=execFileSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8'}).trim();
+  if(inspected!==${JSON.stringify(root)})process.exit(10);
+  fs.writeFileSync(args[args.indexOf('--output-last-message')+1],JSON.stringify({status:'PASS',summary:'inspected selected checkout'}));
+});
+`,
+    { mode: 0o700 },
+  );
+  const variables = {
+    GIT_DIR: join(root, 'nonexistent-git-dir'),
+    GIT_WORK_TREE: join(root, 'wrong-worktree'),
+    GIT_INDEX_FILE: join(root, 'wrong-index'),
+    GIT_CONFIG_COUNT: '1',
+    GIT_CONFIG_KEY_0: 'core.worktree',
+    GIT_CONFIG_VALUE_0: join(root, 'wrong-worktree'),
+    GIT_ASKPASS: 'preserved-helper',
+    CODEX_HOME: join(root, 'codex-home'),
+  };
+  const previous = Object.fromEntries(
+    Object.keys(variables).map((name) => [name, process.env[name]]),
+  );
+  Object.assign(process.env, variables);
+  try {
+    for (const [label, role] of [
+      ['architect', 'investigator'],
+      ['reviewer', 'reviewer'],
+    ] as const)
+      await t.test(label, async () => {
+        const result = await runCodexExecWorker(
+          { ...assignment, id: `read-${label}`, role },
+          {
+            executable,
+            workspaceRoot: root,
+            evidenceDirectory: join(root, label),
+            timeoutMs: 2000,
+          },
+        );
+        assert.equal(
+          result.status,
+          'PASS',
+          await readFile(join(root, label, 'stderr.log'), 'utf8'),
+        );
+        assert.equal(result.summary, 'inspected selected checkout');
+      });
+  } finally {
+    for (const [name, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('write worker Git commands use its clone despite inherited Git routing variables', async () => {
   const root = await mkdtemp(join(tmpdir(), 'temari-write-env-'));
   execFileSync('git', ['init', '-q', root]);
