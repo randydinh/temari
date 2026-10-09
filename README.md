@@ -2,6 +2,10 @@
 
 Portable, host- and model-agnostic conversational engineering partner.
 
+Temari builds on [P-stack](https://github.com/cursor/plugins/tree/main/pstack)
+by Lauren Tan. See [credits and provenance](docs/credits.md) for the imported
+workflow, Temari-owned platform, and other component boundaries.
+
 This is the canonical Nx workspace (`randydinh/temari`). Legacy products
 are `temari-v1` … `temari-v4.1`. See [docs/lineage.md](docs/lineage.md)
 and [docs/architecture.md](docs/architecture.md).
