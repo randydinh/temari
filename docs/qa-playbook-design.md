@@ -1,6 +1,6 @@
 # QA playbooks for Temari
 
-Design recommendation, 2026-09-29. This document proposes architecture and acceptance checks. It does not install a QA agent or admit a new runtime route. The user clarified that “workbooks” meant **playbooks**, organized like P-stack.
+Design recommendation, 2026-09-29; QA Triage guidance packaged 2026-10-08. This document proposes architecture and acceptance checks. It does not install a QA agent or admit a new runtime route. The user clarified that “workbooks” meant **playbooks**, organized like P-stack.
 
 For the user-confirmed meanings and high-level flows of sprint planning, QA
 Review, and QA Triage, use the [QA workflow reference](qa-workflow-reference.md).
@@ -95,7 +95,16 @@ The independent evaluator should receive the pinned intent, uncertainty/conflict
 
 ## Initial playbook catalog
 
-These are proposed families. Implement the first useful vertical slice and add another family when a real task needs it. A catalog entry does not imply executable support.
+These are playbook families, mostly proposed. Ticket acceptance has packaged
+support for its existing admitted QA routes. Issue triage now has a bundled
+[analytical skill](../packages/workflow-runtime/public/skills/qa-triage/SKILL.md),
+[ordered playbook](../packages/workflow-runtime/public/skills/qa-triage/references/issue-triage-v1.md)
+and [compact handoff](../packages/workflow-runtime/public/skills/qa-triage/assets/triage-note.md).
+Temari and Poteto are its two callers; ticket acceptance can load it for failure
+analysis. This adds no executable QA profile, policy entry or lifecycle and does
+not downgrade full QA Review. The existing writer retains verification notes and
+project defect formatting; Poteto retains authorized repair. A catalog entry
+does not imply executable support.
 
 | Playbook                                   | Trigger and output                                                                                                                                                                                      | Skills needed                                                                                                       | Conditional work                                                                                                                                            |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -127,7 +136,7 @@ Keep scope and authority in the small shared contract. They must not depend on w
 
 Create a separate skill when it has a distinct trigger and output and at least two concrete consumers, or a significant tool/permission boundary. Keep a single-task substep as a playbook section or reference. Avoid a skill for every testing technique and avoid multiple routers matching the same request.
 
-Reuse the available `assess-change-impact`, `testmo-test-cases`, `qa-review-verification`, and Playwright guidance. Candidate new capabilities are requirement/oracle analysis, exploratory scenario design, execution coordination, and defect triage. Final boundaries should follow pilot usage, not a target skill count.
+Reuse the available `assess-change-impact`, `testmo-test-cases`, `qa-review-verification`, and Playwright guidance. Candidate new capabilities are requirement/oracle analysis, exploratory scenario design, and execution coordination. Defect triage is now supplied by the packaged QA Triage skill. Final boundaries should follow pilot usage, not a target skill count.
 
 ## Playbook contract and example
 

@@ -243,6 +243,33 @@ test('packages an isolated relocated outer bundle with three current public entr
     const policy = await child([join(artifact, 'bin/temari.mjs'), 'policy']);
     assert.equal(policy.status, 'described');
     assert.equal(policy.supportedProfile, 'lightweight-engineering-v1');
+    for (const resource of [
+      'SKILL.md',
+      'references/issue-triage-v1.md',
+      'assets/triage-note.md',
+    ]) {
+      const path = `skills/qa-triage/${resource}`;
+      const bytes = await readFile(join(artifact, path));
+      assert.deepEqual(
+        bytes,
+        await readFile(join(repository, 'packages/workflow-runtime/public', path)),
+      );
+      assert.equal(
+        manifest.files.find((file) => file.path === path)?.sha256,
+        createHash('sha256').update(bytes).digest('hex'),
+      );
+    }
+    assert.deepEqual(
+      await readFile(join(artifact, 'policy.json')),
+      await readFile(join(repository, 'packages/workflow-runtime/public/policy.json')),
+      'analytical guidance must preserve admission policy bytes',
+    );
+    await writeFile(
+      join(artifact, 'skills/qa-triage/assets/triage-note.md'), 'tampered',
+    );
+    await assert.rejects(
+      checkPublicEntryArtifact(artifact, manifestSha256(manifest)),
+    );
   } finally {
     await rm(relocatedRoot, { recursive: true, force: true });
   }
@@ -2161,7 +2188,7 @@ process.stdin.on('end', () => {
   });
 }
 
-test('both engineering skills reach shared conversation guidance and the complete QA writer inside the artifact', async () => {
+test('both engineering skills reach shared conversation guidance, QA triage and the complete QA writer inside the artifact', async () => {
   for (const entry of ['temari', 'poteto-mode']) {
     const visited = new Set();
     const visit = async (path) => {
@@ -2217,6 +2244,26 @@ test('both engineering skills reach shared conversation guidance and the complet
         manifest.source.files.some(
           (file) => file.path === `packages/workflow-runtime/public/${path}`,
         ),
+      );
+    }
+    for (const resource of [
+      'SKILL.md',
+      'references/issue-triage-v1.md',
+      'assets/triage-note.md',
+    ]) {
+      const path = `skills/qa-triage/${resource}`;
+      assert(
+        visited.has(path),
+        `Unreachable triage resource from ${entry}: ${resource}`,
+      );
+      assert(
+        manifest.source.files.some(
+          (file) => file.path === `packages/workflow-runtime/public/${path}`,
+        ),
+      );
+      assert.deepEqual(
+        await readFile(join(output, path)),
+        await readFile(join(repository, 'packages/workflow-runtime/public', path)),
       );
     }
     const skill = await readFile(
@@ -2487,6 +2534,23 @@ test('public engineering admission refuses unsupported routes and blocks unprove
   );
   assert.equal(lightweight.status, 'rejected');
   assert(lightweight.reasons.includes('profile-not-admitted'));
+
+  for (const entry of ['temari', 'poteto-mode']) {
+    await writeFile(
+      requestPath,
+      JSON.stringify(request(entry, {
+        route: 'qa-triage',
+        profile: 'qa-triage-v1',
+      })),
+    );
+    const triage = await child(
+      [join(output, `bin/${entry}.mjs`), 'admit', '--request', requestPath],
+      1,
+    );
+    assert.equal(triage.status, 'rejected');
+    assert(triage.reasons.includes('route-not-admitted'));
+    assert(triage.reasons.includes('profile-not-admitted'));
+  }
 });
 
 test('installed skills keep worker contract host-neutral and bundle the Codex adapter separately', async () => {

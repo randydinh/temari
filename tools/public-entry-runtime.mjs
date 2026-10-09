@@ -134,6 +134,14 @@ const publicFiles = [
     `packages/workflow-runtime/public/skills/qa-review-verification/${path}`,
     `skills/qa-review-verification/${path}`,
   ]),
+  ...[
+    'SKILL.md',
+    'references/issue-triage-v1.md',
+    'assets/triage-note.md',
+  ].map((path) => [
+    `packages/workflow-runtime/public/skills/qa-triage/${path}`,
+    `skills/qa-triage/${path}`,
+  ]),
   ...REGISTRAR_PAYLOAD_FILES.map((path) => [
     `packages/workflow-runtime/registrar/${path}`,
     `registrar/${path}`,

@@ -29,6 +29,13 @@ This supporting writer also handles evidence-only local drafts; it does not admi
 QA execution or convert a document into a runtime receipt. Test-case authoring
 alone, code review, and defect repair retain their existing owners.
 
+For an unexplained failure or reported defect, use the bundled
+[QA Triage skill](../qa-triage/SKILL.md) to establish symptom, expected behavior,
+current mechanism and uncertainty before selecting a repair. Poteto owns repair
+under the existing engineering authority and admission; triage supplies analysis,
+not permission or proof of a fix. Keep full QA assignments and their evaluator
+obligations open when using triage as a supporting step.
+
 For work on an existing codebase, read the installed policy, then apply the
 [Temari bounded codebase-context intake](../temari/SKILL.md) within the admitted
 source scope before broad investigation. Registrar and graph results guide source

@@ -149,9 +149,12 @@ a view of the review record, never a substitute for it.
 
 ## QA Triage flow
 
-Input is a reported symptom. The current public artifact has no admitted
-dedicated triage playbook; the flow below is the required task contract for a
-future route and a guide for honest bounded investigation today.
+Input is a reported symptom. The public artifact bundles the
+[QA Triage skill](../packages/workflow-runtime/public/skills/qa-triage/SKILL.md),
+[ordered playbook](../packages/workflow-runtime/public/skills/qa-triage/references/issue-triage-v1.md)
+and five-section analytical handoff. This is packaged guidance within existing
+Temari QA, not a new executable profile or admission route. Full QA Review stays
+open with its required scenarios and evaluator obligations when triage assists it.
 
 ```mermaid
 flowchart TD
@@ -174,14 +177,19 @@ flowchart TD
 
 If the report came from production, test the same relevant scenario on the
 upcoming release build when safe and available. If it came from that build,
-compare production. Pin both build identities and preserve differences in data,
+compare production only through permitted observations. Pin both build identities
+and preserve differences in data,
 configuration, persona, and steps; an unavailable or unlike environment is not
 proof of absence. Record a reproducible sequence or a specific reason the
 result remains unconfirmed. Separate conflated symptoms into distinct proposed
 reports when they require different expected outcomes, causes, or owners.
 
-Investigate root cause, but distinguish a supported mechanism from a plausible
-hypothesis. The triage result should leave the next decision clear: confirmed
+Investigate root cause against the current pinned commit and relevant callers,
+but distinguish a supported mechanism from a plausible hypothesis and from
+attribution of the reported incident. Keep facts, retained summaries and inference
+separate. Block only dependent checks; a handoff request states Established,
+Still needed, Who, Why, Meanwhile and Resume check so useful work can continue.
+The triage result should leave the next decision clear: confirmed
 defect, unresolved product expectation, improvement opportunity, no action with
 an accountable decision, or further investigation. Severity informs that
 decision; priority also depends on delivery timing and options. Filing a report
@@ -192,6 +200,7 @@ or proposing a fix does not itself authorize code repair or tracker changes.
 Before assigning a numeric or named severity level, use the selected project's
 existing scale and decision owner. This reference does not define universal
 thresholds, an automatic fix deadline, or who can accept risk for every product.
-The project-specific triage playbook, adapters, and environment authority still
-need implementation and admission. Keep those gaps visible in Temari's handoff
+The reusable triage guidance is packaged; project context, adapters and
+environment authority remain external prerequisites for actual checks. Keep
+those gaps visible in Temari's handoff
 and in its route announcement when the user opted into workflow visibility.
