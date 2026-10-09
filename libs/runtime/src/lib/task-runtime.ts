@@ -18,6 +18,8 @@ import {
   resumeExecutionHarness,
   startExecutionHarness,
   verifyExecutionHarnessRunIdentity,
+  startReviewedLocalCandidateHarness,
+  type ReviewedLocalCandidatePaths,
 } from './harness-runtime.js';
 import {
   selectExecutionHarness,
@@ -277,6 +279,73 @@ export class TaskRuntime {
       readonly inputs: Readonly<Record<string, string>>;
     },
   ): Promise<TaskSnapshot> {
+    assert.notEqual(
+      request.entrypoint,
+      'temari-reviewed-local-candidate',
+      'Managed candidate requires route-specific admission and dispatch.',
+    );
+    return (
+      await this.dispatchThrough(request, (run, task, intent) =>
+        startExecutionHarness(this.requireSelection(), {
+          runId: run.runId,
+          revision: run.revision,
+          plan: run.plan,
+          workspaceRoot: task.workspaceRoot,
+          entrypoint: intent.entrypoint!,
+          inputs: intent.inputs!,
+          recovery: 'required',
+        }),
+      )
+    ).task;
+  }
+
+  /** Persist the exact protected inputs before the managed admission/start port.
+   * Duplicate and uncertain dispatch never fall through to a second native launch. */
+  async dispatchReviewedLocalCandidate(
+    request: TaskRunCommand & {
+      readonly paths: ReviewedLocalCandidatePaths;
+    },
+  ): Promise<{ readonly task: TaskSnapshot; readonly dispatched: boolean }> {
+    const paths = structuredClone(request.paths);
+    for (const pin of [paths.expectedRequestSha256, paths.expectedBridgeSha256])
+      assert.match(pin, /^[a-f0-9]{64}$/);
+    return this.dispatchThrough(
+      {
+        ...request,
+        entrypoint: 'temari-reviewed-local-candidate',
+        inputs: {
+          spec: paths.specPath,
+          bridge: paths.bridgePath,
+          request_sha256: paths.expectedRequestSha256,
+          bridge_sha256: paths.expectedBridgeSha256,
+        },
+      },
+      (run, task) =>
+        startReviewedLocalCandidateHarness(
+          this.requireSelection(),
+          {
+            runId: run.runId,
+            revision: run.revision,
+            plan: run.plan,
+            workspaceRoot: task.workspaceRoot,
+            recovery: 'required',
+          },
+          paths,
+        ),
+    );
+  }
+
+  private async dispatchThrough(
+    request: TaskRunCommand & {
+      readonly entrypoint: string;
+      readonly inputs: Readonly<Record<string, string>>;
+    },
+    launch: (
+      run: TaskRun,
+      task: TaskRecord,
+      intent: TaskRun['operations'][number],
+    ) => Promise<HarnessRunRef>,
+  ): Promise<{ readonly task: TaskSnapshot; readonly dispatched: boolean }> {
     const selection = this.requireSelection();
     const harness = selectExecutionHarness(selection);
     assert(
@@ -291,21 +360,14 @@ export class TaskRuntime {
       harnessId: harness.id,
       harnessVersion: harness.version,
     });
-    if (!started.applied) return this.snapshot(request.taskId);
+    if (!started.applied)
+      return { task: await this.snapshot(request.taskId), dispatched: false };
     const run = boundRun(started.task, request.runId);
     const intent = run.operations.find(
       (op) => op.commandId === request.idempotencyKey,
     )!;
     try {
-      const reference = await startExecutionHarness(selection, {
-        runId: run.runId,
-        revision: run.revision,
-        plan: run.plan,
-        workspaceRoot: started.task.workspaceRoot,
-        entrypoint: intent.entrypoint!,
-        inputs: intent.inputs!,
-        recovery: 'required',
-      });
+      const reference = await launch(run, started.task, intent);
       await this.finish(request, 'bound', {
         type: 'native-bound',
         runId: run.runId,
@@ -316,7 +378,7 @@ export class TaskRuntime {
       await this.uncertain(request, error);
       throw error;
     }
-    return this.snapshot(request.taskId);
+    return { task: await this.snapshot(request.taskId), dispatched: true };
   }
 
   /** Recover a retained dispatch only after the selected executor recognizes

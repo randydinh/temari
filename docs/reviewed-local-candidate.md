@@ -119,6 +119,55 @@ rather than claiming generic DONE.
 Run `pnpm exec nx run workflow-runtime:managed-candidate-test` for source
 fixtures. Source fixtures prove mechanical contracts, not live coding, model
 quality, camera hardware, another provider/host, or installed bundle admission.
+
+## Dashboard source launcher
+
+The source dashboard can select a host-owned `managedCandidate` configuration
+and a planning policy with `profile: reviewed-local-candidate-v1`. That policy
+admits exactly one builder slot; ordinary planning and implementation policies
+still require two to four independent slots. The policy's preparation and
+verification argv must equal the protected baseline and acceptance checks in
+the managed profile. The managed planner uses the pinned executable and explicit
+model/provider/reasoning flags. Its proposal supplies bounded goals and criteria,
+never executable paths, roots, commands or provider selection.
+
+`tools/dashboard-managed-candidate.mts` validates canonical, disjoint source,
+preparation, evidence and task roots and protected input pins. The controller
+also requires a separate canonical Archon home. An accepted proposal freezes
+the request outside the source tree, records goal/proposal/planning-policy and
+managed-policy digests, initializes the exact child store and admits the request
+before binding a new run on the same task. Interrupted immutable preparation is
+retained for explicit recovery; it is never overwritten with another candidate.
+
+`TaskRuntime.dispatchReviewedLocalCandidate` records the protected inputs as
+dispatch intent and calls the managed harness admission port. Generic dispatch
+refuses this entrypoint. The managed dispatch reports whether this caller owns
+the launch, so concurrent duplicate requests cannot enter the one-shot readiness
+gate twice. The controller retains the exact returned reference before readiness,
+shares a ten-second abortable readiness window and records its observations.
+Lost responses remain uncertain; readiness refusal records a blocker and keeps
+the existing reference. Exact reconciliation and cancellation remain host
+recovery operations. This controller increment does not provide a new cleanup
+supervisor or claim that refusal proves native/process termination.
+
+On explicit exact-run observation of native success, the controller selects
+`output_root/artifacts/runs/<native-id>` under the configured Archon home. It
+attaches that run's canonical evidence, invokes the pinned bridge's semantic
+`verify` command through `readReviewedLocalCandidateResult`, and retains the
+candidate root, commit and completion digest in the task handoff. Read-only
+dashboard/Talk projection reopens this result and its native identity instead
+of trusting the handoff text. The task remains `NEEDS_REVIEW`; no generic
+acceptance or `DONE` transition is added.
+
+Run `pnpm exec nx run runtime:dashboard-managed-candidate-test` for the synthetic
+Talk intake → planner → preparation → managed launch → native success → reviewed
+result journey and refusal/replay cases. These fixtures inject admission and
+native ports and publish synthetic canonical stage evidence. They establish
+controller composition, not another live execution or real reviewed product
+candidate. A host must select a frozen external profile and source checkout
+before a separately admitted live run. Automatic observation/sustained dashboard
+supervision, installed bundle promotion and publication remain later work.
+
 Cancellation retains failures and terminates owned subprocess groups. A late
 cancel after an already completed capture reads that outcome without dispatch;
 route closeout still requires current native success and resolved controls.

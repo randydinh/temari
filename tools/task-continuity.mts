@@ -16,6 +16,7 @@ import {
 } from '../libs/runtime/src/index.js';
 import { platformInfo } from '../packages/initializer/src/lib/platform.js';
 import { createOpenWorkReader } from './dashboard-open-work.mjs';
+import { createManagedCandidateHost } from './dashboard-managed-candidate.mjs';
 import { startTaskViewServer } from './task-view.mjs';
 import {
   DashboardController,
@@ -359,7 +360,7 @@ export async function runTaskCommand(
         ? {
             workflowSource: values['workflow-source']
               ? absolute(values['workflow-source'], '--workflow-source')
-              : resolve(
+              : dashboardConfig?.managedCandidate ? resolve('packages/workflow-runtime/host') : resolve(
                   'packages/workflow-runtime/assets/v4.1/integrations/archon',
                 ),
           }
@@ -407,6 +408,7 @@ export async function runTaskCommand(
           config: dashboardConfig,
           store,
           runtime,
+          ...(dashboardConfig.managedCandidate && selection ? { managedCandidateHost: createManagedCandidateHost(dashboardConfig.managedCandidate, selection) } : {}),
           archonHome: absolute(values['archon-home'], '--archon-home'),
           bridgePath: resolve(
             'packages/workflow-runtime/assets/v4.1/integrations/archon/canonical-bridge.ts',
