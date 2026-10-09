@@ -1,0 +1,44 @@
+{
+  "request": "Explain why station-report.js subtracts unknown minutes. Is that consistent with the Cobalt pilot policy? This is an explanation request; leave the product unchanged.",
+  "owner": "Read-only software explanation using Poteto investigation and Temari Knowledge; no delivery profile invoked",
+  "need": "required",
+  "scope": {
+    "question": "Unknown-minute subtraction and consistency with current Cobalt policy",
+    "sources": [
+      "2bbc01bed06a4a979f75b37af5005da3",
+      "station-report.js"
+    ],
+    "budget": "5 discovery results; one policy document up to 10000 chars; targeted code read",
+    "freshness": "Current registered policy and current fixture bytes"
+  },
+  "observations": [
+    {
+      "operation": "knowledge_discover",
+      "resultRef": null
+    },
+    {
+      "operation": "knowledge_read",
+      "resultRef": null
+    },
+    {
+      "operation": "exec_command: nl -ba station-report.js",
+      "resultRef": null
+    }
+  ],
+  "evidence": {
+    "policy": {
+      "path": "cobalt-policy.md",
+      "generation": "279187854003445e9399d537c289ef5f",
+      "sha256": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224",
+      "lines": "1-5"
+    },
+    "code": "station-report.js:1-3"
+  },
+  "result": "retrieved",
+  "conclusion": "Subtraction is consistent with conservative uptime policy; unknown stays distinct from confirmed downtime and remains in denominator.",
+  "gaps": [
+    "No retainable host tool-event IDs; observations are descriptive, not independent execution proof.",
+    "No code graph or git repository present.",
+    "Three-line function does not establish upstream classification or separate reporting."
+  ]
+}

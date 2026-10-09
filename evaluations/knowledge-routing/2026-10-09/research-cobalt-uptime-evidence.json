@@ -1,0 +1,11 @@
+{
+  "request": "Cobalt pilot heartbeat loss: reporting rule and unresolved assumptions",
+  "need": "required",
+  "reason": "Project reporting policy was not supplied in the question.",
+  "scope": {"source_id": "2bbc01bed06a4a979f75b37af5005da3", "question": "Heartbeat loss treatment in uptime reporting", "read_budget_bytes": 16000, "currentness": "Current registered local project policy"},
+  "observations": ["knowledge_discover: heartbeat uptime; one matching document, no gaps", "knowledge_read: cobalt-policy.md; complete, source bytes and spans verified"],
+  "evidence": {"path": "cobalt-policy.md", "lines": [1, 5], "revision": "2026-10-09", "generation": "279187854003445e9399d537c289ef5f", "sha256": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224"},
+  "result": "retrieved",
+  "conclusion": "Three missed scheduled heartbeats trigger unknown classification; communications and charging reported separately per port; only approved scheduled maintenance excluded; unknown minutes separately disclosed and not credited as proven up.",
+  "unresolved": ["Heartbeat schedule, grace and time-boundary details", "Sufficient corroborating evidence and retrospective reclassification rules", "Mapping station-level silence to individual ports", "Exact arithmetic behind the policy's not-proven-up numerator wording"]
+}

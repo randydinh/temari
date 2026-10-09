@@ -1,11 +1,37 @@
 ---
 name: temari
-description: Use Temari as the current Nx conversational engineering entry point with lightweight, host-proven feature, and versioned QA routes.
+description: Use Temari to choose and continue source-dependent research, engineering, or QA work. Compose bounded evidence retrieval with Poteto engineering methods and the current Nx runtime's admitted routes.
 ---
 
 # Temari
 
 Temari is the conversational entry point for the current Nx workflow runtime.
+
+## Decide evidence need and work responsibility
+
+For each request handled through Temari, decide what outcome the user wants and
+what evidence it depends on. Source-dependent research does not require the user
+to name Knowledge: use the bundled [Knowledge skill](../temari-knowledge/SKILL.md)
+when material dependencies remain beyond relevant supplied or reusable evidence.
+This includes documents, current external facts, product requirements, existing
+code behavior, source comparisons, and factual verification. A self-contained
+rewrite or calculation can use its supplied context without external retrieval.
+
+Before substantial planning or dependent work, follow the shared
+[evidence intake](../temari-knowledge/references/evidence-intake.md) to bound the
+question, sources, freshness requirement and observations. Retain its small local
+decision in existing task artifacts/context references, or per-request context
+when untracked. Missing evidence limits dependent claims; independent work can
+continue. An announcement that retrieval will run does not establish that it ran.
+
+Choose the work responsibility separately. A research answer can use Knowledge
+alone; software investigation, design, repair and implementation use Poteto's
+engineering method alongside any needed retrieval. QA acceptance keeps its QA
+owner and evaluator obligations. Research need alone admits no engineering
+profile, and retrieved context grants no permission to implement or publish.
+Revisit the decision when the requested outcome or material dependencies change.
+These are skill instructions for the host path using them; the packaged CLI does
+not intercept every chat or mechanically enforce natural-language selection.
 
 Use the shared [conversation guidance](references/conversation.md) for progress,
 results, choices, and blocked work. Temari owns their practical meaning and the
@@ -128,7 +154,7 @@ Evidence-only drafting produces a local document; it does not admit a QA executi
 route or complete its review obligations. Test-case authoring alone and generic code
 review keep their existing routes.
 
-## Bounded codebase context intake
+## Apply evidence intake to a codebase
 
 After reading the installed policy and identifying the selected repository and
 candidate, use context providers only within the admitted task authority. When a
@@ -137,8 +163,8 @@ documents, then read relevant source-backed requirements and product decisions.
 When an existing knowledge graph covers the admitted repository and candidate,
 query affected components, callers, and boundaries before broad file exploration.
 Record the source scope, query, selection, budget, revisions or graph snapshot,
-useful citations, and coverage gaps. Treat graph relationships and indexed
-summaries as navigation; verify material claims against the current ticket,
+useful citations, and coverage gaps in the shared evidence decision. Treat graph
+relationships and indexed summaries as navigation; verify material claims against the current ticket,
 document, and source. A provider is optional and does not decide a QA disposition
 or expand the task's authority. If it is unavailable, stale, or lacks the needed
 corpus, state the gap and continue with scoped direct inspection. Do not silently

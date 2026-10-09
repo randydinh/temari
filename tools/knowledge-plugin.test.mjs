@@ -17,6 +17,7 @@ import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import {
+  checkHistoricalKnowledgePlugin,
   checkKnowledgePlugin,
   packageKnowledgePlugin,
   readRegularSource,
@@ -36,6 +37,36 @@ before(async () => {
   expected = createHash('sha256')
     .update(await readFile(join(artifact, 'knowledge-plugin-manifest.json')))
     .digest('hex');
+});
+
+test('historical plugin without intake guidance remains historical, never a current candidate', async () => {
+  const historical = join(root, 'historical-without-intake');
+  await cp(artifact, historical, { recursive: true });
+  const reference =
+    'skills/content-registrar-knowledge/references/evidence-intake.md';
+  await rm(join(historical, reference));
+  const vintage = structuredClone(manifest);
+  vintage.files = vintage.files.filter((file) => file.path !== reference);
+  vintage.source.additionalFiles = vintage.source.additionalFiles.filter(
+    (file) =>
+      file.path !==
+      'packages/workflow-runtime/public/skills/temari-knowledge/references/evidence-intake.md',
+  );
+  const bytes = Buffer.from(`${JSON.stringify(vintage, null, 2)}\n`);
+  await writeFile(join(historical, 'knowledge-plugin-manifest.json'), bytes);
+  const digest = createHash('sha256').update(bytes).digest('hex');
+  const upstreamBytes = await readFile(
+    join(historical, 'registrar/UPSTREAM.json'),
+  );
+  const provenance = {
+    commit: JSON.parse(upstreamBytes).upstream.commit,
+    manifestSha256: createHash('sha256').update(upstreamBytes).digest('hex'),
+  };
+  assert.deepEqual(
+    await checkHistoricalKnowledgePlugin(historical, digest, provenance),
+    vintage,
+  );
+  await assert.rejects(checkKnowledgePlugin(historical, digest), /deep-equal/);
 });
 
 after(async () => {
@@ -70,8 +101,42 @@ test('standalone plugin has only Knowledge entry files and a checked payload', a
       '.codex-plugin/plugin.json',
       'bin/temari-knowledge.mjs',
       'skills/content-registrar-knowledge/SKILL.md',
+      'skills/content-registrar-knowledge/references/evidence-intake.md',
     ],
   );
+  const reference =
+    'skills/content-registrar-knowledge/references/evidence-intake.md';
+  assert.deepEqual(
+    await readFile(join(artifact, reference)),
+    await readFile(
+      new URL(
+        '../packages/workflow-runtime/public/skills/temari-knowledge/references/evidence-intake.md',
+        import.meta.url,
+      ),
+    ),
+    'standalone intake guidance must preserve its owning source bytes',
+  );
+  for (const [, link] of (
+    await readFile(
+      join(artifact, 'skills/content-registrar-knowledge/SKILL.md'),
+      'utf8',
+    )
+  ).matchAll(/\]\(([^)]+)\)/g)) {
+    if (/^[a-z][a-z\d+.-]*:|^#/i.test(link)) continue;
+    const target = new URL(
+      link,
+      pathToFileURL(
+        join(artifact, 'skills/content-registrar-knowledge/SKILL.md'),
+      ),
+    );
+    assert(
+      target.pathname.startsWith(
+        `${artifact}/skills/content-registrar-knowledge/`,
+      ),
+      `Standalone skill link escapes its available resources: ${link}`,
+    );
+    await readFile(target);
+  }
   await assert.rejects(packageKnowledgePlugin(artifact), /already exists/);
   const tampered = join(root, 'tampered');
   await cp(artifact, tampered, { recursive: true });

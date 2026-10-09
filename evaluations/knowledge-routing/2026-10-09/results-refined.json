@@ -1,0 +1,12 @@
+[
+  {
+    "case": "research-refined",
+    "exitCode": 0,
+    "elapsedSeconds": 33.5
+  },
+  {
+    "case": "engineering-refined",
+    "exitCode": 0,
+    "elapsedSeconds": 40.5
+  }
+]

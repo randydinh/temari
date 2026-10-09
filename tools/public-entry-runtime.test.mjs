@@ -2338,7 +2338,7 @@ process.stdin.on('end', () => {
   });
 }
 
-test('both engineering skills reach shared conversation guidance, QA triage and the complete QA writer inside the artifact', async () => {
+test('both engineering skills reach shared conversation guidance, evidence intake, QA triage and the complete QA writer inside the artifact', async () => {
   for (const entry of ['temari', 'poteto-mode']) {
     const visited = new Set();
     const visit = async (path) => {
@@ -2376,6 +2376,13 @@ test('both engineering skills reach shared conversation guidance, QA triage and 
         join(repository, 'packages/workflow-runtime/public', conversationPath),
       ),
       'relocated guidance must preserve the owning source bytes',
+    );
+    const intakePath = 'skills/temari-knowledge/references/evidence-intake.md';
+    assert(visited.has(intakePath), `${entry} cannot reach shared evidence intake`);
+    assert.deepEqual(
+      await readFile(join(output, intakePath)),
+      await readFile(join(repository, 'packages/workflow-runtime/public', intakePath)),
+      'relocated intake guidance must preserve the owning source bytes',
     );
     for (const resource of [
       'SKILL.md',

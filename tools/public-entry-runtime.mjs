@@ -113,6 +113,10 @@ const publicFiles = [
     'skills/temari-knowledge/SKILL.md',
   ],
   [
+    'packages/workflow-runtime/public/skills/temari-knowledge/references/evidence-intake.md',
+    'skills/temari-knowledge/references/evidence-intake.md',
+  ],
+  [
     'packages/workflow-runtime/public/skills/poteto-mode/SKILL.md',
     'skills/poteto-mode/SKILL.md',
   ],

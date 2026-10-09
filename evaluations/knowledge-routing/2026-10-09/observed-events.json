@@ -1,0 +1,933 @@
+{
+  "schemaVersion": 1,
+  "scope": "Synthetic CLI source-scoped Registrar trials; independently inspected completed events, not canonical workflow receipts",
+  "trials": [
+    {
+      "case": "research",
+      "threadId": "01a12205-a3b7-7361-87e0-48b2e405200e",
+      "records": [
+        "research-cobalt-uptime-evidence.json"
+      ],
+      "trace": [
+        {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I\u2019ll use the Temari knowledge skill to check the Cobalt reporting policy and identify any assumptions it leaves unresolved."
+        },
+        {
+          "id": "item_1",
+          "type": "command_execution",
+          "command": "/bin/zsh -lc 'cat /private/tmp/temari-routing-live-c0n1v9wc/artifact/skills/temari-knowledge/SKILL.md'",
+          "exit_code": 0,
+          "status": "completed"
+        },
+        {
+          "id": "item_2",
+          "type": "command_execution",
+          "command": "/bin/zsh -lc 'cat /private/tmp/temari-routing-live-c0n1v9wc/artifact/skills/temari-knowledge/references/evidence-intake.md'",
+          "exit_code": 0,
+          "status": "completed"
+        },
+        {
+          "id": "item_3",
+          "type": "mcp_tool_call",
+          "server": "temari_fixture",
+          "tool": "knowledge_discover",
+          "arguments": {
+            "query": "heartbeat uptime",
+            "source_ids": [
+              "2bbc01bed06a4a979f75b37af5005da3"
+            ],
+            "max_bytes": 12000
+          },
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"schema\": 1, \"operation\": \"discover\", \"status\": \"complete\", \"query\": \"heartbeat uptime\", \"variants\": [], \"snapshot\": \"33d086f694de588dd596a1f2086276a4f6e4c73e9404af73fc01b7fd8b452017\", \"documents\": [{\"source_id\": \"2bbc01bed06a4a979f75b37af5005da3\", \"path\": \"cobalt-policy.md\", \"sha256\": \"a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224\", \"generation\": \"279187854003445e9399d537c289ef5f\", \"duplicate_group\": \"a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224\", \"chunk_count\": 1, \"retrieval\": {\"kind\": \"exact\", \"score\": 2, \"matched_terms\": [\"heartbeat\", \"uptime\"]}, \"applicability\": \"not-declared\", \"declared_conflicts\": []}], \"sources\": [{\"id\": \"2bbc01bed06a4a979f75b37af5005da3\", \"generation\": \"279187854003445e9399d537c289ef5f\", \"enabled\": true, \"scan_status\": \"complete\", \"last_scan_at\": \"2026-10-09T18:54:20.588623+00:00\", \"inventory\": {\"indexed\": 1}}], \"gaps\": [], \"freshness\": \"indexed membership as of last scan; local bytes checked; remote freshness unknown\", \"coverage\": {\"indexed_documents\": 1, \"matched\": 1, \"returned\": 1, \"consumed\": 1, \"remaining\": 0, \"enumeration_exhausted\": true, \"semantic_recall\": \"not-evaluated\"}, \"next_cursor\": null}"
+              }
+            ],
+            "structured_content": {
+              "schema": 1,
+              "operation": "discover",
+              "status": "complete",
+              "query": "heartbeat uptime",
+              "variants": [],
+              "snapshot": "33d086f694de588dd596a1f2086276a4f6e4c73e9404af73fc01b7fd8b452017",
+              "documents": [
+                {
+                  "source_id": "2bbc01bed06a4a979f75b37af5005da3",
+                  "path": "cobalt-policy.md",
+                  "sha256": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224",
+                  "generation": "279187854003445e9399d537c289ef5f",
+                  "duplicate_group": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224",
+                  "chunk_count": 1,
+                  "retrieval": {
+                    "kind": "exact",
+                    "score": 2,
+                    "matched_terms": [
+                      "heartbeat",
+                      "uptime"
+                    ]
+                  },
+                  "applicability": "not-declared",
+                  "declared_conflicts": []
+                }
+              ],
+              "sources": [
+                {
+                  "id": "2bbc01bed06a4a979f75b37af5005da3",
+                  "generation": "279187854003445e9399d537c289ef5f",
+                  "enabled": true,
+                  "scan_status": "complete",
+                  "last_scan_at": "2026-10-09T18:54:20.588623+00:00",
+                  "inventory": {
+                    "indexed": 1
+                  }
+                }
+              ],
+              "gaps": [],
+              "freshness": "indexed membership as of last scan; local bytes checked; remote freshness unknown",
+              "coverage": {
+                "indexed_documents": 1,
+                "matched": 1,
+                "returned": 1,
+                "consumed": 1,
+                "remaining": 0,
+                "enumeration_exhausted": true,
+                "semantic_recall": "not-evaluated"
+              },
+              "next_cursor": null
+            }
+          },
+          "error": null,
+          "status": "completed"
+        },
+        {
+          "id": "item_4",
+          "type": "mcp_tool_call",
+          "server": "temari_fixture",
+          "tool": "knowledge_read",
+          "arguments": {
+            "source_id": "2bbc01bed06a4a979f75b37af5005da3",
+            "path": "cobalt-policy.md",
+            "expected_generation": "279187854003445e9399d537c289ef5f",
+            "expected_sha256": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224",
+            "max_bytes": 16000
+          },
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"schema\": 1, \"operation\": \"read\", \"status\": \"complete\", \"source_id\": \"2bbc01bed06a4a979f75b37af5005da3\", \"path\": \"cobalt-policy.md\", \"generation\": \"279187854003445e9399d537c289ef5f\", \"sha256\": \"a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224\", \"snapshot\": \"33d086f694de588dd596a1f2086276a4f6e4c73e9404af73fc01b7fd8b452017\", \"total_chars\": 590, \"offset\": 0, \"next_offset\": null, \"record\": {\"body\": \"# Cobalt pilot reporting policy\\n\\nRevision 2026-10-09. Synthetic test material, not an OCPP requirement.\\n\\nA heartbeat stale interval begins after three missed scheduled heartbeats. Until corroborating status or delivery evidence arrives, classify that interval as unknown, not confirmed downtime. Report communications availability separately from charging capability. Use the port as the reporting unit. Eligible minutes exclude only operator-approved scheduled maintenance. Publish unknown minutes separately and include them as not-proven-up minutes in the conservative uptime numerator.\\n\", \"support\": \"source-bytes-and-spans-verified\", \"citations\": [{\"source_id\": \"2bbc01bed06a4a979f75b37af5005da3\", \"path\": \"cobalt-policy.md\", \"sha256\": \"a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224\", \"start\": 1, \"end\": 5, \"text_start\": 0, \"text_end\": 590, \"extraction\": \"utf-8-text\", \"extractor_signature\": \"ac314023280d5f2280520e822b6c8d36702bf5d78e9f0b6b33843aad6e68e445\", \"quote\": \"# Cobalt pilot reporting policy\\n\\nRevision 2026-10-09. Synthetic test material, not an OCPP requirement.\\n\\nA heartbeat stale interval begins after three missed scheduled heartbeats. Until corroborating status or delivery evidence arrives, classify that interval as unknown, not confirmed downtime. Report communications availability separately from charging capability. Use the port as the reporting unit. Eligible minutes exclude only operator-approved scheduled maintenance. Publish unknown minutes separately and include them as not-proven-up minutes in the conservative uptime numerator.\\n\"}]}, \"gaps\": []}"
+              }
+            ],
+            "structured_content": {
+              "schema": 1,
+              "operation": "read",
+              "status": "complete",
+              "source_id": "2bbc01bed06a4a979f75b37af5005da3",
+              "path": "cobalt-policy.md",
+              "generation": "279187854003445e9399d537c289ef5f",
+              "sha256": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224",
+              "snapshot": "33d086f694de588dd596a1f2086276a4f6e4c73e9404af73fc01b7fd8b452017",
+              "total_chars": 590,
+              "offset": 0,
+              "next_offset": null,
+              "record": {
+                "body": "# Cobalt pilot reporting policy\n\nRevision 2026-10-09. Synthetic test material, not an OCPP requirement.\n\nA heartbeat stale interval begins after three missed scheduled heartbeats. Until corroborating status or delivery evidence arrives, classify that interval as unknown, not confirmed downtime. Report communications availability separately from charging capability. Use the port as the reporting unit. Eligible minutes exclude only operator-approved scheduled maintenance. Publish unknown minutes separately and include them as not-proven-up minutes in the conservative uptime numerator.\n",
+                "support": "source-bytes-and-spans-verified",
+                "citations": [
+                  {
+                    "source_id": "2bbc01bed06a4a979f75b37af5005da3",
+                    "path": "cobalt-policy.md",
+                    "sha256": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224",
+                    "start": 1,
+                    "end": 5,
+                    "text_start": 0,
+                    "text_end": 590,
+                    "extraction": "utf-8-text",
+                    "extractor_signature": "ac314023280d5f2280520e822b6c8d36702bf5d78e9f0b6b33843aad6e68e445",
+                    "quote": "# Cobalt pilot reporting policy\n\nRevision 2026-10-09. Synthetic test material, not an OCPP requirement.\n\nA heartbeat stale interval begins after three missed scheduled heartbeats. Until corroborating status or delivery evidence arrives, classify that interval as unknown, not confirmed downtime. Report communications availability separately from charging capability. Use the port as the reporting unit. Eligible minutes exclude only operator-approved scheduled maintenance. Publish unknown minutes separately and include them as not-proven-up minutes in the conservative uptime numerator.\n"
+                  }
+                ]
+              },
+              "gaps": []
+            }
+          },
+          "error": null,
+          "status": "completed"
+        },
+        {
+          "id": "item_5",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "/private/tmp/temari-routing-live-c0n1v9wc/research/outputs/cobalt-uptime-evidence.json",
+              "kind": "add"
+            }
+          ],
+          "status": "completed"
+        },
+        {
+          "id": "item_6",
+          "type": "agent_message",
+          "text": "For Cobalt, **heartbeat silence becomes \u201cunknown,\u201d not confirmed downtime, after three missed scheduled heartbeats**, pending corroborating status or delivery evidence.\n\nThe project rule also requires:\n\n- Reporting **per port**, with communications availability separate from charging capability.\n- Excluding only **operator-approved scheduled maintenance** from eligible minutes.\n- Publishing unknown minutes separately and treating them as **not proven up** in conservative uptime reporting.\n\nUnresolved details include the heartbeat cadence and timing tolerance, what evidence permits reclassification (including retrospectively), and how station-level silence maps to individual ports. The policy\u2019s phrase \u201cinclude them as not-proven-up minutes in the conservative uptime numerator\u201d also needs arithmetic clarification. The conservative interpretation is **proven-up minutes \u00f7 eligible minutes**, retaining unknown minutes in the denominator without crediting them as up.\n\nSource: *Cobalt pilot reporting policy*, revision **2026-10-09**, `cobalt-policy.md`, lines 3\u20135; registered source `2bbc01bed06a4a979f75b37af5005da3`. This is a Cobalt project rule, not a general OCPP requirement."
+        }
+      ],
+      "artifactManifestSha256": "da7e33338d84d1f486a1e7f3fec9ca9bc276f9042056c7269d97b6306441c88a",
+      "sourceRevision": "bb94777c9aaa2efc97970edb5813a46c5e9917e7",
+      "sourceDirty": true,
+      "skillResources": [
+        {
+          "path": "skills/poteto-mode/SKILL.md",
+          "sha256": "4179e97315330ba3212bab9b3af3d30e8087fadafe213457f1330aec97161b71",
+          "bytes": 4977
+        },
+        {
+          "path": "skills/temari-knowledge/SKILL.md",
+          "sha256": "9e6a9a0afa87486b7e43e795ff2b313cde6f1b301687609cef8fb3621a7e550a",
+          "bytes": 7949
+        },
+        {
+          "path": "skills/temari-knowledge/references/evidence-intake.md",
+          "sha256": "5181dcf0408cad66ed5708d689946f33741319567662b983c14c0ef3140a5c4a",
+          "bytes": 3711
+        },
+        {
+          "path": "skills/temari/SKILL.md",
+          "sha256": "546cfcb5a1e4d865526d970f2a2489b52300c9122eddfb09d841a65a1405b6f8",
+          "bytes": 16359
+        }
+      ]
+    },
+    {
+      "case": "engineering",
+      "threadId": "01a12206-1f21-7a40-971c-5e1e3b0eca25",
+      "records": [
+        "engineering-evidence-decision.md"
+      ],
+      "trace": [
+        {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I\u2019ll use the Temari and Graphify skills to trace the calculation and compare it with the registered Cobalt policy, leaving the product unchanged."
+        },
+        {
+          "id": "item_1",
+          "type": "command_execution",
+          "command": "/bin/zsh -lc 'cat /private/tmp/temari-routing-live-c0n1v9wc/artifact/skills/temari/SKILL.md /Users/randydinh/.codex/skills/graphify/SKILL.md'",
+          "exit_code": 0,
+          "status": "completed"
+        },
+        {
+          "id": "item_2",
+          "type": "command_execution",
+          "command": "/bin/zsh -lc 'cat /private/tmp/temari-routing-live-c0n1v9wc/artifact/skills/temari-knowledge/SKILL.md /private/tmp/temari-routing-live-c0n1v9wc/artifact/skills/temari-knowledge/references/evidence-intake.md /private/tmp/temari-routing-live-c0n1v9wc/artifact/skills/poteto-mode/SKILL.md'",
+          "exit_code": 0,
+          "status": "completed"
+        },
+        {
+          "id": "item_3",
+          "type": "command_execution",
+          "command": "/bin/zsh -lc \"rg --files -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!outputs/**'\"'\"",
+          "exit_code": 0,
+          "status": "completed"
+        },
+        {
+          "id": "item_4",
+          "type": "command_execution",
+          "command": "/bin/zsh -lc 'cat /private/tmp/temari-routing-live-c0n1v9wc/artifact/policy.json /private/tmp/temari-routing-live-c0n1v9wc/artifact/skills/temari/references/conversation.md;'",
+          "exit_code": 0,
+          "status": "completed"
+        },
+        {
+          "id": "item_5",
+          "type": "command_execution",
+          "command": "/bin/zsh -lc \"ls -la .codex; cat AGENTS.md; nl -ba station-report.js; rg -n 'query|existing|read-only' /Users/randydinh/.codex/skills/graphify/SKILL.md\"",
+          "exit_code": 0,
+          "status": "completed"
+        },
+        {
+          "id": "item_6",
+          "type": "mcp_tool_call",
+          "server": "codex",
+          "tool": "list_mcp_resources",
+          "status": "completed"
+        },
+        {
+          "id": "item_7",
+          "type": "mcp_tool_call",
+          "server": "codex",
+          "tool": "list_mcp_resource_templates",
+          "status": "completed"
+        },
+        {
+          "id": "item_8",
+          "type": "agent_message",
+          "text": "The function keeps unknown minutes in the total eligible time but removes them from credited uptime. That makes the percentage conservative: missing evidence of availability cannot improve the result. I\u2019m checking the policy source to confirm whether Cobalt requires that treatment."
+        },
+        {
+          "id": "item_9",
+          "type": "command_execution",
+          "command": "/bin/zsh -lc 'ls -la /private/tmp/temari-routing-live-c0n1v9wc; ls -la;'",
+          "exit_code": 0,
+          "status": "completed"
+        },
+        {
+          "id": "item_10",
+          "type": "command_execution",
+          "command": "/bin/zsh -lc \"test -f graphify-out/graph.json && echo present || echo 'No existing graph'\"",
+          "exit_code": 0,
+          "status": "completed"
+        },
+        {
+          "id": "item_11",
+          "type": "mcp_tool_call",
+          "server": "temari_fixture",
+          "tool": "knowledge_discover",
+          "arguments": {
+            "query": "unknown",
+            "source_ids": [
+              "2bbc01bed06a4a979f75b37af5005da3"
+            ],
+            "limit": 5,
+            "max_bytes": 10000
+          },
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"schema\": 1, \"operation\": \"discover\", \"status\": \"complete\", \"query\": \"unknown\", \"variants\": [], \"snapshot\": \"33d086f694de588dd596a1f2086276a4f6e4c73e9404af73fc01b7fd8b452017\", \"documents\": [{\"source_id\": \"2bbc01bed06a4a979f75b37af5005da3\", \"path\": \"cobalt-policy.md\", \"sha256\": \"a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224\", \"generation\": \"279187854003445e9399d537c289ef5f\", \"duplicate_group\": \"a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224\", \"chunk_count\": 1, \"retrieval\": {\"kind\": \"exact\", \"score\": 1, \"matched_terms\": [\"unknown\"]}, \"applicability\": \"not-declared\", \"declared_conflicts\": []}], \"sources\": [{\"id\": \"2bbc01bed06a4a979f75b37af5005da3\", \"generation\": \"279187854003445e9399d537c289ef5f\", \"enabled\": true, \"scan_status\": \"complete\", \"last_scan_at\": \"2026-10-09T18:54:20.588623+00:00\", \"inventory\": {\"indexed\": 1}}], \"gaps\": [], \"freshness\": \"indexed membership as of last scan; local bytes checked; remote freshness unknown\", \"coverage\": {\"indexed_documents\": 1, \"matched\": 1, \"returned\": 1, \"consumed\": 1, \"remaining\": 0, \"enumeration_exhausted\": true, \"semantic_recall\": \"not-evaluated\"}, \"next_cursor\": null}"
+              }
+            ],
+            "structured_content": {
+              "schema": 1,
+              "operation": "discover",
+              "status": "complete",
+              "query": "unknown",
+              "variants": [],
+              "snapshot": "33d086f694de588dd596a1f2086276a4f6e4c73e9404af73fc01b7fd8b452017",
+              "documents": [
+                {
+                  "source_id": "2bbc01bed06a4a979f75b37af5005da3",
+                  "path": "cobalt-policy.md",
+                  "sha256": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224",
+                  "generation": "279187854003445e9399d537c289ef5f",
+                  "duplicate_group": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224",
+                  "chunk_count": 1,
+                  "retrieval": {
+                    "kind": "exact",
+                    "score": 1,
+                    "matched_terms": [
+                      "unknown"
+                    ]
+                  },
+                  "applicability": "not-declared",
+                  "declared_conflicts": []
+                }
+              ],
+              "sources": [
+                {
+                  "id": "2bbc01bed06a4a979f75b37af5005da3",
+                  "generation": "279187854003445e9399d537c289ef5f",
+                  "enabled": true,
+                  "scan_status": "complete",
+                  "last_scan_at": "2026-10-09T18:54:20.588623+00:00",
+                  "inventory": {
+                    "indexed": 1
+                  }
+                }
+              ],
+              "gaps": [],
+              "freshness": "indexed membership as of last scan; local bytes checked; remote freshness unknown",
+              "coverage": {
+                "indexed_documents": 1,
+                "matched": 1,
+                "returned": 1,
+                "consumed": 1,
+                "remaining": 0,
+                "enumeration_exhausted": true,
+                "semantic_recall": "not-evaluated"
+              },
+              "next_cursor": null
+            }
+          },
+          "error": null,
+          "status": "completed"
+        },
+        {
+          "id": "item_12",
+          "type": "mcp_tool_call",
+          "server": "temari_fixture",
+          "tool": "knowledge_read",
+          "arguments": {
+            "source_id": "2bbc01bed06a4a979f75b37af5005da3",
+            "path": "cobalt-policy.md",
+            "expected_generation": "279187854003445e9399d537c289ef5f",
+            "expected_sha256": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224",
+            "max_chars": 12000,
+            "max_bytes": 16000
+          },
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"schema\": 1, \"operation\": \"read\", \"status\": \"complete\", \"source_id\": \"2bbc01bed06a4a979f75b37af5005da3\", \"path\": \"cobalt-policy.md\", \"generation\": \"279187854003445e9399d537c289ef5f\", \"sha256\": \"a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224\", \"snapshot\": \"33d086f694de588dd596a1f2086276a4f6e4c73e9404af73fc01b7fd8b452017\", \"total_chars\": 590, \"offset\": 0, \"next_offset\": null, \"record\": {\"body\": \"# Cobalt pilot reporting policy\\n\\nRevision 2026-10-09. Synthetic test material, not an OCPP requirement.\\n\\nA heartbeat stale interval begins after three missed scheduled heartbeats. Until corroborating status or delivery evidence arrives, classify that interval as unknown, not confirmed downtime. Report communications availability separately from charging capability. Use the port as the reporting unit. Eligible minutes exclude only operator-approved scheduled maintenance. Publish unknown minutes separately and include them as not-proven-up minutes in the conservative uptime numerator.\\n\", \"support\": \"source-bytes-and-spans-verified\", \"citations\": [{\"source_id\": \"2bbc01bed06a4a979f75b37af5005da3\", \"path\": \"cobalt-policy.md\", \"sha256\": \"a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224\", \"start\": 1, \"end\": 5, \"text_start\": 0, \"text_end\": 590, \"extraction\": \"utf-8-text\", \"extractor_signature\": \"ac314023280d5f2280520e822b6c8d36702bf5d78e9f0b6b33843aad6e68e445\", \"quote\": \"# Cobalt pilot reporting policy\\n\\nRevision 2026-10-09. Synthetic test material, not an OCPP requirement.\\n\\nA heartbeat stale interval begins after three missed scheduled heartbeats. Until corroborating status or delivery evidence arrives, classify that interval as unknown, not confirmed downtime. Report communications availability separately from charging capability. Use the port as the reporting unit. Eligible minutes exclude only operator-approved scheduled maintenance. Publish unknown minutes separately and include them as not-proven-up minutes in the conservative uptime numerator.\\n\"}]}, \"gaps\": []}"
+              }
+            ],
+            "structured_content": {
+              "schema": 1,
+              "operation": "read",
+              "status": "complete",
+              "source_id": "2bbc01bed06a4a979f75b37af5005da3",
+              "path": "cobalt-policy.md",
+              "generation": "279187854003445e9399d537c289ef5f",
+              "sha256": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224",
+              "snapshot": "33d086f694de588dd596a1f2086276a4f6e4c73e9404af73fc01b7fd8b452017",
+              "total_chars": 590,
+              "offset": 0,
+              "next_offset": null,
+              "record": {
+                "body": "# Cobalt pilot reporting policy\n\nRevision 2026-10-09. Synthetic test material, not an OCPP requirement.\n\nA heartbeat stale interval begins after three missed scheduled heartbeats. Until corroborating status or delivery evidence arrives, classify that interval as unknown, not confirmed downtime. Report communications availability separately from charging capability. Use the port as the reporting unit. Eligible minutes exclude only operator-approved scheduled maintenance. Publish unknown minutes separately and include them as not-proven-up minutes in the conservative uptime numerator.\n",
+                "support": "source-bytes-and-spans-verified",
+                "citations": [
+                  {
+                    "source_id": "2bbc01bed06a4a979f75b37af5005da3",
+                    "path": "cobalt-policy.md",
+                    "sha256": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224",
+                    "start": 1,
+                    "end": 5,
+                    "text_start": 0,
+                    "text_end": 590,
+                    "extraction": "utf-8-text",
+                    "extractor_signature": "ac314023280d5f2280520e822b6c8d36702bf5d78e9f0b6b33843aad6e68e445",
+                    "quote": "# Cobalt pilot reporting policy\n\nRevision 2026-10-09. Synthetic test material, not an OCPP requirement.\n\nA heartbeat stale interval begins after three missed scheduled heartbeats. Until corroborating status or delivery evidence arrives, classify that interval as unknown, not confirmed downtime. Report communications availability separately from charging capability. Use the port as the reporting unit. Eligible minutes exclude only operator-approved scheduled maintenance. Publish unknown minutes separately and include them as not-proven-up minutes in the conservative uptime numerator.\n"
+                  }
+                ]
+              },
+              "gaps": []
+            }
+          },
+          "error": null,
+          "status": "completed"
+        },
+        {
+          "id": "item_13",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "/private/tmp/temari-routing-live-c0n1v9wc/engineering/outputs/evidence-decision.md",
+              "kind": "add"
+            }
+          ],
+          "status": "completed"
+        },
+        {
+          "id": "item_14",
+          "type": "agent_message",
+          "text": "**Yes\u2014the subtraction is consistent with Cobalt\u2019s conservative uptime policy.**\n\n[station-report.js:2](/private/tmp/temari-routing-live-c0n1v9wc/engineering/station-report.js:2) calculates:\n\n```text\n100 \u00d7 (eligible \u2212 unavailable \u2212 unknown) / eligible\n```\n\nUnknown minutes remain eligible but receive no uptime credit because availability hasn\u2019t been established. For example, 100 eligible minutes with 10 unavailable and 5 unknown yields **85%**.\n\nThe registered **Cobalt pilot reporting policy, revision 2026-10-09, line 5**, explicitly requires unknown minutes to count as \u201cnot-proven-up\u201d in the conservative numerator. It also requires publishing unknown minutes separately. **This does not classify unknown time as confirmed downtime**\u2014three missed scheduled heartbeats trigger an unknown interval pending corroborating evidence.\n\nThe arithmetic matches that rule. This small function alone cannot establish whether the surrounding reporting meets the policy\u2019s separate-reporting and per-port requirements. Product unchanged."
+        }
+      ],
+      "artifactManifestSha256": "da7e33338d84d1f486a1e7f3fec9ca9bc276f9042056c7269d97b6306441c88a",
+      "sourceRevision": "bb94777c9aaa2efc97970edb5813a46c5e9917e7",
+      "sourceDirty": true,
+      "skillResources": [
+        {
+          "path": "skills/poteto-mode/SKILL.md",
+          "sha256": "4179e97315330ba3212bab9b3af3d30e8087fadafe213457f1330aec97161b71",
+          "bytes": 4977
+        },
+        {
+          "path": "skills/temari-knowledge/SKILL.md",
+          "sha256": "9e6a9a0afa87486b7e43e795ff2b313cde6f1b301687609cef8fb3621a7e550a",
+          "bytes": 7949
+        },
+        {
+          "path": "skills/temari-knowledge/references/evidence-intake.md",
+          "sha256": "5181dcf0408cad66ed5708d689946f33741319567662b983c14c0ef3140a5c4a",
+          "bytes": 3711
+        },
+        {
+          "path": "skills/temari/SKILL.md",
+          "sha256": "546cfcb5a1e4d865526d970f2a2489b52300c9122eddfb09d841a65a1405b6f8",
+          "bytes": 16359
+        }
+      ]
+    },
+    {
+      "case": "rewrite",
+      "threadId": "01a12206-ede8-70a1-a74b-ce4f4623e8c8",
+      "records": [],
+      "trace": [
+        {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "Charging starts when the driver taps Start."
+        }
+      ],
+      "artifactManifestSha256": "da7e33338d84d1f486a1e7f3fec9ca9bc276f9042056c7269d97b6306441c88a",
+      "sourceRevision": "bb94777c9aaa2efc97970edb5813a46c5e9917e7",
+      "sourceDirty": true,
+      "skillResources": [
+        {
+          "path": "skills/poteto-mode/SKILL.md",
+          "sha256": "4179e97315330ba3212bab9b3af3d30e8087fadafe213457f1330aec97161b71",
+          "bytes": 4977
+        },
+        {
+          "path": "skills/temari-knowledge/SKILL.md",
+          "sha256": "9e6a9a0afa87486b7e43e795ff2b313cde6f1b301687609cef8fb3621a7e550a",
+          "bytes": 7949
+        },
+        {
+          "path": "skills/temari-knowledge/references/evidence-intake.md",
+          "sha256": "5181dcf0408cad66ed5708d689946f33741319567662b983c14c0ef3140a5c4a",
+          "bytes": 3711
+        },
+        {
+          "path": "skills/temari/SKILL.md",
+          "sha256": "546cfcb5a1e4d865526d970f2a2489b52300c9122eddfb09d841a65a1405b6f8",
+          "bytes": 16359
+        }
+      ]
+    },
+    {
+      "case": "research-refined",
+      "threadId": "01a12209-fdce-7e00-bc8d-c78852e8400a",
+      "records": [
+        "research-refined-heartbeat-evidence.json"
+      ],
+      "trace": [
+        {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I\u2019m using the Temari knowledge skill to check the Cobalt reporting policy and identify any assumptions it leaves unresolved.\n"
+        },
+        {
+          "id": "item_1",
+          "type": "command_execution",
+          "command": "/bin/zsh -lc 'cat /private/tmp/temari-routing-live-c0n1v9wc/artifact-final/skills/temari-knowledge/SKILL.md'",
+          "exit_code": 0,
+          "status": "completed"
+        },
+        {
+          "id": "item_2",
+          "type": "command_execution",
+          "command": "/bin/zsh -lc 'cat /private/tmp/temari-routing-live-c0n1v9wc/artifact-final/skills/temari-knowledge/references/evidence-intake.md'",
+          "exit_code": 0,
+          "status": "completed"
+        },
+        {
+          "id": "item_3",
+          "type": "mcp_tool_call",
+          "server": "temari_fixture",
+          "tool": "knowledge_discover",
+          "arguments": {
+            "query": "heartbeat uptime",
+            "source_ids": [
+              "2bbc01bed06a4a979f75b37af5005da3"
+            ],
+            "limit": 5,
+            "max_bytes": 14000
+          },
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"schema\": 1, \"operation\": \"discover\", \"status\": \"complete\", \"query\": \"heartbeat uptime\", \"variants\": [], \"snapshot\": \"33d086f694de588dd596a1f2086276a4f6e4c73e9404af73fc01b7fd8b452017\", \"documents\": [{\"source_id\": \"2bbc01bed06a4a979f75b37af5005da3\", \"path\": \"cobalt-policy.md\", \"sha256\": \"a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224\", \"generation\": \"279187854003445e9399d537c289ef5f\", \"duplicate_group\": \"a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224\", \"chunk_count\": 1, \"retrieval\": {\"kind\": \"exact\", \"score\": 2, \"matched_terms\": [\"heartbeat\", \"uptime\"]}, \"applicability\": \"not-declared\", \"declared_conflicts\": []}], \"sources\": [{\"id\": \"2bbc01bed06a4a979f75b37af5005da3\", \"generation\": \"279187854003445e9399d537c289ef5f\", \"enabled\": true, \"scan_status\": \"complete\", \"last_scan_at\": \"2026-10-09T18:54:20.588623+00:00\", \"inventory\": {\"indexed\": 1}}], \"gaps\": [], \"freshness\": \"indexed membership as of last scan; local bytes checked; remote freshness unknown\", \"coverage\": {\"indexed_documents\": 1, \"matched\": 1, \"returned\": 1, \"consumed\": 1, \"remaining\": 0, \"enumeration_exhausted\": true, \"semantic_recall\": \"not-evaluated\"}, \"next_cursor\": null}"
+              }
+            ],
+            "structured_content": {
+              "schema": 1,
+              "operation": "discover",
+              "status": "complete",
+              "query": "heartbeat uptime",
+              "variants": [],
+              "snapshot": "33d086f694de588dd596a1f2086276a4f6e4c73e9404af73fc01b7fd8b452017",
+              "documents": [
+                {
+                  "source_id": "2bbc01bed06a4a979f75b37af5005da3",
+                  "path": "cobalt-policy.md",
+                  "sha256": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224",
+                  "generation": "279187854003445e9399d537c289ef5f",
+                  "duplicate_group": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224",
+                  "chunk_count": 1,
+                  "retrieval": {
+                    "kind": "exact",
+                    "score": 2,
+                    "matched_terms": [
+                      "heartbeat",
+                      "uptime"
+                    ]
+                  },
+                  "applicability": "not-declared",
+                  "declared_conflicts": []
+                }
+              ],
+              "sources": [
+                {
+                  "id": "2bbc01bed06a4a979f75b37af5005da3",
+                  "generation": "279187854003445e9399d537c289ef5f",
+                  "enabled": true,
+                  "scan_status": "complete",
+                  "last_scan_at": "2026-10-09T18:54:20.588623+00:00",
+                  "inventory": {
+                    "indexed": 1
+                  }
+                }
+              ],
+              "gaps": [],
+              "freshness": "indexed membership as of last scan; local bytes checked; remote freshness unknown",
+              "coverage": {
+                "indexed_documents": 1,
+                "matched": 1,
+                "returned": 1,
+                "consumed": 1,
+                "remaining": 0,
+                "enumeration_exhausted": true,
+                "semantic_recall": "not-evaluated"
+              },
+              "next_cursor": null
+            }
+          },
+          "error": null,
+          "status": "completed"
+        },
+        {
+          "id": "item_4",
+          "type": "mcp_tool_call",
+          "server": "temari_fixture",
+          "tool": "knowledge_read",
+          "arguments": {
+            "source_id": "2bbc01bed06a4a979f75b37af5005da3",
+            "path": "cobalt-policy.md",
+            "expected_generation": "279187854003445e9399d537c289ef5f",
+            "expected_sha256": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224",
+            "max_chars": 16000
+          },
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"schema\": 1, \"operation\": \"read\", \"status\": \"complete\", \"source_id\": \"2bbc01bed06a4a979f75b37af5005da3\", \"path\": \"cobalt-policy.md\", \"generation\": \"279187854003445e9399d537c289ef5f\", \"sha256\": \"a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224\", \"snapshot\": \"33d086f694de588dd596a1f2086276a4f6e4c73e9404af73fc01b7fd8b452017\", \"total_chars\": 590, \"offset\": 0, \"next_offset\": null, \"record\": {\"body\": \"# Cobalt pilot reporting policy\\n\\nRevision 2026-10-09. Synthetic test material, not an OCPP requirement.\\n\\nA heartbeat stale interval begins after three missed scheduled heartbeats. Until corroborating status or delivery evidence arrives, classify that interval as unknown, not confirmed downtime. Report communications availability separately from charging capability. Use the port as the reporting unit. Eligible minutes exclude only operator-approved scheduled maintenance. Publish unknown minutes separately and include them as not-proven-up minutes in the conservative uptime numerator.\\n\", \"support\": \"source-bytes-and-spans-verified\", \"citations\": [{\"source_id\": \"2bbc01bed06a4a979f75b37af5005da3\", \"path\": \"cobalt-policy.md\", \"sha256\": \"a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224\", \"start\": 1, \"end\": 5, \"text_start\": 0, \"text_end\": 590, \"extraction\": \"utf-8-text\", \"extractor_signature\": \"ac314023280d5f2280520e822b6c8d36702bf5d78e9f0b6b33843aad6e68e445\", \"quote\": \"# Cobalt pilot reporting policy\\n\\nRevision 2026-10-09. Synthetic test material, not an OCPP requirement.\\n\\nA heartbeat stale interval begins after three missed scheduled heartbeats. Until corroborating status or delivery evidence arrives, classify that interval as unknown, not confirmed downtime. Report communications availability separately from charging capability. Use the port as the reporting unit. Eligible minutes exclude only operator-approved scheduled maintenance. Publish unknown minutes separately and include them as not-proven-up minutes in the conservative uptime numerator.\\n\"}]}, \"gaps\": []}"
+              }
+            ],
+            "structured_content": {
+              "schema": 1,
+              "operation": "read",
+              "status": "complete",
+              "source_id": "2bbc01bed06a4a979f75b37af5005da3",
+              "path": "cobalt-policy.md",
+              "generation": "279187854003445e9399d537c289ef5f",
+              "sha256": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224",
+              "snapshot": "33d086f694de588dd596a1f2086276a4f6e4c73e9404af73fc01b7fd8b452017",
+              "total_chars": 590,
+              "offset": 0,
+              "next_offset": null,
+              "record": {
+                "body": "# Cobalt pilot reporting policy\n\nRevision 2026-10-09. Synthetic test material, not an OCPP requirement.\n\nA heartbeat stale interval begins after three missed scheduled heartbeats. Until corroborating status or delivery evidence arrives, classify that interval as unknown, not confirmed downtime. Report communications availability separately from charging capability. Use the port as the reporting unit. Eligible minutes exclude only operator-approved scheduled maintenance. Publish unknown minutes separately and include them as not-proven-up minutes in the conservative uptime numerator.\n",
+                "support": "source-bytes-and-spans-verified",
+                "citations": [
+                  {
+                    "source_id": "2bbc01bed06a4a979f75b37af5005da3",
+                    "path": "cobalt-policy.md",
+                    "sha256": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224",
+                    "start": 1,
+                    "end": 5,
+                    "text_start": 0,
+                    "text_end": 590,
+                    "extraction": "utf-8-text",
+                    "extractor_signature": "ac314023280d5f2280520e822b6c8d36702bf5d78e9f0b6b33843aad6e68e445",
+                    "quote": "# Cobalt pilot reporting policy\n\nRevision 2026-10-09. Synthetic test material, not an OCPP requirement.\n\nA heartbeat stale interval begins after three missed scheduled heartbeats. Until corroborating status or delivery evidence arrives, classify that interval as unknown, not confirmed downtime. Report communications availability separately from charging capability. Use the port as the reporting unit. Eligible minutes exclude only operator-approved scheduled maintenance. Publish unknown minutes separately and include them as not-proven-up minutes in the conservative uptime numerator.\n"
+                  }
+                ]
+              },
+              "gaps": []
+            }
+          },
+          "error": null,
+          "status": "completed"
+        },
+        {
+          "id": "item_5",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "/private/tmp/temari-routing-live-c0n1v9wc/research-refined/outputs/heartbeat-evidence.json",
+              "kind": "add"
+            }
+          ],
+          "status": "completed"
+        },
+        {
+          "id": "item_6",
+          "type": "agent_message",
+          "text": "Treat heartbeat loss as **unknown availability once three scheduled heartbeats are missed**, until corroborating status or delivery evidence arrives. Silence alone does not establish confirmed downtime.\n\nThe **Cobalt pilot reporting policy, revision 2026-10-09**, requires:\n\n- Reporting **per port**, with communications availability separate from charging capability.\n- Excluding only **operator-approved scheduled maintenance** from eligible minutes.\n- Publishing unknown minutes separately and treating them as **not proven up** in conservative uptime reporting.\n\nUnresolved assumptions are the heartbeat schedule and timing tolerance, what evidence resolves an unknown interval, whether later evidence revises historical reports, and how station-level silence maps to individual ports.\n\nThe policy\u2019s phrase \u201cinclude them as not-proven-up minutes in the conservative uptime numerator\u201d needs formula clarification. My interpretation is that unknown minutes remain eligible but earn **no uptime credit**.\n\nSource: registered `cobalt-policy.md`, lines 1\u20135, source ID `2bbc01bed06a4a979f75b37af5005da3`. This is a Cobalt project rule, not a general OCPP requirement."
+        }
+      ],
+      "artifactManifestSha256": "6b825d97c2a2651be39238b2d99e53ed2f71ec8235870249a2debeaa60f412f1",
+      "sourceRevision": "bb94777c9aaa2efc97970edb5813a46c5e9917e7",
+      "sourceDirty": true,
+      "skillResources": [
+        {
+          "path": "skills/poteto-mode/SKILL.md",
+          "sha256": "4179e97315330ba3212bab9b3af3d30e8087fadafe213457f1330aec97161b71",
+          "bytes": 4977
+        },
+        {
+          "path": "skills/temari-knowledge/SKILL.md",
+          "sha256": "9e6a9a0afa87486b7e43e795ff2b313cde6f1b301687609cef8fb3621a7e550a",
+          "bytes": 7949
+        },
+        {
+          "path": "skills/temari-knowledge/references/evidence-intake.md",
+          "sha256": "50aabbc4e38a84b034aeb2c891c25a289f802bdca484b8d78fa86b8c5df33525",
+          "bytes": 4311
+        },
+        {
+          "path": "skills/temari/SKILL.md",
+          "sha256": "3abbfce1f2372485d32ced22fdb1ff438171f3fd92545f63f92ea4d72764436d",
+          "bytes": 16359
+        }
+      ]
+    },
+    {
+      "case": "engineering-refined",
+      "threadId": "01a1220a-7e1a-7392-b2a2-f6c12f535b68",
+      "records": [
+        "engineering-refined-evidence-context.json"
+      ],
+      "trace": [
+        {
+          "id": "item_0",
+          "type": "agent_message",
+          "text": "I\u2019ll use the Temari and Poteto investigation guidance to trace the calculation and compare it with the registered Cobalt policy, leaving the product unchanged."
+        },
+        {
+          "id": "item_1",
+          "type": "command_execution",
+          "command": "/bin/zsh -lc 'cat /private/tmp/temari-routing-live-c0n1v9wc/artifact-final/skills/temari/SKILL.md /private/tmp/temari-routing-live-c0n1v9wc/artifact-final/skills/poteto-mode/SKILL.md /Users/randydinh/.codex/skills/graphify/SKILL.md'",
+          "exit_code": 0,
+          "status": "completed"
+        },
+        {
+          "id": "item_2",
+          "type": "command_execution",
+          "command": "/bin/zsh -lc 'cat /private/tmp/temari-routing-live-c0n1v9wc/artifact-final/skills/poteto-mode/SKILL.md /private/tmp/temari-routing-live-c0n1v9wc/artifact-final/skills/temari-knowledge/SKILL.md /private/tmp/temari-routing-live-c0n1v9wc/artifact-final/skills/temari-knowledge/references/evidence-intake.md /private/tmp/temari-routing-live-c0n1v9wc/artifact-final/policy.json'",
+          "exit_code": 0,
+          "status": "completed"
+        },
+        {
+          "id": "item_3",
+          "type": "command_execution",
+          "command": "/bin/zsh -lc 'cat /Users/randydinh/.codex/skills/graphify/SKILL.md'",
+          "exit_code": 0,
+          "status": "completed"
+        },
+        {
+          "id": "item_4",
+          "type": "command_execution",
+          "command": "/bin/zsh -lc \"rg --files -g '\"'!node_modules'\"' -g '\"'!outputs/**'\"' -g '\"'!package-lock.json'\"' -g '\"'!yarn.lock'\"' ; git status --short\"",
+          "exit_code": 128,
+          "status": "failed"
+        },
+        {
+          "id": "item_5",
+          "type": "mcp_tool_call",
+          "server": "temari_fixture",
+          "tool": "knowledge_discover",
+          "arguments": {
+            "source_ids": [
+              "2bbc01bed06a4a979f75b37af5005da3"
+            ],
+            "query": "Cobalt pilot reporting unknown minutes denominator",
+            "limit": 5,
+            "max_bytes": 12000
+          },
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"schema\": 1, \"operation\": \"discover\", \"status\": \"complete\", \"query\": \"Cobalt pilot reporting unknown minutes denominator\", \"variants\": [], \"snapshot\": \"33d086f694de588dd596a1f2086276a4f6e4c73e9404af73fc01b7fd8b452017\", \"documents\": [{\"source_id\": \"2bbc01bed06a4a979f75b37af5005da3\", \"path\": \"cobalt-policy.md\", \"sha256\": \"a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224\", \"generation\": \"279187854003445e9399d537c289ef5f\", \"duplicate_group\": \"a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224\", \"chunk_count\": 1, \"retrieval\": {\"kind\": \"exact\", \"score\": 7, \"matched_terms\": [\"cobalt\", \"minutes\", \"pilot\", \"reporting\", \"unknown\"]}, \"applicability\": \"not-declared\", \"declared_conflicts\": []}], \"sources\": [{\"id\": \"2bbc01bed06a4a979f75b37af5005da3\", \"generation\": \"279187854003445e9399d537c289ef5f\", \"enabled\": true, \"scan_status\": \"complete\", \"last_scan_at\": \"2026-10-09T18:54:20.588623+00:00\", \"inventory\": {\"indexed\": 1}}], \"gaps\": [], \"freshness\": \"indexed membership as of last scan; local bytes checked; remote freshness unknown\", \"coverage\": {\"indexed_documents\": 1, \"matched\": 1, \"returned\": 1, \"consumed\": 1, \"remaining\": 0, \"enumeration_exhausted\": true, \"semantic_recall\": \"not-evaluated\"}, \"next_cursor\": null}"
+              }
+            ],
+            "structured_content": {
+              "schema": 1,
+              "operation": "discover",
+              "status": "complete",
+              "query": "Cobalt pilot reporting unknown minutes denominator",
+              "variants": [],
+              "snapshot": "33d086f694de588dd596a1f2086276a4f6e4c73e9404af73fc01b7fd8b452017",
+              "documents": [
+                {
+                  "source_id": "2bbc01bed06a4a979f75b37af5005da3",
+                  "path": "cobalt-policy.md",
+                  "sha256": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224",
+                  "generation": "279187854003445e9399d537c289ef5f",
+                  "duplicate_group": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224",
+                  "chunk_count": 1,
+                  "retrieval": {
+                    "kind": "exact",
+                    "score": 7,
+                    "matched_terms": [
+                      "cobalt",
+                      "minutes",
+                      "pilot",
+                      "reporting",
+                      "unknown"
+                    ]
+                  },
+                  "applicability": "not-declared",
+                  "declared_conflicts": []
+                }
+              ],
+              "sources": [
+                {
+                  "id": "2bbc01bed06a4a979f75b37af5005da3",
+                  "generation": "279187854003445e9399d537c289ef5f",
+                  "enabled": true,
+                  "scan_status": "complete",
+                  "last_scan_at": "2026-10-09T18:54:20.588623+00:00",
+                  "inventory": {
+                    "indexed": 1
+                  }
+                }
+              ],
+              "gaps": [],
+              "freshness": "indexed membership as of last scan; local bytes checked; remote freshness unknown",
+              "coverage": {
+                "indexed_documents": 1,
+                "matched": 1,
+                "returned": 1,
+                "consumed": 1,
+                "remaining": 0,
+                "enumeration_exhausted": true,
+                "semantic_recall": "not-evaluated"
+              },
+              "next_cursor": null
+            }
+          },
+          "error": null,
+          "status": "completed"
+        },
+        {
+          "id": "item_6",
+          "type": "agent_message",
+          "text": "The policy source is available through the local registrar. There\u2019s no existing code graph in this fixture, so I\u2019m inspecting `station-report.js` directly and using Temari Knowledge to read the policy."
+        },
+        {
+          "id": "item_7",
+          "type": "command_execution",
+          "command": "/bin/zsh -lc 'cat /private/tmp/temari-routing-live-c0n1v9wc/artifact-final/skills/temari/references/conversation.md /private/tmp/temari-routing-live-c0n1v9wc/artifact-final/policy.json'",
+          "exit_code": 0,
+          "status": "completed"
+        },
+        {
+          "id": "item_8",
+          "type": "command_execution",
+          "command": "/bin/zsh -lc 'nl -ba station-report.js'",
+          "exit_code": 0,
+          "status": "completed"
+        },
+        {
+          "id": "item_9",
+          "type": "mcp_tool_call",
+          "server": "temari_fixture",
+          "tool": "knowledge_read",
+          "arguments": {
+            "source_id": "2bbc01bed06a4a979f75b37af5005da3",
+            "path": "cobalt-policy.md",
+            "expected_generation": "279187854003445e9399d537c289ef5f",
+            "expected_sha256": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224",
+            "max_chars": 10000,
+            "max_bytes": 14000
+          },
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "{\"schema\": 1, \"operation\": \"read\", \"status\": \"complete\", \"source_id\": \"2bbc01bed06a4a979f75b37af5005da3\", \"path\": \"cobalt-policy.md\", \"generation\": \"279187854003445e9399d537c289ef5f\", \"sha256\": \"a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224\", \"snapshot\": \"33d086f694de588dd596a1f2086276a4f6e4c73e9404af73fc01b7fd8b452017\", \"total_chars\": 590, \"offset\": 0, \"next_offset\": null, \"record\": {\"body\": \"# Cobalt pilot reporting policy\\n\\nRevision 2026-10-09. Synthetic test material, not an OCPP requirement.\\n\\nA heartbeat stale interval begins after three missed scheduled heartbeats. Until corroborating status or delivery evidence arrives, classify that interval as unknown, not confirmed downtime. Report communications availability separately from charging capability. Use the port as the reporting unit. Eligible minutes exclude only operator-approved scheduled maintenance. Publish unknown minutes separately and include them as not-proven-up minutes in the conservative uptime numerator.\\n\", \"support\": \"source-bytes-and-spans-verified\", \"citations\": [{\"source_id\": \"2bbc01bed06a4a979f75b37af5005da3\", \"path\": \"cobalt-policy.md\", \"sha256\": \"a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224\", \"start\": 1, \"end\": 5, \"text_start\": 0, \"text_end\": 590, \"extraction\": \"utf-8-text\", \"extractor_signature\": \"ac314023280d5f2280520e822b6c8d36702bf5d78e9f0b6b33843aad6e68e445\", \"quote\": \"# Cobalt pilot reporting policy\\n\\nRevision 2026-10-09. Synthetic test material, not an OCPP requirement.\\n\\nA heartbeat stale interval begins after three missed scheduled heartbeats. Until corroborating status or delivery evidence arrives, classify that interval as unknown, not confirmed downtime. Report communications availability separately from charging capability. Use the port as the reporting unit. Eligible minutes exclude only operator-approved scheduled maintenance. Publish unknown minutes separately and include them as not-proven-up minutes in the conservative uptime numerator.\\n\"}]}, \"gaps\": []}"
+              }
+            ],
+            "structured_content": {
+              "schema": 1,
+              "operation": "read",
+              "status": "complete",
+              "source_id": "2bbc01bed06a4a979f75b37af5005da3",
+              "path": "cobalt-policy.md",
+              "generation": "279187854003445e9399d537c289ef5f",
+              "sha256": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224",
+              "snapshot": "33d086f694de588dd596a1f2086276a4f6e4c73e9404af73fc01b7fd8b452017",
+              "total_chars": 590,
+              "offset": 0,
+              "next_offset": null,
+              "record": {
+                "body": "# Cobalt pilot reporting policy\n\nRevision 2026-10-09. Synthetic test material, not an OCPP requirement.\n\nA heartbeat stale interval begins after three missed scheduled heartbeats. Until corroborating status or delivery evidence arrives, classify that interval as unknown, not confirmed downtime. Report communications availability separately from charging capability. Use the port as the reporting unit. Eligible minutes exclude only operator-approved scheduled maintenance. Publish unknown minutes separately and include them as not-proven-up minutes in the conservative uptime numerator.\n",
+                "support": "source-bytes-and-spans-verified",
+                "citations": [
+                  {
+                    "source_id": "2bbc01bed06a4a979f75b37af5005da3",
+                    "path": "cobalt-policy.md",
+                    "sha256": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224",
+                    "start": 1,
+                    "end": 5,
+                    "text_start": 0,
+                    "text_end": 590,
+                    "extraction": "utf-8-text",
+                    "extractor_signature": "ac314023280d5f2280520e822b6c8d36702bf5d78e9f0b6b33843aad6e68e445",
+                    "quote": "# Cobalt pilot reporting policy\n\nRevision 2026-10-09. Synthetic test material, not an OCPP requirement.\n\nA heartbeat stale interval begins after three missed scheduled heartbeats. Until corroborating status or delivery evidence arrives, classify that interval as unknown, not confirmed downtime. Report communications availability separately from charging capability. Use the port as the reporting unit. Eligible minutes exclude only operator-approved scheduled maintenance. Publish unknown minutes separately and include them as not-proven-up minutes in the conservative uptime numerator.\n"
+                  }
+                ]
+              },
+              "gaps": []
+            }
+          },
+          "error": null,
+          "status": "completed"
+        },
+        {
+          "id": "item_10",
+          "type": "file_change",
+          "changes": [
+            {
+              "path": "/private/tmp/temari-routing-live-c0n1v9wc/engineering-refined/outputs/evidence-context.json",
+              "kind": "add"
+            }
+          ],
+          "status": "completed"
+        },
+        {
+          "id": "item_11",
+          "type": "agent_message",
+          "text": "Yes\u2014the subtraction is consistent with the Cobalt pilot\u2019s **conservative uptime** policy.\n\n[station-report.js:2](/private/tmp/temari-routing-live-c0n1v9wc/engineering-refined/station-report.js:2) calculates:\n\n```text\n100 \u00d7 (eligible \u2212 unavailable \u2212 unknown) / eligible\n```\n\nUnknown minutes remain eligible time but receive no credit as proven uptime. For example, 100 eligible minutes, 5 unavailable and 10 unknown produce **85% conservative uptime**.\n\nThe registered `cobalt-policy.md` (revision 2026-10-09, line 5) explicitly says to \u201cpublish unknown minutes separately and include them as not-proven-up minutes in the conservative uptime numerator.\u201d This does **not** classify unknown time as confirmed downtime: three missed scheduled heartbeats begin an unknown interval until corroborating evidence arrives.\n\nThe formula matches that rule. This small function alone cannot establish whether callers correctly classify intervals, exclude only approved maintenance, or report unknown minutes separately per port.\n\nThe product is unchanged."
+        }
+      ],
+      "artifactManifestSha256": "6b825d97c2a2651be39238b2d99e53ed2f71ec8235870249a2debeaa60f412f1",
+      "sourceRevision": "bb94777c9aaa2efc97970edb5813a46c5e9917e7",
+      "sourceDirty": true,
+      "skillResources": [
+        {
+          "path": "skills/poteto-mode/SKILL.md",
+          "sha256": "4179e97315330ba3212bab9b3af3d30e8087fadafe213457f1330aec97161b71",
+          "bytes": 4977
+        },
+        {
+          "path": "skills/temari-knowledge/SKILL.md",
+          "sha256": "9e6a9a0afa87486b7e43e795ff2b313cde6f1b301687609cef8fb3621a7e550a",
+          "bytes": 7949
+        },
+        {
+          "path": "skills/temari-knowledge/references/evidence-intake.md",
+          "sha256": "50aabbc4e38a84b034aeb2c891c25a289f802bdca484b8d78fa86b8c5df33525",
+          "bytes": 4311
+        },
+        {
+          "path": "skills/temari/SKILL.md",
+          "sha256": "3abbfce1f2372485d32ced22fdb1ff438171f3fd92545f63f92ea4d72764436d",
+          "bytes": 16359
+        }
+      ]
+    }
+  ]
+}
