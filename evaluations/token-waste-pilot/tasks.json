@@ -1,0 +1,40 @@
+[
+  {
+    "id": "investigation",
+    "source": "libs/host-adapters/src/lib/process-capture.ts",
+    "question": "Investigate runProcessToFiles in source.ts. Explain process termination, capture failure recovery, stdin failures, and the distinction between captureComplete and successful execution. Return a concise evidence note with source.ts line citations and limitations. Do not execute the source.",
+    "criteria": [
+      "accurate-citations",
+      "termination-and-timeout",
+      "capture-failure-recovery",
+      "stdin-exceptions",
+      "capture-versus-exit",
+      "source-access-controls"
+    ]
+  },
+  {
+    "id": "qa",
+    "source": "evaluations/token-waste-pilot/qa-source.md",
+    "question": "Using source.md, draft a synthetic QA evidence note, not a full QA disposition. Distinguish observed from reported and not-run evidence, identify the product expectation gap, and give concrete next actions with owners. Preserve environment and exact results.",
+    "criteria": [
+      "synthetic-scope",
+      "observed-versus-reported",
+      "not-run",
+      "expectation-gap",
+      "owners-and-next-actions",
+      "source-access-controls"
+    ]
+  },
+  {
+    "id": "revision",
+    "source": "evaluations/token-waste-pilot/revision-source.md",
+    "question": "Return only the complete revised synthetic accepted draft from source.md, with exactly these changes: replace the Retry paragraph with 'Retry once after 30 seconds. If the request still fails, contact Support with the request ID.' and change the Escalation owner from Operations to Support. Preserve every other byte of the draft, including headings and blank lines. Do not include the source's synthetic label or delimiters.",
+    "criteria": [
+      "exact-retry-replacement",
+      "exact-owner-change",
+      "unchanged-sections",
+      "no-extra-content",
+      "source-access-controls"
+    ]
+  }
+]
