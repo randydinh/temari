@@ -1122,139 +1122,156 @@ async function executeClaimed(
   request.signal?.addEventListener('abort', abort, { once: true });
   if (request.signal?.aborted) abort();
   try {
-  let result: WorkerResult | null = null;
-  let failure: unknown = null;
-  let failed = false;
-  let failureDiagnostics: ChildFailureDiagnostics | undefined;
-  try {
-    assert(!controller.signal.aborted, 'Worker authority cancelled before dispatch.');
-    result = await request.handler(claimed.assignment, { signal: controller.signal, child: claimed.record });
-    assert(!controller.signal.aborted, 'Late worker result after authority loss.');
-    assertWorkerResult(result);
-    result = await publishWorkerEvidence(request, claimed.assignment, result);
-    const saved = await persistWorkspaceManifest(
-      request,
-      claimed.assignment,
-      claimed.record.taskId,
-      now,
-    );
-    if (saved)
-      result = { ...result, workspaceManifestId: claimed.record.taskId };
-    await stopRenewal();
-    assert(!controller.signal.aborted && !request.signal?.aborted, 'Late result after worker cancellation.');
-  } catch (error) {
-    failed = true;
-    failure = error;
+    let result: WorkerResult | null = null;
+    let failure: unknown = null;
+    let failed = false;
+    let failureDiagnostics: ChildFailureDiagnostics | undefined;
     try {
-      failureDiagnostics = await retainFailureDiagnostics(
+      assert(
+        !controller.signal.aborted,
+        'Worker authority cancelled before dispatch.',
+      );
+      result = await request.handler(claimed.assignment, {
+        signal: controller.signal,
+        child: claimed.record,
+      });
+      if (renewalError) throw renewalError;
+      assert(
+        !controller.signal.aborted,
+        'Late worker result after authority loss.',
+      );
+      assertWorkerResult(result);
+      result = await publishWorkerEvidence(request, claimed.assignment, result);
+      const saved = await persistWorkspaceManifest(
         request,
         claimed.assignment,
-        error,
+        claimed.record.taskId,
+        now,
       );
+      if (saved)
+        result = { ...result, workspaceManifestId: claimed.record.taskId };
+      await stopRenewal();
+      if (renewalError) throw renewalError;
+      assert(
+        !controller.signal.aborted && !request.signal?.aborted,
+        'Late result after worker cancellation.',
+      );
+    } catch (error) {
+      failed = true;
+      failure = error;
       try {
-        await persistWorkspaceManifest(
-          request,
-          claimed.assignment,
-          claimed.record.taskId,
-          now,
-        );
-      } catch (manifestError) {
-        if (failureDiagnostics) {
-          const references = [...failureDiagnostics.references];
-          let secondaryIssue = '';
-          try {
-            references.push(
-              await publishEvidenceInput(request, {
-                source: 'stream',
-                kind: 'other',
-                content: textEvidence(fullFailureText(manifestError)),
-              }),
-            );
-          } catch (archiveError) {
-            secondaryIssue = `; Secondary diagnostic archive failed (${privateFailureSummary(archiveError)})`;
-          }
-          failureDiagnostics = {
-            schema: 1,
-            status: 'archive-failed',
-            references,
-            message: boundedFailureMessage(
-              `${failureDiagnostics.status === 'archive-failed' ? failureDiagnostics.message + '; ' : ''}Workspace manifest failed (${privateFailureSummary(manifestError)})${secondaryIssue}`,
-            ),
-          };
-        } else
-          failure = new Error(
-            `${boundedFailureMessage(error)}; workspace manifest failed: ${boundedFailureMessage(manifestError)}`,
+        // Renewal diagnostics are archived once below, with the full cause.
+        if (!renewalError || error !== renewalError)
+          failureDiagnostics = await retainFailureDiagnostics(
+            request,
+            claimed.assignment,
+            error,
           );
+        try {
+          await persistWorkspaceManifest(
+            request,
+            claimed.assignment,
+            claimed.record.taskId,
+            now,
+          );
+        } catch (manifestError) {
+          if (failureDiagnostics) {
+            const references = [...failureDiagnostics.references];
+            let secondaryIssue = '';
+            try {
+              references.push(
+                await publishEvidenceInput(request, {
+                  source: 'stream',
+                  kind: 'other',
+                  content: textEvidence(fullFailureText(manifestError)),
+                }),
+              );
+            } catch (archiveError) {
+              secondaryIssue = `; Secondary diagnostic archive failed (${privateFailureSummary(archiveError)})`;
+            }
+            failureDiagnostics = {
+              schema: 1,
+              status: 'archive-failed',
+              references,
+              message: boundedFailureMessage(
+                `${failureDiagnostics.status === 'archive-failed' ? failureDiagnostics.message + '; ' : ''}Workspace manifest failed (${privateFailureSummary(manifestError)})${secondaryIssue}`,
+              ),
+            };
+          } else
+            failure = new Error(
+              `${boundedFailureMessage(error)}; workspace manifest failed: ${boundedFailureMessage(manifestError)}`,
+            );
+        }
+      } finally {
+        await stopRenewal();
       }
     } finally {
       await stopRenewal();
     }
-  } finally {
-    await stopRenewal();
-  }
-  if (
-    renewalError &&
-    !(await request.childStore.cancellationRequested(claimed.record.taskId))
-  ) {
-    const { evidenceForFailure: _failureSources, ...renewalRequest } = request;
-    const renewalDiagnostics = await retainFailureDiagnostics(
-      renewalRequest,
-      claimed.assignment,
-      renewalError,
-    );
-    if (failureDiagnostics && renewalDiagnostics) {
-      const references = [
-        ...failureDiagnostics.references,
-        ...renewalDiagnostics.references,
-      ];
-      const issues = [failureDiagnostics, renewalDiagnostics]
-        .filter((item) => item.status === 'archive-failed')
-        .map((item) => (item.status === 'archive-failed' ? item.message : ''));
-      failureDiagnostics =
-        issues.length > 0
-          ? {
-              schema: 1,
-              status: 'archive-failed',
-              references,
-              message: boundedFailureMessage(issues.join('; ')),
-            }
-          : {
-              schema: 1,
-              status: 'retained',
-              references: references as [
-                WorkerEvidenceReference,
-                ...WorkerEvidenceReference[],
-              ],
-            };
-    } else failureDiagnostics = renewalDiagnostics;
-    failure = failed
-      ? new Error(
-          `${boundedFailureMessage(failure)}; lease renewal failed: ${boundedFailureMessage(renewalError)}`,
-        )
-      : renewalError;
-    failed = true;
-  }
-  try {
-    assert(failed || result, 'Successful child result is missing.');
-    await request.childStore.complete({
-      taskId: claimed.record.taskId,
-      owner: request.owner,
-      leaseToken: lease.token,
-      fencingEpoch: lease.fencingEpoch,
-      status: failed ? 'FAILED' : workerStatus(result!.status),
-      idempotencyKey,
-      result: failed ? null : result,
-      error: failed
-        ? failureProjection(request, failure, failureDiagnostics)
-        : null,
-      ...(failureDiagnostics === undefined ? {} : { failureDiagnostics }),
-      now: now(),
-    });
-    return false;
-  } catch (completionError) {
-    if (isLeaseLoss(completionError)) return true;
-    throw completionError;
-  }
+    if (
+      renewalError &&
+      !(await request.childStore.cancellationRequested(claimed.record.taskId))
+    ) {
+      const { evidenceForFailure: _failureSources, ...renewalRequest } = request;
+      const renewalDiagnostics = await retainFailureDiagnostics(
+        renewalRequest,
+        claimed.assignment,
+        renewalError,
+      );
+      if (failureDiagnostics && renewalDiagnostics) {
+        const references = [
+          ...failureDiagnostics.references,
+          ...renewalDiagnostics.references,
+        ];
+        const issues = [failureDiagnostics, renewalDiagnostics]
+          .filter((item) => item.status === 'archive-failed')
+          .map((item) => (item.status === 'archive-failed' ? item.message : ''));
+        failureDiagnostics =
+          issues.length > 0
+            ? {
+                schema: 1,
+                status: 'archive-failed',
+                references,
+                message: boundedFailureMessage(issues.join('; ')),
+              }
+            : {
+                schema: 1,
+                status: 'retained',
+                references: references as [
+                  WorkerEvidenceReference,
+                  ...WorkerEvidenceReference[],
+                ],
+              };
+      } else failureDiagnostics = renewalDiagnostics;
+      failure =
+        failed && failure !== renewalError
+          ? new Error(
+              `${boundedFailureMessage(failure)}; lease renewal failed: ${boundedFailureMessage(renewalError)}`,
+            )
+          : renewalError;
+      failed = true;
+    }
+    try {
+      assert(failed || result, 'Successful child result is missing.');
+      await request.childStore.complete({
+        taskId: claimed.record.taskId,
+        owner: request.owner,
+        leaseToken: lease.token,
+        fencingEpoch: lease.fencingEpoch,
+        status: failed ? 'FAILED' : workerStatus(result!.status),
+        idempotencyKey,
+        result: failed ? null : result,
+        error: failed
+          ? failureProjection(request, failure, failureDiagnostics)
+          : null,
+        ...(failureDiagnostics === undefined ? {} : { failureDiagnostics }),
+        now: now(),
+      });
+      return false;
+    } catch (completionError) {
+      if (isLeaseLoss(completionError)) return true;
+      throw completionError;
+    }
   } finally {
     request.signal?.removeEventListener('abort', abort);
     if (cancellation) await cancellation;

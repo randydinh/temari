@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import {
   chmod,
@@ -245,7 +244,7 @@ if(a[0]==='--version'){console.log('codex-cli 0.154.0');process.exit(0);}
 const expected=['exec','--ignore-user-config','--model','admitted-model','--config','model_provider="openai"','--config','model_reasoning_effort="high"'];
 if(JSON.stringify(a.slice(0,expected.length))!==JSON.stringify(expected))process.exit(12);
 if(process.env.CODEX_HOME!==${JSON.stringify(configHome)})process.exit(13);
-let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{fs.writeFileSync(a[a.indexOf('--output-last-message')+1],JSON.stringify({status:'PASS',summary:'explicit selection'}));});`,
+let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{console.log(JSON.stringify({type:'thread.started',thread_id:'managed-fixture-thread'}));process.stdout.write('x'.repeat(2*1024*1024));fs.writeFileSync(a[a.indexOf('--output-last-message')+1],JSON.stringify({status:'PASS',summary:'explicit selection'}));});`,
     { mode: 0o700 },
   );
   const selection = {
@@ -261,12 +260,17 @@ let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{fs.writeFi
     evidenceDirectory: join(root, 'evidence'),
     timeoutMs: 1000,
     providerSelection: selection,
+    finalResponseLimitBytes: 1024,
     skipGitRepoCheck: true,
   });
   assert.equal(result.status, 'PASS');
   const evidence = JSON.parse(
     await readFile(join(root, 'evidence', 'process.json'), 'utf8'),
   );
+  assert.equal(evidence.nativeThreadId, 'managed-fixture-thread');
+  assert.equal(evidence.captureComplete, true);
+  assert.equal(evidence.outputLimitExceeded, false);
+  assert(evidence.stdoutWrittenBytes > 2 * 1024 * 1024);
   assert.deepEqual(evidence.argv.slice(0, 8), [
     'exec',
     '--ignore-user-config',

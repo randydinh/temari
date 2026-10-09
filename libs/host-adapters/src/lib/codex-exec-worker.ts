@@ -593,19 +593,30 @@ async function executeCodexExecWorker(
   const nativeThreadIds = new Set<string>();
   let nativeIdentityError: string | null = null;
   if (provider && capture.stdout.available) {
-    const lines = createInterface({ input: createReadStream(stdoutPath), crlfDelay: Infinity });
+    const lines = createInterface({
+      input: createReadStream(stdoutPath),
+      crlfDelay: Infinity,
+    });
     try {
       for await (const line of lines) {
         try {
           const event = JSON.parse(line);
-          if (event.type === 'thread.started' && typeof event.thread_id === 'string') nativeThreadIds.add(event.thread_id);
+          if (
+            event.type === 'thread.started' &&
+            typeof event.thread_id === 'string'
+          )
+            nativeThreadIds.add(event.thread_id);
         } catch { /* Retain non-event output in the raw log. */ }
       }
-      if (nativeThreadIds.size > 1) nativeIdentityError = 'Worker transport returned conflicting native thread identities.';
+      if (nativeThreadIds.size > 1)
+        nativeIdentityError =
+          'Worker transport returned conflicting native thread identities.';
     } catch (cause) {
       nativeIdentityError = 'Worker native thread identity capture failed.';
       await retainAdapterCause('metadata', cause);
-    } finally { lines.close(); }
+    } finally {
+      lines.close();
+    }
   }
   const evidence: ProcessEvidence = {
     schema: 1,
