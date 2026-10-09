@@ -512,7 +512,7 @@ export async function packagePublicEntries(
       schemaVersion: 1,
       source: {
         revision: git('rev-parse', 'HEAD'),
-        dirty: git('status', '--porcelain=v1', '--untracked-files=all') !== '',
+        dirty: git('status', '--porcelain=v1', '--untracked-files=normal') !== '',
         files: sortedRecords(sourceFiles),
       },
       build: {
