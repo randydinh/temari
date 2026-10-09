@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import test,{type TestContext} from 'node:test';
 import { FileTaskStore,TaskRuntime,conversationDigest } from '../libs/runtime/src/index.js';
 import type { ModelRequest,ModelTransport } from '../libs/host-adapters/src/index.js';
-import { createDashboardTalk,loadDashboardTalkConfig,validateDashboardTalkRoots,TalkRequestError,type DashboardTalkConfig,type DashboardTalkService } from './dashboard-talk.mjs';
+import { createDashboardTalk,loadDashboardTalkConfig,validateDashboardTalkRoots,TalkRequestError,type DashboardTalkConfig,type DashboardTalkService,type DashboardTalkTaskBridge } from './dashboard-talk.mjs';
 
 const answer=(text='Safe retained answer')=>JSON.stringify({kind:'answer',text,proposedTask:null});
 function transport(response:string|((request:ModelRequest)=>Promise<string>)) {
@@ -13,12 +13,13 @@ function transport(response:string|((request:ModelRequest)=>Promise<string>)) {
   const port:ModelTransport={async complete(request){calls.push(structuredClone(request));const text=typeof response==='string'?response:await response(request);return {text,coverage:'host-mediated-text',displayText(){throw new Error('Restoration must not be used for history.');},dispose(){disposed++;}};}};
   return {port,calls,get disposed(){return disposed;}};
 }
-async function fixture(t:TestContext,port?:ModelTransport) {
+async function fixture(t:TestContext,port?:ModelTransport,taskBridge?:DashboardTalkTaskBridge) {
   const root=await mkdtemp(join(tmpdir(),'temari-talk-service-'));t.after(()=>rm(root,{recursive:true,force:true}));
   const workspaceRoot=join(root,'workspace');await mkdir(workspaceRoot);
   const config:DashboardTalkConfig={schema:1,root:join(root,'conversation'),workspaceRoot,hostId:'fixture-host',workspaceId:'fixture-workspace',taskStoreId:'fixture-tasks'};
+  if(taskBridge)(taskBridge as {workspaceRoot:string}).workspaceRoot=workspaceRoot;
   const tasks=await FileTaskStore.create(join(root,'tasks')),runtime=new TaskRuntime({store:tasks});
-  const create=()=>createDashboardTalk({config,taskStore:tasks,runtime,...(port?{transport:port,transportIdentity:{adapter:'fixture-only',model:'fixture-model'}}:{})});
+  const create=()=>createDashboardTalk({config,taskStore:tasks,runtime,...(port?{transport:port,transportIdentity:{adapter:'fixture-only',model:'fixture-model'}}:{}),...(taskBridge?{taskBridge}:{})});
   const service=await create();return {root,config,tasks,runtime,service,create};
 }
 async function settle(service:DashboardTalkService,topicId:string,state:string) {
@@ -119,6 +120,38 @@ test('proposal create ACK loss becomes uncertain and explicit retry links exactl
   assert.equal(accepted.turns[0]!.proposedTask!.state,'linked');assert.equal(accepted.linkedTasks[0]!.status,'OPEN');assert.equal(accepted.linkedTasks[0]!.semanticAcceptance,false);assert.equal(accepted.linkedTasks[0]!.currentRunId,null);
   assert.deepEqual(await readFile(join(f.tasks.root,'tasks.json')),taskBytes);assert.equal((await f.tasks.list())[0]!.acceptance,null);assert.equal((await f.tasks.list())[0]!.runs.length,0);
   await f.service.accept(topic.topicId,'turn-offered',{requestId:'explicit-retry',expectedVersion:topic.version});assert.deepEqual(await readFile(join(f.tasks.root,'tasks.json')),taskBytes);
+});
+
+test('accepted proposal uses one host bridge identity and starts its configured planner exactly once across uncertain retry',async(t)=>{
+  const model=transport(JSON.stringify({kind:'task-proposal',text:'Explicit proposal.',proposedTask:{title:'Planned task',goal:'Plan this bounded change'}}));
+  let f:Awaited<ReturnType<typeof fixture>>;let calls=0,starts=0,lose=true;
+  const seen=new Set<string>();
+  const bridge:DashboardTalkTaskBridge={workspaceRoot:'pending',async intake(input){calls++;const taskId='task-'+input.requestId;
+    await f.tasks.createTask({taskId,actor:'fixture-controller',idempotencyKey:'intake-'+input.requestId,title:input.title,goal:input.goal,workspaceRoot:f.config.workspaceRoot});
+    if(!seen.has(input.requestId)){seen.add(input.requestId);starts++;}
+    if(lose){lose=false;throw new Error('Fixture lost planning intake acknowledgment');}
+    return {taskId};},async project(){return null;}};
+  f=await fixture(t,model.port,bridge);
+  const created=await f.service.create({requestId:'planned-proposal',title:'Planned proposal'});
+  await f.service.turn(created.topic.topicId,{requestId:'planned-offer',expectedVersion:created.topic.version,text:'Offer the goal'});
+  let topic=await settle(f.service,created.topic.topicId,'responded');
+  await assert.rejects(f.service.accept(topic.topicId,'turn-planned-offer',{requestId:'accept-once',expectedVersion:topic.version}),/lost planning/);
+  topic=(await f.service.store.load(topic.topicId))!;
+  const accepted=await f.service.accept(topic.topicId,'turn-planned-offer',{requestId:'accept-retry',expectedVersion:topic.version});
+  assert.equal(calls,2);assert.equal(starts,1);assert.equal((await f.tasks.list()).length,1);
+  assert.equal(accepted.linkedTasks[0]!.taskId,'task-talk-proposal-planned-offer');
+  assert.equal((await f.service.describe()).capabilities.canStartTask,true);
+});
+
+test('linked cards expose at most one host-admitted task action while controller absence remains save-only',async(t)=>{
+  let f:Awaited<ReturnType<typeof fixture>>;
+  const bridge:DashboardTalkTaskBridge={workspaceRoot:'pending',async intake(){throw new Error('unused');},async project(){return {phase:'planning',state:'READY',message:'Validated plan is ready.',action:{action:'prepare-plan',label:'Prepare implementation plan',proposalSha256:'a'.repeat(64)}};}};
+  f=await fixture(t,undefined,bridge);
+  const task=await f.tasks.createTask({taskId:'action-task',actor:'fixture',idempotencyKey:'action-task',title:'Action task',goal:'A bounded goal',workspaceRoot:f.config.workspaceRoot});
+  const created=await f.service.create({requestId:'action-topic',title:'Action topic'});
+  const detail=await f.service.link(created.topic.topicId,{requestId:'action-link',expectedVersion:created.topic.version,taskId:task.taskId});
+  assert.deepEqual(detail.linkedTasks[0]!.controller,{phase:'planning',state:'READY',message:'Validated plan is ready.',action:{action:'prepare-plan',label:'Prepare implementation plan',proposalSha256:'a'.repeat(64)}});
+  const noController=await fixture(t);assert.equal((await noController.service.describe()).capabilities.canStartTask,false);
 });
 
 test('linked task status and attention are current runtime facts, acknowledgment is separate and wrong workspace refuses',async(t)=>{

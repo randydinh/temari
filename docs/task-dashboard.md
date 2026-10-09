@@ -8,7 +8,20 @@ for the person configuring the workspace and reviewing its results. The
 
 For a conversational starting point, configure [Talk to Temari](dashboard-talk.md).
 It keeps topic histories separate, shows linked task updates and saves explicitly
-accepted task proposals. The task journeys below provide execution and review.
+accepted task proposals. In schema1, when Talk and controlled mode select the same
+canonical workspace and the host configures exactly one planning policy,
+acceptance starts that bounded planner idempotently. Talk then shows at most one
+admitted **Prepare plan** or **Start implementation** action on the linked card,
+alongside that task's actual planning/implementation state and bounded controller
+message. Legacy tasks make no planner-progress claim. Lost action responses are
+never replayed. For implementation start, Talk needs both the exact retained
+intent event and a controller state beyond `PREPARED`; it reports that observed
+state rather than treating intent as successful launch. Otherwise the outcome
+stays unresolved.
+The model cannot select a route or command. Candidate review, acceptance, apply,
+publication, merge, cancellation and closeout remain explicit task boundaries.
+Schema2 registries and mismatched or ambiguous controller configurations keep
+proposal acceptance save-only. The task journeys below provide execution and review.
 
 | Type of work                         | User flow                                                                                                                                      | Result                                                                                                                       |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |

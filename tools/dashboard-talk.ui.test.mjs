@@ -240,7 +240,7 @@ test('task proposal is explicit, safely rendered, and uses only the fixed accept
   ui.click(accept); await flush();
   assert.equal(ui.requests.filter((request) => request.method === 'POST').length, 1);
   assert.match(ui.get('talk-transcript').textContent, /Goal saved and linked/);
-  assert.match(ui.get('talk-transcript').textContent, /Task controls own planning and execution/);
+  assert.match(ui.get('talk-transcript').textContent, /linked task shows any admitted planning or implementation progress/);
 });
 
 test('attention total is counted once and omitted older topic items remain accessible', async () => {
@@ -356,6 +356,78 @@ test('linked cards expose goal, unavailable reason and shortening; missing trans
   assert.match(ui.get('talk-linked-tasks').textContent, /Workspace could not be verified/);
   assert.match(ui.get('talk-linked-tasks').textContent, /Shortened fields: goal/);
   assert.equal(ui.get('talk-send').disabled, true);
+});
+
+test('linked task action uses the existing versioned CSRF route and a stale refusal preserves topic and draft',async()=>{
+  const task={taskId:'task-one',title:'Planned task',status:'OPEN',version:7,currentRunId:null,goal:'Build one thing',nextAction:'Review the plan',available:true,omittedFields:[],controller:{phase:'planning',state:'READY',message:'Validated proposal is ready.',action:{action:'prepare-plan',label:'Prepare implementation plan',proposalSha256:'a'.repeat(64)}}};
+  const ui=await harness(async({path,method,body,headers})=>{
+    if(path==='/api/topics')return response(listing([summary('topic-a')]));
+    if(method==='POST'){
+      assert.equal(path,'/api/tasks/task-one/actions');assert.equal(headers['x-temari-token'],'fixture-session-token');
+      assert.deepEqual(body,{action:'prepare-plan',requestId:'fixture-request-1',expectedVersion:7,proposalSha256:'a'.repeat(64)});
+      return response({error:'Task version conflict; refresh before changing this task.'},409);
+    }
+    return response(detail('topic-a',[],{linkedTasks:[task]}));
+  });
+  await ui.activate();ui.input('Keep this draft');
+  const action=descendants(ui.get('talk-linked-tasks')).find((element)=>element.dataset.taskAction==='prepare-plan');
+  ui.click(action);await flush();
+  assert.equal(ui.get('talk-message').value,'Keep this draft');assert.equal(ui.get('talk-topic-title').textContent,'topic-a');
+  assert.match(ui.get('talk-error').textContent,/version conflict/);assert.equal(ui.requests.filter((request)=>request.method==='POST').length,1);
+});
+
+test('uncertain linked task action is never automatically retried',async()=>{
+  const task={taskId:'task-one',title:'Prepared task',status:'OPEN',version:8,currentRunId:'run-one',goal:'Implement it',nextAction:'Start implementation',available:true,omittedFields:[],controller:{phase:'implementation',state:'PREPARED',message:'Implementation is prepared.',action:{action:'implementation-start',label:'Start implementation'}}};
+  const ui=await harness(async({path,method})=>{
+    if(path==='/api/topics')return response(listing([summary('topic-a')]));
+    if(method==='POST')throw new Error('Fixture lost action acknowledgment');
+    return response(detail('topic-a',[],{linkedTasks:[task]}));
+  });
+  await ui.activate();ui.input('Draft remains');
+  ui.click(descendants(ui.get('talk-linked-tasks')).find((element)=>element.dataset.taskAction==='implementation-start'));await flush();
+  assert.match(ui.get('talk-error').textContent,/will not be retried automatically/);assert.equal(ui.get('talk-message').value,'Draft remains');
+  await ui.poll();assert.equal(ui.requests.filter((request)=>request.method==='POST').length,1);
+});
+
+test('a lost task-action response needs exact retained intent and an advanced controller state',async()=>{
+  const task={taskId:'task-one',title:'Prepared task',status:'OPEN',version:8,currentRunId:'run-one',goal:'Implement it',nextAction:'Start implementation',available:true,omittedFields:[],controller:{phase:'implementation',state:'PREPARED',message:'Implementation is prepared.',action:{action:'implementation-start',label:'Start implementation'}}};
+  let applied=false,controllerState='PREPARED';
+  const ui=await harness(async({path,method,body})=>{
+    if(path==='/api/topics')return response(listing([summary('topic-a')]));
+    if(path==='/api/tasks/task-one')return response({task:{taskId:'task-one',events:applied?[{idempotencyKey:`ui-${body?.requestId??'fixture-request-1'}`}]:[]}});
+    if(method==='POST'){
+      applied=true;
+      throw new Error('Fixture lost response after retaining the action event');
+    }
+    return response(detail('topic-a',[],{linkedTasks:[{...task,controller:{...task.controller,state:controllerState,message:controllerState==='PREPARED'?'Implementation is prepared.':'The supervisor owns implementation.'}}]}));
+  });
+  await ui.activate();ui.input('Keep exact draft');
+  ui.click(descendants(ui.get('talk-linked-tasks')).find((element)=>element.dataset.taskAction==='implementation-start'));await flush();
+  assert.equal(ui.requests.filter((request)=>request.method==='POST').length,1);
+  assert.match(ui.get('talk-error').textContent,/will not be retried automatically/,'retained intent plus PREPARED is unresolved');
+  assert.equal(ui.get('talk-message').value,'Keep exact draft');
+  controllerState='RUNNING';await ui.poll();
+  assert.match(ui.get('talk-turn-status').textContent,/intent is retained; the controller now reports running/i);
+  assert.equal(ui.get('talk-error').hidden,true);assert.equal(ui.requests.filter((request)=>request.method==='POST').length,1);
+});
+
+test('legacy linked proposals make no planner claim and blocked or recovery planners report their actual phase',async()=>{
+  const linked=turn('turn-legacy','Legacy proposal',{proposedTask:{proposalId:'legacy',title:'Legacy goal',goal:'Retained before the bridge',state:'linked',taskId:'task-legacy'}});
+  const tasks=[
+    {taskId:'task-legacy',title:'Legacy task',status:'OPEN',version:2,currentRunId:null,goal:'Existing goal',nextAction:null,available:true,omittedFields:[]},
+    {taskId:'task-blocked',title:'Blocked plan',status:'BLOCKED',version:3,currentRunId:null,goal:'Blocked goal',nextAction:null,available:true,omittedFields:[],controller:{phase:'planning',state:'BLOCKED',message:'Planner rejected the retained response.',action:null}},
+    {taskId:'task-recovery',title:'Recovery plan',status:'BLOCKED',version:4,currentRunId:null,goal:'Recovery goal',nextAction:null,available:true,omittedFields:[],controller:{phase:'planning',state:'RECOVERY_REQUIRED',message:'Planner evidence needs recovery.',action:null}},
+  ];
+  const ui=await harness(async({path})=>path==='/api/topics'
+    ? response(listing([summary('topic-a')],[],{capabilities:{...capabilities,canStartTask:true}}))
+    : response(detail('topic-a',[linked],{linkedTasks:tasks})));
+  await ui.activate();
+  assert.match(ui.get('talk-transcript').textContent,/linked task shows any admitted planning or implementation progress/);
+  assert.doesNotMatch(ui.get('talk-transcript').textContent,/planner is handling/);
+  const cards=descendants(ui.get('talk-linked-tasks')).filter((element)=>element.dataset.linkedTaskId);
+  assert.doesNotMatch(cards[0].textContent,/planning ·/);
+  assert.match(cards[1].textContent,/planning · BLOCKED/i);assert.match(cards[1].textContent,/rejected the retained response/);
+  assert.match(cards[2].textContent,/planning · RECOVERY REQUIRED/i);assert.match(cards[2].textContent,/evidence needs recovery/);
 });
 
 const registryCapabilities = { ...capabilities, canAcknowledge: true, canAcceptProposal: true, canStartTask: false };

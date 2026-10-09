@@ -5,15 +5,37 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import test from 'node:test';
-import { validateDashboardConfig } from './dashboard-controller.mjs';
-import { FileMergeReconciliationStore } from '../libs/runtime/src/index.js';
+import { validateDashboardConfig,type DashboardConfig } from './dashboard-controller.mjs';
+import { FileMergeReconciliationStore,FileTaskStore,TaskRuntime } from '../libs/runtime/src/index.js';
 import { projectRetainedReconciliationReview } from './merge-reconciliation-dashboard.mjs';
 import {
   createTaskContinuityReconciliationDashboard,
+  createDashboardTalkTaskBridge,
   runTaskCommand,
 } from './task-continuity.mjs';
 
 const run = promisify(execFile);
+
+test('Talk planning bridge requires the same canonical workspace and one host-selected policy',async(t)=>{
+  const root=await realpath(await mkdtemp(join(tmpdir(),'temari-talk-bridge-')));t.after(()=>rm(root,{recursive:true,force:true}));
+  const workspace=join(root,'workspace'),other=join(root,'other');await mkdir(workspace);await mkdir(other);
+  const store=await FileTaskStore.create(join(root,'tasks')),runtime=new TaskRuntime({store});
+  const policy={id:'default-plan'} as any;
+  const dashboard={schema:1,workspaceRoot:workspace,preparationRoot:join(root,'prepare'),recipes:[],planning:{executable:'/host/codex',timeoutMs:1000,policies:[policy]}} as DashboardConfig;
+  let createCalls=0,describeCalls=0;
+  let projectedControl:any={actions:['prepare-plan','update'],planning:{state:'READY',proposalSha256:'b'.repeat(64)},message:'Validated proposal is ready.'};
+  const controller={async create(input:unknown){createCalls++;const request=input as {requestId:string;title:string;goal:string;policyId:string};assert.equal(request.policyId,'default-plan');return store.createTask({taskId:'task-'+request.requestId,actor:'controller',idempotencyKey:'intake-'+request.requestId,title:request.title,goal:request.goal,workspaceRoot:workspace});},async describe(){describeCalls++;return {controls:{'task-talk-one':projectedControl}};}};
+  const talk={schema:1 as const,root:join(root,'talk'),workspaceRoot:workspace,hostId:'host',workspaceId:'workspace',taskStoreId:'tasks'};
+  const bridge=await createDashboardTalkTaskBridge({talkConfig:talk,dashboardConfig:dashboard,controller:controller as never,runtime});assert(bridge);
+  assert.deepEqual(await bridge.intake({requestId:'talk-one',title:'One',goal:'Goal'}),{taskId:'task-talk-one'});assert.equal(createCalls,1);
+  assert.deepEqual(await bridge.project({taskId:'task-talk-one',expectedVersion:1}),{phase:'planning',state:'READY',message:'Validated proposal is ready.',action:{action:'prepare-plan',label:'Prepare implementation plan',proposalSha256:'b'.repeat(64)}});assert.equal(describeCalls,1);
+  projectedControl={actions:['update'],planning:{state:'BLOCKED',proposalSha256:null},message:'Planner rejected the retained response.'};
+  assert.deepEqual(await bridge.project({taskId:'task-talk-one',expectedVersion:1}),{phase:'planning',state:'BLOCKED',message:'Planner rejected the retained response.',action:null});
+  projectedControl={actions:['update'],planning:{state:'RECOVERY_REQUIRED',proposalSha256:null},message:'Planner evidence needs recovery.'};
+  assert.deepEqual(await bridge.project({taskId:'task-talk-one',expectedVersion:1}),{phase:'planning',state:'RECOVERY_REQUIRED',message:'Planner evidence needs recovery.',action:null});
+  assert.equal(await createDashboardTalkTaskBridge({talkConfig:{...talk,workspaceRoot:other},dashboardConfig:dashboard,controller:controller as never,runtime}),undefined);
+  assert.equal(await createDashboardTalkTaskBridge({talkConfig:talk,dashboardConfig:{...dashboard,planning:{...dashboard.planning!,policies:[policy,policy]}},controller:controller as never,runtime}),undefined);
+});
 
 test('task-continuity leaves reconciliation controls unavailable without explicit host configuration', async () => {
   const dashboard = await createTaskContinuityReconciliationDashboard(
