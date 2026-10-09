@@ -136,10 +136,10 @@ async function fixture(t, mode = 'pass', options = {}) {
   const script = `#!${process.execPath}
 const fs=require('node:fs');const path=require('node:path');const a=process.argv.slice(2);
 if(a[0]==='--version'){console.log('codex-cli 0.162.0');process.exit(0);}
-if(a.includes('--help')){console.log('--sandbox --output-schema --json');process.exit(0);}
+if(a.includes('--help')){console.log('--sandbox --output-schema --json --ignore-user-config --model --config');process.exit(0);}
 if(a[0]==='login'){console.log('Logged in using fixture');process.exit(0);}
 let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{
- if(a.includes('--ignore-user-config'))process.exit(9);
+ if(!a.includes('--ignore-user-config')||a[a.indexOf('--model')+1]!=='fixture-model'||!a.includes('model_provider="openai"')||!a.includes('model_reasoning_effort="high"'))process.exit(9);
  const role=p.includes('isolated Git clone')?'builder':p.includes('Role: reviewer')?'reviewer':'architect';
  fs.appendFileSync(${JSON.stringify(counter)},role+'\\n');
  const mode=JSON.parse(fs.readFileSync(${JSON.stringify(control)},'utf8')).mode;
@@ -147,6 +147,8 @@ let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{
  if(mode==='builder-wait' && role==='builder'){setInterval(()=>{},1000);return;}
  const cwd=a[a.indexOf('--cd')+1];
  if(role==='builder'){fs.writeFileSync(path.join(cwd,'value.txt'),'implemented\\n');if(mode==='unowned')fs.writeFileSync(path.join(cwd,'protected.txt'),'bad\\n');}
+ if(mode==='config-critical-during-worker')fs.writeFileSync(${JSON.stringify(configPath)},'model = "other-model"\\nmodel_reasoning_effort = "high"\\n');
+ if(mode==='config-irrelevant-during-worker')fs.writeFileSync(${JSON.stringify(configPath)},'model = "fixture-model"\\nmodel_reasoning_effort = "high"\\nnotify = ["changed-during-worker"]\\n');
  const status=mode===role+'-fail'?'ISSUES':'PASS';
  fs.writeFileSync(a[a.indexOf('--output-last-message')+1],JSON.stringify({status,summary:role+' inspected literal requirements'}));
  console.log(JSON.stringify({type:'thread.started',thread_id:role+'-fixture'}));
@@ -446,6 +448,78 @@ test('summed protected-check limits exceeding native envelopes refuse before wor
     /verify native timeout does not cover composed work/,
   );
   await assert.rejects(readFile(f.counter), { code: 'ENOENT' });
+});
+
+test('unrelated live user-config drift is retained as a diagnostic and does not stop the next stage', async (t) => {
+  const f = await fixture(t);
+  await f.run('investigate');
+  const config = f.spec.modelAdmission.configPath;
+  await writeFile(
+    config,
+    'model = "fixture-model"\nmodel_reasoning_effort = "high"\nnotify = ["changed-after-admission"]\n',
+  );
+  const admitted = await admitReviewedLocalCandidate(f.input);
+  assert.equal(admitted.modelSelection.config.drifted, true);
+  assert.equal(
+    admitted.modelSelection.config.initialSha256,
+    f.spec.modelAdmission.configSha256,
+  );
+  assert.notEqual(
+    admitted.modelSelection.config.currentSha256,
+    f.spec.modelAdmission.configSha256,
+  );
+  assert.equal((await f.run('plan')).status, 'PASS');
+});
+
+test('raw drift before the first admission cannot create the immutable baseline', async (t) => {
+  const f = await fixture(t);
+  await writeFile(
+    f.spec.modelAdmission.configPath,
+    'model = "fixture-model"\nmodel_reasoning_effort = "high"\nnotify = ["changed-too-early"]\n',
+  );
+  await assert.rejects(
+    admitReviewedLocalCandidate(f.input),
+    /was not proven before raw drift/,
+  );
+  await assert.rejects(
+    readFile(
+      join(f.spec.evidenceRoot, f.spec.runId, 'model-admission-baseline.json'),
+    ),
+    { code: 'ENOENT' },
+  );
+});
+
+test('execution-critical live user-config drift refuses the next stage', async (t) => {
+  const f = await fixture(t);
+  await f.run('investigate');
+  await writeFile(
+    f.spec.modelAdmission.configPath,
+    'model = "other-model"\nmodel_reasoning_effort = "high"\n',
+  );
+  await assert.rejects(f.run('plan'), /differs from inherited user settings/);
+  assert.equal((await readFile(f.counter, 'utf8')).trim(), 'architect');
+});
+
+test('completion observation accepts irrelevant drift introduced by a worker and records both observations', async (t) => {
+  const f = await fixture(t, 'config-irrelevant-during-worker');
+  const stage = await f.run('investigate');
+  assert.equal(stage.modelSelection.admission.config.drifted, false);
+  assert.equal(stage.modelSelection.completion.config.drifted, true);
+  assert.equal(
+    stage.modelSelection.admission.baseline.sha256,
+    stage.modelSelection.completion.baseline.sha256,
+  );
+});
+
+test('completion observation refuses critical drift introduced by a worker', async (t) => {
+  const f = await fixture(t, 'config-critical-during-worker');
+  await assert.rejects(
+    f.run('investigate'),
+    /differs from inherited user settings/,
+  );
+  await assert.rejects(readFile(join(f.input.artifacts, 'investigate.json')), {
+    code: 'ENOENT',
+  });
 });
 async function acceptedChild(f, stage = 'build') {
   const root = join(f.spec.evidenceRoot, f.spec.runId);
@@ -782,7 +856,12 @@ test('missing execution capabilities and binary drift refuse pre-dispatch', asyn
   const f = await fixture(t);
   await writeFile(
     f.spec.executable,
-    `#!${process.execPath}\nconsole.log(process.argv.includes('--version')?'codex-cli 0.162.0':'unsupported');\n`,
+    `#!${process.execPath}
+const a=process.argv.slice(2);
+if(a.includes('--version'))console.log('codex-cli 0.162.0');
+else if(a.includes('--help'))console.log('--sandbox --output-schema --json');
+else if(a[0]==='login')console.log('Logged in using fixture');
+`,
     { mode: 0o700 },
   );
   await assert.rejects(admitReviewedLocalCandidate(f.input), /Evidence drift/);

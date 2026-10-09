@@ -47,7 +47,8 @@ acceptance command argv with bounded timeouts. Protected executables and input
 files are outside the candidate and hashed before execution and closeout.
 `{candidate}` and `{evidence}` substitutions are argv strings, never shell code.
 The host requires a pinned account-catalog snapshot for the selected CLI version,
-plus the actual inherited user config digest and requested model/reasoning. It
+plus the actual user-config path, its initial digest and the requested
+model/reasoning. It
 matches a three-part release catalog version to either the same stable CLI
 version or an `alpha.N` CLI build of that release (for example,
 `codex-cli 0.162.0-alpha.2` with catalog `0.162.0`). The complete executable
@@ -55,11 +56,25 @@ version and SHA256 remain exact pins; the retained catalog observation includes
 both versions. Different releases, leading zeros, build metadata, other
 prerelease forms and malformed versions are refused. This bounded compatibility
 rule establishes a version relationship, not model execution proof. The host
-parses that config with Python's TOML parser, refuses unsupported catalog models
-or reasoning, and refuses ambiguous profile/provider/project overrides. A cached
-catalog is a prerequisite, not server execution proof. The host preserves user
-model settings. Model and reasoning observations stay
-null when the transport does not expose them; CLI selection is not model proof.
+parses that config with a byte-pinned Python TOML parser, refuses unsupported
+catalog models or reasoning, and refuses ambiguous profile/provider/project
+overrides. The first admission requires the live config digest to equal the
+externally pinned initial digest and seals a sanitized baseline receipt under the
+run evidence root. That immutable receipt contains only the digest, critical
+projection and provider selection. Later admissions verify the receipt. Parsing
+uses the exact bytes already read and hashed through the pinned parser's stdin,
+so reopening a changed path cannot mix observations. Every stage records separate
+admission-time and completion-time observations with initial/current config
+digests and a raw-drift flag. Changes to unrelated preferences are diagnostic
+when the execution-critical projection is unchanged; changes to model, reasoning,
+provider, profile or catalog override fail closed before stage completion. Raw
+config contents are not retained. A cached catalog is a prerequisite, not server
+execution proof. Pre-native admission verifies that the pinned CLI advertises
+`--ignore-user-config`, `--model` and `--config` as well as the structured-output
+and sandbox flags. Workers use the admitted executable's resolved path with those
+explicit selection flags. Authentication still comes from `CODEX_HOME`; no
+credentials are copied. Model and reasoning observations stay null when the
+transport does not expose them; explicit CLI selection is not served-model proof.
 
 The existing write-worker controller validates owned changes and integrates
 patches into an isolated clone. The read-only reviewer sees that exact commit.

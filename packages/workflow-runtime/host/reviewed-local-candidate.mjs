@@ -180,6 +180,66 @@ async function checkRefs(refs) {
     if (ref.bytes !== undefined) assert.equal(bytes.length, ref.bytes);
   }
 }
+async function checkProtectedInputs(spec) {
+  const configRef = spec.protectedInputs.find(
+    (ref) => ref.path === spec.modelAdmission.configPath,
+  );
+  assert(configRef, 'Initial model configuration reference missing.');
+  assert.equal(
+    configRef.sha256,
+    spec.modelAdmission.configSha256,
+    'Initial model configuration digest binding changed.',
+  );
+  await checkRefs(
+    spec.protectedInputs.filter(
+      (ref) => ref.path !== spec.modelAdmission.configPath,
+    ),
+  );
+}
+async function observeManagedModelSelection(spec) {
+  const observed = await observeCodexModelSelection(
+    spec.providerSelection,
+    spec.modelAdmission,
+    spec.repositoryRoot,
+  );
+  const root = join(spec.evidenceRoot, spec.runId);
+  await mkdir(root, { recursive: true, mode: 0o700 });
+  const path = join(root, 'model-admission-baseline.json');
+  const baseline = {
+    schema: 1,
+    kind: 'codex-model-admission-baseline',
+    configSha256: spec.modelAdmission.configSha256,
+    critical: observed.config.critical,
+    selection: spec.providerSelection,
+  };
+  if (observed.config.currentSha256 === spec.modelAdmission.configSha256) {
+    await sealed(path, baseline);
+  } else {
+    assert(
+      await exists(path),
+      'Initial model configuration digest was not proven before raw drift.',
+    );
+    assert.deepEqual(
+      await json(path),
+      baseline,
+      'Immutable model-admission baseline changed.',
+    );
+  }
+  assert(
+    (await lstat(path)).isFile(),
+    'Model-admission baseline must be a regular file.',
+  );
+  const bytes = await readFile(path);
+  assert.deepEqual(
+    JSON.parse(bytes),
+    baseline,
+    'Immutable model-admission baseline changed.',
+  );
+  return {
+    ...observed,
+    baseline: { path, sha256: digest(bytes) },
+  };
+}
 function capabilities(source, observedAt) {
   return {
     host: 'managed-local-codex',
@@ -284,7 +344,7 @@ export async function admitReviewedLocalCandidate({
     assignments: [{ worker: spec.workers.builder, owns: spec.owns }],
     verify: [{ program: 'git', args: ['diff', '--check'] }],
   });
-  await checkRefs(spec.protectedInputs);
+  await checkProtectedInputs(spec);
   for (const ref of spec.protectedInputs)
     assert(
       !inside(spec.repositoryRoot, await realpath(ref.path)),
@@ -313,11 +373,7 @@ export async function admitReviewedLocalCandidate({
   }
   const nativeBudgetCoverage = nativeStageBudgetCoverage(spec);
   pinned(spec.repositoryRoot, spec.baseCommit);
-  const modelSelection = await observeCodexModelSelection(
-    spec.providerSelection,
-    spec.modelAdmission,
-    spec.repositoryRoot,
-  );
+  const modelSelection = await observeManagedModelSelection(spec);
   const provider = await observeCodexProvider(
     spec.executable,
     spec.providerSelection,
@@ -329,7 +385,14 @@ export async function admitReviewedLocalCandidate({
     timeout: 10000,
     maxBuffer: 65536,
   });
-  for (const flag of ['--sandbox', '--output-schema', '--json'])
+  for (const flag of [
+    '--sandbox',
+    '--output-schema',
+    '--json',
+    '--ignore-user-config',
+    '--model',
+    '--config',
+  ])
     assert(help.includes(flag), 'Missing Codex execution capability.');
   const auth = execFileSync(provider.executable, ['login', 'status'], {
     encoding: 'utf8',
@@ -439,7 +502,7 @@ async function runChecks(
   await mkdir(root, { recursive: true });
   const results = [];
   for (let i = 0; i < commands.length; i++) {
-    await checkRefs(admitted.spec.protectedInputs);
+    await checkProtectedInputs(admitted.spec);
     const path = join(root, `${i}.json`);
     assert(
       !(await exists(path)),
@@ -1101,8 +1164,9 @@ async function captureOperation({
     };
     refs = predecessors.flatMap((x) => x.refs);
   }
-  await checkRefs(spec.protectedInputs);
+  await checkProtectedInputs(spec);
   pinned(spec.repositoryRoot, spec.baseCommit);
+  const completionModelSelection = await observeManagedModelSelection(spec);
   await control.assertActive();
   assert(!signal?.aborted, 'Cancelled stage cannot publish completion.');
   const body = {
@@ -1111,6 +1175,10 @@ async function captureOperation({
     status: 'PASS',
     startedAt,
     endedAt: new Date().toISOString(),
+    modelSelection: {
+      admission: admitted.modelSelection,
+      completion: completionModelSelection,
+    },
     result,
     refs,
   };
@@ -1641,6 +1709,7 @@ async function main(args) {
             policySha256: result.policySha256,
             planSha256: result.planSha256,
             provider: result.provider,
+            modelSelection: result.modelSelection,
             nativeBudgetCoverage: result.nativeBudgetCoverage,
           }
         : command === 'verify'

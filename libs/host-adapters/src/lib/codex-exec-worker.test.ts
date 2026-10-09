@@ -39,6 +39,26 @@ const assignment: WorkerAssignment = {
   },
 };
 
+async function tomlParser(): Promise<string> {
+  for (const command of ['python3', 'python3.11', 'python3.12']) {
+    try {
+      return await realpath(
+        execFileSync(
+          command,
+          ['-c', 'import sys,tomllib;print(sys.executable)'],
+          { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+        ).trim(),
+      );
+    } catch {}
+  }
+  throw new Error(
+    'A Python TOML parser is required for model admission tests.',
+  );
+}
+
+const sha256 = (bytes: Uint8Array) =>
+  createHash('sha256').update(bytes).digest('hex');
+
 test('model admission matches only stable or alpha CLI releases to release-format catalogs', async (t) => {
   const root = await realpath(
     await mkdtemp(join(tmpdir(), 'temari-catalog-version-')),
@@ -199,6 +219,195 @@ process.stdin.on('end', () => {
     true,
   );
   await assert.rejects(() => readFile(join(root, 'injected')));
+});
+
+test('managed execution ignores live user config and passes the exact admitted selection', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'temari-managed-worker-'));
+  const configHome = join(root, 'codex-home');
+  await mkdir(configHome);
+  await writeFile(
+    join(configHome, 'config.toml'),
+    'model = "unrelated-live-model"\nmodel_reasoning_effort = "low"\n',
+  );
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = configHome;
+  t.after(async () => {
+    if (previousCodexHome === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = previousCodexHome;
+    await rm(root, { recursive: true, force: true });
+  });
+  const executable = join(root, 'fake-codex');
+  await writeFile(
+    executable,
+    `#!${process.execPath}
+const fs=require('node:fs');const a=process.argv.slice(2);
+if(a[0]==='--version'){console.log('codex-cli 0.154.0');process.exit(0);}
+const expected=['exec','--ignore-user-config','--model','admitted-model','--config','model_provider="openai"','--config','model_reasoning_effort="high"'];
+if(JSON.stringify(a.slice(0,expected.length))!==JSON.stringify(expected))process.exit(12);
+if(process.env.CODEX_HOME!==${JSON.stringify(configHome)})process.exit(13);
+let p='';process.stdin.on('data',x=>p+=x);process.stdin.on('end',()=>{fs.writeFileSync(a[a.indexOf('--output-last-message')+1],JSON.stringify({status:'PASS',summary:'explicit selection'}));});`,
+    { mode: 0o700 },
+  );
+  const selection = {
+    provider: 'codex' as const,
+    executableSha256: sha256(await readFile(executable)),
+    executableVersion: 'codex-cli 0.154.0',
+    model: 'admitted-model',
+    reasoning: 'high',
+  };
+  const result = await runCodexExecWorker(assignment, {
+    executable,
+    workspaceRoot: root,
+    evidenceDirectory: join(root, 'evidence'),
+    timeoutMs: 1000,
+    providerSelection: selection,
+    skipGitRepoCheck: true,
+  });
+  assert.equal(result.status, 'PASS');
+  const evidence = JSON.parse(
+    await readFile(join(root, 'evidence', 'process.json'), 'utf8'),
+  );
+  assert.deepEqual(evidence.argv.slice(0, 8), [
+    'exec',
+    '--ignore-user-config',
+    '--model',
+    'admitted-model',
+    '--config',
+    'model_provider="openai"',
+    '--config',
+    'model_reasoning_effort="high"',
+  ]);
+});
+
+test('raw config drift is diagnostic while execution-critical drift is refused', async (t) => {
+  const root = await realpath(
+    await mkdtemp(join(tmpdir(), 'temari-config-projection-')),
+  );
+  const configHome = join(root, 'codex-home');
+  await mkdir(configHome);
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = configHome;
+  t.after(async () => {
+    if (previousCodexHome === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = previousCodexHome;
+    await rm(root, { recursive: true, force: true });
+  });
+  const configPath = join(configHome, 'config.toml');
+  const catalogPath = join(root, 'catalog.json');
+  const parserExecutable = await tomlParser();
+  const initial =
+    'model = "fixture-model"\nmodel_reasoning_effort = "high"\nnotify = ["initial"]\n';
+  await writeFile(configPath, initial);
+  await writeFile(
+    catalogPath,
+    JSON.stringify({
+      client_version: '0.154.0',
+      fetched_at: new Date().toISOString(),
+      models: [
+        {
+          slug: 'fixture-model',
+          supported_reasoning_levels: [{ effort: 'high' }],
+        },
+      ],
+    }),
+  );
+  const selection = {
+    provider: 'codex' as const,
+    executableSha256: 'a'.repeat(64),
+    executableVersion: 'codex-cli 0.154.0',
+    model: 'fixture-model',
+    reasoning: 'high',
+  };
+  const admission = {
+    configPath,
+    configSha256: sha256(Buffer.from(initial)),
+    catalogPath,
+    catalogSha256: sha256(await readFile(catalogPath)),
+    parserExecutable,
+    parserSha256: sha256(await readFile(parserExecutable)),
+  };
+  await writeFile(
+    configPath,
+    'model = "fixture-model"\nmodel_reasoning_effort = "high"\nnotify = ["changed"]\n',
+  );
+  const diagnostic = await observeCodexModelSelection(
+    selection,
+    admission,
+    root,
+  );
+  assert.equal(diagnostic.config.initialSha256, admission.configSha256);
+  assert.equal(diagnostic.config.drifted, true);
+  assert.notEqual(diagnostic.config.currentSha256, admission.configSha256);
+  assert.equal(diagnostic.config.critical.model, 'fixture-model');
+
+  await writeFile(
+    configPath,
+    'model = "other-model"\nmodel_reasoning_effort = "high"\n',
+  );
+  await assert.rejects(
+    () => observeCodexModelSelection(selection, admission, root),
+    /differs from inherited user settings/,
+  );
+});
+
+test('model admission parses the exact config bytes that it hashes', async (t) => {
+  const root = await realpath(
+    await mkdtemp(join(tmpdir(), 'temari-config-bytes-')),
+  );
+  const configHome = join(root, 'codex-home');
+  await mkdir(configHome);
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = configHome;
+  t.after(async () => {
+    if (previousCodexHome === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = previousCodexHome;
+    await rm(root, { recursive: true, force: true });
+  });
+  const configPath = join(configHome, 'config.toml');
+  const initial = 'model = "fixture-model"\nmodel_reasoning_effort = "high"\n';
+  await writeFile(configPath, initial);
+  const catalogPath = join(root, 'catalog.json');
+  await writeFile(
+    catalogPath,
+    JSON.stringify({
+      client_version: '0.154.0',
+      fetched_at: new Date().toISOString(),
+      models: [
+        {
+          slug: 'fixture-model',
+          supported_reasoning_levels: [{ effort: 'high' }],
+        },
+      ],
+    }),
+  );
+  const parserExecutable = join(root, 'parser');
+  await writeFile(
+    parserExecutable,
+    `#!${process.execPath}
+const fs=require('node:fs');let input='';process.stdin.on('data',x=>input+=x);process.stdin.on('end',()=>{if(!input.includes('model = "fixture-model"'))process.exit(9);fs.writeFileSync(${JSON.stringify(configPath)},'model = "other-model"\\nmodel_reasoning_effort = "low"\\n');console.log(JSON.stringify({model:'fixture-model',model_reasoning_effort:'high',model_provider:null,profile:null,model_catalog_json:null}));});`,
+    { mode: 0o700 },
+  );
+  const result = await observeCodexModelSelection(
+    {
+      provider: 'codex',
+      executableSha256: 'a'.repeat(64),
+      executableVersion: 'codex-cli 0.154.0',
+      model: 'fixture-model',
+      reasoning: 'high',
+    },
+    {
+      configPath,
+      configSha256: sha256(Buffer.from(initial)),
+      catalogPath,
+      catalogSha256: sha256(await readFile(catalogPath)),
+      parserExecutable,
+      parserSha256: sha256(await readFile(parserExecutable)),
+    },
+    root,
+  );
+  assert.equal(result.config.currentSha256, sha256(Buffer.from(initial)));
+  assert.equal(result.config.critical.model, 'fixture-model');
+  assert.match(await readFile(configPath, 'utf8'), /other-model/);
 });
 
 test('missing executable fails before process launch', async () => {

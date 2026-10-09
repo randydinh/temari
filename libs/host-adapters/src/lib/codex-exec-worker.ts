@@ -3,7 +3,7 @@ import {
   retainProcessDiagnostic,
   type CapturedProcessDiagnostic,
 } from './process-capture.js';
-import { execFile } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { promisify } from 'node:util';
 import { createReadStream } from 'node:fs';
@@ -151,9 +151,89 @@ export interface CodexModelAdmission {
   readonly parserSha256: string;
 }
 
+interface CodexCriticalConfig {
+  readonly model: string | null;
+  readonly model_reasoning_effort: string | null;
+  readonly model_provider: string | null;
+  readonly profile: string | null;
+  readonly model_catalog_json: string | null;
+}
+
+const CRITICAL_CONFIG_KEYS = [
+  'model',
+  'model_reasoning_effort',
+  'model_provider',
+  'profile',
+  'model_catalog_json',
+] as const;
+
+async function parseCodexCriticalConfig(
+  parserExecutable: string,
+  configBytes: Uint8Array,
+): Promise<CodexCriticalConfig> {
+  const parse = `import json,sys,tomllib
+c=tomllib.load(sys.stdin.buffer)
+print(json.dumps({k:c.get(k) for k in ${JSON.stringify(CRITICAL_CONFIG_KEYS)}}))`;
+  const output = await new Promise<string>((resolveOutput, rejectOutput) => {
+    const child = spawn(parserExecutable, ['-c', parse], {
+      shell: false,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    let bytes = 0;
+    let settled = false;
+    let timeout: NodeJS.Timeout | undefined;
+    const finish = (error?: Error, value?: string): void => {
+      if (settled) return;
+      settled = true;
+      if (timeout) clearTimeout(timeout);
+      if (error) rejectOutput(error);
+      else resolveOutput(value ?? '');
+    };
+    const collect =
+      (target: Buffer[]) =>
+      (chunk: Buffer): void => {
+        bytes += chunk.length;
+        if (bytes > 65536) {
+          child.kill('SIGKILL');
+          finish(new Error('TOML parser output exceeded 65536 bytes.'));
+        } else target.push(chunk);
+      };
+    child.stdout.on('data', collect(stdout));
+    child.stderr.on('data', collect(stderr));
+    child.on('error', (error) => finish(error));
+    child.on('close', (code, signal) => {
+      if (code !== 0)
+        finish(
+          new Error(
+            `TOML parser exited with code ${code}, signal ${signal ?? 'none'}.`,
+          ),
+        );
+      else finish(undefined, Buffer.concat(stdout).toString('utf8'));
+    });
+    child.stdin.on('error', (error) => {
+      child.kill('SIGKILL');
+      finish(error);
+    });
+    child.stdin.end(Buffer.from(configBytes));
+    timeout = setTimeout(() => {
+      child.kill('SIGKILL');
+      finish(new Error('TOML parser exceeded 10000 ms.'));
+    }, 10000);
+  });
+  const parsed = JSON.parse(output) as Record<string, unknown>;
+  for (const key of CRITICAL_CONFIG_KEYS) {
+    if (parsed[key] !== null && typeof parsed[key] !== 'string')
+      throw new Error(`Unsupported ${key} configuration value.`);
+  }
+  return parsed as unknown as CodexCriticalConfig;
+}
+
 /** A pinned account catalog can refuse unsupported selections without inference.
  * It is an admission prerequisite, not evidence that a model served a request.
- * Only the simple inherited user configuration is admitted in this increment. */
+ * Only a simple user configuration with an explicit critical selection is
+ * admitted; workers execute that frozen selection without loading the file. */
 export async function observeCodexModelSelection(
   selection: CodexProviderSelection,
   input: CodexModelAdmission,
@@ -165,7 +245,8 @@ export async function observeCodexModelSelection(
     !isAbsolute(input.configPath) ||
     !isAbsolute(input.catalogPath) ||
     !selection.model ||
-    selection.reasoning === undefined
+    typeof selection.reasoning !== 'string' ||
+    !selection.reasoning.trim()
   )
     throw new Error(
       'Managed coding requires explicit pinned model/config/catalog admission.',
@@ -200,22 +281,11 @@ export async function observeCodexModelSelection(
     createHash('sha256').update(bytes).digest('hex');
   if (sha(await readFile(input.parserExecutable)) !== input.parserSha256)
     throw new Error('TOML parser executable identity drifted.');
-  if (
-    sha(configBytes) !== input.configSha256 ||
-    sha(catalogBytes) !== input.catalogSha256
-  )
-    throw new Error('Model configuration/catalog identity drifted.');
-  const parse = `import json,sys,tomllib
-c=tomllib.load(open(sys.argv[1],'rb'))
-print(json.dumps({k:c.get(k) for k in ['model','model_reasoning_effort','model_provider','profile','model_catalog_json']}))`;
-  const parsed = JSON.parse(
-    (
-      await promisify(execFile)(
-        input.parserExecutable,
-        ['-c', parse, input.configPath],
-        { timeout: 10000, maxBuffer: 65536 },
-      )
-    ).stdout,
+  if (sha(catalogBytes) !== input.catalogSha256)
+    throw new Error('Model catalog identity drifted.');
+  const parsed = await parseCodexCriticalConfig(
+    input.parserExecutable,
+    configBytes,
   );
   if (
     parsed.profile ||
@@ -265,9 +335,16 @@ print(json.dumps({k:c.get(k) for k in ['model','model_reasoning_effort','model_p
   )
     throw new Error('Unsupported reasoning selection for this model.');
   return {
+    observedAt: new Date().toISOString(),
     requested: { model: selection.model, reasoning: selection.reasoning },
     observed: { model: null, reasoning: null },
-    config: { path: input.configPath, sha256: input.configSha256 },
+    config: {
+      path: input.configPath,
+      initialSha256: input.configSha256,
+      currentSha256: sha(configBytes),
+      drifted: sha(configBytes) !== input.configSha256,
+      critical: parsed,
+    },
     catalog: {
       path: input.catalogPath,
       sha256: input.catalogSha256,
@@ -275,8 +352,28 @@ print(json.dumps({k:c.get(k) for k in ['model','model_reasoning_effort','model_p
       clientVersion: catalog.client_version,
       executableVersion: selection.executableVersion,
     },
-    scope: 'pinned-inherited-selection-and-cached-account-admission-only',
+    scope: 'frozen-explicit-selection-and-cached-account-admission-only',
   };
+}
+
+function managedSelectionArgs(selection: CodexProviderSelection): string[] {
+  if (
+    !selection.model ||
+    typeof selection.reasoning !== 'string' ||
+    !selection.reasoning.trim()
+  )
+    throw new Error(
+      'Managed Codex execution requires explicit model and reasoning selection.',
+    );
+  return [
+    '--ignore-user-config',
+    '--model',
+    selection.model,
+    '--config',
+    'model_provider="openai"',
+    '--config',
+    `model_reasoning_effort=${JSON.stringify(selection.reasoning)}`,
+  ];
 }
 
 interface ProcessEvidence {
@@ -449,7 +546,9 @@ async function executeCodexExecWorker(
   }
   const args = [
     'exec',
-    ...(options.providerSelection ? [] : ['--ignore-user-config']),
+    ...(options.providerSelection
+      ? managedSelectionArgs(options.providerSelection)
+      : ['--ignore-user-config']),
     '--ephemeral',
     '--sandbox',
     sandbox,
@@ -466,7 +565,7 @@ async function executeCodexExecWorker(
   let capture: Awaited<ReturnType<typeof runProcessToFiles>>;
   try {
     capture = await runProcessToFiles({
-      program: options.executable,
+      program: provider?.executable ?? options.executable,
       args,
       cwd: options.workspaceRoot,
       env:
@@ -479,7 +578,7 @@ async function executeCodexExecWorker(
       onStarted: async ({ pid, startedAt }) => {
         await writeFile(
           startPath,
-          `${JSON.stringify({ schema: 1, pid, startedAt, executable: options.executable, workspaceRoot: options.workspaceRoot, assignmentId: assignment.id, sandbox })}\n`,
+          `${JSON.stringify({ schema: 1, pid, startedAt, executable: provider?.executable ?? options.executable, workspaceRoot: options.workspaceRoot, assignmentId: assignment.id, sandbox })}\n`,
           { flag: 'wx', mode: 0o600 },
         );
       },
