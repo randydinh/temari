@@ -712,3 +712,51 @@ capabilities to implement and evaluate. The archive preserves unsupported files
 with gaps rather than claiming their contents were understood.
 The [bounded real-corpus pilot](../../docs/evidence/knowledge-system/real-corpus-pilot-2026-09-30.md)
 records the latest measured coverage and remaining format/relationship gaps.
+
+### Optional OpenAI Decisions trial
+
+For this company-specific trial, OpenAI Decisions supersedes the historical Jev
+choice: Jev is not company approved. Historical examples, receipts and scheduled
+jobs above remain unchanged. This separate command is one explicit run; it does
+not install anything, schedule work, guarantee exactly-once billing, or promote
+a production default.
+
+Use only synthetic documents registered through Registrar for now. The trial
+always runs local archive retrieval with hosted text disabled, then reads only
+verified first excerpts from the retained shortlist checkpoint. Both handoff
+local-only restrictions and current Registrar source policy still apply.
+Select a provider explicitly; `none` stays offline and never accesses a key.
+
+Save a strict JSON input file (unknown fields are rejected):
+
+```json
+{
+  "handoffPath": "/absolute/synthetic/archive-handoff.json",
+  "id": "openai-shadow",
+  "query": "Proposal",
+  "sourceIds": ["synthetic-source"],
+  "topK": 2,
+  "discoveryMode": "bm25",
+  "provider": "openai-decisions",
+  "hostedTextApproved": true
+}
+```
+
+```sh
+pnpm exec nx run knowledge:demo -- journey-decisions-trial --input /absolute/trial.json
+```
+
+For a later authorized live trial, configure `OPENAI_API_KEY` server-side from a
+direct OpenAI API project using your secret-management process; do not print it
+or place it in the input JSON. There is no Keychain or TypeSafe credential
+fallback. No key is configured for this implementation: live verification is
+pending a credential, and missing-key receipts record zero attempted requests.
+
+The [official Decisions guide](https://developers.openai.com/api/docs/guides/decisions)
+contract supplied on 2026-10-08 uses the beta `gpt-6-luna` model at the fixed
+`POST https://api.openai.com/v1/decisions` endpoint. Synthetic injected transport
+tests verify named answers, unknown outcomes, and actual token accounting;
+they do not establish live availability or calibration parity with Jev.
+The durable `temari-openai-decisions-trial` report links the forced-local base
+query and verified checkpoint without embedding source text or credentials.
+No company documents should be sent in this trial.

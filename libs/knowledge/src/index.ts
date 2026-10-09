@@ -47,3 +47,6 @@ export * from './lib/archive-refresh-handoff.js';
 export * from './lib/archive-source-cycle.js';
 export * from './lib/archive-source-lifecycle.js';
 export * from './lib/archive-recovery-dependency-plan.js';
+
+export * from './lib/openai-decisions.js';
+export * from './lib/openai-decisions-trial.js';

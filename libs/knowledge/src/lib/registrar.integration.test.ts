@@ -421,3 +421,5 @@ import './archive-recovery.integration.test.js';
 import './archive-graph-recovery.integration.test.js';
 import './archive-graph-reviewed-change.integration.test.js';
 import './archive-source-lifecycle.integration.test.js';
+
+import './openai-decisions-trial.integration.test.js';

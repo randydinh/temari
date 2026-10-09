@@ -42,7 +42,7 @@ test('ACTUAL CLI: sealed graph gate records an improvement and displacement with
       '-B', '-m', 'knowledge_agent.cli', 'archive', '--workspace', join(f.base, 'state'), ...args,
     ], {
       cwd: registrarSource, timeout: 60000, maxBuffer: 1_048_576,
-      env: { PATH: '/usr/bin:/bin', PYTHONPATH: join(registrarSource, 'src'), PYTHONNOUSERSITE: '1' },
+      env: { PATH: '/usr/bin:/bin', PYTHONPATH: join(registrarSource, 'src'), PYTHONNOUSERSITE: '1', PYTHONDONTWRITEBYTECODE: '1' },
     });
     return JSON.parse(stdout);
   };
