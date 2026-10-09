@@ -1,0 +1,43 @@
+{
+  "evaluatedHead": "e63ca84e265bfc85df9a87bae7e43b7d1a482e0d",
+  "comparedMainHead": "23aa59de4a525680a4730ba3ee48798434794902",
+  "comparison": "identical bytes for listed files",
+  "sourceSha256": {
+    "libs/contracts/src/lib/execution-plan.ts": "2b12f52a2d7ca6ea20afc887980dbb03afa9e7a4c29fe4c9728e6fd23c928641",
+    "libs/contracts/src/lib/execution-harness.ts": "3a40cfa176685a1efe90b33cbd55b3cc2698f1bf612b97e86c2bf18b9aced60d",
+    "libs/runtime/src/lib/harness-selector.ts": "aa460809b0bd457f378f8a063e2107a0d8b55360850d6629c21b56be9a3f7db0",
+    "tools/dashboard-planner.mts": "48d2ebcdcbb8b754b29294a263b25cea358bf36173fa51f10e96ac1ceb627bc3",
+    "tools/dashboard-implementation.mts": "a0ac3ceb4d53de571ef2126fb4da586ed7f9461b1706faab376521e01446f953",
+    "tools/dashboard-talk.mts": "8f9673343a2d6a4a02bc4a740a289895aaccc916557386c79db37ebdd41aabf3",
+    "tools/dashboard-controller.mts": "61e6b138423fbd2c474f8fa4c91263e3f22e50bedd374c885c4313b5dc228c78",
+    "libs/host-adapters/src/lib/codex-exec-worker.ts": "efcb28e99d86e0f69f842d85cf2135a7fb523f2ef07450ed97c128b1bc94d586",
+    "docs/system-roles-and-responsibilities.md": "ef2c60abd78c04ee27b3e37bd808b71a8694e9c1ab7734f89db732a09a2a2f65"
+  },
+  "logs": {
+    "core-tests.log": {
+      "sha256": "396c58228833e991f44bf8a58bad4214fcd9a03c1f1f4c04262b4ceb5325f85f",
+      "bytes": 657
+    },
+    "planner-tests.log": {
+      "sha256": "e49e8e42444edc7413008ac24e6cb6943c3cd6b120da66fe702e8ec7036237f3",
+      "bytes": 4073
+    },
+    "implementation-tests.log": {
+      "sha256": "76c6ba0cb4cfe4948a4cb077358d3823cab9abaf544424dcf815035a68d93632",
+      "bytes": 4803
+    }
+  },
+  "scope": "local source evaluation and existing fixture tests; no live cross-provider proof",
+  "secondPass": {
+    "method": "Source reinspection of entry admission, full pinned request, capability proof and completion scope; prior passing tests reused because code is unchanged",
+    "sourceSha256": {
+      "packages/workflow-runtime/public/policy.json": "044e8b52172f7aac82fa0686d6d791afdcdf233489d8ca18e0ac5fbade439f76",
+      "packages/workflow-runtime/public/bin/public-entry.mjs": "d3ed8df4c1eb8ad855e0f7492af8e17337a7b6d632dc17b8ddd45b560514d446",
+      "packages/workflow-runtime/host/feature-proof.mjs": "1b26168c16108465cf63b92cd67ba10bd5d23ba1ab3c8706cfd6c36990bce1a0",
+      "packages/workflow-runtime/host/local-worker.mjs": "cd6c5e63e1d768494911461270552756b8277992784edd8582a35fee07830f5b",
+      "docs/decisions/2026-09-30-temari-program-ownership.md": "dd163d6886234749d2cad8b131298e812663c4f9852f4ef00c0b5dfa634cc9d8",
+      "docs/pstack-audit/index.md": "946db0d71228fcc439277248b9fcc27983aec717b33f37118c3ff03282368bff"
+    },
+    "assessmentSha256": "facb207df6f0e01dd6e5ff5ce4adf69408e77c4783d8c5b4bc977e3a8b21f968"
+  }
+}

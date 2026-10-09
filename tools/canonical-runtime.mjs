@@ -428,7 +428,7 @@ export async function packageCanonicalRuntime(output) {
     schemaVersion: 1,
     source: {
       revision: git('rev-parse', 'HEAD'),
-      dirty: git('status', '--porcelain=v1', '--untracked-files=all') !== '',
+      dirty: git('status', '--porcelain=v1', '--untracked-files=normal') !== '',
       files: sortedRecords(inputs),
     },
     compiler: {
