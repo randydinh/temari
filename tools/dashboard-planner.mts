@@ -151,7 +151,12 @@ interface Ended {
   evidence: GoalPlanEvidenceRef[];
 }
 const runFile = promisify(execFile);
-const script = fileURLToPath(import.meta.url);
+const sourceScript = fileURLToPath(import.meta.url);
+let supervisorScript = sourceScript;
+export function configureGoalPlannerSupervisor(path: string): void {
+  assert(isAbsolute(path), 'Planner supervisor path must be absolute.');
+  supervisorScript = path;
+}
 const LIMIT = 1024 * 1024;
 const FINAL_LIMIT = 64 * 1024;
 const FRESH_MS = 5_000;
@@ -976,19 +981,19 @@ export async function startGoalPlan(
     return inspectGoalPlan(handle);
   const log = await open(join(root, 'supervisor.log'), 'a', 0o600);
   try {
+    const direct = supervisorScript.endsWith('.mjs');
     const child = spawn(
       process.execPath,
       [
-        '--import',
-        '@swc-node/register/esm-register',
-        script,
+        ...(direct ? [] : ['--import', '@swc-node/register/esm-register']),
+        supervisorScript,
         '--supervise-planner',
         handle.requestPath,
         handle.manifestSha256,
         nonce,
       ],
       {
-        cwd: resolve(dirname(script), '..'),
+        cwd: resolve(dirname(supervisorScript), direct ? '.' : '..'),
         shell: false,
         detached: process.platform !== 'win32',
         stdio: ['ignore', log.fd, log.fd],
@@ -1366,7 +1371,7 @@ async function supervise(handle: GoalPlanHandle, nonce: string): Promise<void> {
 }
 if (
   process.argv[1] &&
-  resolve(process.argv[1]) === script &&
+  resolve(process.argv[1]) === sourceScript &&
   process.argv[2] === '--supervise-planner'
 ) {
   (async () => {

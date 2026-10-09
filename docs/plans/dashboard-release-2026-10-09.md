@@ -26,26 +26,26 @@ not a release dependency.
   and owned-process helpers. A smoke run proved the artifact can read a durable
   task store and serve both the UI and task API outside the source command path.
 
-## Remaining release gates
+## Completed release gates
 
 ### 1. Stable operator lifecycle
 
-Provide `configure`, `start`, `status`, `stop`, and `doctor` commands around the
-artifact. Store the selected profile, PID, port, URL, logs, and task state under
+The artifact provides `configure`, `start`, `status`, `stop`, and `doctor`
+commands. It stores the selected profile, PID, port, URL, logs, and task state under
 the Temari data directory. A repeated start must converge on one healthy local
 instance, and restart must preserve the task ledger.
 
 ### 2. Project profile materialization
 
-Replace hand-written feature-specific control JSON with a versioned project
-profile. The profile pins the project root, preparation and evidence roots,
+The versioned project profile replaces hand-written feature-specific control
+JSON. The profile pins the project root, preparation and evidence roots,
 Codex executable and model selection, workflow assets, ownership scopes, and
 verification commands. Validate every path and executable at configuration time
 and report missing capabilities through `doctor`.
 
 ### 3. Coordinator closeout
 
-Add the coordinator action that selects the reviewed integration candidate,
+The coordinator `apply --task` action selects the reviewed integration candidate,
 checks that its retained hashes and protected verification still match, applies
 it to the intended project checkout, and records the resulting task handoff or
 acceptance. Keep publication and destructive source operations outside automatic
@@ -53,11 +53,13 @@ worker authority.
 
 ### 4. Release proof
 
-Build the artifact from a clean checkout and run an end-to-end local journey:
-configure a disposable project, start the dashboard, submit a small goal, allow
-planning and implementation to finish, review and apply the exact candidate,
-restart the service, and confirm the task and evidence remain available. Retain
-the build digest, profile, candidate receipt, checks, and restart observation.
+`dashboard:release-smoke` builds and relocates the artifact, configures a
+disposable project, starts the dashboard, submits a small goal through a
+deterministic Codex transport, runs the real native managed workflow, restarts
+the service while that workflow is active, recovers its reviewed result, refuses
+a dirty source checkout, applies the exact candidate, and verifies idempotent
+closeout. The command and operator contract are in
+[the local release guide](../dashboard-local-release.md).
 
 ## Deferred work
 

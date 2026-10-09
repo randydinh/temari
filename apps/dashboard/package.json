@@ -48,23 +48,14 @@
               "output": "owned-process"
             }
           ],
-          "esbuildOptions": {
-            "sourcemap": true,
-            "outExtension": {
-              ".js": ".mjs"
-            }
-          }
+          "sourcemap": false,
+          "esbuildConfig": "apps/dashboard/esbuild.config.mjs"
         },
         "configurations": {
-          "development": {},
-          "production": {
-            "esbuildOptions": {
-              "sourcemap": false,
-              "outExtension": {
-                ".js": ".mjs"
-              }
-            }
-          }
+          "development": {
+            "sourcemap": true
+          },
+          "production": {}
         }
       },
       "prune-lockfile": {
@@ -141,6 +132,17 @@
         "executor": "nx:run-commands",
         "options": {
           "command": "node apps/dashboard/scripts/smoke.mjs",
+          "cwd": ""
+        }
+      },
+      "release-smoke": {
+        "dependsOn": [
+          "build"
+        ],
+        "cache": false,
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "node apps/dashboard/scripts/release-smoke.mjs",
           "cwd": ""
         }
       }

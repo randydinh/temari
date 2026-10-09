@@ -65,7 +65,7 @@ export function managedOperationCommand(
   );
   return {
     program: process.execPath,
-    args: isBun
+    args: isBun || tool.endsWith('.mjs')
       ? [tool, requestPath, resultPath]
       : [
           '--import',
@@ -979,19 +979,21 @@ async function worker(
         const requestPath = join(workerRoot, 'owned-operation-input.json');
         const resultPath = join(workerRoot, 'owned-operation-output.json');
         await sealed(requestPath, { stage, request });
-        const tool = fileURLToPath(
-          new URL(
-            '../../../tools/managed-candidate-operation.mts',
-            import.meta.url,
-          ),
-        );
+        const packagedTool = fileURLToPath(new URL('./managed-candidate-operation.mjs', import.meta.url));
+        let tool = packagedTool, cwd = dirname(packagedTool);
+        try { await access(packagedTool); }
+        catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+          tool = fileURLToPath(new URL('../../../tools/managed-candidate-operation.mts', import.meta.url));
+          cwd = fileURLToPath(new URL('../../../', import.meta.url));
+        }
         await assertManagedBridgeRuntime(spec);
         const command = managedOperationCommand(tool, requestPath, resultPath);
         await control.run(
           `${control.options.authorityId}-worker`,
           {
             ...command,
-            cwd: fileURLToPath(new URL('../../../', import.meta.url)),
+            cwd,
             timeoutMs: spec.timeoutMs + (stage === 'build' ? 900000 : 180000),
           },
           {
