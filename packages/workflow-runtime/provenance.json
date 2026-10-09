@@ -694,9 +694,9 @@
       "path": "skills/poteto-mode/SKILL.md",
       "lane": "portable",
       "sourceSha256": "d6507c6b87d3a3c7c263b711e9152bb513ca1c8b0204aa8da4a1fefe4357f9b3",
-      "artifactSha256": "dcaad1aac05d925f0818dd20c7220f4129579846e367bc4be554e02b77366907",
+      "artifactSha256": "ab17a54132b3295d1823621271f64250e5ac20b743fedf92f09eee7670567255",
       "executable": false,
-      "transformation": "Return program/lifecycle intent to Temari; retain technical method and legacy catalog references."
+      "transformation": "Return program/lifecycle intent to Temari; retain technical method and legacy catalog references. Decide source-dependent evidence need before planning through bounded knowledge retrieval."
     },
     {
       "path": "skills/poteto-mode/playbook-contracts/v1/feature.json",
@@ -1478,9 +1478,9 @@
       "path": "skills/temari/SKILL.md",
       "lane": "portable",
       "sourceSha256": "4309ed9237767f9a25cea2ff8da1322ccc19abfd990e65074e86ad6e80a30206",
-      "artifactSha256": "0c00b12dc084706b220cca87b549cc93f0208ca9d3a20e7f1f69084b2c8b0de4",
+      "artifactSha256": "2bf842887353f80a9c1151771bd970c2b64ab93643c7f3bbf7ac052f5e1a0bd2",
       "executable": false,
-      "transformation": "Retain the previously accepted semantic skill-selection and invocation policy sentence assigning policy to Temari and translation to the host adapter; source revision removed it. Add the merge-reconciliation route while preserving the vendored policy. Add explicit program planning/lifecycle selection and bounded overnight contracts, retaining merge recovery and provider admission."
+      "transformation": "Retain the previously accepted semantic skill-selection and invocation policy sentence assigning policy to Temari and translation to the host adapter; source revision removed it. Add the merge-reconciliation route while preserving the vendored policy. Add explicit program planning/lifecycle selection and bounded overnight contracts, retaining merge recovery and provider admission. Decide evidence need alongside work responsibility and record bounded knowledge retrieval in local task context."
     },
     {
       "path": "skills/temari/references/credentials.md",
