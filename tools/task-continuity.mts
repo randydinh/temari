@@ -1,6 +1,6 @@
 import { readFile, realpath, stat } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
-import { isAbsolute, resolve, join } from 'node:path';
+import { basename, isAbsolute, resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs, promisify } from 'node:util';
 import {
@@ -608,6 +608,7 @@ export async function runTaskCommand(
 
 if (
   process.argv[1] &&
+  basename(process.argv[1]) === 'task-continuity.mts' &&
   import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 ) {
   try {

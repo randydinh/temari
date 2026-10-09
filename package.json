@@ -11,13 +11,14 @@
     "temari:doctor": "node --import @swc-node/register/esm-register packages/initializer/src/cli.ts doctor"
   },
   "private": true,
-  "dependencies": {},
   "devDependencies": {
+    "@nx/esbuild": "23.2.0",
     "@nx/js": "23.2.0",
     "@swc-node/register": "1.11.1",
     "@swc/core": "1.15.8",
     "@swc/helpers": "0.5.18",
     "@types/node": "^24.0.0",
+    "esbuild": "^0.27.0",
     "nx": "23.2.0",
     "prettier": "^3.8.1",
     "tslib": "^2.3.0",

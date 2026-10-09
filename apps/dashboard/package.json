@@ -1,0 +1,150 @@
+{
+  "name": "@temari/dashboard",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "nx": {
+    "name": "dashboard",
+    "targets": {
+      "build": {
+        "executor": "@nx/esbuild:esbuild",
+        "inputs": [
+          "production",
+          "^production",
+          "{workspaceRoot}/tools/**/*",
+          "{workspaceRoot}/libs/**/*",
+          "{workspaceRoot}/packages/**/*"
+        ],
+        "outputs": [
+          "{options.outputPath}"
+        ],
+        "defaultConfiguration": "production",
+        "options": {
+          "platform": "node",
+          "outputPath": "apps/dashboard/dist",
+          "format": [
+            "esm"
+          ],
+          "bundle": true,
+          "thirdParty": true,
+          "declaration": false,
+          "skipTypeCheck": true,
+          "main": "apps/dashboard/src/main.ts",
+          "tsConfig": "apps/dashboard/tsconfig.app.json",
+          "assets": [
+            {
+              "input": "tools",
+              "glob": "task-view.{html,js,css}",
+              "output": "."
+            },
+            {
+              "input": "tools",
+              "glob": "dashboard-{pages,talk,reconciliation}.js",
+              "output": "."
+            },
+            {
+              "input": "libs/host-adapters/src/lib/owned-process",
+              "glob": "*.mjs",
+              "output": "owned-process"
+            }
+          ],
+          "esbuildOptions": {
+            "sourcemap": true,
+            "outExtension": {
+              ".js": ".mjs"
+            }
+          }
+        },
+        "configurations": {
+          "development": {},
+          "production": {
+            "esbuildOptions": {
+              "sourcemap": false,
+              "outExtension": {
+                ".js": ".mjs"
+              }
+            }
+          }
+        }
+      },
+      "prune-lockfile": {
+        "dependsOn": [
+          "build"
+        ],
+        "cache": true,
+        "executor": "@nx/js:prune-lockfile",
+        "inputs": [
+          "default",
+          "^default",
+          "{workspaceRoot}/pnpm-workspace.yaml",
+          "{workspaceRoot}/package.json",
+          {
+            "runtime": "node -e \"try{console.log('pnpm major '+require('child_process').execSync('pnpm --version',{stdio:['ignore','pipe','ignore']}).toString().trim().split('.')[0])}catch{console.log('pnpm major unavailable')}\""
+          }
+        ],
+        "outputs": [
+          "{workspaceRoot}/apps/dashboard/dist/package.json",
+          "{workspaceRoot}/apps/dashboard/dist/pnpm-lock.yaml",
+          "{workspaceRoot}/apps/dashboard/dist/pnpm-workspace.yaml",
+          "{workspaceRoot}/apps/dashboard/dist/patches",
+          "{workspaceRoot}/apps/dashboard/dist/local_path_modules"
+        ],
+        "options": {
+          "buildTarget": "build"
+        }
+      },
+      "copy-workspace-modules": {
+        "dependsOn": [
+          "build"
+        ],
+        "cache": true,
+        "outputs": [
+          "{workspaceRoot}/apps/dashboard/dist/workspace_modules"
+        ],
+        "executor": "@nx/js:copy-workspace-modules",
+        "options": {
+          "buildTarget": "build"
+        }
+      },
+      "prune": {
+        "dependsOn": [
+          "prune-lockfile",
+          "copy-workspace-modules"
+        ],
+        "executor": "nx:noop"
+      },
+      "serve": {
+        "continuous": true,
+        "executor": "@nx/js:node",
+        "defaultConfiguration": "development",
+        "dependsOn": [
+          "build"
+        ],
+        "options": {
+          "buildTarget": "dashboard:build",
+          "runBuildTargetDependencies": false
+        },
+        "configurations": {
+          "development": {
+            "buildTarget": "dashboard:build:development"
+          },
+          "production": {
+            "buildTarget": "dashboard:build:production"
+          }
+        }
+      },
+      "smoke": {
+        "dependsOn": [
+          "build"
+        ],
+        "cache": false,
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "node apps/dashboard/scripts/smoke.mjs",
+          "cwd": ""
+        }
+      }
+    }
+  },
+  "dependencies": {}
+}

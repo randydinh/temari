@@ -617,7 +617,7 @@ export async function startDashboardSwarm(
         '--import',
         '@swc-node/register/esm-register',
         script,
-        '--supervise',
+        '--supervise-swarm',
         handle.requestPath,
         handle.manifestSha256,
         nonce,
@@ -874,10 +874,14 @@ async function supervise(
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === script) {
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === script &&
+  process.argv[2] === '--supervise-swarm'
+) {
   (async () => {
     assert(
-      process.argv.length === 6 && process.argv[2] === '--supervise',
+      process.argv.length === 6,
       'This module is an internal dashboard supervisor.',
     );
     const requestPath = process.argv[3]!;

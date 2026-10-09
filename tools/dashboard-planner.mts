@@ -982,7 +982,7 @@ export async function startGoalPlan(
         '--import',
         '@swc-node/register/esm-register',
         script,
-        '--supervise',
+        '--supervise-planner',
         handle.requestPath,
         handle.manifestSha256,
         nonce,
@@ -1364,10 +1364,14 @@ async function supervise(handle: GoalPlanHandle, nonce: string): Promise<void> {
     } satisfies Ended);
   }
 }
-if (process.argv[1] && resolve(process.argv[1]) === script) {
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === script &&
+  process.argv[2] === '--supervise-planner'
+) {
   (async () => {
     assert(
-      process.argv.length === 6 && process.argv[2] === '--supervise',
+      process.argv.length === 6,
       'Internal planner supervisor only.',
     );
     await supervise(

@@ -899,7 +899,7 @@ export async function startDashboardImplementation(
         '--import',
         '@swc-node/register/esm-register',
         script,
-        '--supervise',
+        '--supervise-implementation',
         handle.requestPath,
         handle.manifestSha256,
         nonce,
@@ -1356,10 +1356,14 @@ async function supervise(
     });
   }
 }
-if (process.argv[1] && resolve(process.argv[1]) === script) {
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === script &&
+  process.argv[2] === '--supervise-implementation'
+) {
   (async () => {
     assert(
-      process.argv.length === 6 && process.argv[2] === '--supervise',
+      process.argv.length === 6,
       'Internal implementation supervisor.',
     );
     const path = process.argv[3]!,
