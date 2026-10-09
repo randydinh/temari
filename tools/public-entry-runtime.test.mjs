@@ -243,8 +243,194 @@ test('packages an isolated relocated outer bundle with three current public entr
     const policy = await child([join(artifact, 'bin/temari.mjs'), 'policy']);
     assert.equal(policy.status, 'described');
     assert.equal(policy.supportedProfile, 'lightweight-engineering-v1');
+    for (const resource of [
+      'SKILL.md',
+      'references/issue-triage-v1.md',
+      'assets/triage-note.md',
+    ]) {
+      const path = `skills/qa-triage/${resource}`;
+      const bytes = await readFile(join(artifact, path));
+      assert.deepEqual(
+        bytes,
+        await readFile(join(repository, 'packages/workflow-runtime/public', path)),
+      );
+      assert.equal(
+        manifest.files.find((file) => file.path === path)?.sha256,
+        createHash('sha256').update(bytes).digest('hex'),
+      );
+    }
+    assert.deepEqual(
+      await readFile(join(artifact, 'policy.json')),
+      await readFile(join(repository, 'packages/workflow-runtime/public/policy.json')),
+      'analytical guidance must preserve admission policy bytes',
+    );
+    await writeFile(
+      join(artifact, 'skills/qa-triage/assets/triage-note.md'), 'tampered',
+    );
+    await assert.rejects(
+      checkPublicEntryArtifact(artifact, manifestSha256(manifest)),
+    );
   } finally {
     await rm(relocatedRoot, { recursive: true, force: true });
+  }
+});
+
+test('relocated managed resources launch compiled operations, owned children and planner under stock Node', async (t) => {
+  if (process.platform === 'win32')
+    return t.skip('Owned process groups require POSIX.');
+  const root = await realpath(
+    await mkdtemp(join(tmpdir(), 'temari managed relocated-')),
+  );
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const artifact = join(root, 'artifact');
+  await cp(output, artifact, { recursive: true });
+  const fixture = join(root, 'fixture');
+  const repo = join(fixture, 'repo');
+  await mkdir(repo, { recursive: true });
+  execFileSync('git', ['init', '-q', repo]);
+  await writeFile(join(repo, 'README'), 'synthetic fixture\n');
+  execFileSync('git', ['add', '.'], { cwd: repo });
+  execFileSync(
+    'git',
+    [
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@localhost',
+      'commit',
+      '-qm',
+      'base',
+    ],
+    { cwd: repo },
+  );
+  const head = execFileSync('git', ['rev-parse', 'HEAD'], {
+    cwd: repo,
+    encoding: 'utf8',
+  }).trim();
+  const executable = join(fixture, 'fake-codex');
+  const promptPath = join(fixture, 'prompt.txt');
+  await writeFile(
+    executable,
+    `#!${process.execPath}
+import fs from 'node:fs';
+const args=process.argv.slice(2), final=args[args.indexOf('--output-last-message')+1];
+const schema=JSON.parse(fs.readFileSync(args[args.indexOf('--output-schema')+1],'utf8'));
+let prompt='';process.stdin.on('data', chunk=>prompt+=chunk);process.stdin.on('end',()=>{
+ fs.writeFileSync(${JSON.stringify(promptPath)},prompt);
+ const result=schema.properties?.schema
+  ? {schema:1,title:'Synthetic plan',summary:'Bounded fixture',assignments:[{slotId:'alpha',goal:'Read fixture',acceptanceCriteria:['Report fixture'],dependsOn:[]}],blockers:[]}
+  : {status:'PASS',summary:'Synthetic review'};
+ fs.writeFileSync(final,JSON.stringify(result));
+});
+`,
+    { mode: 0o700 },
+  );
+  const script = join(fixture, 'verify.mjs');
+  await writeFile(
+    script,
+    `
+import assert from 'node:assert/strict';
+import {readFile,writeFile} from 'node:fs/promises';
+import {execFile,fork} from 'node:child_process';
+import {promisify} from 'node:util';
+import {createHash} from 'node:crypto';
+import {pathToFileURL} from 'node:url';
+const artifact=${JSON.stringify(artifact)}, fixture=${JSON.stringify(fixture)}, repo=${JSON.stringify(repo)}, executable=${JSON.stringify(executable)};
+const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
+const bridge=await import(pathToFileURL(artifact+'/host/reviewed-local-candidate.mjs'));
+const dashboard=await import(pathToFileURL(artifact+'/host/dashboard-managed-candidate.mjs'));
+const planner=await import(pathToFileURL(artifact+'/host/dashboard-planner.mjs'));
+assert.equal(typeof dashboard.prepareManagedCandidate,'function');
+const resources=bridge.managedCandidateResources();
+assert.equal(resources.operation,artifact+'/host/managed-candidate-operation.mjs');
+assert.equal(resources.cwd,artifact+'/host/');
+assert((await readFile(resources.workflow,'utf8')).includes('"$INPUTS_BRIDGE_RUNTIME" "$INPUTS_BRIDGE"'));
+const protectedPaths=[resources.bridge,resources.operation,resources.workflow,artifact+'/host/owned-process/guardian.mjs',artifact+'/host/owned-process/anchor.mjs'];
+const spec={repositoryRoot:repo,protectedInputs:await Promise.all(protectedPaths.map(async path=>({path,sha256:hash(await readFile(path))})))};
+await bridge.assertManagedResourceBindings(spec);
+await assert.rejects(bridge.assertManagedResourceBindings({...spec,protectedInputs:spec.protectedInputs.slice(0,1)}),/protected input missing/);
+await assert.rejects(bridge.assertManagedResourceBindings({...spec,protectedInputs:spec.protectedInputs.map((ref,i)=>i===1?{...ref,sha256:'0'.repeat(64)}:ref)}),/digest changed/);
+if(process.permission){
+ await assert.rejects(readFile(${JSON.stringify(join(repository, 'package.json'))}),error=>error.code==='ERR_ACCESS_DENIED');
+ console.log(JSON.stringify({imports:'portable',bindings:'verified',source:'denied'}));
+ process.exit(0);
+}
+const brief={goal:'Inspect fixture',context:'Synthetic only',scope:'README',acceptanceCriteria:['Report fixture'],verificationCommand:null,reportFormat:'json',forbiddenActions:['No edits']};
+const requestPath=fixture+'/operation.json', resultPath=fixture+'/operation-result.json';
+await writeFile(requestPath,JSON.stringify({stage:'investigate',request:{runId:'relocated-operation',revision:'fixture',workspaceRoot:repo,evidenceRoot:fixture+'/evidence',maxConcurrency:1,executable,timeoutMs:5000,assignments:[{id:'reader',role:'investigator',required:true,brief}]}}));
+const command=bridge.managedOperationCommand(resources.operation,requestPath,resultPath,false);
+assert.equal(command.program,process.execPath);
+assert.deepEqual(command.args,[resources.operation,requestPath,resultPath]);
+// Node permission mode disables fsync and propagates to descendants. The separate
+// restricted probe above validates imports/bindings; persistent children use the
+// production stock-Node launch path in this second process.
+await promisify(execFile)(command.program,command.args,{cwd:resources.cwd,env:{...process.env,NODE_OPTIONS:'',NODE_PATH:''},timeout:15000});
+const operationResult=JSON.parse(await readFile(resultPath,'utf8'));
+assert.equal(operationResult.status,'PASS',await readFile(operationResult.receiptPath,'utf8'));
+assert((await readFile(${JSON.stringify(promptPath)},'utf8')).includes('temari-worker-efficiency/v1'));
+const {createOwnedExecutionAdapter}=await import(pathToFileURL(artifact+'/runtime/node_modules/@temari/host-adapters/src/lib/owned-execution.js'));
+const adapter=createOwnedExecutionAdapter();
+const identity={nonce:'relocation-fixture',binding:'synthetic',receiptPath:fixture+'/owned-receipt.json'};
+let registered=false;
+const owned=await adapter.launch({program:process.execPath,args:['-e','console.log("owned-fixture")'],cwd:fixture,timeoutMs:5000},identity,new AbortController().signal,async witness=>{assert(witness.guardianPid>1&&witness.anchorPid>1);registered=true;});
+assert(registered);assert.equal(owned.code,0);assert.equal(owned.cleanup,'CONFIRMED');assert(owned.stdout.includes('owned-fixture'));
+const outerIdentity={nonce:'outer-resource-fixture',binding:'synthetic',receiptPath:fixture+'/outer-owned-receipt.json'};
+const outerOwned=await new Promise((resolve,reject)=>{
+ const guardian=fork(artifact+'/host/owned-process/guardian.mjs',[],{execArgv:[],stdio:['ignore','pipe','pipe','ipc']});
+ const bound=setTimeout(()=>{guardian.send({type:'cancel'});reject(new Error('Outer guardian fixture timeout'));},15000);
+ guardian.once('error',reject);
+ guardian.on('message',message=>{
+  if(message.type==='prepared')guardian.send({type:'go'});
+  if(message.type==='finished'){clearTimeout(bound);guardian.disconnect();resolve(message.receipt);}
+ });
+ guardian.send({type:'prepare',identity:outerIdentity,command:{program:process.execPath,args:['-e','process.exit(0)'],cwd:fixture,timeoutMs:5000}});
+});
+assert.deepEqual(outerOwned.identity,outerIdentity);assert.equal(outerOwned.code,0);assert.equal(outerOwned.cleanup,'CONFIRMED');
+const plannerInput={root:fixture+'/preparations/task-1/planning',taskId:'task-1',requestId:'request-1',goal:'Read fixture',workspaceRoot:repo,candidate:{head:${JSON.stringify(head)},fingerprint:hash('')},policy:{profile:'reviewed-local-candidate-v1',id:'fixture-policy',title:'Fixture',description:'One bounded slot',slots:[{id:'alpha',title:'Alpha',description:'Read fixture',owns:[{kind:'file',path:'alpha.txt'}],mandatoryCriteria:['Report fixture']}],prepare:[],verify:[{program:process.execPath,args:['-e','process.exit(0)'],timeoutMs:1000}],reviewer:{id:'reviewer',role:'reviewer',required:true,brief}},executable,timeoutMs:5000,selection:{executableSha256:hash(await readFile(executable)),model:'fixture-model',reasoning:'high'}};
+const planned=await promisify(execFile)(process.execPath,['--input-type=module','-e',
+  'import assert from "node:assert/strict";import * as planner from '+JSON.stringify(pathToFileURL(artifact+'/host/dashboard-planner.mjs').href)+';'+
+  'const handle=await planner.prepareGoalPlan('+JSON.stringify(plannerInput)+');await planner.startGoalPlan(handle);'+
+  'let snapshot;const deadline=Date.now()+15000;do{snapshot=await planner.inspectGoalPlan(handle);if(!["STARTING","RUNNING","PREPARED"].includes(snapshot.state))break;await new Promise(resolve=>setTimeout(resolve,40));}while(Date.now()<deadline);'+
+  'assert.equal(snapshot.state,"READY",JSON.stringify(snapshot));assert.equal(snapshot.proposal.title,"Synthetic plan");console.log(JSON.stringify({state:snapshot.state}));'
+],{cwd:fixture,env:{...process.env,NODE_OPTIONS:'',NODE_PATH:''},timeout:20000});
+const snapshot=JSON.parse(planned.stdout);
+const supervisorLog=await readFile(fixture+'/preparations/task-1/planning/supervisor.log','utf8');
+assert(!supervisorLog.includes('@swc-node'));
+console.log(JSON.stringify({operation:'PASS',policy:'temari-worker-efficiency/v1',cleanup:owned.cleanup,planner:snapshot.state}));
+`,
+  );
+  const restricted = await childResult([
+    '--permission',
+    `--allow-fs-read=${artifact}`,
+    `--allow-fs-read=${fixture}`,
+    script,
+  ]);
+  assert.deepEqual(JSON.parse(restricted.stdout), {
+    imports: 'portable',
+    bindings: 'verified',
+    source: 'denied',
+  });
+  const result = await childResult([script]);
+  assert.deepEqual(JSON.parse(result.stdout), {
+    operation: 'PASS',
+    policy: 'temari-worker-efficiency/v1',
+    cleanup: 'CONFIRMED',
+    planner: 'READY',
+  });
+  for (const source of [
+    'tools/managed-candidate-operation.mts',
+    'tools/dashboard-managed-candidate.mts',
+    'tools/dashboard-planner.mts',
+    'packages/workflow-runtime/host/reviewed-local-candidate.mjs',
+    'libs/host-adapters/src/lib/owned-process/guardian.mjs',
+    'libs/host-adapters/src/lib/owned-process/anchor.mjs',
+  ]) {
+    assert.equal(
+      manifest.source.files.find((record) => record.path === source)?.sha256,
+      createHash('sha256')
+        .update(await readFile(join(repository, source)))
+        .digest('hex'),
+    );
   }
 });
 
@@ -1047,6 +1233,7 @@ const sandbox = args[args.indexOf('--sandbox') + 1];
 let prompt = '';
 process.stdin.on('data', chunk => prompt += chunk);
 process.stdin.on('end', () => {
+  if (!prompt.includes('temari-worker-efficiency/v1') || !prompt.includes('task constraints take priority')) throw new Error('Shared managed worker policy missing.');
   const id = prompt.match(/Goal: ([A-Za-z]+)/)?.[1] ?? 'unknown';
   setTimeout(() => {
     if (sandbox === 'workspace-write') fs.writeFileSync(id + '.txt', id + '\\n');
@@ -1645,6 +1832,8 @@ for (const trackingMode of [
   'tracked',
   'worker-failure',
   'duplicate-start',
+  'pinned-submodules',
+  'pinned-reviewer-mutation',
 ]) {
   test(`full feature start binds local host proof to six persisted stages (${trackingMode})`, async (t) => {
     if (process.platform === 'win32')
@@ -1662,6 +1851,47 @@ for (const trackingMode of [
     await writeFile(join(candidate, 'README.md'), 'base\n');
     execFileSync('git', ['add', 'README.md'], { cwd: candidate });
     execFileSync('git', ['commit', '-qm', 'base'], { cwd: candidate });
+    if (trackingMode.startsWith('pinned-')) {
+      const child = join(root, 'local-dependency');
+      execFileSync('git', ['init', '-q', child]);
+      const git = (...args) => execFileSync('git', ['-C', child, ...args]);
+      git('config', 'user.name', 'Test');
+      git('config', 'user.email', 'test@localhost');
+      await writeFile(join(child, 'privacy.txt'), 'pinned dependency\n');
+      await writeFile(join(child, '.gitignore'), 'private.txt\n');
+      git('add', '.');
+      git('commit', '-qm', 'dependency');
+      execFileSync('git', [
+        '-C',
+        candidate,
+        '-c',
+        'protocol.file.allow=always',
+        'submodule',
+        'add',
+        '-q',
+        child,
+        'app/dependencies/privacy',
+      ]);
+      execFileSync('git', [
+        '-C',
+        candidate,
+        'commit',
+        '-qam',
+        'pin dependency',
+      ]);
+      execFileSync('git', [
+        '-C',
+        candidate,
+        'config',
+        'submodule.app/dependencies/privacy.ignore',
+        'all',
+      ]);
+      await writeFile(
+        join(candidate, 'app/dependencies/privacy/private.txt'),
+        'private',
+      );
+    }
+
     execFileSync('git', [
       '-C',
       candidate,
@@ -1712,6 +1942,7 @@ process.stdin.on('end', () => {
   const finish = () => {
   const id = prompt.match(/Goal: ([A-Za-z]+)/)?.[1] ?? 'unknown';
   if (sandbox === 'workspace-write') fs.writeFileSync(id + '.txt', id + '\\n');
+  if (id === 'review' && process.env.FAKE_REVIEW_MUTATION === 'yes') fs.writeFileSync('app/dependencies/privacy/privacy.txt', 'reviewer mutation');
   fs.writeFileSync(final, JSON.stringify({status:process.env.FAKE_WORKER_FAIL === 'yes' ? 'ISSUES' : 'PASS',summary:id}));
   };
   if (process.env.FAKE_WAIT_GATE && !fs.existsSync(process.env.FAKE_WAIT_GATE)) {
@@ -1823,6 +2054,8 @@ process.stdin.on('end', () => {
             FAKE_INTEGRATION_PATH: integrationPath,
             FAKE_FORGE_LOG: join(root, 'forge-calls.log'),
             FAKE_WORKER_LOG: join(root, 'worker-calls.log'),
+            FAKE_REVIEW_MUTATION:
+              trackingMode === 'pinned-reviewer-mutation' ? 'yes' : 'no',
             FAKE_WORKER_FAIL: trackingMode === 'worker-failure' ? 'yes' : 'no',
             FAKE_WAIT_GATE:
               trackingMode === 'duplicate-start'
@@ -1872,7 +2105,7 @@ process.stdin.on('end', () => {
               reject,
               timer: setTimeout(
                 () => reject(new Error(`Feature stage timeout: ${stderr}`)),
-                15000,
+                60000,
               ),
             };
           });
@@ -1954,6 +2187,18 @@ process.stdin.on('end', () => {
         forgeBefore,
       );
       await writeFile(join(root, 'release-workers'), 'continue\n');
+    }
+    if (trackingMode === 'pinned-reviewer-mutation') {
+      assert.notEqual(await session.done, 0);
+      await assert.rejects(lstat(runDirectory), { code: 'ENOENT' });
+      assert.equal(
+        await readFile(
+          join(candidate, 'app/dependencies/privacy/privacy.txt'),
+          'utf8',
+        ),
+        'pinned dependency\n',
+      );
+      return;
     }
     if (trackingMode === 'worker-failure') {
       assert.notEqual(await session.done, 0);
@@ -2131,7 +2376,10 @@ process.stdin.on('end', () => {
     const runtime = await import(
       pathToFileURL(artifactRequire.resolve('@temari/runtime')).href
     );
-    const current = await runtime.observeCandidate(descriptor.candidate);
+    const current = await runtime.observeCandidate({
+      ...descriptor.candidate,
+      observation: descriptor.expectedInitial.scope,
+    });
     const currentBytes = Buffer.from(JSON.stringify(current));
     const currentPath = join(root, 'current.json');
     await writeFile(currentPath, currentBytes);
@@ -2158,10 +2406,99 @@ process.stdin.on('end', () => {
       },
     );
     assert.equal(JSON.parse(closeout.stdout).status, 'candidate-verified');
+    assert.equal(descriptor.expectedInitial.scope, 'git-tracked-files-v1');
+    if (trackingMode === 'pinned-submodules') {
+      const dependencies = runtime.observePinnedDependencies(
+        candidate,
+        baseCommit,
+      );
+      runtime.verifyPinnedDependencies(integrationPath, dependencies);
+      await assert.rejects(
+        readFile(join(integrationPath, 'app/dependencies/privacy/private.txt')),
+        /ENOENT/,
+      );
+      const before = await runtime.observeCandidate({
+        ...descriptor.candidate,
+        observation: 'git-tracked-files-v1',
+      });
+      await writeFile(
+        join(integrationPath, '.git/description'),
+        'metadata change only',
+      );
+      assert.deepEqual(
+        await runtime.observeCandidate({
+          ...descriptor.candidate,
+          observation: 'git-tracked-files-v1',
+        }),
+        before,
+      );
+      const { verifyLocalFeatureHostProof } = await import(
+        pathToFileURL(join(artifact, 'host/feature-proof.mjs')).href
+      );
+      const verifyProof = () =>
+        verifyLocalFeatureHostProof({
+          runId: descriptor.runId,
+          revision: descriptor.revision,
+          candidateRoot: candidate,
+          evidenceRoot,
+          baseCommit,
+          hostBinding: descriptor.featureHost.hostBinding,
+          proofSha256: descriptor.featureHost.proofSha256,
+        });
+      const oldPath = process.env.PATH;
+      process.env.PATH = root + ':' + oldPath;
+      const oldIntegration = process.env.FAKE_INTEGRATION_PATH;
+      process.env.FAKE_INTEGRATION_PATH = integrationPath;
+      const oldLog = process.env.FAKE_FORGE_LOG;
+      process.env.FAKE_FORGE_LOG = join(root, 'forge-calls.log');
+      try {
+        await verifyProof();
+        for (const target of [candidate, integrationPath]) {
+          const path = join(target, 'app/dependencies/privacy/privacy.txt');
+          await writeFile(path, 'hidden mutation');
+          await assert.rejects(verifyProof());
+          await writeFile(path, 'pinned dependency\n');
+        }
+      } finally {
+        if (oldPath === undefined) delete process.env.PATH;
+        else process.env.PATH = oldPath;
+        if (oldIntegration === undefined)
+          delete process.env.FAKE_INTEGRATION_PATH;
+        else process.env.FAKE_INTEGRATION_PATH = oldIntegration;
+        if (oldLog === undefined) delete process.env.FAKE_FORGE_LOG;
+        else process.env.FAKE_FORGE_LOG = oldLog;
+      }
+      await writeFile(
+        join(integrationPath, 'app/dependencies/privacy/privacy.txt'),
+        'closeout mutation',
+      );
+      await childResult(
+        [
+          join(artifact, 'bin/closeout.mjs'),
+          'verify',
+          '--request',
+          requestPath,
+          '--expected-request-sha256',
+          digest(requestBytes),
+          '--expected-manifest-sha256',
+          manifestSha256(manifest),
+          '--expected-current',
+          currentPath,
+          '--expected-current-sha256',
+          digest(currentBytes),
+        ],
+        1,
+        {
+          PATH: root + ':' + process.env.PATH,
+          FAKE_INTEGRATION_PATH: integrationPath,
+          FAKE_FORGE_LOG: join(root, 'forge-calls.log'),
+        },
+      );
+    }
   });
 }
 
-test('both engineering skills reach shared conversation guidance and the complete QA writer inside the artifact', async () => {
+test('both engineering skills reach shared conversation guidance, evidence intake, QA triage and the complete QA writer inside the artifact', async () => {
   for (const entry of ['temari', 'poteto-mode']) {
     const visited = new Set();
     const visit = async (path) => {
@@ -2200,6 +2537,13 @@ test('both engineering skills reach shared conversation guidance and the complet
       ),
       'relocated guidance must preserve the owning source bytes',
     );
+    const intakePath = 'skills/temari-knowledge/references/evidence-intake.md';
+    assert(visited.has(intakePath), `${entry} cannot reach shared evidence intake`);
+    assert.deepEqual(
+      await readFile(join(output, intakePath)),
+      await readFile(join(repository, 'packages/workflow-runtime/public', intakePath)),
+      'relocated intake guidance must preserve the owning source bytes',
+    );
     for (const resource of [
       'SKILL.md',
       'CHANGELOG.md',
@@ -2217,6 +2561,26 @@ test('both engineering skills reach shared conversation guidance and the complet
         manifest.source.files.some(
           (file) => file.path === `packages/workflow-runtime/public/${path}`,
         ),
+      );
+    }
+    for (const resource of [
+      'SKILL.md',
+      'references/issue-triage-v1.md',
+      'assets/triage-note.md',
+    ]) {
+      const path = `skills/qa-triage/${resource}`;
+      assert(
+        visited.has(path),
+        `Unreachable triage resource from ${entry}: ${resource}`,
+      );
+      assert(
+        manifest.source.files.some(
+          (file) => file.path === `packages/workflow-runtime/public/${path}`,
+        ),
+      );
+      assert.deepEqual(
+        await readFile(join(output, path)),
+        await readFile(join(repository, 'packages/workflow-runtime/public', path)),
       );
     }
     const skill = await readFile(
@@ -2487,6 +2851,23 @@ test('public engineering admission refuses unsupported routes and blocks unprove
   );
   assert.equal(lightweight.status, 'rejected');
   assert(lightweight.reasons.includes('profile-not-admitted'));
+
+  for (const entry of ['temari', 'poteto-mode']) {
+    await writeFile(
+      requestPath,
+      JSON.stringify(request(entry, {
+        route: 'qa-triage',
+        profile: 'qa-triage-v1',
+      })),
+    );
+    const triage = await child(
+      [join(output, `bin/${entry}.mjs`), 'admit', '--request', requestPath],
+      1,
+    );
+    assert.equal(triage.status, 'rejected');
+    assert(triage.reasons.includes('route-not-admitted'));
+    assert(triage.reasons.includes('profile-not-admitted'));
+  }
 });
 
 test('installed skills keep worker contract host-neutral and bundle the Codex adapter separately', async () => {

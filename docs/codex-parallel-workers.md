@@ -136,7 +136,7 @@ ports before claiming children.
 }
 ```
 
-Run `node --import @swc-node/register/esm-register tools/run-codex-write-workers.mts /absolute/path/to/request.json`. The JSON response contains the status, receipt path, integration checkout path, and integrated commit ID when successful. The integration checkout and per-worker clones remain under `<evidenceRoot>/<runId>` for review. A required worker failure blocks integration; an optional worker failure is recorded as a degradation and its patch is omitted. Failed verification leaves the integration checkout for inspection and produces no integration commit. The command rejects submodules, symlink edits, dirty or moved bases, overlapping ownership, and paths that target Git metadata. It does not resume interrupted external processes, apply changes back to the source checkout, or claim a real Codex smoke from fake-process tests.
+Run `node --import @swc-node/register/esm-register tools/run-codex-write-workers.mts /absolute/path/to/request.json`. The JSON response contains the status, receipt path, integration checkout path, and integrated commit ID when successful. The integration checkout and per-worker clones remain under `<evidenceRoot>/<runId>` for review. A required worker failure blocks integration; an optional worker failure is recorded as a degradation and its patch is omitted. Failed verification leaves the integration checkout for inspection and produces no integration commit. The command supports the pinned read-only submodules described below and rejects symlink edits, dirty or moved bases, overlapping ownership, and paths that target Git metadata. It does not resume interrupted external processes, apply changes back to the source checkout, or claim a real Codex smoke from fake-process tests.
 
 ## Repo-local batch routing
 
@@ -183,3 +183,42 @@ semantic/control data. The legacy buffered evidence APIs retain their 16 MiB
 materialization bound, and stage attestations retain their
 32-payload/16-MiB aggregate input bounds. These limits do not truncate raw retained
 diagnostics.
+
+## Existing pinned read-only submodules
+
+Application-only edits support initialized, clean first-level submodules already
+recorded as gitlinks and uniquely mapped by tracked `.gitmodules` at the pinned
+parent commit. Each dependency must be at that exact commit and contain tracked
+regular files only. Working-tree bytes must equal stored blobs; checkout filters
+and line-ending transformations are unsupported. Ordinary `.git` files into the parent's Git administration
+and independent `.git` directories are supported. Nested dependencies, symlinks,
+unsafe or case-colliding paths, shallow/borrowed object databases, missing objects,
+uninitialized checkouts and coordinated dependency edits are refused. Dependency
+capture is bounded to 10,000 files, 64 MiB of tracked content and 1 MiB of compact
+plan evidence. Application Git capture has its own 10,000-file/64-MiB bound.
+
+The runner freezes `pinned-readonly-dependencies-v1` evidence containing each
+path, commit and tracked file's mode, size and SHA-256, plus `.gitmodules` identity.
+Worker patches and integration receipts retain this plan. Preparation copies local
+Git objects into independent repositories, checks out the exact pins, and never
+fetches remotes or copies ignored/private worktree payloads. Verification that needs
+ignored configuration must supply it separately through the existing preparation
+contract. Dependency identity excludes Git administration and ignored payloads;
+it does not attest to those payloads or their influence on commands.
+
+Owning a parent directory does not authorize changing its dependencies. Changes to
+child bytes, modes, index, HEAD, nonignored untracked files, parent gitlinks or
+`.gitmodules` block integration. Recursive checks explicitly override
+`ignore-submodules`, inspect tracked bytes even under assume-unchanged flags, and
+run around preparation, patch capture/application, verification and source checks.
+The feature host repeats the same typed checks around independent review, stages,
+resume, forge proof and trusted closeout. A parent Git tree or worker PASS alone is
+insufficient; the six-stage canonical receipt and exact-commit PR remain required.
+
+For a refusal, retain the failed receipt and logs. Restore the intended clean,
+initialized dependency at the recorded pin through your normal repository workflow,
+then start a fresh run with a newly reviewed request. The runner does not fetch,
+repair, advance dependencies, rewrite evidence or apply integration changes to the
+source. Rebuild the public package from TypeScript to obtain this behavior; never
+edit an installed cache. Synthetic fixtures prove mechanics, not live worker or
+Sports Analyst compatibility.

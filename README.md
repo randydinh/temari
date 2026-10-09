@@ -2,6 +2,10 @@
 
 Portable, host- and model-agnostic conversational engineering partner.
 
+Temari builds on [P-stack](https://github.com/cursor/plugins/tree/main/pstack)
+by Lauren Tan. See [credits and provenance](docs/credits.md) for the imported
+workflow, Temari-owned platform, and other component boundaries.
+
 This is the canonical Nx workspace (`randydinh/temari`). Legacy products
 are `temari-v1` … `temari-v4.1`. See [docs/lineage.md](docs/lineage.md)
 and [docs/architecture.md](docs/architecture.md).
@@ -102,10 +106,11 @@ overlays/              Placeholder only — local files are gitignored
 ## Commands
 
 ```sh
-# Temari requires pnpm 11.25.0 (declared in package.json).
+# Temari requires Node.js 22 or newer and pnpm 11.25.0.
 pnpm --version
 
-# From a clean checkout: verify tools and lockfiles, then install everything.
+# Init bootstraps Bun and Archon, then doctor checks the result.
+# Do not install Bun separately and do not add it to PATH.
 pnpm temari:init
 pnpm temari:doctor
 
@@ -129,12 +134,15 @@ The repository requires pnpm 11.25.0 (declared in `package.json`), which must
 be installed before running the commands above. CI installs the same version.
 
 `temari:init` is the OS-agnostic dependency entry point. It uses Node APIs
-instead of shell-specific installers, installs the Nx workspace with the
-frozen pnpm lockfile, installs the packaged Poteto runtime with its frozen Bun
-lockfile, and writes an install receipt under the platform's user-local Temari
-state directory. On supported architectures, initialization also downloads
-the pinned Archon v0.10.1 executable into Temari's versioned user-local cache
-and records its source, platform, and SHA-256 in the receipt. The
+instead of shell-specific installers. On a clean machine it downloads pinned
+Bun 1.4.2 into the user-local Temari cache before the other installs, then
+installs the Nx workspace with the frozen pnpm lockfile, installs the packaged
+Poteto runtime with that managed Bun, and writes an install receipt under the
+platform's user-local Temari state directory. Doctor finds this Bun without a
+`PATH` change. On supported architectures, initialization also downloads the
+pinned Archon v0.10.1 executable into Temari's versioned user-local cache and
+records its source, platform, and SHA-256 in the receipt. `pnpm temari:doctor`
+stays read-only: a missing Bun or Archon exits 1 and prints `pnpm temari:init`. The
 `@temari/archon-harness` adapter is selected through a replaceable harness port;
 hosts and alternate harnesses can replace it without changing the workflow
 engine. See the [harness decision](docs/decisions/2026-09-22-archon-harness.md)
@@ -157,6 +165,13 @@ canonical QA dispositions. A draft does not admit a full QA execution route or
 satisfy its independent review requirements. Changes to the writer have a versioned
 [changelog](packages/workflow-runtime/public/skills/qa-review-verification/CHANGELOG.md)
 and retained [trial records](evaluations/qa-review-verification/README.md).
+
+For reported defects or uncertain QA failures, Temari and Poteto use the bundled
+[QA Triage skill](packages/workflow-runtime/public/skills/qa-triage/SKILL.md), its
+[ordered playbook](packages/workflow-runtime/public/skills/qa-triage/references/issue-triage-v1.md)
+and compact analytical handoff. It separates evidence, causal confidence, impact
+and next action. This is guidance, not a new executable profile or QA signoff;
+the existing writer handles reports and Poteto handles authorized repair.
 
 The [facilities uptime walkthrough](docs/demos/facilities-uptime.md) shows the
 same engine applied to a synthetic hospital site-operations incident.

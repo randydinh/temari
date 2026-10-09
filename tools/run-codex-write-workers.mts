@@ -1,3 +1,11 @@
+import {
+  observePinnedDependencies,
+  verifyPinnedDependencies,
+  assertDependencyOwnership,
+  preparePinnedDependencies,
+  type PinnedDependencyPlan,
+} from './pinned-submodules.mjs';
+import { inOwnedProcessGroup } from '../libs/host-adapters/src/lib/owned-execution.js';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
@@ -31,6 +39,8 @@ import {
   resolveCodexExecutable,
   runProcessToFiles,
   retainProcessDiagnostic,
+  assertCodexProviderSelection,
+  type CodexProviderSelection,
   runCodexExecWriteWorker,
   type CodexWriteOwnedPath,
   type CapturedStream,
@@ -66,11 +76,13 @@ export interface WriteRunRequest {
   readonly timeoutMs: number;
   readonly outputLimitBytes?: number;
   readonly finalResponseLimitBytes?: number;
+  readonly providerSelection?: CodexProviderSelection;
   readonly prepare?: readonly CommandSpec[];
   readonly verify: readonly CommandSpec[];
   readonly assignments: readonly WriteAssignment[];
 }
 export interface WorkerPatch {
+  readonly dependencies?: PinnedDependencyPlan;
   readonly assignmentId: string;
   readonly baseCommit: string;
   readonly snapshotCommit: string;
@@ -87,6 +99,7 @@ interface CommandResult {
   readonly outputLimitExceeded: boolean;
 }
 export interface WriteRunReceipt {
+  readonly dependencies?: PinnedDependencyPlan;
   readonly schema: 1;
   readonly runId: string;
   readonly baseCommit: string;
@@ -126,6 +139,15 @@ export function verificationEvidencePaths(
     ...(command.capture?.evidencePaths ?? []),
   ]);
 }
+const plans = new WeakMap<WriteRunRequest, PinnedDependencyPlan>();
+function dependencyPlan(request: WriteRunRequest): PinnedDependencyPlan {
+  let plan = plans.get(request);
+  if (!plan) {
+    plan = observePinnedDependencies(request.sourceRepo, request.baseCommit);
+    plans.set(request, plan);
+  }
+  return plan;
+}
 const gitEnv = {
   ...Object.fromEntries(
     Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_')),
@@ -135,6 +157,11 @@ const gitEnv = {
   GIT_COMMITTER_NAME: 'Temari',
   GIT_COMMITTER_EMAIL: 'temari@localhost',
   GIT_CONFIG_NOSYSTEM: '1',
+  GIT_CONFIG_GLOBAL: '/dev/null',
+  GIT_OPTIONAL_LOCKS: '0',
+  GIT_NO_LAZY_FETCH: '1',
+  GIT_NO_REPLACE_OBJECTS: '1',
+  GIT_ALLOW_PROTOCOL: 'file',
 };
 
 function object(value: unknown): Record<string, unknown> {
@@ -237,6 +264,8 @@ function worker(value: unknown): WorkerAssignment {
 }
 export function parseWriteRunRequest(value: unknown): WriteRunRequest {
   const item = object(value);
+  if (item.providerSelection !== undefined)
+    assertCodexProviderSelection(item.providerSelection);
   const runId = id(item.runId, 'runId');
   const sourceRepo = absolute(item.sourceRepo, 'sourceRepo');
   const evidenceRoot = absolute(item.evidenceRoot, 'evidenceRoot');
@@ -314,6 +343,9 @@ export function parseWriteRunRequest(value: unknown): WriteRunRequest {
     ...(finalResponseLimitBytes === undefined
       ? {}
       : { finalResponseLimitBytes }),
+    ...(item.providerSelection
+      ? { providerSelection: item.providerSelection }
+      : {}),
     prepare: (item.prepare ?? []).map(command),
     verify: item.verify.map(command),
     assignments,
@@ -322,7 +354,10 @@ export function parseWriteRunRequest(value: unknown): WriteRunRequest {
 function killGroup(pid: number | undefined): void {
   if (!pid) return;
   try {
-    process.kill(process.platform === 'win32' ? pid : -pid, 'SIGKILL');
+    process.kill(
+      process.platform === 'win32' || inOwnedProcessGroup() ? pid : -pid,
+      'SIGKILL',
+    );
   } catch {}
 }
 async function runBufferedSemanticCommand(
@@ -345,7 +380,7 @@ async function runBufferedSemanticCommand(
   const child = spawn(program, [...args], {
     cwd,
     shell: false,
-    detached: process.platform !== 'win32',
+    detached: process.platform !== 'win32' && !inOwnedProcessGroup(),
     stdio: ['pipe', 'pipe', 'pipe'],
     env: gitEnv,
   });
@@ -427,7 +462,14 @@ async function git(
   signal?: AbortSignal,
   input?: Buffer,
 ): Promise<Buffer> {
-  return checked('git', args, cwd, 120000, signal, input);
+  return checked(
+    'git',
+    ['-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', ...args],
+    cwd,
+    120000,
+    signal,
+    input,
+  );
 }
 function inside(parent: string, child: string): boolean {
   const rel = relative(parent, child);
@@ -448,7 +490,13 @@ async function ensureNoSymlinkPath(root: string, path: string): Promise<void> {
 }
 async function changedPaths(cwd: string): Promise<string[]> {
   const raw = await git(
-    ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+    [
+      'status',
+      '--porcelain=v1',
+      '-z',
+      '--untracked-files=all',
+      '--ignore-submodules=none',
+    ],
     cwd,
   );
   const entries = raw.toString('utf8').split('\0');
@@ -502,17 +550,23 @@ async function preflight(request: WriteRunRequest): Promise<string> {
   if (
     (
       await git(
-        ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+        [
+          'status',
+          '--porcelain=v1',
+          '-z',
+          '--untracked-files=all',
+          '--ignore-submodules=none',
+        ],
         source,
       )
     ).length
   )
     throw new Error('Source checkout must be clean.');
-  const submodules = (await git(['ls-files', '--stage', '-z'], source))
-    .toString('utf8')
-    .split('\0')
-    .filter((line) => line.startsWith('160000 '));
-  if (submodules.length) throw new Error('Submodules are not supported.');
+  const plan = dependencyPlan(request);
+  assertDependencyOwnership(
+    plan,
+    request.assignments.flatMap((entry) => entry.owns),
+  );
   for (const assignment of request.assignments)
     for (const scope of assignment.owns)
       await ensureNoSymlinkPath(source, scope.path);
@@ -530,6 +584,7 @@ async function clone(
   path: string,
   signal?: AbortSignal,
 ): Promise<void> {
+  const plan = observePinnedDependencies(source, base);
   await checked(
     'git',
     ['clone', '--local', '--no-hardlinks', '--no-checkout', source, path],
@@ -538,6 +593,7 @@ async function clone(
     signal,
   );
   await git(['checkout', '--detach', base], path, signal);
+  preparePinnedDependencies(source, path, plan);
 }
 async function prepare(
   path: string,
@@ -545,7 +601,9 @@ async function prepare(
   baseCommit: string,
   signal?: AbortSignal,
 ): Promise<void> {
-  for (const command of commands)
+  const plan = observePinnedDependencies(path, baseCommit);
+  for (const command of commands) {
+    verifyPinnedDependencies(path, plan);
     await checked(
       command.program,
       command.args,
@@ -553,6 +611,8 @@ async function prepare(
       command.timeoutMs,
       signal,
     );
+    verifyPinnedDependencies(path, plan);
+  }
   if (
     (await git(['rev-parse', 'HEAD'], path)).toString('utf8').trim() !==
     baseCommit
@@ -561,7 +621,13 @@ async function prepare(
   if (
     (
       await git(
-        ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+        [
+          'status',
+          '--porcelain=v1',
+          '-z',
+          '--untracked-files=all',
+          '--ignore-submodules=none',
+        ],
         path,
       )
     ).length
@@ -576,6 +642,9 @@ async function patchFor(
   result: WorkerResult,
 ): Promise<{ result: WorkerResult; patch?: WorkerPatch }> {
   if (result.status !== 'PASS') return { result };
+  const dependencies = dependencyPlan(request);
+  verifyPinnedDependencies(request.sourceRepo, dependencies);
+  verifyPinnedDependencies(clonePath, dependencies);
   const head = (await git(['rev-parse', 'HEAD'], clonePath))
     .toString('utf8')
     .trim();
@@ -600,6 +669,10 @@ async function patchFor(
         summary: 'Worker changed too many paths.',
       },
     };
+  assertDependencyOwnership(
+    dependencies,
+    paths.map((path) => ({ path })),
+  );
   for (const path of paths) {
     if (!owned(path, assignment.owns))
       return {
@@ -653,7 +726,9 @@ async function patchFor(
   )
     .toString('utf8')
     .trim();
+  verifyPinnedDependencies(clonePath, dependencies);
   const patch: WorkerPatch = {
+    dependencies,
     assignmentId: assignment.worker.id,
     baseCommit: request.baseCommit,
     snapshotCommit,
@@ -676,6 +751,7 @@ export async function integrateWriteWorkerPatches(
   onPhase?: (phase: 'integrating' | 'verifying') => Promise<void>,
 ): Promise<WriteRunReceipt> {
   const source = request.sourceRepo;
+  const dependencies = dependencyPlan(request);
   const integrationPath = join(runPath, 'integration');
   const patches = new Map(
     patchList.map((patch) => [patch.assignmentId, patch]),
@@ -697,7 +773,13 @@ export async function integrateWriteWorkerPatches(
         sourceHead !== request.baseCommit ||
         (
           await git(
-            ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+            [
+              'status',
+              '--porcelain=v1',
+              '-z',
+              '--untracked-files=all',
+              '--ignore-submodules=none',
+            ],
             source,
           )
         ).length
@@ -705,6 +787,8 @@ export async function integrateWriteWorkerPatches(
         throw new Error(
           'Source checkout moved or became dirty during worker run.',
         );
+      verifyPinnedDependencies(source, dependencies);
+      verifyPinnedDependencies(integrationPath, dependencies);
       await onPhase?.('integrating');
       for (const entry of request.assignments) {
         const patch = patches.get(entry.worker.id);
@@ -715,6 +799,17 @@ export async function integrateWriteWorkerPatches(
             );
           continue;
         }
+        if (
+          dependencies.dependencies.length &&
+          JSON.stringify(patch.dependencies) !== JSON.stringify(dependencies)
+        )
+          throw new Error('Patch dependency evidence differs.');
+        assertDependencyOwnership(
+          dependencies,
+          patch.changedPaths.map((path) => ({ path })),
+        );
+        verifyPinnedDependencies(source, dependencies);
+        verifyPinnedDependencies(integrationPath, dependencies);
         const patchBytes = await readFile(patch.patchPath);
         if (
           createHash('sha256').update(patchBytes).digest('hex') !== patch.sha256
@@ -732,9 +827,17 @@ export async function integrateWriteWorkerPatches(
           signal,
           patchBytes,
         );
+        verifyPinnedDependencies(integrationPath, dependencies);
       }
+      verifyPinnedDependencies(integrationPath, dependencies);
       const before = await git(
-        ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+        [
+          'status',
+          '--porcelain=v1',
+          '-z',
+          '--untracked-files=all',
+          '--ignore-submodules=none',
+        ],
         integrationPath,
       );
       const verifiedTree = (await git(['write-tree'], integrationPath))
@@ -752,6 +855,8 @@ export async function integrateWriteWorkerPatches(
         throw new Error('Integration candidate contains untracked files.');
       await onPhase?.('verifying');
       for (const [index, command] of request.verify.entries()) {
+        verifyPinnedDependencies(source, dependencies);
+        verifyPinnedDependencies(integrationPath, dependencies);
         const logPath = join(runPath, `verify-${index}.log`);
         const stdoutPath = join(runPath, `verify-${index}.stdout.log`);
         const stderrPath = join(runPath, `verify-${index}.stderr.log`);
@@ -906,6 +1011,8 @@ export async function integrateWriteWorkerPatches(
               })),
             },
           );
+        verifyPinnedDependencies(source, dependencies);
+        verifyPinnedDependencies(integrationPath, dependencies);
         if (
           output.code !== 0 ||
           output.timedOut ||
@@ -929,7 +1036,13 @@ export async function integrateWriteWorkerPatches(
           );
       }
       const after = await git(
-        ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+        [
+          'status',
+          '--porcelain=v1',
+          '-z',
+          '--untracked-files=all',
+          '--ignore-submodules=none',
+        ],
         integrationPath,
       );
       const afterHead = (await git(['rev-parse', 'HEAD'], integrationPath))
@@ -961,7 +1074,13 @@ export async function integrateWriteWorkerPatches(
         finalSourceHead !== request.baseCommit ||
         (
           await git(
-            ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+            [
+              'status',
+              '--porcelain=v1',
+              '-z',
+              '--untracked-files=all',
+              '--ignore-submodules=none',
+            ],
             source,
           )
         ).length
@@ -998,6 +1117,8 @@ export async function integrateWriteWorkerPatches(
         throw new Error(
           'Integration commit does not match the verified candidate.',
         );
+      verifyPinnedDependencies(source, dependencies);
+      verifyPinnedDependencies(integrationPath, dependencies);
       status = 'PASS';
     }
   } catch (error) {
@@ -1005,6 +1126,7 @@ export async function integrateWriteWorkerPatches(
     reason = error instanceof Error ? error.message : String(error);
   }
   const receipt: WriteRunReceipt = {
+    dependencies: dependencyPlan(request),
     schema: 1,
     runId: request.runId,
     baseCommit: request.baseCommit,
@@ -1036,6 +1158,7 @@ export async function assertWriteCandidate(
   path: string,
   revision: string,
 ): Promise<void> {
+  observePinnedDependencies(path, revision);
   if (
     (await git(['rev-parse', 'HEAD'], path)).toString('utf8').trim() !==
     revision
@@ -1044,7 +1167,13 @@ export async function assertWriteCandidate(
   if (
     (
       await git(
-        ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+        [
+          'status',
+          '--porcelain=v1',
+          '-z',
+          '--untracked-files=all',
+          '--ignore-submodules=none',
+        ],
         path,
       )
     ).length
@@ -1076,6 +1205,7 @@ export async function runCodexWriteWorkersRequest(
   let integratedCommit: string | null = null;
   try {
     await clone(source, request.baseCommit, integrationPath, signal);
+    verifyPinnedDependencies(source, dependencyPlan(request));
     await prepare(
       integrationPath,
       request.prepare ?? [],
@@ -1092,6 +1222,8 @@ export async function runCodexWriteWorkersRequest(
       const path = workerPaths.get(entry.worker.id)!;
       await clone(source, request.baseCommit, path, signal);
       await prepare(path, request.prepare ?? [], request.baseCommit, signal);
+      verifyPinnedDependencies(source, dependencyPlan(request));
+      verifyPinnedDependencies(path, dependencyPlan(request));
     }
     const plan = reconcilePlan({
       workType: 'feature',
@@ -1133,6 +1265,7 @@ export async function runCodexWriteWorkersRequest(
           timeoutMs: request.timeoutMs,
           outputLimitBytes: request.outputLimitBytes,
           finalResponseLimitBytes: request.finalResponseLimitBytes,
+          providerSelection: request.providerSelection,
           signal,
           baseCommit: request.baseCommit,
           owns: entry.owns,
@@ -1164,6 +1297,7 @@ export async function runCodexWriteWorkersRequest(
     reason = error instanceof Error ? error.message : String(error);
   }
   const receipt: WriteRunReceipt = {
+    dependencies: dependencyPlan(request),
     schema: 1,
     runId: request.runId,
     baseCommit: request.baseCommit,

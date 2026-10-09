@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "scope": "Temari public entries and v4.1 bundled P-stack skills and playbooks, with adjacent ownership boundaries",
-  "reviewedAt": "2026-10-03",
+  "reviewedAt": "2026-10-09",
   "evidenceRule": "documented and source_reference edges describe checked source; review_recommendation edges are proposals, not current behavior",
   "nodes": [
     {
@@ -396,16 +396,46 @@
       "source": "packages/workflow-runtime/public/skills/temari/SKILL.md"
     },
     {
+      "id": "public-playbook:issue-triage-v1",
+      "kind": "public-playbook",
+      "label": "Issue triage v1",
+      "source": "packages/workflow-runtime/public/skills/qa-triage/references/issue-triage-v1.md"
+    },
+    {
+      "id": "public-playbook:ticket-acceptance-v1",
+      "kind": "public-playbook",
+      "label": "Ticket acceptance QA v1",
+      "source": "packages/workflow-runtime/public/qa/ticket-acceptance-v1.md"
+    },
+    {
+      "id": "public-reference:evidence-intake",
+      "kind": "public-reference",
+      "label": "Bounded evidence intake",
+      "source": "packages/workflow-runtime/public/skills/temari-knowledge/references/evidence-intake.md"
+    },
+    {
       "id": "public-skill:qa-review-verification",
       "kind": "public-skill",
       "label": "QA verification",
       "source": "packages/workflow-runtime/public/skills/qa-review-verification/SKILL.md"
     },
     {
+      "id": "public-skill:qa-triage",
+      "kind": "public-skill",
+      "label": "QA Triage",
+      "source": "packages/workflow-runtime/public/skills/qa-triage/SKILL.md"
+    },
+    {
       "id": "public-skill:temari-knowledge",
       "kind": "public-skill",
       "label": "Temari Knowledge",
       "source": "packages/workflow-runtime/public/skills/temari-knowledge/SKILL.md"
+    },
+    {
+      "id": "public-template:triage-note",
+      "kind": "template",
+      "label": "Compact triage handoff",
+      "source": "packages/workflow-runtime/public/skills/qa-triage/assets/triage-note.md"
     },
     {
       "id": "public:policy",
@@ -1445,6 +1475,27 @@
       "evidence": "packages/workflow-runtime/public/skills/poteto-mode/SKILL.md"
     },
     {
+      "from": "public-entry:poteto-mode",
+      "to": "public-skill:qa-triage",
+      "relation": "invokes_supporting_skill",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "public-entry:poteto-mode",
+      "to": "public-skill:temari-knowledge",
+      "relation": "invokes_supporting_skill",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "public-entry:poteto-mode",
+      "to": "public-reference:evidence-intake",
+      "relation": "uses_evidence_decision",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/public/skills/poteto-mode/SKILL.md"
+    },
+    {
       "from": "public-entry:temari",
       "to": "skill:temari",
       "relation": "adapts_source_skill",
@@ -1457,6 +1508,76 @@
       "relation": "invokes_supporting_skill",
       "basis": "documented",
       "evidence": "packages/workflow-runtime/public/skills/temari/SKILL.md"
+    },
+    {
+      "from": "public-entry:temari",
+      "to": "public-skill:qa-triage",
+      "relation": "invokes_supporting_skill",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/skills/temari/SKILL.md"
+    },
+    {
+      "from": "public-entry:temari",
+      "to": "public-skill:temari-knowledge",
+      "relation": "invokes_supporting_skill",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/skills/temari/SKILL.md"
+    },
+    {
+      "from": "public-entry:temari",
+      "to": "public-reference:evidence-intake",
+      "relation": "uses_evidence_decision",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/public/skills/temari/SKILL.md"
+    },
+    {
+      "from": "public-playbook:issue-triage-v1",
+      "to": "public-template:triage-note",
+      "relation": "produces_handoff",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/public/skills/qa-triage/references/issue-triage-v1.md"
+    },
+    {
+      "from": "public-playbook:ticket-acceptance-v1",
+      "to": "public-skill:qa-triage",
+      "relation": "optional_failure_analysis",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/public/qa/ticket-acceptance-v1.md"
+    },
+    {
+      "from": "public-skill:qa-triage",
+      "to": "owner:poteto",
+      "relation": "hands_off_authorized_repair",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/skills/qa-triage/SKILL.md"
+    },
+    {
+      "from": "public-skill:qa-triage",
+      "to": "public-skill:qa-review-verification",
+      "relation": "hands_off_reporting",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/public/skills/qa-triage/SKILL.md"
+    },
+    {
+      "from": "public-skill:qa-triage",
+      "to": "owner:temari",
+      "relation": "intent_authority_lifecycle",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/skills/qa-triage/SKILL.md"
+    },
+    {
+      "from": "public-skill:qa-triage",
+      "to": "public-playbook:issue-triage-v1",
+      "relation": "uses_playbook",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/public/skills/qa-triage/SKILL.md"
+    },
+    {
+      "from": "public-skill:temari-knowledge",
+      "to": "public-reference:evidence-intake",
+      "relation": "uses_evidence_decision",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/public/skills/temari-knowledge/SKILL.md"
     },
     {
       "from": "public:policy",

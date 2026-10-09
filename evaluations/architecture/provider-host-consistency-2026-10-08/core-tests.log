@@ -1,0 +1,28 @@
+
+ NX   Running target test for 3 projects:
+
+- workflow-engine
+- runtime
+- host-adapters
+
+
+✔  nx run workflow-engine:test
+✔  nx run host-adapters:test
+✔  nx run runtime:test
+
+
+
+ NX   Successfully ran target test for 3 projects
+
+
+Output of 3 successful tasks were not shown. Run with --verbose or --output-style=static to see it.
+
+  Run duration:      50.0s
+  Cache:             Skipped (--skip-nx-cache)
+  Critical path:     50.0s (1 task)
+  Recoverable time:  <1ms
+
+  Recommendations:
+    - Cache: drop --skip-nx-cache to restore unchanged tasks instantly.
+    - Speed up or split the longest tasks on the critical path:
+        runtime:test    50.0s

@@ -65,6 +65,16 @@ contract and record the missing project context.
 
 ## Temari and P-stack navigation
 
+Apply `temari-worker-efficiency/v1` automatically to work in this workspace.
+The shared managed-worker policy is in
+`libs/contracts/src/lib/worker-efficiency.ts`. For large sources, start with
+relevant searches and bounded excerpts; expand when correctness requires it.
+Use authorized exact operations when they replace work or resolve uncertainty,
+and avoid duplicate passes. Keep the requested output format, necessary evidence,
+unresolved gaps, and all required verification. Task constraints, source budgets,
+privacy and permissions take priority. This guidance does not grant additional
+tools or authorize extra worker launches.
+
 Before changing a bundled P-stack skill, playbook, agent, or execution boundary,
 read the [P-stack capability index](docs/pstack-audit/index.md). Use its
 [knowledge graph](docs/pstack-audit/graph.json) to follow source-linked skill,

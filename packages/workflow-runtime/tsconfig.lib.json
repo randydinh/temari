@@ -10,13 +10,19 @@
   "include": ["src/**/*.ts"],
   "references": [
     {
-      "path": "../../libs/contracts/tsconfig.lib.json"
-    },
-    {
       "path": "../../libs/runtime/tsconfig.lib.json"
     },
     {
+      "path": "../../libs/host-adapters/tsconfig.lib.json"
+    },
+    {
       "path": "../../libs/temari-core/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/contracts/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/archon-harness/tsconfig.lib.json"
     }
   ]
 }

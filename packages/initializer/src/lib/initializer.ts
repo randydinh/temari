@@ -18,6 +18,7 @@ import {
   archonAssetFor,
   installArchonRuntime,
   UnsupportedArchonPlatformError,
+  type ArchonReleaseAsset,
   type ManagedArchonRuntime,
 } from '@temari/archon-harness';
 
@@ -28,7 +29,11 @@ import {
   type PlatformInfo,
 } from './platform.js';
 import { commandInvocation } from './command.js';
-
+import {
+  installManagedBun,
+  managedBunExecutable,
+  type BunInstallOptions,
+} from './managed-bun.js';
 const DEFAULT_MANIFEST_PATH = fileURLToPath(
   new URL('../../dependency-manifest.json', import.meta.url),
 );
@@ -162,6 +167,7 @@ export interface InitializeOptions {
     readonly platform: NodeJS.Platform;
     readonly arch: string;
   }) => Promise<ManagedArchonRuntime>;
+  readonly bunInstaller?: (options: BunInstallOptions) => Promise<string>;
 }
 
 export interface DoctorOptions {
@@ -169,6 +175,7 @@ export interface DoctorOptions {
   readonly manifestPath?: string;
   readonly platform?: PlatformInfo;
   readonly environment?: NodeJS.ProcessEnv;
+  readonly archonAsset?: ArchonReleaseAsset;
 }
 
 export interface InitializationResult {
@@ -337,6 +344,30 @@ function executableNames(
   ];
 }
 
+async function locateTool(
+  requirement: ToolRequirement,
+  platform: PlatformInfo,
+  environment: NodeJS.ProcessEnv,
+): Promise<string | null> {
+  if (requirement.command === 'bun') {
+    const managed = managedBunExecutable(
+      platform.cacheDirectory,
+      platform.platform,
+      platform.arch,
+    );
+    try {
+      await access(
+        managed,
+        platform.platform === 'win32' ? constants.F_OK : constants.X_OK,
+      );
+      return managed;
+    } catch {
+      // Fall back to PATH when init has not bootstrapped Bun yet.
+    }
+  }
+  return findExecutable(requirement.command, platform.platform, environment);
+}
+
 export async function findExecutable(
   command: string,
   platform: NodeJS.Platform = process.platform,
@@ -499,11 +530,7 @@ export async function inspectTools(
       continue;
     }
 
-    const path = await findExecutable(
-      requirement.command,
-      platform.platform,
-      environment,
-    );
+    const path = await locateTool(requirement, platform, environment);
     if (!path) {
       checks.push({
         name,
@@ -640,7 +667,11 @@ export async function doctor(
   const runner = createCommandRunner(platform.platform, environment);
   const tools = await inspectTools(manifest, platform, environment, runner);
   const lockfiles = await inspectLockfiles(manifest, workspaceRoot);
-  const archon = await inspectArchonRuntime(platform, runner);
+  const archon = await inspectArchonRuntime(
+    platform,
+    runner,
+    options.archonAsset,
+  );
   return {
     schema: 1,
     ok:
@@ -690,9 +721,11 @@ async function hashFile(
 async function inspectArchonRuntime(
   platform: PlatformInfo,
   runner: CommandRunner,
+  assetOverride?: ArchonReleaseAsset,
 ): Promise<ArchonRuntimeCheck> {
   try {
-    const asset = archonAssetFor(platform.platform, platform.arch);
+    const asset =
+      assetOverride ?? archonAssetFor(platform.platform, platform.arch);
     const executable = joinPlatformPath(
       platform.platform,
       platform.cacheDirectory,
@@ -824,12 +857,37 @@ export async function initialize(
   const environment = options.environment ?? process.env;
   const runner =
     options.runner ?? createCommandRunner(platform.platform, environment);
-  const tools = await inspectTools(manifest, platform, environment, runner);
+  let tools = await inspectTools(manifest, platform, environment, runner);
   const lockfiles = await inspectLockfiles(manifest, workspaceRoot);
   const steps: InitializationStep[] = [];
+  let bunBootstrapError: string | null = null;
+  const bunRequirement = manifest.tools.bun;
+  if (bunRequirement?.required) {
+    const bun = toolByName(tools, 'bun');
+    if (!bun?.ok) {
+      try {
+        await (options.bunInstaller ?? installManagedBun)({
+          cacheDirectory: platform.cacheDirectory,
+          platform: platform.platform,
+          arch: platform.arch,
+          minimumMajor: bunRequirement.minimumMajor ?? 1,
+        });
+        tools = await inspectTools(manifest, platform, environment, runner);
+      } catch (error) {
+        bunBootstrapError =
+          error instanceof Error ? error.message : String(error);
+      }
+    }
+  }
 
   const missingRequiredTool = tools.find((tool) => tool.required && !tool.ok);
-  if (missingRequiredTool) {
+  const gateReason = bunBootstrapError
+    ? `required tool bun bootstrap failed: ${bunBootstrapError}`
+    : missingRequiredTool
+      ? `required tool ${missingRequiredTool.name} ${missingRequiredTool.reason}`
+      : null;
+
+  if (gateReason) {
     for (const installation of manifest.installations) {
       steps.push({
         installationId: installation.id,
@@ -842,7 +900,7 @@ export async function initialize(
         exitCode: null,
         stdoutSha256: null,
         stderrSha256: null,
-        reason: `required tool ${missingRequiredTool.name} ${missingRequiredTool.reason}`,
+        reason: gateReason,
       });
     }
   } else {
@@ -945,14 +1003,14 @@ export async function initialize(
     asset: null,
     sourceUrl: null,
     sha256: null,
-    reason: missingRequiredTool
-      ? `required tool ${missingRequiredTool.name} is unavailable`
+    reason: gateReason
+      ? gateReason
       : failed
         ? 'a required package installation failed'
         : 'not attempted',
   };
 
-  if (!missingRequiredTool && !failed) {
+  if (!gateReason && !failed) {
     try {
       const asset = archonAssetFor(platform.platform, platform.arch);
       const runtime = await (options.archonInstaller ?? installArchonRuntime)({
@@ -1009,7 +1067,7 @@ export async function initialize(
   const receipt: InstallationReceipt = {
     schema: 1,
     status:
-      failed || missingRequiredTool !== undefined || archon.status === 'FAILED'
+      failed || gateReason !== null || archon.status === 'FAILED'
         ? 'FAILED'
         : 'SUCCEEDED',
     initializedAt: new Date().toISOString(),
@@ -1060,6 +1118,12 @@ export function formatReport(report: DoctorReport): string {
   lines.push(
     `archon=${report.archon.status.toLowerCase()}${report.archon.version ? ` version=${report.archon.version}` : ''} reason=${report.archon.reason}`,
   );
+  const bunFailed = report.tools.some(
+    (tool) => tool.name === 'bun' && !tool.ok,
+  );
+  if (bunFailed || report.archon.status === 'MISSING') {
+    lines.push('next=pnpm temari:init');
+  }
   return `${lines.join('\n')}\n`;
 }
 

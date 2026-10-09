@@ -1,11 +1,12 @@
 # P-stack capability index and ownership review
 
-Reviewed 2026-10-03 against this checkout's bundled Temari v4.1 assets and
+Reviewed 2026-10-09 against this checkout's bundled Temari v4.1 assets and
 public bundle source. This is a source and scenario review, not evidence that
 every route ran against a live application, PR, or external service. The v4.1
 tree has 53 skill entry files, including 23 principles and
 `merge-reconciliation`, and 24 playbooks. The public bundle has three
-policy entries plus QA verification and Temari Knowledge supporting skills.
+policy entries plus QA verification, Temari Knowledge and QA Triage supporting
+skills (six public skill files).
 These are inventory counts for this checkout, not upstream byte-parity claims.
 
 The companion [knowledge graph](graph.json) records every bundled skill and
@@ -34,8 +35,21 @@ verifies a trusted invocation against the current candidate.
 is a public supporting skill, invoked through Temari for QA deliverables rather
 than a fourth `policy.entries` key.
 [Temari Knowledge](../../packages/workflow-runtime/public/skills/temari-knowledge/SKILL.md)
-is the fifth public skill file: a supporting knowledge capability, not a
-fourth workflow admission entry.
+is a supporting knowledge capability, not a fourth workflow admission entry.
+Temari and Poteto now link to its shared
+[evidence intake](../../packages/workflow-runtime/public/skills/temari-knowledge/references/evidence-intake.md).
+The guidance composes source-dependent research and engineering with bounded
+retrieval and retained request context. It does not add chat interception,
+authenticated tool proof, or execution admission. Neutral-prompt observations
+remain separate from these source-linked graph relationships.
+[QA Triage](../../packages/workflow-runtime/public/skills/qa-triage/SKILL.md)
+provides analytical guidance through an ordered
+[issue triage playbook](../../packages/workflow-runtime/public/skills/qa-triage/references/issue-triage-v1.md)
+and compact handoff. Temari and Poteto call it for investigation; ticket acceptance
+can use it for failure analysis without surrendering full QA obligations. It
+hands reporting to the existing writer and authorized repair to Poteto. It adds
+no policy entry, executable profile, evaluator, or lifecycle. The graph records
+these supporting relationships separately from the unchanged v4.1 inventory.
 
 The [upstream overnight guide](https://github.com/cursor/plugins/blob/main/pstack/docs/guide/07-overnight.md)
 starts with one task and a checkable finish condition. Temari should suggest

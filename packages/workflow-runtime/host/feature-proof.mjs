@@ -1,3 +1,4 @@
+import { verifyGitCandidate } from './git-candidate.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { realpath, writeFile } from 'node:fs/promises';
@@ -43,6 +44,10 @@ export async function runLocalFeatureHostProof(input, signal) {
     3,
     'Feature workers must have distinct identities.',
   );
+  const dependencies = await verifyGitCandidate(
+    input.candidateRoot,
+    input.baseCommit,
+  );
   const forge = observeLocalForge(input.candidateRoot);
   const architect = await runLocalHostWorker(
     {
@@ -77,7 +82,14 @@ export async function runLocalFeatureHostProof(input, signal) {
   );
   assert.notEqual(architect.worker.pid, workers.builder.pid);
   assert.notEqual(architect.worker.pid, workers.reviewer.pid);
+  await verifyGitCandidate(input.candidateRoot, input.baseCommit, dependencies);
+  await verifyGitCandidate(
+    workers.integrationPath,
+    workers.integratedCommit,
+    dependencies,
+  );
   const proof = {
+    dependencies,
     schemaVersion: 1,
     host: 'local-feature',
     status: 'proven',
@@ -126,7 +138,7 @@ export async function verifyLocalFeatureHostProof(input) {
   assert.match(input.proofSha256, /^[0-9a-f]{64}$/);
   const evidenceRoot = await realpath(input.evidenceRoot);
   const proofPath = join(evidenceRoot, `${input.runId}-host-proof.json`);
-  const bytes = await readBoundedFile(proofPath, 64 * 1024);
+  const bytes = await readBoundedFile(proofPath, 4 * 1024 * 1024);
   assert.equal(digest(bytes), input.proofSha256, 'Feature host proof changed.');
   const proof = JSON.parse(bytes.toString());
   assert.equal(proof.schemaVersion, 1);
@@ -136,6 +148,11 @@ export async function verifyLocalFeatureHostProof(input) {
   assert.equal(proof.revision, input.revision);
   assert.deepEqual(proof.hostBinding, input.hostBinding);
   assert.equal(proof.source.baseCommit, input.baseCommit);
+  await verifyGitCandidate(
+    input.candidateRoot,
+    input.baseCommit,
+    proof.dependencies,
+  );
   const currentForge = observeLocalForge(input.candidateRoot);
   for (const key of ['actor', 'nameWithOwner', 'repositoryUrl', 'remoteSha256'])
     assert.equal(
@@ -154,7 +171,7 @@ export async function verifyLocalFeatureHostProof(input) {
   );
   const architectBytes = await readBoundedFile(
     proof.architect.observationPath,
-    64 * 1024,
+    4 * 1024 * 1024,
   );
   assert.equal(digest(architectBytes), proof.architect.observationSha256);
   const architect = JSON.parse(architectBytes.toString());
@@ -197,6 +214,11 @@ export async function verifyLocalFeatureHostProof(input) {
   });
   assert.equal(proof.workers.reportPath, workers.reportPath);
   assert.equal(proof.integratedCommit, workers.integratedCommit);
+  await verifyGitCandidate(
+    workers.integrationPath,
+    workers.integratedCommit,
+    proof.dependencies,
+  );
   assert.notEqual(proof.architect.id, workers.builder.id);
   assert.notEqual(proof.architect.id, workers.reviewer.id);
   assert.notEqual(proof.architect.pid, workers.builder.pid);

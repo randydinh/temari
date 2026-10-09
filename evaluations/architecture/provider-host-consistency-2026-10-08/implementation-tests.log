@@ -1,0 +1,70 @@
+
+> nx run runtime:dashboard-implementation-test
+
+> node --import @swc-node/register/esm-register --test --test-concurrency=1 tools/dashboard-implementation.test.mts tools/run-codex-write-workers.test.mts
+
+(node:85457) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:85501) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:85501) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:85501) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ isolated real implementers integrate exact patches then independent reviewer binds exact commit; duplicate start and fresh client retain one execution (2311.510209ms)
+✔ preflight rejects overlapping scopes and dirty candidate before any launch (105.549375ms)
+✔ out of scope worker cannot integrate; successful sibling and blocked durable reviewer remain visible (1638.733333ms)
+✔ verification mutation prevents commit and resolves reviewer without invoking it (1846.708875ms)
+✔ tampered successful sibling retains lifecycle and cancellation drains a hanging implementer (1802.3025ms)
+✔ cancellation drains an in-progress fixed verification command without starting reviewer (2069.014708ms)
+✔ review cancellation is durable and drains the independently owned read-only process (2457.318875ms)
+✔ completed candidate tamper produces integrity issue without changing observed completion or relaunching (2212.487542ms)
+✔ reviewer changing its candidate cannot produce a usable reviewed integration (1981.618875ms)
+✔ unobserved old launch is recovery required; cancellation never proves old process absence (190.1295ms)
+✔ manifest or handle tamper fails before launch and prepared cancellation launches nothing (203.924875ms)
+✔ portable evidence and reviewer binding tamper are detected; late cancellation preserves completed observations (2065.752417ms)
+✔ completed lifecycle remains observed while missing required artifacts block use of its results (2262.06575ms)
+✔ oversized inline verification metadata blocks reviewer launch without dropping sealed host results (1859.946792ms)
+✔ observed supervisor awaiting its first heartbeat stays starting only within the launch window (153.154459ms)
+✔ a terminal marker published during a child read cannot produce an earlier reviewer snapshot (1821.053333ms)
+(node:11854) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:11854) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:11854) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ disjoint write workers overlap in separate clones and join into one verified commit (997.461708ms)
+✔ out-of-scope worker change cannot produce integration commit (508.353625ms)
+✔ both endpoints of a staged rename must be owned (524.272792ms)
+✔ optional worker failure degrades while required patch still integrates (967.890917ms)
+✔ tampered patch evidence cannot be applied during integration (1554.534834ms)
+✔ dirty and moved base are rejected before any worker starts (134.598167ms)
+✔ untracked worker file is captured in its patch (910.993041ms)
+✔ failed integration verification retains checkout and never reports PASS (913.430125ms)
+✔ verification cannot alter and re-stage a candidate file (875.833208ms)
+✔ preparation may not move HEAD even when it leaves a clean checkout (159.649125ms)
+✔ abort during verification leaves no integration commit (826.951292ms)
+✔ nested source checkout and inherited Git routing are handled before launch (916.1805ms)
+✔ public write CLI isolates inherited Git routing variables at startup (1110.20875ms)
+✔ overlapping ownership and evidence inside source reject before work (98.626916ms)
+ℹ tests 30
+ℹ suites 0
+ℹ pass 30
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 35853.90575
+
+
+
+ NX   Successfully ran target dashboard-implementation-test for project runtime
+
+
+  Run duration:      35.9s
+  Cache:             Skipped (--skip-nx-cache)
+  Critical path:     35.9s (1 task)
+  Recoverable time:  <1ms
+
+  Recommendations:
+    - Cache: drop --skip-nx-cache to restore unchanged tasks instantly.
+    - Speed up or split the longest tasks on the critical path:
+        runtime:dashboard-implementation-test    35.9s

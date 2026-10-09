@@ -52,6 +52,24 @@ export type ChildFailureDiagnostics =
       readonly references: readonly WorkerEvidenceReference[];
       readonly message: string;
     };
+/** Durable launch gate and cleanup, independent of the semantic task status.
+ * PIDs are descriptive evidence, never recovery signalling authority. */
+export interface ChildExecutionRecord {
+  readonly nonce: string;
+  readonly binding: string;
+  readonly attempt: number;
+  readonly fencingEpoch: number;
+  readonly state: 'PREPARED' | 'LIVE' | 'CLEANED' | 'UNCERTAIN';
+  readonly receiptPath: string;
+  readonly guardianPid: number | null;
+  readonly anchorPid: number | null;
+}
+export interface UpdateChildExecutionRequest {
+  readonly taskId: string;
+  readonly actor: string;
+  readonly execution: ChildExecutionRecord;
+  readonly leaseToken?: string;
+}
 
 export interface ChildTaskRecord {
   readonly schema: 1;
@@ -67,6 +85,7 @@ export interface ChildTaskRecord {
   readonly result: WorkerResult | null;
   readonly error: string | null;
   readonly failureDiagnostics?: ChildFailureDiagnostics;
+  readonly execution?: ChildExecutionRecord;
 }
 
 export interface ChildTaskGroupRecord {
@@ -84,6 +103,7 @@ export type ChildTaskEventPayload = Readonly<
 >;
 
 export type ChildTaskEventType =
+  | 'task-execution-updated'
   | 'task-created'
   | 'task-claimed'
   | 'task-lease-renewed'
@@ -196,6 +216,9 @@ export interface ListReadyChildTasksRequest {
 }
 
 export interface ChildTaskStore {
+  updateExecution?(
+    request: UpdateChildExecutionRequest,
+  ): Promise<ChildTaskRecord>;
   create(request: CreateChildTaskRequest): Promise<ChildTaskRecord>;
   load(taskId: string): Promise<ChildTaskRecord | null>;
   reconcile(taskId: string): Promise<ChildTaskRecord | null>;
@@ -536,9 +559,28 @@ function parseLease(value: unknown): ChildTaskLease {
   return lease as ChildTaskLease;
 }
 
+function assertExecution(execution: ChildExecutionRecord): void {
+  assert.match(execution.nonce, /^[0-9a-f-]{36}$/);
+  assertText(execution.binding, 'Execution binding', 8192);
+  assert(Number.isSafeInteger(execution.attempt) && execution.attempt > 0);
+  assert(
+    Number.isSafeInteger(execution.fencingEpoch) && execution.fencingEpoch > 0,
+  );
+  assert(
+    ['PREPARED', 'LIVE', 'CLEANED', 'UNCERTAIN'].includes(execution.state),
+  );
+  assert(isAbsolute(execution.receiptPath));
+  for (const pid of [execution.guardianPid, execution.anchorPid])
+    assert(pid === null || (Number.isSafeInteger(pid) && pid > 1));
+}
+function unresolvedExecution(record: ChildTaskRecord): boolean {
+  return !!record.execution && record.execution.state !== 'CLEANED';
+}
+
 function parseRecord(value: unknown): ChildTaskRecord {
   assert(value && typeof value === 'object', 'Child task record is invalid.');
   const record = value as Partial<ChildTaskRecord>;
+  if (record.execution) assertExecution(record.execution);
   assert.equal(record.schema, 1);
   assert(typeof record.taskId === 'string');
   assertSafeId(record.taskId, 'Task ID');
@@ -660,7 +702,8 @@ function parseEvent(value: unknown): ChildTaskEvent {
   assert(typeof event.revision === 'string');
   assertText(event.revision, 'Revision');
   assert(
-    event.type === 'task-created' ||
+    event.type === 'task-execution-updated' ||
+      event.type === 'task-created' ||
       event.type === 'task-claimed' ||
       event.type === 'task-lease-renewed' ||
       event.type === 'task-cancellation-requested' ||
@@ -750,6 +793,8 @@ function assertEventHistory(
   let latestClaim: ChildTaskEvent | null = null;
   let latestTerminal: ChildTaskEvent | null = null;
   let cancellationRequested = false;
+  let execution: ChildExecutionRecord | undefined;
+  let executionEvents = 0;
   for (const event of events.slice(1)) {
     const diagnostics = childFailureDiagnosticsFromEvent(event);
     const requestedDiagnostics = childFailureDiagnosticsFromEvent(
@@ -767,6 +812,13 @@ function assertEventHistory(
       assert.equal(event.payload.cancellationRequested, true);
       assert.equal(event.payload.requestedStatus, 'FAILED');
       assert.equal(event.payload.to, 'CANCELLED');
+    }
+    if (event.type === 'task-execution-updated') {
+      execution = JSON.parse(String(event.payload.execution));
+      assertExecution(execution!);
+      assert.equal(execution!.attempt, attempts);
+      executionEvents++;
+      continue;
     }
     if (event.type === 'task-claimed') {
       assert(status === 'QUEUED' || status === 'RUNNING');
@@ -874,6 +926,7 @@ function assertEventHistory(
   const expectedLength =
     1 +
     record.attempt +
+    executionEvents +
     leaseRenewals +
     cancellationRequests +
     terminalEvents +
@@ -886,6 +939,7 @@ function assertEventHistory(
     events.length >= expectedLength,
     'Child task state is ahead of its event log.',
   );
+  assert.deepEqual(execution, record.execution);
   assert.equal(attempts, record.attempt);
   assert.equal(status, record.status);
   if (cancellationRequested && isTerminal(record.status)) {
@@ -1257,7 +1311,8 @@ export class FileChildTaskStore implements ChildTaskStore {
     const now = request.now ?? new Date();
     assertDate(now);
     const nowMs = now.getTime();
-    if (isTerminal(record.status)) return { claimed: false, record };
+    if (isTerminal(record.status) || unresolvedExecution(record))
+      return { claimed: false, record };
     if (record.status === 'RUNNING') {
       assert(record.lease);
       if (Date.parse(record.lease.expiresAt) > nowMs) {
@@ -1391,6 +1446,10 @@ export class FileChildTaskStore implements ChildTaskStore {
           record.status,
           'RUNNING',
           'Only a running lease can be renewed.',
+        );
+        assert(
+          record.execution?.state !== 'UNCERTAIN',
+          'Execution authority was lost.',
         );
         assert(record.lease, 'Child task lease is missing.');
         assert.equal(
@@ -1593,6 +1652,10 @@ export class FileChildTaskStore implements ChildTaskStore {
           Date.parse(record.lease.expiresAt) > now.getTime(),
           'Child task lease has expired.',
         );
+        assert(
+          !unresolvedExecution(record),
+          'Execution cleanup is unresolved; result acceptance refused.',
+        );
         const cancelledAtCompletion = events.some(
           (event) => event.type === 'task-cancellation-requested',
         );
@@ -1659,6 +1722,148 @@ export class FileChildTaskStore implements ChildTaskStore {
     );
   }
 
+  async executionRecords(runId: string): Promise<readonly ChildTaskRecord[]> {
+    assertSafeId(runId, 'Run ID');
+    // Inventory under the existing store lock, so registration cannot disappear
+    // between scanning group membership and reconciling its child records.
+    return this.withStoreLock(async () => {
+      const names = await readdir(this.root);
+      const taskIds = new Set<string>();
+      const membership = new Map<string, ChildTaskGroupRecord[]>();
+      for (const name of names) {
+        if (name.endsWith('.group.json')) {
+          const groupId = name.slice(0, -'.group.json'.length);
+          assertSafeId(groupId, 'Group ID');
+          const group = await this.loadGroup(groupId);
+          assert(group, 'Retained execution group is missing.');
+          assert.equal(
+            group.groupId,
+            groupId,
+            'Execution group filename identity changed.',
+          );
+          for (const taskId of group.taskIds) {
+            taskIds.add(taskId);
+            membership.set(taskId, [...(membership.get(taskId) ?? []), group]);
+          }
+        } else if (name.endsWith('.task.json'))
+          taskIds.add(name.slice(0, -'.task.json'.length));
+        else if (name.endsWith('.events.jsonl'))
+          taskIds.add(name.slice(0, -'.events.jsonl'.length));
+        else if (name.startsWith('.') && name.endsWith('.transaction.json'))
+          taskIds.add(name.slice(1, -'.transaction.json'.length));
+        assert(
+          taskIds.size <= 4096,
+          'Execution store exceeds inspection bound.',
+        );
+      }
+      const records: ChildTaskRecord[] = [];
+      for (const taskId of [...taskIds].sort()) {
+        // load reconciles a valid interrupted transaction and validates its log;
+        // retained logs or membership without a state are never an empty result.
+        const record = await this.load(taskId);
+        assert(record, `Execution member ${taskId} is missing its state.`);
+        assert.equal(
+          record.taskId,
+          taskId,
+          'Execution member filename identity changed.',
+        );
+        for (const group of membership.get(taskId) ?? []) {
+          assert.equal(
+            record.runId,
+            group.runId,
+            'Execution member run differs from its group.',
+          );
+          assert.equal(
+            record.revision,
+            group.revision,
+            'Execution member revision differs from its group.',
+          );
+        }
+        if (record.runId === runId) {
+          assert(
+            membership.has(taskId),
+            `Execution member ${taskId} is missing its group.`,
+          );
+          records.push(record);
+        }
+      }
+      return records;
+    });
+  }
+
+  async updateExecution(
+    request: UpdateChildExecutionRequest,
+  ): Promise<ChildTaskRecord> {
+    assertSafeId(request.taskId, 'Task ID');
+    assertText(request.actor, 'Actor');
+    assertExecution(request.execution);
+    return this.withStoreLock(() =>
+      this.withLock(request.taskId, async () => {
+        await this.reconcileLocked(request.taskId);
+        const record = await this.requireRecord(request.taskId);
+        const events = await this.readEvents(request.taskId, record.revision);
+        const nextExecution = request.execution;
+        if (record.execution) {
+          const old = record.execution;
+          assert.equal(nextExecution.nonce, old.nonce);
+          assert.equal(nextExecution.binding, old.binding);
+          assert.equal(nextExecution.receiptPath, old.receiptPath);
+          assert.equal(nextExecution.attempt, old.attempt);
+          assert.equal(nextExecution.fencingEpoch, old.fencingEpoch);
+          if (old.state === 'CLEANED') {
+            assert.deepEqual(nextExecution, old);
+            return record;
+          }
+          assert(nextExecution.state !== 'PREPARED');
+          if (nextExecution.state === 'LIVE')
+            assert.equal(old.state, 'PREPARED');
+        } else assert.equal(nextExecution.state, 'PREPARED');
+        if (
+          nextExecution.state === 'PREPARED' ||
+          nextExecution.state === 'LIVE'
+        ) {
+          assert.equal(record.status, 'RUNNING');
+          assert.equal(record.lease?.owner, request.actor);
+          assert.equal(record.lease?.token, request.leaseToken);
+          assert.equal(record.lease?.fencingEpoch, nextExecution.fencingEpoch);
+          assert.equal(record.attempt, nextExecution.attempt);
+          assert(
+            Date.parse(record.lease!.expiresAt) > Date.now(),
+            'Execution lease expired.',
+          );
+          assert(
+            !events.some((e) => e.type === 'task-cancellation-requested'),
+            'Cancellation fenced execution launch.',
+          );
+        }
+        const next = {
+          ...record,
+          execution: nextExecution,
+          updatedAt: new Date().toISOString(),
+        };
+        const event = this.createEvent({
+          taskId: record.taskId,
+          runId: record.runId,
+          revision: record.revision,
+          sequence: events.length + 1,
+          actor: request.actor,
+          type: 'task-execution-updated',
+          idempotencyKey: `execution:${nextExecution.nonce}:${events.length}`,
+          now: new Date(next.updatedAt),
+          payload: { execution: JSON.stringify(nextExecution) },
+        });
+        await this.commitTransitionLocked({
+          taskId: record.taskId,
+          baseState: record,
+          baseEvents: events,
+          nextState: next,
+          nextEvents: [...events, event],
+        });
+        return next;
+      }),
+    );
+  }
+
   async retry(request: RetryChildTaskRequest): Promise<ChildTaskRecord> {
     assertSafeId(request.taskId, 'Task ID');
     assertText(request.actor, 'Actor');
@@ -1676,6 +1881,10 @@ export class FileChildTaskStore implements ChildTaskStore {
           assert.equal(existing.actor, request.actor);
           return record;
         }
+        assert(
+          !unresolvedExecution(record),
+          'Unresolved execution cleanup forbids retry.',
+        );
         assert.equal(
           record.status,
           'FAILED',
@@ -1839,7 +2048,11 @@ export class FileChildTaskStore implements ChildTaskStore {
       ) {
         continue;
       }
-      if (reclaimable && (await this.dependenciesSucceeded(record))) {
+      if (
+        reclaimable &&
+        !unresolvedExecution(record) &&
+        (await this.dependenciesSucceeded(record))
+      ) {
         records.push(record);
       }
     }
@@ -2189,15 +2402,61 @@ export class FileChildTaskStore implements ChildTaskStore {
     );
   }
 
+  /** Local-store lock recovery only, never process signalling. A reused PID
+   * conservatively blocks. Missing/unknown owners require explicit recovery.
+   * Moving the unique owner filename claims exactly that abandoned generation;
+   * contenders cannot rename a newly acquired lock with a different nonce. */
+  private async recoverDeadLock(path: string): Promise<boolean> {
+    try {
+      const names = await readdir(path);
+      if (names.length !== 1 || !/^owner\.[0-9a-f-]{36}\.json$/.test(names[0]!))
+        return false;
+      const ownerPath = join(path, names[0]!);
+      if (!(await lstat(ownerPath)).isFile()) return false;
+      const owner = JSON.parse(await readFile(ownerPath, 'utf8'));
+      if (
+        owner.schema !== 1 ||
+        owner.nonce !== names[0] ||
+        !Number.isSafeInteger(owner.pid) ||
+        owner.pid <= 1
+      )
+        return false;
+      try {
+        process.kill(owner.pid, 0);
+        return false;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ESRCH') return false;
+      }
+      const recovered = join(this.root, `.recovered-lock-${randomUUID()}.json`);
+      await rename(ownerPath, recovered);
+      await rmdir(path);
+      await unlink(recovered);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private async withLockPath<T>(
     path: string,
     subject: string,
     operation: () => Promise<T>,
   ): Promise<T> {
     let acquired = false;
+    const ownerName = `owner.${randomUUID()}.json`;
+    const ownerPath = join(path, ownerName);
     for (let attempt = 0; attempt < 100; attempt += 1) {
       try {
         await mkdir(path, { mode: 0o700 });
+        const owner = await open(ownerPath, 'wx', 0o600);
+        try {
+          await owner.writeFile(
+            JSON.stringify({ schema: 1, pid: process.pid, nonce: ownerName }),
+          );
+          await owner.sync();
+        } finally {
+          await owner.close();
+        }
         acquired = true;
         break;
       } catch (error) {
@@ -2212,6 +2471,7 @@ export class FileChildTaskStore implements ChildTaskStore {
           }
         }
         if (!lockExists) throw error;
+        if (await this.recoverDeadLock(path)) continue;
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
     }
@@ -2223,6 +2483,7 @@ export class FileChildTaskStore implements ChildTaskStore {
         cause: error,
       });
     } finally {
+      await unlink(ownerPath).catch(() => undefined);
       await rmdir(path).catch(() => undefined);
     }
   }

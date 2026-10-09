@@ -3,6 +3,11 @@ import {
   retainProcessDiagnostic,
   type CapturedProcessDiagnostic,
 } from './process-capture.js';
+import { spawn, execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { promisify } from 'node:util';
+import { createReadStream } from 'node:fs';
+import { createInterface } from 'node:readline';
 import { constants } from 'node:fs';
 import {
   access,
@@ -12,9 +17,11 @@ import {
   writeFile,
   readFile,
 } from 'node:fs/promises';
-import { delimiter, isAbsolute, join, resolve } from 'node:path';
+import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
+import { homedir } from 'node:os';
 import {
   assertWorkerResult,
+  workerEfficiencyPolicy,
   type WorkerAssignment,
   type WorkerResult,
 } from '@temari/contracts';
@@ -34,7 +41,7 @@ const GIT_ROUTING_VARIABLES = new Set([
   'GIT_PREFIX',
 ]);
 
-function writeWorkerEnvironment(): NodeJS.ProcessEnv {
+function workerEnvironment(): NodeJS.ProcessEnv {
   return Object.fromEntries(
     Object.entries(process.env).filter(
       ([name]) =>
@@ -64,6 +71,310 @@ export interface CodexExecWorkerOptions {
   readonly signal?: AbortSignal;
   /** For isolated synthetic read-only probes outside a Git checkout. */
   readonly skipGitRepoCheck?: boolean;
+  /** Explicit managed execution preserves the user's model settings. */
+  readonly providerSelection?: CodexProviderSelection;
+}
+
+export interface CodexProviderSelection {
+  readonly provider: 'codex';
+  readonly executableSha256: string;
+  readonly executableVersion: string;
+  readonly model?: string;
+  readonly reasoning?: string | null;
+}
+
+export function assertCodexProviderSelection(
+  value: unknown,
+): asserts value is CodexProviderSelection {
+  const item = value as Partial<CodexProviderSelection> | null;
+  if (
+    !item ||
+    item.provider !== 'codex' ||
+    !/^[0-9a-f]{64}$/.test(item.executableSha256 ?? '') ||
+    !item.executableVersion?.startsWith('codex-cli ') ||
+    Object.keys(item).some(
+      (key) =>
+        ![
+          'provider',
+          'executableSha256',
+          'executableVersion',
+          'model',
+          'reasoning',
+        ].includes(key),
+    ) ||
+    (item.model !== undefined &&
+      (typeof item.model !== 'string' || !item.model.trim())) ||
+    (item.reasoning !== undefined &&
+      item.reasoning !== null &&
+      typeof item.reasoning !== 'string')
+  )
+    throw new Error('Unsupported or unpinned coding provider selection.');
+}
+
+export async function observeCodexProvider(
+  executable: string,
+  selection: CodexProviderSelection,
+) {
+  assertCodexProviderSelection(selection);
+  const path = await resolveCodexExecutable(executable);
+  const sha256 = createHash('sha256')
+    .update(await readFile(path))
+    .digest('hex');
+  const version = (
+    await promisify(execFile)(path, ['--version'], {
+      timeout: 10000,
+      maxBuffer: 65536,
+    })
+  ).stdout.trim();
+  if (
+    sha256 !== selection.executableSha256 ||
+    version !== selection.executableVersion
+  )
+    throw new Error('Coding provider executable identity drifted.');
+  return {
+    provider: 'codex' as const,
+    executable: path,
+    sha256,
+    version,
+    model: null,
+    reasoning: null,
+    observation:
+      'CLI version and executable bytes; model/reasoning unavailable from this transport',
+  };
+}
+
+export interface CodexModelAdmission {
+  readonly configPath: string;
+  readonly configSha256: string;
+  readonly catalogPath: string;
+  readonly catalogSha256: string;
+  readonly parserExecutable: string;
+  readonly parserSha256: string;
+}
+
+interface CodexCriticalConfig {
+  readonly model: string | null;
+  readonly model_reasoning_effort: string | null;
+  readonly model_provider: string | null;
+  readonly profile: string | null;
+  readonly model_catalog_json: string | null;
+}
+
+const CRITICAL_CONFIG_KEYS = [
+  'model',
+  'model_reasoning_effort',
+  'model_provider',
+  'profile',
+  'model_catalog_json',
+] as const;
+
+async function parseCodexCriticalConfig(
+  parserExecutable: string,
+  configBytes: Uint8Array,
+): Promise<CodexCriticalConfig> {
+  const parse = `import json,sys,tomllib
+c=tomllib.load(sys.stdin.buffer)
+print(json.dumps({k:c.get(k) for k in ${JSON.stringify(CRITICAL_CONFIG_KEYS)}}))`;
+  const output = await new Promise<string>((resolveOutput, rejectOutput) => {
+    const child = spawn(parserExecutable, ['-c', parse], {
+      shell: false,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    let bytes = 0;
+    let settled = false;
+    let timeout: NodeJS.Timeout | undefined;
+    const finish = (error?: Error, value?: string): void => {
+      if (settled) return;
+      settled = true;
+      if (timeout) clearTimeout(timeout);
+      if (error) rejectOutput(error);
+      else resolveOutput(value ?? '');
+    };
+    const collect =
+      (target: Buffer[]) =>
+      (chunk: Buffer): void => {
+        bytes += chunk.length;
+        if (bytes > 65536) {
+          child.kill('SIGKILL');
+          finish(new Error('TOML parser output exceeded 65536 bytes.'));
+        } else target.push(chunk);
+      };
+    child.stdout.on('data', collect(stdout));
+    child.stderr.on('data', collect(stderr));
+    child.on('error', (error) => finish(error));
+    child.on('close', (code, signal) => {
+      if (code !== 0)
+        finish(
+          new Error(
+            `TOML parser exited with code ${code}, signal ${signal ?? 'none'}.`,
+          ),
+        );
+      else finish(undefined, Buffer.concat(stdout).toString('utf8'));
+    });
+    child.stdin.on('error', (error) => {
+      child.kill('SIGKILL');
+      finish(error);
+    });
+    child.stdin.end(Buffer.from(configBytes));
+    timeout = setTimeout(() => {
+      child.kill('SIGKILL');
+      finish(new Error('TOML parser exceeded 10000 ms.'));
+    }, 10000);
+  });
+  const parsed = JSON.parse(output) as Record<string, unknown>;
+  for (const key of CRITICAL_CONFIG_KEYS) {
+    if (parsed[key] !== null && typeof parsed[key] !== 'string')
+      throw new Error(`Unsupported ${key} configuration value.`);
+  }
+  return parsed as unknown as CodexCriticalConfig;
+}
+
+/** A pinned account catalog can refuse unsupported selections without inference.
+ * It is an admission prerequisite, not evidence that a model served a request.
+ * Only a simple user configuration with an explicit critical selection is
+ * admitted; workers execute that frozen selection without loading the file. */
+export async function observeCodexModelSelection(
+  selection: CodexProviderSelection,
+  input: CodexModelAdmission,
+  workspaceRoot: string,
+) {
+  assertCodexProviderSelection(selection);
+  if (
+    !input ||
+    !isAbsolute(input.configPath) ||
+    !isAbsolute(input.catalogPath) ||
+    !selection.model ||
+    typeof selection.reasoning !== 'string' ||
+    !selection.reasoning.trim()
+  )
+    throw new Error(
+      'Managed coding requires explicit pinned model/config/catalog admission.',
+    );
+  const expectedConfig = resolve(
+    process.env.CODEX_HOME ?? join(homedir(), '.codex'),
+    'config.toml',
+  );
+  if (input.configPath !== expectedConfig)
+    throw new Error(
+      'Model configuration is not the actual inherited Codex user configuration.',
+    );
+  for (let root = resolve(workspaceRoot); ; root = dirname(root)) {
+    const path = join(root, '.codex', 'config.toml');
+    if (path !== expectedConfig) {
+      try {
+        await stat(path);
+        throw new Error(
+          'Project model configuration is not supported by this bounded adapter.',
+        );
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+    }
+    if (dirname(root) === root) break;
+  }
+  if (!isAbsolute(input.parserExecutable))
+    throw new Error('TOML parser executable must be explicitly pinned.');
+  const configBytes = await readFile(input.configPath);
+  const catalogBytes = await readFile(input.catalogPath);
+  const sha = (bytes: Uint8Array) =>
+    createHash('sha256').update(bytes).digest('hex');
+  if (sha(await readFile(input.parserExecutable)) !== input.parserSha256)
+    throw new Error('TOML parser executable identity drifted.');
+  if (sha(catalogBytes) !== input.catalogSha256)
+    throw new Error('Model catalog identity drifted.');
+  const parsed = await parseCodexCriticalConfig(
+    input.parserExecutable,
+    configBytes,
+  );
+  if (
+    parsed.profile ||
+    parsed.model_catalog_json ||
+    ![null, 'openai'].includes(parsed.model_provider)
+  )
+    throw new Error(
+      'Unsupported model profile/provider/catalog override; explicit adapter support is required.',
+    );
+  if (
+    parsed.model !== selection.model ||
+    parsed.model_reasoning_effort !== selection.reasoning
+  )
+    throw new Error(
+      'Requested model/reasoning differs from inherited user settings; refusing silent override.',
+    );
+  const catalog = JSON.parse(catalogBytes.toString());
+  // The account catalog reports the release triplet for alpha CLI builds.
+  // This relation never replaces the exact executable version/hash pin.
+  const release = '(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)';
+  const cliVersion = new RegExp(
+    `^codex-cli (${release})(?:-alpha\\.(?:0|[1-9][0-9]*))?$`,
+  ).exec(selection.executableVersion);
+  if (
+    !cliVersion ||
+    cliVersion[0] !== selection.executableVersion ||
+    typeof catalog.client_version !== 'string' ||
+    new RegExp(`^${release}$`).exec(catalog.client_version)?.[0] !==
+      catalog.client_version
+  )
+    throw new Error('Unsupported CLI/catalog version format.');
+  if (catalog.client_version !== cliVersion[1])
+    throw new Error('Model catalog belongs to a different CLI version.');
+  const age = Date.now() - Date.parse(catalog.fetched_at);
+  if (!Number.isFinite(age) || age < -60000 || age > 24 * 60 * 60 * 1000)
+    throw new Error('Account model catalog is missing or stale.');
+  const model = catalog.models?.find(
+    (item: { slug?: string }) => item.slug === selection.model,
+  );
+  if (!model)
+    throw new Error(`Unsupported selected Codex CLI model: ${selection.model}`);
+  if (
+    selection.reasoning &&
+    !model.supported_reasoning_levels?.some(
+      (item: { effort?: string }) => item.effort === selection.reasoning,
+    )
+  )
+    throw new Error('Unsupported reasoning selection for this model.');
+  return {
+    observedAt: new Date().toISOString(),
+    requested: { model: selection.model, reasoning: selection.reasoning },
+    observed: { model: null, reasoning: null },
+    config: {
+      path: input.configPath,
+      initialSha256: input.configSha256,
+      currentSha256: sha(configBytes),
+      drifted: sha(configBytes) !== input.configSha256,
+      critical: parsed,
+    },
+    catalog: {
+      path: input.catalogPath,
+      sha256: input.catalogSha256,
+      fetchedAt: catalog.fetched_at,
+      clientVersion: catalog.client_version,
+      executableVersion: selection.executableVersion,
+    },
+    scope: 'frozen-explicit-selection-and-cached-account-admission-only',
+  };
+}
+
+function managedSelectionArgs(selection: CodexProviderSelection): string[] {
+  if (
+    !selection.model ||
+    typeof selection.reasoning !== 'string' ||
+    !selection.reasoning.trim()
+  )
+    throw new Error(
+      'Managed Codex execution requires explicit model and reasoning selection.',
+    );
+  return [
+    '--ignore-user-config',
+    '--model',
+    selection.model,
+    '--config',
+    'model_provider="openai"',
+    '--config',
+    `model_reasoning_effort=${JSON.stringify(selection.reasoning)}`,
+  ];
 }
 
 interface ProcessEvidence {
@@ -89,6 +400,13 @@ interface ProcessEvidence {
   readonly captureError: string | null;
   readonly finalResponseLimitBytes: number;
   readonly diagnostics: readonly CapturedProcessDiagnostic[];
+  readonly provider?: {
+    readonly requested: CodexProviderSelection;
+    readonly observed: Awaited<ReturnType<typeof observeCodexProvider>>;
+    readonly tools: readonly string[];
+  };
+  readonly argv?: readonly string[];
+  readonly nativeThreadId?: string | null;
 }
 
 export async function resolveCodexExecutable(
@@ -120,6 +438,7 @@ function readOnlyPromptFor(assignment: WorkerAssignment): string {
   const { brief } = assignment;
   return [
     'You are a read-only Temari worker. Inspect the workspace and report findings. Do not edit files, run mutating commands, or send messages.',
+    workerEfficiencyPolicy.instructions,
     `Role: ${assignment.role}`,
     `Goal: ${brief.goal}`,
     `Context: ${brief.context}`,
@@ -161,6 +480,9 @@ async function executeCodexExecWorker(
   if (!Number.isSafeInteger(limit) || limit < 1) {
     throw new Error('finalResponseLimitBytes must be a positive integer.');
   }
+  const provider = options.providerSelection
+    ? await observeCodexProvider(options.executable, options.providerSelection)
+    : null;
   await mkdir(options.evidenceDirectory, { recursive: true, mode: 0o700 });
   const schemaPath = join(options.evidenceDirectory, 'output-schema.json');
   const finalPath = join(options.evidenceDirectory, 'final.json');
@@ -226,7 +548,9 @@ async function executeCodexExecWorker(
   }
   const args = [
     'exec',
-    '--ignore-user-config',
+    ...(options.providerSelection
+      ? managedSelectionArgs(options.providerSelection)
+      : ['--ignore-user-config']),
     '--ephemeral',
     '--sandbox',
     sandbox,
@@ -243,11 +567,10 @@ async function executeCodexExecWorker(
   let capture: Awaited<ReturnType<typeof runProcessToFiles>>;
   try {
     capture = await runProcessToFiles({
-      program: options.executable,
+      program: provider?.executable ?? options.executable,
       args,
       cwd: options.workspaceRoot,
-      env:
-        sandbox === 'workspace-write' ? writeWorkerEnvironment() : process.env,
+      env: workerEnvironment(),
       stdin: prompt,
       stdoutPath,
       stderrPath,
@@ -256,7 +579,7 @@ async function executeCodexExecWorker(
       onStarted: async ({ pid, startedAt }) => {
         await writeFile(
           startPath,
-          `${JSON.stringify({ schema: 1, pid, startedAt, executable: options.executable, workspaceRoot: options.workspaceRoot, assignmentId: assignment.id, sandbox })}\n`,
+          `${JSON.stringify({ schema: 1, pid, startedAt, executable: provider?.executable ?? options.executable, workspaceRoot: options.workspaceRoot, assignmentId: assignment.id, sandbox })}\n`,
           { flag: 'wx', mode: 0o600 },
         );
       },
@@ -268,6 +591,34 @@ async function executeCodexExecWorker(
       cause,
     );
   }
+  const nativeThreadIds = new Set<string>();
+  let nativeIdentityError: string | null = null;
+  if (provider && capture.stdout.available) {
+    const lines = createInterface({
+      input: createReadStream(stdoutPath),
+      crlfDelay: Infinity,
+    });
+    try {
+      for await (const line of lines) {
+        try {
+          const event = JSON.parse(line);
+          if (
+            event.type === 'thread.started' &&
+            typeof event.thread_id === 'string'
+          )
+            nativeThreadIds.add(event.thread_id);
+        } catch { /* Retain non-event output in the raw log. */ }
+      }
+      if (nativeThreadIds.size > 1)
+        nativeIdentityError =
+          'Worker transport returned conflicting native thread identities.';
+    } catch (cause) {
+      nativeIdentityError = 'Worker native thread identity capture failed.';
+      await retainAdapterCause('metadata', cause);
+    } finally {
+      lines.close();
+    }
+  }
   const evidence: ProcessEvidence = {
     schema: 1,
     pid: capture.pid,
@@ -278,7 +629,7 @@ async function executeCodexExecWorker(
     timedOut: capture.timedOut,
     cancelled: capture.cancelled,
     outputLimitExceeded: false,
-    error: capture.error,
+    error: nativeIdentityError ?? capture.error,
     stdoutAvailable: capture.stdout.available,
     stderrAvailable: capture.stderr.available,
     stdoutBytes: capture.stdout.receivedBytes,
@@ -291,6 +642,17 @@ async function executeCodexExecWorker(
     captureError: capture.stdout.error ?? capture.stderr.error,
     finalResponseLimitBytes: limit,
     diagnostics: capture.diagnostics,
+    ...(provider && options.providerSelection
+      ? {
+          provider: {
+            requested: options.providerSelection,
+            observed: provider,
+            tools: [sandbox],
+          },
+          argv: args,
+          nativeThreadId: nativeThreadIds.values().next().value ?? null,
+        }
+      : {}),
   };
   try {
     await writeFile(processPath, `${JSON.stringify(evidence, null, 2)}\n`, {
@@ -305,7 +667,7 @@ async function executeCodexExecWorker(
     );
   }
   const { cancelled, timedOut } = capture;
-  const spawnError = capture.error;
+  const spawnError = nativeIdentityError ?? capture.error;
   const exit = { code: capture.code, signal: capture.signal };
   let status: WorkerResult['status'] = 'BLOCKED';
   let summary: string;
@@ -427,6 +789,7 @@ export function runCodexExecWriteWorker(
     .join('\n');
   const prompt = [
     'You are a Temari implementer working in an isolated Git clone. Edit only your owned paths. Do not commit, switch branches, modify Git metadata, or send messages.',
+    workerEfficiencyPolicy.instructions,
     `Pinned base commit: ${options.baseCommit}`,
     `Owned paths:\n${ownership}`,
     `Goal: ${brief.goal}`,

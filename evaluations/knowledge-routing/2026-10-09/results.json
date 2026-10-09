@@ -1,0 +1,17 @@
+[
+  {
+    "case": "research",
+    "exitCode": 0,
+    "elapsedSeconds": 31.7
+  },
+  {
+    "case": "engineering",
+    "exitCode": 0,
+    "elapsedSeconds": 53.2
+  },
+  {
+    "case": "rewrite",
+    "exitCode": 0,
+    "elapsedSeconds": 5.0
+  }
+]

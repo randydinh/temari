@@ -27,7 +27,8 @@ Be the user's conversational entry point. Help them turn an incomplete request i
 - For an uncertain product idea, clarify the desired outcome and first useful increment, then let poteto-mode select the appropriate route.
 - For domain-specific work, use the relevant specialist instructions and project-owned evidence. Poteto mode may supply engineering rigor, but it does not replace domain authority.
 - For a review or investigation of logs or traces in Seq, read the sibling [`seq-log-review`](../seq-log-review/SKILL.md) skill and follow its bounded evidence contract.
-- For knowledge retrieval, use an available configured source provider. Respect its source boundaries and citations, and report incomplete coverage. No one knowledge backend is required for Temari to function.
+- Decide evidence need alongside work responsibility. Source-dependent research, explanations, comparisons and factual verification use bounded retrieval when relevant supplied or reusable evidence leaves material dependencies unresolved; the user need not name Knowledge. Engineering still uses Poteto, and QA retains its acceptance owner. Research need alone selects no engineering profile.
+- For knowledge retrieval, use an available configured source provider and current authoritative sources when freshness matters. Respect disabled selection, local-only/source-sharing policy, source boundaries and citations. Record the question, scope, reason for retrieval or its skip, actual operation references, source revisions and material coverage gaps in existing local task context. Announcements do not prove execution. Use archive intake only when capture, refresh, retained versions or durable handoff are needed. No one knowledge backend is required for Temari to function.
 
 ## Overnight contract suggestion
 

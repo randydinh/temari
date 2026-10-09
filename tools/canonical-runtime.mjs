@@ -24,9 +24,17 @@ const packageNames = [
   'workflow-engine',
   'runtime',
   'knowledge',
+  'privacy',
+  'host-adapters',
+  'plan-draft',
+  'archon-harness',
 ];
 const manifestName = 'canonical-manifest.json';
-const knowledgePrepare = 'node_modules/@temari/knowledge/src/support/prepare.py';
+const knowledgePrepare =
+  'node_modules/@temari/knowledge/src/support/prepare.py';
+const ownedProcessSources = ['guardian.mjs', 'anchor.mjs'].map(
+  (name) => `libs/host-adapters/src/lib/owned-process/${name}`,
+);
 const compilerSettings = {
   target: ts.ScriptTarget.ES2022,
   module: ts.ModuleKind.NodeNext,
@@ -146,7 +154,7 @@ function auditImports(files) {
     if (path === `${owner.root}/package.json`) continue;
     if (path === knowledgePrepare) continue;
     assert(
-      /^src\/.+\.(?:js|d\.ts)$/.test(path.slice(owner.root.length + 1)),
+      /^src\/.+\.(?:m?js|d\.ts)$/.test(path.slice(owner.root.length + 1)),
       `Unexpected emitted file: ${path}`,
     );
     assert(
@@ -380,6 +388,11 @@ export async function packageCanonicalRuntime(output) {
   const preparationBytes = await readFile(join(workspace, preparationSource));
   inputs.set(preparationSource, preparationBytes);
   files.set(knowledgePrepare, preparationBytes);
+  for (const source of ownedProcessSources) {
+    const bytes = await readFile(join(workspace, source));
+    inputs.set(source, bytes);
+    files.set(`node_modules/@temari/${source.slice('libs/'.length)}`, bytes);
+  }
   for (const value of metadata.values()) {
     const dependencies = Object.fromEntries(
       Object.keys(value.dependencies ?? {})
@@ -428,7 +441,7 @@ export async function packageCanonicalRuntime(output) {
     schemaVersion: 1,
     source: {
       revision: git('rev-parse', 'HEAD'),
-      dirty: git('status', '--porcelain=v1', '--untracked-files=all') !== '',
+      dirty: git('status', '--porcelain=v1', '--untracked-files=normal') !== '',
       files: sortedRecords(inputs),
     },
     compiler: {

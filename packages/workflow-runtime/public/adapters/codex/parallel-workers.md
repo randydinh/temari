@@ -95,3 +95,42 @@ The JSON request has `schemaVersion: 1`, `entry: "poteto-mode"`, `runId`, `revis
 `run-workers` is a standalone host worker bridge; its report alone does not grant lifecycle or publish approval. The standalone router remains available for other local batches.
 
 For a full feature lifecycle, invoke `start` with the trusted request and artifact digests. The request uses `route: "full-playbook"`, `profile: "feature-v1"`, the pinned feature obligations from `policy.json`, and an `invocation` with `runId`, `revision`, `candidate: { scopeId, root }`, and `runDirectory`. Add `featureWorkers` containing `evidenceRoot`, full `baseCommit`, `timeoutMs`, required `architect` investigator, `builder` implementer, `owns`, `verify`, and independent `reviewer`; `prepare` is optional. Use the assignment shapes above. Keep the source checkout clean and put the run and evidence directories outside it. The host launches three independent Codex processes, checks GitHub access with `gh`, and retains the proof across resume. The deliver stage must name an open pull request in that repository with the exact integrated commit at its head. Use `closeout verify` with an independently selected current candidate to verify the persisted PASS result. Publishing remains subject to operator approval.
+
+## Existing pinned read-only submodules
+
+Application-only edits support initialized, clean first-level submodules already
+recorded as gitlinks and uniquely mapped by tracked `.gitmodules` at the pinned
+parent commit. Each dependency must be at that exact commit and contain tracked
+regular files only. Working-tree bytes must equal stored blobs; checkout filters
+and line-ending transformations are unsupported. Ordinary `.git` files into the parent's Git administration
+and independent `.git` directories are supported. Nested dependencies, symlinks,
+unsafe or case-colliding paths, shallow/borrowed object databases, missing objects,
+uninitialized checkouts and coordinated dependency edits are refused. Dependency
+capture is bounded to 10,000 files, 64 MiB of tracked content and 1 MiB of compact
+plan evidence. Application Git capture has its own 10,000-file/64-MiB bound.
+
+The runner freezes `pinned-readonly-dependencies-v1` evidence containing each
+path, commit and tracked file's mode, size and SHA-256, plus `.gitmodules` identity.
+Worker patches and integration receipts retain this plan. Preparation copies local
+Git objects into independent repositories, checks out the exact pins, and never
+fetches remotes or copies ignored/private worktree payloads. Verification that needs
+ignored configuration must supply it separately through the existing preparation
+contract. Dependency identity excludes Git administration and ignored payloads;
+it does not attest to those payloads or their influence on commands.
+
+Owning a parent directory does not authorize changing its dependencies. Changes to
+child bytes, modes, index, HEAD, nonignored untracked files, parent gitlinks or
+`.gitmodules` block integration. Recursive checks explicitly override
+`ignore-submodules`, inspect tracked bytes even under assume-unchanged flags, and
+run around preparation, patch capture/application, verification and source checks.
+The feature host repeats the same typed checks around independent review, stages,
+resume, forge proof and trusted closeout. A parent Git tree or worker PASS alone is
+insufficient; the six-stage canonical receipt and exact-commit PR remain required.
+
+For a refusal, retain the failed receipt and logs. Restore the intended clean,
+initialized dependency at the recorded pin through your normal repository workflow,
+then start a fresh run with a newly reviewed request. The runner does not fetch,
+repair, advance dependencies, rewrite evidence or apply integration changes to the
+source. Rebuild the public package from TypeScript to obtain this behavior; never
+edit an installed cache. Synthetic fixtures prove mechanics, not live worker or
+Sports Analyst compatibility.

@@ -33,6 +33,13 @@ automatically restarted. There is no Pause control. See the
 [configuration and limits](task-dashboard.md#control-configuration-reference)
 before enabling execution.
 
+The separate source-only [reviewed local candidate operation](reviewed-local-candidate.md)
+admits one coupled builder inside an Archon-managed six-stage journey. Its
+route-specific result reader verifies current task/native/worker/evidence and
+protected acceptance bindings. It does not change generic TaskRuntime acceptance
+or installed feature-v1 delivery. Retain its exact result as task continuation
+context; ordinary task snapshots do not report stronger-route DONE.
+
 For implementation, the coordinator selects the host-configured plan and pins
 the user's goal with its typed ownership scopes and verification commands. Bind
 both implementer and reviewer groups to the logical task. Child success does not
@@ -169,6 +176,26 @@ The handoff updates the next action and blocker atomically. Its author, timestam
 task version, and current run identity remain in history. Context references can
 include an optional `sha256`; the task store does not open or verify them.
 Handoff prose cannot accept a result or clear a pending native operation.
+
+### Close a host chat after preserving its work
+
+When the user requests chat closure, use this sequence for each selected chat:
+
+1. Review its history, current worktree, branches/commits, stashes, and referenced
+   outputs. Look for work that exists only in chat, untracked files, or temporary
+   storage; a clean worktree alone does not establish preservation.
+2. Persist useful artifacts and decisions in the appropriate durable location.
+   Keep private/project-overlay material outside this repository. Record original
+   paths and hashes, recovered copies, and missing artifacts explicitly.
+3. Review and verify ready source changes, commit them, and merge when authorized.
+   Preserve unready candidates and distinct proposals with their exact identity,
+   blocker, and next action; do not land defective work merely to close a chat.
+4. Save the structured task handoff and a closure record mapping the chat title
+   and ID to its persisted results and remaining work. Reopen material references
+   before claiming preservation; retain unresolved recovery gaps.
+5. Archive the chat through the host's archive operation. Keep its worktree and
+   evidence available unless separately authorized to remove them. Chat archival
+   does not accept a task, verify QA, or turn pending work into `DONE`.
 
 The brief includes the current run identity, refreshed evidence, latest handoff,
 and 12 recent event summaries. It omits full dispatch inputs, native logs, and old

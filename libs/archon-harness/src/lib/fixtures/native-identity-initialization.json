@@ -1,0 +1,35 @@
+[
+  {
+    "id": "20a68c5137032ae7899b48cca95183e4",
+    "workflow_name": "temari-reviewed-local-candidate",
+    "status": "pending",
+    "working_path": null,
+    "metadata": {
+      "inputs": {
+        "temari_binding": "{\"schema\":1,\"harnessId\":\"archon\",\"harnessVersion\":\"0.10.1\",\"runId\":\"nature-managed-codex-shutdown-fixed-20261008\",\"revision\":\"b4d9d6c6a350d491f23314ae2fd4364daf805949\",\"planSha256\":\"1f38495c7c57399c2735816a9f6896775ca2019ae7e8b2f88e3a6b5c8ac4f451\",\"workspaceRoot\":\"/Users/randydinh/Documents/Codex/2026-10-08/temari-managed-candidate-implementation/work/product-start\",\"entrypoint\":\"temari-reviewed-local-candidate\"}"
+      }
+    }
+  },
+  {
+    "id": "20a68c5137032ae7899b48cca95183e4",
+    "workflow_name": "temari-reviewed-local-candidate",
+    "status": "running",
+    "working_path": "/Users/randydinh/Documents/Codex/2026-10-08/temari-managed-candidate-implementation/work/product-start",
+    "metadata": {
+      "inputs": {
+        "temari_binding": "{\"schema\":1,\"harnessId\":\"archon\",\"harnessVersion\":\"0.10.1\",\"runId\":\"nature-managed-codex-shutdown-fixed-20261008\",\"revision\":\"b4d9d6c6a350d491f23314ae2fd4364daf805949\",\"planSha256\":\"1f38495c7c57399c2735816a9f6896775ca2019ae7e8b2f88e3a6b5c8ac4f451\",\"workspaceRoot\":\"/Users/randydinh/Documents/Codex/2026-10-08/temari-managed-candidate-implementation/work/product-start\",\"entrypoint\":\"temari-reviewed-local-candidate\"}"
+      }
+    }
+  },
+  {
+    "id": "20a68c5137032ae7899b48cca95183e4",
+    "workflow_name": "temari-reviewed-local-candidate",
+    "status": "cancelled",
+    "working_path": "/Users/randydinh/Documents/Codex/2026-10-08/temari-managed-candidate-implementation/work/product-start",
+    "metadata": {
+      "inputs": {
+        "temari_binding": "{\"schema\":1,\"harnessId\":\"archon\",\"harnessVersion\":\"0.10.1\",\"runId\":\"nature-managed-codex-shutdown-fixed-20261008\",\"revision\":\"b4d9d6c6a350d491f23314ae2fd4364daf805949\",\"planSha256\":\"1f38495c7c57399c2735816a9f6896775ca2019ae7e8b2f88e3a6b5c8ac4f451\",\"workspaceRoot\":\"/Users/randydinh/Documents/Codex/2026-10-08/temari-managed-candidate-implementation/work/product-start\",\"entrypoint\":\"temari-reviewed-local-candidate\"}"
+      }
+    }
+  }
+]

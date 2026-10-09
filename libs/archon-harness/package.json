@@ -34,6 +34,10 @@
           "command": "node --import @swc-node/register/esm-register --test libs/archon-harness/src/lib/canonical-native.test.ts",
           "cwd": "{workspaceRoot}"
         }
+      },
+      "identity-initialization-typecheck": {
+        "command": "tsc --ignoreConfig --noEmit --module nodenext --moduleResolution nodenext --target es2022 --types node --strict --skipLibCheck --allowImportingTsExtensions libs/archon-harness/src/lib/archon-harness.test.ts",
+        "cache": false
       }
     }
   },

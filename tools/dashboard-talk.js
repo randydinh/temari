@@ -6,6 +6,8 @@
   const drafts = new Map();
   const pending = new Map();
   const mutationErrors = new Map();
+  const taskActions = new Set();
+  const uncertainTaskActions = new Map();
   const bindings = new Map();
   const state = {
     configured: null, capabilities: {}, topics: [], attention: [], attentionPage: null, selected: null,
@@ -20,6 +22,16 @@
   const human = (value) => text(value).replaceAll('_', ' ').replaceAll('-', ' ');
   const activeTurn = (value) => ['queued', 'running'].includes(text(value).toLowerCase());
   const count = (value) => Number.isSafeInteger(value) && value >= 0 ? value : value === true ? 1 : 0;
+  const validTaskController = (task) => task.controller == null || (
+    ['planning', 'implementation'].includes(task.controller?.phase) &&
+    typeof task.controller.state === 'string' && task.controller.state.length <= 64 &&
+    (task.controller.message === null || typeof task.controller.message === 'string') &&
+    (task.controller.action === null || (
+      ['prepare-plan', 'implementation-start'].includes(task.controller.action?.action) &&
+      typeof task.controller.action.label === 'string' && Number.isSafeInteger(task.version) && task.version >= 1 &&
+      (task.controller.action.proposalSha256 === undefined || /^[a-f0-9]{64}$/u.test(task.controller.action.proposalSha256))
+    ))
+  );
   const registry = () => state.scopeMode === 'workspace-registry';
   const workspaceKey = (value) => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/u.test(value);
   const opaqueIdentity = (value) => typeof value === 'string' && value.length > 0 && value.length <= 256 && !value.includes('\0');
@@ -235,6 +247,19 @@
       if (text(task.goal) || text(task.summary)) card.append(make('p', '', text(task.goal) || task.summary));
       if (task.available === false) card.append(make('p', 'blocker', text(task.reason) || 'This task observation is unavailable.'));
       if (text(task.nextAction)) card.append(make('p', '', `Next: ${task.nextAction}`));
+      if (task.controller) {
+        card.append(make('p', 'event-detail', `${human(task.controller.phase)} · ${human(task.controller.state)}`));
+        if (text(task.controller.message)) card.append(make('p', ['BLOCKED', 'RECOVERY_REQUIRED'].includes(task.controller.state) ? 'blocker' : '', task.controller.message));
+      }
+      if (task.controller?.action) {
+        const controls = make('div', 'talk-card-actions');
+        const action = make('button', 'quiet', text(task.controller.action.label) || human(task.controller.action.action));
+        action.type = 'button';
+        action.dataset.taskAction = task.controller.action.action;
+        action.disabled = task.available === false || taskActions.has(task.taskId);
+        action.addEventListener('click', () => runTaskAction(task));
+        controls.append(action); card.append(controls);
+      }
       if (Array.isArray(task.omittedFields) && task.omittedFields.length)
         card.append(make('p', 'event-detail', `Shortened fields: ${task.omittedFields.map(human).filter(Boolean).join(', ')}. Open task details for the retained record.`));
       list.append(card);
@@ -299,7 +324,7 @@
     const status = {
       offered: 'Proposed goal — accepting saves and links an open task.',
       linking: 'Task creation or linking is in progress.',
-      linked: 'Goal saved and linked. Task controls own planning and execution.',
+      linked: 'Goal saved and linked. The linked task shows any admitted planning or implementation progress.',
       uncertain: 'Task creation or linking is uncertain. An explicit retry uses the retained proposal identity.',
     }[proposal.state] ?? 'Proposal state unknown. Reload before accepting.';
     box.append(make('p', 'event-detail', status));
@@ -368,7 +393,8 @@
         !['offered', 'linking', 'linked', 'uncertain'].includes(turn.proposedTask.state) ||
         (turn.proposedTask.taskId !== null && !validId(turn.proposedTask.taskId)))) ||
       result.attention.some((item) => !validId(item.attentionId) || item.topicId !== id) ||
-      result.linkedTasks.some((task) => !validId(task.taskId))) throw failed('This topic response has an unsupported shape. Reload before making changes.');
+      result.linkedTasks.some((task) => !validId(task.taskId) || !validTaskController(task)))
+      throw failed('This topic response has an unsupported shape. Reload before making changes.');
     if (registry()) {
       const binding = admitBinding(result.topic);
       if (['canCreateTopic', 'canSendTurn', 'canLinkTask', 'canAcknowledge', 'canAcceptProposal'].some((key) => typeof result.capabilities?.[key] !== 'boolean'))
@@ -412,6 +438,7 @@
       state.detail = detail;
       state.fresh = true;
       reconcile(detail);
+      await reconcileTaskActions(detail);
       error(mutationErrors.get(id) ?? '');
       renderDetail();
     } catch (cause) {
@@ -678,6 +705,56 @@
       path: `${topicPath(id)}/proposals/${encodeURIComponent(turnId)}/accept`,
       body: { requestId: crypto.randomUUID(), expectedVersion: state.detail.topic.version },
     });
+  }
+  async function runTaskAction(task) {
+    const topicId = state.selected;
+    const action = task?.controller?.action;
+    if (!validId(topicId) || !validId(task?.taskId) || !Number.isSafeInteger(task?.version) || task.version < 1 || !action || taskActions.has(task.taskId)) return;
+    saveDraft();
+    taskActions.add(task.taskId); renderLinkedTasks();
+    const requestId = crypto.randomUUID();
+    const body = { action: action.action, requestId, expectedVersion: task.version,
+      ...(action.action === 'prepare-plan' ? { proposalSha256: action.proposalSha256 } : {}) };
+    try {
+      await token();
+      const result = await request(`/api/tasks/${encodeURIComponent(task.taskId)}/actions`, body);
+      if (result?.taskId !== task.taskId || !version(result.version))
+        throw failed('The task action response could not be confirmed. Reload to check saved state.', 0, true);
+      if (state.selected === topicId) state.notice = `${text(action.label) || 'Task action'} saved.`;
+      mutationErrors.delete(topicId);
+    } catch (cause) {
+      const message = cause.uncertain
+        ? `${cause.message} This action will not be retried automatically.`
+        : cause.message;
+      if (cause.uncertain) uncertainTaskActions.set(task.taskId, { topicId, requestId, action: action.action });
+      mutationErrors.set(topicId, message);
+      if (state.selected === topicId) error(message);
+    } finally {
+      taskActions.delete(task.taskId);
+      if (state.selected === topicId) await loadSelected();
+      renderLinkedTasks(); renderControls();
+    }
+  }
+  async function reconcileTaskActions(detail) {
+    const observedImplementationStates = new Set(['STARTING', 'RUNNING', 'COMPLETE', 'FAILED', 'CANCELLED', 'RECOVERY_REQUIRED']);
+    for (const [taskId, operation] of uncertainTaskActions) {
+      const linked = detail.linkedTasks.find((task) => task.taskId === taskId);
+      if (operation.topicId !== detail.topic.topicId || !linked) continue;
+      try {
+        const result = await request(`/api/tasks/${encodeURIComponent(taskId)}`);
+        const task = result?.task;
+        if (task?.taskId !== taskId || !Array.isArray(task.events)) continue;
+        if (!task.events.some((event) => event?.idempotencyKey === `ui-${operation.requestId}`)) continue;
+        if (operation.action !== 'implementation-start' || linked.controller?.phase !== 'implementation' ||
+          !observedImplementationStates.has(linked.controller.state)) continue;
+        uncertainTaskActions.delete(taskId);
+        mutationErrors.delete(operation.topicId);
+        if (state.selected === operation.topicId) {
+          state.notice = `Implementation intent is retained; the controller now reports ${human(linked.controller.state)}.`;
+          error('');
+        }
+      } catch {}
+    }
   }
   async function poll() {
     clearTimeout(state.timer);
