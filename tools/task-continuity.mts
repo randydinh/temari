@@ -1,6 +1,6 @@
 import { readFile, realpath, stat } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
-import { isAbsolute, resolve, join } from 'node:path';
+import { basename, isAbsolute, resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs, promisify } from 'node:util';
 import {
@@ -106,6 +106,13 @@ for a pinned read-only capture, without Archon or control configuration. Refresh
 rereads only that saved capture; source references are provenance only.
 See docs/task-continuity.md for full examples and recovery rules.
 `;
+
+export interface TaskCommandResources {
+  readonly managedWorkflowSource?: string;
+  readonly canonicalWorkflowSource?: string;
+  readonly canonicalBridgePath?: string;
+  readonly canonicalFinalizerPath?: string;
+}
 
 /**
  * Admit the one safe conversational execution bridge. The host must select one
@@ -240,6 +247,7 @@ export async function createTaskContinuityReconciliationDashboard(
 /** CLI and optional local dashboard share the same runtime mutation boundary. */
 export async function runTaskCommand(
   args: readonly string[],
+  resources: TaskCommandResources = {},
 ): Promise<unknown> {
   const { positionals, values } = parseArgs({
     args: [...args],
@@ -361,7 +369,7 @@ export async function runTaskCommand(
         ? {
             workflowSource: values['workflow-source']
               ? absolute(values['workflow-source'], '--workflow-source')
-              : dashboardConfig?.managedCandidate ? resolve('packages/workflow-runtime/host') : resolve(
+              : dashboardConfig?.managedCandidate ? resources.managedWorkflowSource ?? resolve('packages/workflow-runtime/host') : resources.canonicalWorkflowSource ?? resolve(
                   'packages/workflow-runtime/assets/v4.1/integrations/archon',
                 ),
           }
@@ -411,12 +419,12 @@ export async function runTaskCommand(
           runtime,
           ...(dashboardConfig.managedCandidate && selection ? { managedCandidateHost: createManagedCandidateHost(dashboardConfig.managedCandidate, selection) } : {}),
           archonHome: absolute(values['archon-home'], '--archon-home'),
-          bridgePath: resolve(
-            'packages/workflow-runtime/assets/v4.1/integrations/archon/canonical-bridge.ts',
-          ),
-          finalizerPath: resolve(
-            'libs/archon-harness/src/lib/canonical-finalize.ts',
-          ),
+          bridgePath: resources.canonicalBridgePath ?? resolve(
+              'packages/workflow-runtime/assets/v4.1/integrations/archon/canonical-bridge.ts',
+            ),
+          finalizerPath: resources.canonicalFinalizerPath ?? resolve(
+              'libs/archon-harness/src/lib/canonical-finalize.ts',
+            ),
           ...(reconciliation ? { reconciliation } : {}),
           readNative: async (reference) => {
             const result = await promisify(execFile)(
@@ -608,6 +616,7 @@ export async function runTaskCommand(
 
 if (
   process.argv[1] &&
+  basename(process.argv[1]) === 'task-continuity.mts' &&
   import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 ) {
   try {

@@ -393,7 +393,7 @@ test('Bun and Node operation argument shapes always invoke the admitted current 
     assert.equal(command.program, process.execPath);
     assert.deepEqual(
       command.args,
-      isBun
+      isBun || tool.endsWith('.mjs')
         ? [tool, 'fixture-request', 'fixture-result']
         : [
             '--import',
@@ -409,6 +409,21 @@ test('Bun and Node operation argument shapes always invoke the admitted current 
       stdio: ['ignore', 'pipe', 'pipe'],
     });
   }
+  assert.deepEqual(
+    managedOperationCommand(
+      join(root, 'owned-tool.mts'),
+      'fixture-request',
+      'fixture-result',
+      false,
+    ).args,
+    [
+      '--import',
+      '@swc-node/register/esm-register',
+      join(root, 'owned-tool.mts'),
+      'fixture-request',
+      'fixture-result',
+    ],
+  );
   const compiledTool = join(root, 'compiled-tool.mjs');
   await writeFile(compiledTool, '');
   assert.deepEqual(managedOperationCommand(compiledTool, 'in', 'out', false), {
