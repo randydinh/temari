@@ -1,6 +1,6 @@
 # P-stack capability index and ownership review
 
-Reviewed 2026-10-08 against this checkout's bundled Temari v4.1 assets and
+Reviewed 2026-10-10 against this checkout's bundled Temari v4.1 assets and
 public bundle source. This is a source and scenario review, not evidence that
 every route ran against a live application, PR, or external service. The v4.1
 tree has 53 skill entry files, including 23 principles and
@@ -44,6 +44,15 @@ can use it for failure analysis without surrendering full QA obligations. It
 hands reporting to the existing writer and authorized repair to Poteto. It adds
 no policy entry, executable profile, evaluator, or lifecycle. The graph records
 these supporting relationships separately from the unchanged v4.1 inventory.
+
+The current public packager also carries the complete portable inventory under
+`method/pstack/`, indexed by its generated `catalog.json`. It preserves method
+layout, source provenance, member hashes and executable modes without expanding
+root skill discovery. The public entries use a shared
+[method loading guide](../../packages/workflow-runtime/public/skills/temari/references/method-library.md)
+to reach playbooks, helpers and principle leaves after public admission and host
+mapping. This makes method resources available; it adds no executable route or
+second lifecycle. See [public packaging](../../packages/workflow-runtime/README.md#current-public-plugin).
 
 The [upstream overnight guide](https://github.com/cursor/plugins/blob/main/pstack/docs/guide/07-overnight.md)
 starts with one task and a checkable finish condition. Temari should suggest

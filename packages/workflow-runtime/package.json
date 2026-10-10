@@ -88,7 +88,15 @@
         "cache": false
       },
       "public-entry-test": {
-        "command": "node --test tools/public-entry-runtime.test.mjs",
+        "command": "node --test tools/pstack-method-library.test.mjs tools/public-entry-runtime.test.mjs",
+        "cache": false
+      },
+      "public-package": {
+        "command": "node tools/public-entry-runtime.mjs package",
+        "cache": false
+      },
+      "public-check": {
+        "command": "node tools/public-entry-runtime.mjs check",
         "cache": false
       },
       "qa-installed-journey": {

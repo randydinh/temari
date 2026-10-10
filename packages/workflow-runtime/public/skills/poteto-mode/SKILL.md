@@ -7,6 +7,10 @@ description: Use the current Nx P-stack engineering workflow with pinned lightwe
 
 Poteto mode supplies the engineering workflow selected by Temari.
 
+Use the bundled [method library](../temari/references/method-library.md) to load
+the selected playbook, supporting skills and relevant principles. Check public
+policy first; the library's catalog is availability guidance, not route admission.
+
 Use Temari's [conversation guidance](../temari/references/conversation.md) when
 reporting engineering progress or results. Keep the selected route's evidence,
 completion requirements, and authorization boundaries intact.

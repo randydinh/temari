@@ -806,9 +806,9 @@
       "path": "skills/poteto-mode/playbooks/multi-phase-plan.md",
       "lane": "portable",
       "sourceSha256": "b823e05b64bbef84ae5169717c5fab1d9ab5079625996271e3aa7abcdce7b8ad",
-      "artifactSha256": "91ed6bea7fc4831b539915cf6e68ab2024650432a3348b0e7c9b4253cd62a75b",
+      "artifactSha256": "83df7f37efc5c313cc7fba3acaf8c347cb1f6cbc2c6d8c0ae65ce9f1594f5d03",
       "executable": false,
-      "transformation": "Return new standing programs to Temari; retain Orchestrate as a legacy resume reference."
+      "transformation": "Temari owns standing-program admission; make the installed plan checker relocatable and label original source-layout skeleton paths as template inputs."
     },
     {
       "path": "skills/poteto-mode/playbooks/opening-a-pr.md",
