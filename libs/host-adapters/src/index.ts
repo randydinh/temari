@@ -55,3 +55,7 @@ export function createOllamaModelTransport(
   return createProtectedModelTransport(createOllamaModelDriver(options), host);
 }
 export * from './lib/owned-execution.js';
+
+export * from './lib/worker-execution.js';
+export * from './lib/claude-code-worker.js';
+export * from './lib/scoped-worker-tools.js';

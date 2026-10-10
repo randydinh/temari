@@ -153,6 +153,13 @@ export async function setup({ root, expectedSha256, home, profilePath, start = f
     catch (error) { if (error.code !== 'ENOENT') throw error; await copyFile(join(installation, manifest.assets.archon.executable), cachedArchon); }
     await archonModule.installArchonRuntime({ cacheDirectory: cache, platform: process.platform, arch: process.arch, fetchImpl: async () => { throw new Error('Recipient runtime downloads are disabled.'); } });
     const control = profile.control ?? { schema: 1, workspaceRoot: profile.workspaceRoot, preparationRoot: join(home, 'prepared'), recipes: [] };
+    for (const transport of [control.swarm, control.implementation]) {
+      if (transport?.providerSelection?.provider !== 'claude-code') continue;
+      const server = join(installation, 'dashboard', 'workflow-host', 'scoped-worker-tools-stdio.mjs');
+      const pin = { path: server, sha256: digest(await readFile(server)), nodeExecutable: node, nodeSha256: digest(await readFile(node)) };
+      if (transport.scopedToolServer) assert.deepEqual(transport.scopedToolServer, pin, 'Configured scoped worker server differs from the installed server.');
+      transport.scopedToolServer = pin;
+    }
     if (control.managedCandidate) {
       control.managedCandidate.bridgeRuntimeExecutable = node;
       control.managedCandidate.bridgeRuntimeSha256 = digest(await readFile(node));

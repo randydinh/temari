@@ -6,7 +6,7 @@ Temari is the main conversation. The runtime coordinates admitted work and retai
 
 ## Before setup
 
-Use the distribution for your OS and CPU. Native recipient verification covers macOS arm64 (macOS 14) and Linux x64/arm64 (Ubuntu 24.04). Intel macOS packaging is blocked by a locked Python dependency without a compatible binary wheel. Native Windows binaries pass version diagnostics, but knowledge setup is unsupported. WSL2 and other OS/libc/CPU baselines still need their own recipient verification.
+Use the distribution for your OS and CPU. Native recipient verification covers macOS arm64 (macOS 14) and Linux x64/arm64 (Ubuntu 24.04). Intel macOS uses an outer, hash-pinned compatibility lock with cryptography 48.0.1. Full Intel setup and knowledge access pass locally under Rosetta; native Intel CI is required before advertising support. Original Registrar and marketplace dependency metadata remain unchanged. Native Windows binaries pass version diagnostics, but knowledge setup is unsupported. WSL2 and other OS/libc/CPU baselines still need their own recipient verification.
 
 Extract the distribution and obtain its `UNIFIED.json` SHA-256 from the release publisher through a trusted channel. Verify the archive before executing the included launcher. The manifest digest is required independently; computing a new digest from an untrusted download does not establish trust.
 
@@ -61,7 +61,39 @@ No global PATH changes are needed. Keep the data directory at its installed loca
 
 The verified Codex marketplace is included under `installations/RELEASE_MANIFEST_SHA256/marketplace`. Connect it using the existing [plugin installation guide](install-temari.md). This additive package preserves the 0.15.5 plugin's verification contract.
 
-Chat and library access work with the configured model transport. Engineering execution still needs the existing host capability and repository admission. The default controller provides task intake with no execution recipes. To enable work, supply the optional `control` object using the [dashboard configuration](../task-dashboard.md#control-configuration-reference). Existing managed candidate profiles receive the included Node/Python interpreter pins during setup. Codex workers, repository authentication, models, and forge access remain explicit host requirements; managed runtimes do not prove those capabilities.
+Chat and library access work with the configured model transport. Engineering execution still needs the existing host capability and repository admission. The default controller provides task intake with no execution recipes. To enable work, supply the optional `control` object using the [dashboard configuration](../task-dashboard.md#control-configuration-reference). Existing managed candidate profiles receive the included Node/Python interpreter pins during setup. Codex or Claude Code workers, repository authentication, models, and forge access remain explicit host requirements; managed runtimes do not prove those capabilities.
+
+## Select an engineering host
+
+Investigation and configured implementation plans share one execution adapter. Existing configurations default to Codex. Optional `providerSelection` and `scopedToolServer` fields belong to `control.swarm` or `control.implementation`, together with the existing executable, concurrency, time bound and plans. Browser input cannot choose a different executable or expand its tools.
+
+For Claude Code, install and authenticate its native CLI separately. Version 2.1.286 or later is required. Select its exact executable/version/hash and an explicit model:
+
+```json
+{
+  "executable": "/absolute/path/to/claude",
+  "providerSelection": {
+    "provider": "claude-code",
+    "executableSha256": "INDEPENDENT_EXECUTABLE_SHA256",
+    "executableVersion": "2.1.296 (Claude Code)",
+    "model": "YOUR_MODEL",
+    "policy": "temari-scoped-tools-v1",
+    "maxTurns": 32,
+    "maxBudgetUsd": 5
+  },
+  "maxConcurrency": 2,
+  "timeoutMs": 180000,
+  "plans": ["REPLACE_WITH_A_VALID_ADMITTED_PLAN"]
+}
+```
+
+This fragment illustrates the implementation transport; replace `plans` using the [configured plan contract](../dashboard-implementation-design.md). For investigations, use `maxWorkers` instead of `plans`. Unified setup supplies the bundled scoped MCP server and managed Node interpreter pins. Source-only callers must supply `scopedToolServer: {path, sha256}` explicitly; optional `nodeExecutable` and `nodeSha256` must be paired.
+
+Claude workers use only bounded filesystem MCP tools: read, list, search, and writes within typed ownership. Built-in tools, inherited MCP servers, hooks, skills and subagents are disabled by bare mode and exact tool selection. Shell and network tools are unavailable to workers. The CLI still contacts its configured model provider; `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN` and `ANTHROPIC_BASE_URL` may be inherited from the launching environment. Bare mode does not use saved OAuth/keychain credentials. Keep credential values out of profiles and evidence.
+
+Trusted preparation and combined verification commands remain coordinator configuration. The runtime integrates worker patches, runs verification, and retains a separate reviewer result. Archon remains the native harness for admitted run workflows. Worker success alone cannot mark Temari DONE or authorize publication. Provider, tool server, interpreter and policy pins are retained with process evidence; changing the host configuration requires a fresh preparation.
+
+The public 0.15.5 marketplace stays Codex-specific. The additive dashboard adapter does not claim Claude plugin installation or full-feature host admission. See the [increment evidence](../plans/portable-execution-increment-2026-10-10.md) for exactly which hosts and model backends were exercised.
 
 ## Retry and recovery
 

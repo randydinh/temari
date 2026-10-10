@@ -60,3 +60,49 @@ test('partial dependency copy can resume, while startup injection and changed by
   await writeFile(join(target, 'module.py'), 'changed');
   await assert.rejects(copyKnowledge(source, target), /dependency bytes changed/);
 }));
+
+const registrarRoot = new URL('../packages/workflow-runtime/registrar/', import.meta.url);
+const compatibilityRoot = new URL('../packages/workflow-runtime/unified/knowledge-compatibility/darwin-x64-v1/', import.meta.url);
+async function compatibilityBytes() {
+  return {
+    profileBytes: await readFile(new URL('profile.json', compatibilityRoot)),
+    originalProjectBytes: await readFile(new URL('pyproject.toml', registrarRoot)),
+    originalLockBytes: await readFile(new URL('uv.lock', registrarRoot)),
+    compatibilityProjectBytes: await readFile(new URL('pyproject.toml', compatibilityRoot)),
+    compatibilityLockBytes: await readFile(new URL('uv.lock', compatibilityRoot)),
+  };
+}
+test('Intel compatibility preserves original direct requirements and every package except cryptography', async () => {
+  const { validateKnowledgeCompatibility } = await import('./unified-release.mjs'), bytes = await compatibilityBytes();
+  const profile = validateKnowledgeCompatibility(bytes);
+  assert.equal(profile.id, 'darwin-x64-knowledge-v1');
+  assert(bytes.compatibilityProjectBytes.subarray(0, bytes.originalProjectBytes.length).equals(bytes.originalProjectBytes));
+  assert.equal(bytes.compatibilityProjectBytes.subarray(bytes.originalProjectBytes.length).toString(), '\n# Outer unified-distribution compatibility profile. Registrar sources stay unchanged.\n[tool.uv]\nconstraint-dependencies = ["cryptography==48.0.1"]\n');
+  const packages = value => new Map(value.toString().split('[[package]]\n').slice(1).map(block => [block.match(/^name = "([^"]+)"/)[1], block.split('\n[manifest]')[0]]));
+  const original = packages(bytes.originalLockBytes), compatibility = packages(bytes.compatibilityLockBytes);
+  assert.deepEqual([...compatibility.keys()], [...original.keys()]);
+  for (const [name, block] of original) if (name !== 'cryptography') assert.equal(compatibility.get(name), block);
+  assert.match(original.get('cryptography'), /version = "50\.0\.1"/);
+  assert.match(compatibility.get('cryptography'), /version = "48\.0\.1"/);
+  assert(compatibility.get('cryptography').includes(profile.changes[0].wheel));
+  assert(compatibility.get('cryptography').includes(profile.changes[0].wheelSha256));
+});
+test('compatibility provenance refuses altered profiles, source metadata, and either lock', async () => {
+  const { validateKnowledgeCompatibility } = await import('./unified-release.mjs'), bytes = await compatibilityBytes();
+  for (const key of Object.keys(bytes)) assert.throws(() => validateKnowledgeCompatibility({ ...bytes, [key]: Buffer.concat([bytes[key], Buffer.from('\nchanged')]) }), /provenance/);
+  const forged = JSON.parse(bytes.profileBytes); forged.compatibility.dependencyLockSha256 = digest(Buffer.from('forged lock'));
+  assert.throws(() => validateKnowledgeCompatibility({ ...bytes, profileBytes: Buffer.from(JSON.stringify(forged)), compatibilityLockBytes: Buffer.from('forged lock') }), /profile differs/);
+});
+test('only Intel macOS selects compatibility; ARM and Linux retain the original lock', async () => {
+  const { selectKnowledgeDependencies } = await import('./unified-release.mjs'), { fileURLToPath } = await import('node:url');
+  const root = fileURLToPath(registrarRoot), bytes = await compatibilityBytes();
+  const intel = await selectKnowledgeDependencies({ platform: 'darwin-x64', registrarRoot: root });
+  assert.equal(intel.knowledge.dependencyLockSha256, digest(bytes.compatibilityLockBytes));
+  assert.equal(intel.knowledge.originalDependencyLockSha256, digest(bytes.originalLockBytes));
+  assert.equal(intel.knowledge.compatibility.platform, 'darwin-x64');
+  for (const platform of ['darwin-arm64', 'linux-x64', 'linux-arm64']) {
+    const selection = await selectKnowledgeDependencies({ platform, registrarRoot: root, compatibilityRoot: '/missing-profile-must-not-be-read' });
+    assert.equal(selection.projectRoot, root); assert.equal(selection.knowledge.dependencyLockSha256, digest(bytes.originalLockBytes));
+    assert.equal(selection.knowledge.compatibility, null); assert.equal(selection.profileBytes, undefined);
+  }
+});

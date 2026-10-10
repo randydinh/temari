@@ -15,6 +15,35 @@ async function run(command, args, env = {}) {
   return execute(command, args, { maxBuffer: 8 * 1024 * 1024, timeout: 300000, env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1', UV_PYTHON_DOWNLOADS: 'never', ...env } });
 }
 
+const intelCompatibilityRoot = join(source, 'knowledge-compatibility', 'darwin-x64-v1');
+const intelCompatibilityProfileSha256 = 'ba95e3b043eed5133e98617ed2d93d422115e4c2509278c3dc5705c69987c3a9';
+
+export function validateKnowledgeCompatibility({ profileBytes, originalProjectBytes, originalLockBytes, compatibilityProjectBytes, compatibilityLockBytes }) {
+  assert.equal(digest(profileBytes), intelCompatibilityProfileSha256, 'Knowledge compatibility profile differs from pinned provenance.');
+  const profile = JSON.parse(profileBytes);
+  assert.equal(digest(originalProjectBytes), profile.registrar.projectSha256, 'Original Registrar project differs from compatibility provenance.');
+  assert.equal(digest(originalLockBytes), profile.registrar.dependencyLockSha256, 'Original Registrar lock differs from compatibility provenance.');
+  assert.equal(digest(compatibilityProjectBytes), profile.compatibility.projectSha256, 'Knowledge compatibility project differs from pinned provenance.');
+  assert.equal(digest(compatibilityLockBytes), profile.compatibility.dependencyLockSha256, 'Knowledge compatibility lock differs from pinned provenance.');
+  return profile;
+}
+
+export async function selectKnowledgeDependencies({ platform, registrarRoot, compatibilityRoot = intelCompatibilityRoot }) {
+  const originalProjectBytes = await readFile(join(registrarRoot, 'pyproject.toml'));
+  const originalLockBytes = await readFile(join(registrarRoot, 'uv.lock'));
+  const original = { projectSha256: digest(originalProjectBytes), dependencyLockSha256: digest(originalLockBytes) };
+  if (platform !== 'darwin-x64') return { projectRoot: registrarRoot, lockRoot: registrarRoot, knowledge: { ...original, originalProjectSha256: original.projectSha256, originalDependencyLockSha256: original.dependencyLockSha256, compatibility: null } };
+  const profileBytes = await readFile(join(compatibilityRoot, 'profile.json'));
+  const compatibilityProjectBytes = await readFile(join(compatibilityRoot, 'pyproject.toml'));
+  const compatibilityLockBytes = await readFile(join(compatibilityRoot, 'uv.lock'));
+  const profile = validateKnowledgeCompatibility({ profileBytes, originalProjectBytes, originalLockBytes, compatibilityProjectBytes, compatibilityLockBytes });
+  return {
+    projectRoot: compatibilityRoot, lockRoot: compatibilityRoot, profileBytes,
+    knowledge: { ...profile.compatibility, originalProjectSha256: original.projectSha256, originalDependencyLockSha256: original.dependencyLockSha256,
+      compatibility: { id: profile.id, platform, profileSha256: intelCompatibilityProfileSha256, changes: profile.changes } },
+  };
+}
+
 export async function packageUnified({ marketplaceRoot, releaseSha256, publicManifestSha256, dashboardRoot, outputRoot, cacheRoot, uv = 'uv' }) {
   for (const path of [marketplaceRoot, dashboardRoot, outputRoot, cacheRoot]) assert(isAbsolute(path), 'Build paths must be absolute.');
   assert(process.platform !== 'win32', 'Native Windows Registrar remains unsupported; build on macOS or Linux.');
@@ -36,9 +65,17 @@ export async function packageUnified({ marketplaceRoot, releaseSha256, publicMan
     const registrar = join(outputRoot, 'marketplace', 'plugins', 'temari', 'registrar');
     const originalRegistrar = join(workspace, 'packages', 'workflow-runtime', 'registrar');
     assert.deepEqual(await readFile(join(registrar, 'pyproject.toml')), await readFile(join(originalRegistrar, 'pyproject.toml')), 'Lockfile source differs from selected Registrar.');
+    assert.deepEqual(await readFile(join(registrar, 'uv.lock')), await readFile(join(originalRegistrar, 'uv.lock')), 'Dependency lock differs from selected Registrar.');
+    const dependencySelection = await selectKnowledgeDependencies({ platform: assets.platform, registrarRoot: originalRegistrar });
     const requirements = join(outputRoot, 'knowledge', 'requirements.txt');
-    await uvRun(['export', '--project', originalRegistrar, '--locked', '--no-dev', '--no-editable', '--no-emit-project', '--format', 'requirements.txt', '--output-file', requirements]);
-    await copyFile(join(originalRegistrar, 'uv.lock'), join(outputRoot, 'knowledge', 'uv.lock'));
+    await uvRun(['export', '--project', dependencySelection.projectRoot, '--locked', '--no-dev', '--no-editable', '--no-emit-project', '--python', python, '--no-python-downloads', '--no-build', '--format', 'requirements.txt', '--output-file', requirements]);
+    await copyFile(join(dependencySelection.lockRoot, 'uv.lock'), join(outputRoot, 'knowledge', 'uv.lock'));
+    await copyFile(join(originalRegistrar, 'uv.lock'), join(outputRoot, 'knowledge', 'original-uv.lock'));
+    await copyFile(join(originalRegistrar, 'pyproject.toml'), join(outputRoot, 'knowledge', 'original-pyproject.toml'));
+    if (dependencySelection.profileBytes) {
+      await writeFile(join(outputRoot, 'knowledge', 'compatibility-profile.json'), dependencySelection.profileBytes, { flag: 'wx' });
+      await copyFile(join(dependencySelection.projectRoot, 'pyproject.toml'), join(outputRoot, 'knowledge', 'compatibility-pyproject.toml'));
+    }
     const site = join(outputRoot, 'knowledge', 'site-packages');
     await uvRun(['pip', 'install', '--python', python, '--target', site, '--only-binary', ':all:', '--require-hashes', '--no-python-downloads', '--no-config', '-r', requirements]);
     // Registrar is pure Python: use the verified release source directly, avoiding
@@ -59,7 +96,7 @@ lines += ['Requires-Dist: '+requirement for requirement in p['dependencies']]
       await copyFile(join(workspace, path), join(outputRoot, 'library', name));
     }
     await writeFile(join(outputRoot, 'profile.example.json'), JSON.stringify({ schema: 1, id: 'my-project', workspaceRoot: '/absolute/path/to/my-project', port: 3095, transport: { kind: 'ollama', model: 'YOUR_INSTALLED_MODEL' } }, null, 2) + '\n');
-    const manifest = { schema: 1, kind: 'temari-unified-distribution', version: '0.1.0', assets, knowledge: { registrarPackaging: 'verified-release-source', dependencyLockSha256: digest(await readFile(join(originalRegistrar, 'uv.lock'))) }, marketplace: { version: '0.15.5', releaseSha256, publicManifestSha256 }, files: await inventory(outputRoot) };
+    const manifest = { schema: 1, kind: 'temari-unified-distribution', version: '0.1.0', assets, knowledge: { registrarPackaging: 'verified-release-source', ...dependencySelection.knowledge }, marketplace: { version: '0.15.5', releaseSha256, publicManifestSha256 }, files: await inventory(outputRoot) };
     const bytes = Buffer.from(JSON.stringify(manifest, null, 2) + '\n');
     await writeFile(join(outputRoot, 'UNIFIED.json'), bytes, { flag: 'wx' });
     const sha256 = digest(bytes);

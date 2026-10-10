@@ -38,6 +38,13 @@ export async function packageManagedWorkflow(output) {
       target: 'node22',
       sourcemap: false,
     }),
+    build({
+      entryPoints: ['libs/host-adapters/src/lib/scoped-worker-tools-stdio.ts'],
+      outfile: join(output, 'scoped-worker-tools-stdio.mjs'),
+      bundle: true, platform: 'node', format: 'esm', target: 'node22',
+      sourcemap: false,
+      banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
+    }),
     copyFile(
       'packages/workflow-runtime/host/.archon/workflows/temari-reviewed-local-candidate.yaml',
       join(

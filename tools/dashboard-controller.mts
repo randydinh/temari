@@ -33,6 +33,7 @@ import {
   verifyExecutionHarnessRunIdentity,
   type TaskSnapshot,
 } from '../libs/runtime/src/index.js';
+import { assertWorkerProviderSelection, assertWorkerToolServerPin, type WorkerProviderSelection, type WorkerToolServerPin } from '../libs/host-adapters/src/index.js';
 import type { TaskViewController } from './task-view.mjs';
 import {
   prepareDashboardSwarm,
@@ -125,12 +126,16 @@ export interface DashboardConfig {
   preparationRoot: string;
   recipes: DashboardRecipe[];
   swarm?: {
+    providerSelection?: WorkerProviderSelection;
+    scopedToolServer?: WorkerToolServerPin;
     executable: string;
     maxConcurrency: number;
     maxWorkers: number;
     timeoutMs: number;
   };
   implementation?: {
+    providerSelection?: WorkerProviderSelection;
+    scopedToolServer?: WorkerToolServerPin;
     executable: string;
     maxConcurrency: number;
     timeoutMs: number;
@@ -515,17 +520,24 @@ function boundedAssignment(
   assert.equal(brief.reportFormat, 'json');
 }
 
+function validateWorkerTransport(config: Record<string, any>): void {
+  if (config.providerSelection !== undefined) assertWorkerProviderSelection(config.providerSelection);
+  if (config.scopedToolServer !== undefined) assertWorkerToolServerPin(config.scopedToolServer);
+  assert(config.providerSelection?.provider !== 'claude-code' || config.scopedToolServer, 'Claude Code requires a pinned scoped worker tool server.');
+}
+
 async function validateImplementationConfig(
   value: unknown,
   workspaceRoot: string,
   preparationRoot: string,
 ): Promise<void> {
   const config = object(value);
-  fields(config, ['executable', 'maxConcurrency', 'timeoutMs', 'plans']);
+  fields(config, ['executable', 'maxConcurrency', 'timeoutMs', 'plans'], ['providerSelection', 'scopedToolServer']);
+  validateWorkerTransport(config);
   text(config.executable);
   assert(
     isAbsolute(config.executable) && (await lstat(config.executable)).isFile(),
-    'Implementation requires the installed Codex executable.',
+    'Implementation requires the configured worker executable.',
   );
   assert(
     Number.isSafeInteger(config.maxConcurrency) &&
@@ -630,6 +642,8 @@ async function validateImplementationConfig(
       maxConcurrency: Math.min(config.maxConcurrency, item.assignments.length),
       executable: config.executable,
       timeoutMs: config.timeoutMs,
+      providerSelection: config.providerSelection,
+      scopedToolServer: config.scopedToolServer,
       assignments: item.assignments,
       prepare: item.prepare,
       verify: item.verify,
@@ -642,6 +656,8 @@ async function validateImplementationConfig(
       maxConcurrency: 1,
       executable: config.executable,
       timeoutMs: config.timeoutMs,
+      providerSelection: config.providerSelection,
+      scopedToolServer: config.scopedToolServer,
       assignments: [item.reviewer],
     });
   }
@@ -878,10 +894,11 @@ export async function validateDashboardConfig(
   }
   if (config.swarm !== undefined) {
     const swarm = object(config.swarm);
-    fields(swarm, ['executable', 'maxConcurrency', 'maxWorkers', 'timeoutMs']);
+    fields(swarm, ['executable', 'maxConcurrency', 'maxWorkers', 'timeoutMs'], ['providerSelection', 'scopedToolServer']);
+    validateWorkerTransport(swarm);
     assert(
       isAbsolute(swarm.executable) && (await lstat(swarm.executable)).isFile(),
-      'Swarm requires the installed Codex executable.',
+      'Swarm requires the configured worker executable.',
     );
     assert(
       Number.isSafeInteger(swarm.maxWorkers) &&
@@ -1383,6 +1400,7 @@ export class DashboardController implements TaskViewController {
       const prior = await this.swarmPreparation(task);
       assert(prior);
       const manifest = await json(prior.handle.requestPath);
+      assert.equal(taskDigest({ executable: manifest.request.executable, providerSelection: manifest.request.providerSelection, scopedToolServer: manifest.request.scopedToolServer }), taskDigest({ executable: config.executable, providerSelection: config.providerSelection, scopedToolServer: config.scopedToolServer }), 'Configured worker transport changed; prepare a new task.');
       assert.equal(
         manifest.request.assignments.length,
         request.workerCount,
@@ -1444,6 +1462,8 @@ export class DashboardController implements TaskViewController {
         runId,
         revision: candidate.head,
         workspaceRoot: task.workspaceRoot,
+        providerSelection: config.providerSelection,
+        scopedToolServer: config.scopedToolServer,
         assignments,
         maxConcurrency: request.maxConcurrency,
         executable: config.executable,
@@ -1454,6 +1474,7 @@ export class DashboardController implements TaskViewController {
     }
     assert.equal(prepared.taskId, taskId);
     const manifest = await json(prepared.handle.requestPath);
+    assert.equal(taskDigest({ executable: manifest.request.executable, providerSelection: manifest.request.providerSelection, scopedToolServer: manifest.request.scopedToolServer }), taskDigest({ executable: config.executable, providerSelection: config.providerSelection, scopedToolServer: config.scopedToolServer }), 'Configured worker transport changed; prepare a new task.');
     assert.equal(manifest.request.runId, runId);
     assert.equal(
       manifest.request.assignments.length,
@@ -1688,6 +1709,8 @@ export class DashboardController implements TaskViewController {
     const runId = `run-${request.requestId}`;
     const planSha256 = taskDigest({
       selected,
+      providerSelection: config.providerSelection,
+      scopedToolServer: config.scopedToolServer,
       executable: config.executable,
       maxConcurrency: config.maxConcurrency,
       timeoutMs: config.timeoutMs,
@@ -1753,6 +1776,8 @@ export class DashboardController implements TaskViewController {
         runId,
         revision: candidate.head,
         workspaceRoot: task.workspaceRoot,
+        providerSelection: config.providerSelection,
+        scopedToolServer: config.scopedToolServer,
         assignments,
         reviewer,
         maxConcurrency: Math.min(config.maxConcurrency, assignments.length),

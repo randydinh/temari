@@ -4,14 +4,16 @@ import { basename, isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   reconcilePlan,
-  type HostCapabilityReport,
   type WorkerAssignment,
 } from '../libs/contracts/src/index.js';
 import {
-  resolveCodexExecutable,
-  assertCodexProviderSelection,
-  type CodexProviderSelection,
-  runCodexExecWorker,
+  preflightWorkerExecution,
+  assertWorkerProviderSelection,
+  assertWorkerToolServerPin,
+  type WorkerProviderSelection,
+  type WorkerToolServerPin,
+  runWorkerExecution,
+  workerExecutionCapabilities,
 } from '../libs/host-adapters/src/index.js';
 import {
   preflightParallelWorkers,
@@ -29,7 +31,8 @@ export interface CodexWorkersRequest {
   readonly timeoutMs: number;
   readonly outputLimitBytes?: number;
   readonly finalResponseLimitBytes?: number;
-  readonly providerSelection?: CodexProviderSelection;
+  readonly providerSelection?: WorkerProviderSelection;
+  readonly scopedToolServer?: WorkerToolServerPin;
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -104,7 +107,11 @@ function parseAssignment(value: unknown): WorkerAssignment {
 export function parseCodexWorkersRequest(value: unknown): CodexWorkersRequest {
   const input = record(value);
   if (input.providerSelection !== undefined)
-    assertCodexProviderSelection(input.providerSelection);
+    assertWorkerProviderSelection(input.providerSelection);
+  if (input.scopedToolServer !== undefined)
+    assertWorkerToolServerPin(input.scopedToolServer);
+  if (input.providerSelection?.provider === 'claude-code' && !input.scopedToolServer)
+    throw new Error('Claude workers require a pinned scoped tool server.');
   const runId = identifier(input.runId, 'runId');
   const revision = identifier(input.revision, 'revision');
   const workspaceRoot = absolutePath(input.workspaceRoot, 'workspaceRoot');
@@ -168,6 +175,7 @@ export function parseCodexWorkersRequest(value: unknown): CodexWorkersRequest {
     ...(input.providerSelection
       ? { providerSelection: input.providerSelection }
       : {}),
+    ...(input.scopedToolServer ? { scopedToolServer: input.scopedToolServer } : {}),
   };
 }
 
@@ -180,33 +188,12 @@ export async function runCodexWorkersRequest(
   if (!workspace.isDirectory())
     throw new Error('workspaceRoot must be a directory.');
   await access(request.workspaceRoot, constants.R_OK | constants.X_OK);
-  const executable = await resolveCodexExecutable(request.executable);
+  const { executable } = await preflightWorkerExecution(request.executable, request.providerSelection, request.scopedToolServer);
   const plan = reconcilePlan({
     workType: 'investigation',
     parallelism: { maxConcurrency: request.maxConcurrency },
   });
-  const capabilities: HostCapabilityReport = {
-    host: 'codex-exec-local',
-    available: ['parallelism'],
-    missing: [
-      'subagents',
-      'model_diversity',
-      'worktree_isolation',
-      'durable_delivery',
-      'forge',
-    ],
-    notes: {
-      parallelism:
-        'Independent local codex exec processes launched by this request.',
-    },
-    provenance: {
-      parallelism: {
-        status: 'unproven',
-        source:
-          'local process transport declaration; real Codex overlap is not yet verified',
-      },
-    },
-  };
+  const capabilities = workerExecutionCapabilities(request.providerSelection, 'read-only');
   await mkdir(join(request.evidenceRoot, request.runId), {
     recursive: true,
     mode: 0o700,
@@ -224,7 +211,8 @@ export async function runCodexWorkersRequest(
     capabilities,
     assignments: request.assignments,
     handler: (assignment) =>
-      runCodexExecWorker(assignment, {
+      runWorkerExecution(assignment, {
+        access: 'read-only',
         executable,
         workspaceRoot: request.workspaceRoot,
         evidenceDirectory: join(runDirectory, assignment.id),
@@ -232,6 +220,7 @@ export async function runCodexWorkersRequest(
         outputLimitBytes: request.outputLimitBytes,
         finalResponseLimitBytes: request.finalResponseLimitBytes,
         providerSelection: request.providerSelection,
+        scopedToolServer: request.scopedToolServer,
         signal,
       }),
   });

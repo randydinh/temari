@@ -40,7 +40,7 @@ export function classifyCodexParallelRequest(
     !request.assignments.length
   )
     throw new Error(
-      'A nonempty assignments array is required to select a Codex route.',
+      'A nonempty assignments array is required to select a worker route.',
     );
 
   const kinds = request.assignments.map((raw) => {
@@ -57,7 +57,7 @@ export function classifyCodexParallelRequest(
       : 'unknown';
   });
   if (kinds.includes('unknown') || new Set(kinds).size !== 1)
-    throw new Error('Mixed or ambiguous Codex assignments cannot be routed.');
+    throw new Error('Mixed or ambiguous worker assignments cannot be routed.');
 
   const route = kinds[0] as CodexParallelRoute;
   const readFields = ['workspaceRoot', 'revision'];
@@ -89,7 +89,7 @@ export async function runCodexParallelRequest(
   return { route, ...result };
 }
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
   if (process.argv.length !== 3)
     throw new Error(
       'Usage: node --import @swc-node/register/esm-register tools/run-codex-parallel.mts <request.json>',
@@ -129,3 +129,7 @@ if (
     process.exitCode = 1;
   });
 }
+
+// Provider-neutral API; historical Codex entry points remain compatible.
+export const classifyWorkerParallelRequest = classifyCodexParallelRequest;
+export const runWorkerParallelRequest = runCodexParallelRequest;
