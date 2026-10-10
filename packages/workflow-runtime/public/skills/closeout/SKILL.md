@@ -5,6 +5,10 @@ description: Persist and verify a current Temari run only through trusted invoca
 
 # Closeout
 
+The bundled [method library](../temari/references/method-library.md) supplies
+engineering guidance. This public entry retains the canonical closeout contract;
+the library's historical closeout and receipt tools do not replace it.
+
 Verify a completed local run with the installed `bin/closeout.mjs` entry.
 This operation reads the canonical receipt, stage evidence, workspace manifests,
 and current product. It never grants merge, archive, deployment, independent QA,

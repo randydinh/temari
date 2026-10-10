@@ -7,6 +7,10 @@ description: Use Temari to choose and continue source-dependent research, engine
 
 Temari is the conversational entry point for the current Nx workflow runtime.
 
+For engineering work, use the bundled [method library](references/method-library.md)
+after checking public policy and source scope. It supplies P-stack's playbooks,
+supporting skills and principles behind this entry without adding execution routes.
+
 ## Decide evidence need and work responsibility
 
 For each request handled through Temari, decide what outcome the user wants and

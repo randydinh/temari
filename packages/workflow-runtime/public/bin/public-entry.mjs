@@ -374,6 +374,35 @@ export async function verifyBundle(expectedDigest, artifactRoot = root) {
       `Artifact bytes changed: ${record.path}`,
     );
   }
+  const { checkPstackMethodLibrary } = await import(
+    pathToFileURL(join(artifactRoot, 'host/pstack-method-library.mjs')).href
+  );
+  const method = await checkPstackMethodLibrary(
+    join(artifactRoot, 'method/pstack'),
+  );
+  assert.deepEqual(
+    manifest.methodLibrary,
+    {
+      path: 'method/pstack',
+      sourceRevision: method.catalog.sourceRevision,
+      provenanceSha256: method.provenanceSha256,
+      catalogSha256: method.catalogSha256,
+    },
+    'Method library differs from the pinned manifest.',
+  );
+  const sourceProvenance = manifest.source?.files?.filter(
+    (record) => record.path === 'packages/workflow-runtime/provenance.json',
+  );
+  assert.equal(
+    sourceProvenance?.length,
+    1,
+    'Method source provenance is missing or duplicated.',
+  );
+  assert.equal(
+    sourceProvenance[0].sha256,
+    method.provenanceSha256,
+    'Method provenance differs from its source inventory.',
+  );
   return JSON.parse(
     utf8.decode(await readBoundedFile(join(artifactRoot, 'policy.json'), POLICY_BYTES)),
   );

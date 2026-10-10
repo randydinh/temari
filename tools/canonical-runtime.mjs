@@ -93,9 +93,17 @@ function packageRoot(name) {
   return `node_modules/@temari/${name}`;
 }
 
-function auditImports(files) {
+function auditImports(files, { historical = false } = {}) {
   const packages = new Map();
-  for (const name of packageNames) {
+  // The pinned predecessor required the first five packages. Validate any
+  // newer known packages it actually carries, without requiring future modules.
+  const requiredPackages = historical
+    ? packageNames.filter(
+        (name, index) =>
+          index < 5 || files.has(`${packageRoot(name)}/package.json`),
+      )
+    : packageNames;
+  for (const name of requiredPackages) {
     const root = packageRoot(name);
     assert(files.has(`${root}/package.json`), `Missing package: ${name}`);
     const metadata = JSON.parse(files.get(`${root}/package.json`).toString());
@@ -121,7 +129,10 @@ function auditImports(files) {
         'temari-knowledge': './src/demo.js',
       });
       assert(files.has(`${root}/src/demo.js`), 'Missing knowledge CLI');
-      assert(files.has(knowledgePrepare), 'Missing knowledge preparation helper');
+      assert(
+        files.has(knowledgePrepare),
+        'Missing knowledge preparation helper',
+      );
     } else assert.equal(metadata.bin, undefined);
     assert.deepEqual(metadata.exports, expectedExports);
     assert(files.has(`${root}/src/index.js`), `Missing entry for ${name}`);
@@ -158,7 +169,9 @@ function auditImports(files) {
       `Unexpected emitted file: ${path}`,
     );
     assert(
-      !/(?:^|\/)(?:fixtures?|demos?|__tests__)(?:\/|$)|\.(?:test|spec)\./.test(path),
+      !/(?:^|\/)(?:fixtures?|demos?|__tests__)(?:\/|$)|\.(?:test|spec)\./.test(
+        path,
+      ),
       `Nonproduction file: ${path}`,
     );
     const source = ts.createSourceFile(
@@ -257,7 +270,11 @@ async function artifactFiles(root) {
 }
 
 /** Checks local integrity, not provenance or a signature. */
-export async function checkCanonicalArtifact(root, expectedManifest) {
+export async function checkCanonicalArtifact(
+  root,
+  expectedManifest,
+  { historical = false } = {},
+) {
   assert(isAbsolute(root), 'Artifact path must be absolute');
   const files = await artifactFiles(root);
   assert(files.has(manifestName), `Missing ${manifestName}`);
@@ -303,7 +320,7 @@ export async function checkCanonicalArtifact(root, expectedManifest) {
     sortedRecords(files),
     'Artifact file integrity differs from manifest (missing, extra, or tampered content)',
   );
-  auditImports(files);
+  auditImports(files, { historical });
   return manifest;
 }
 
@@ -337,7 +354,9 @@ export async function packageCanonicalRuntime(output) {
   host.getCurrentDirectory = () => workspace;
   const program = ts.createProgram(
     [
-      ...packageNames.map((name) => join(workspace, 'libs', name, 'src/index.ts')),
+      ...packageNames.map((name) =>
+        join(workspace, 'libs', name, 'src/index.ts'),
+      ),
       join(workspace, 'libs/knowledge/src/demo.ts'),
     ],
     options,
@@ -366,7 +385,9 @@ export async function packageCanonicalRuntime(output) {
       `Source outside production closure: ${path}`,
     );
     assert(
-      !/(?:^|\/)(?:fixtures?|demos?|__tests__)(?:\/|$)|\.(?:test|spec)\./.test(path),
+      !/(?:^|\/)(?:fixtures?|demos?|__tests__)(?:\/|$)|\.(?:test|spec)\./.test(
+        path,
+      ),
       `Nonproduction source: ${path}`,
     );
     inputs.set(`libs/${path}`, Buffer.from(source.text));

@@ -275,6 +275,149 @@ test('packages an isolated relocated outer bundle with three current public entr
   }
 });
 
+test('relocated public entries carry the complete portable method without widening skill discovery or policy', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'temari method-relocated-'));
+  t.after(async () => rm(root, { recursive: true, force: true }));
+  const artifact = join(root, 'installed', 'temari');
+  await cp(output, artifact, { recursive: true });
+  const inventory = JSON.parse(
+    await readFile(
+      join(repository, 'packages/workflow-runtime/provenance.json'),
+      'utf8',
+    ),
+  );
+  const members = inventory.files.filter((file) => file.lane === 'portable');
+  for (const member of members) {
+    const path = `method/pstack/${member.path}`;
+    const installed = await readFile(join(artifact, path));
+    assert.deepEqual(
+      installed,
+      await readFile(
+        join(repository, 'packages/workflow-runtime/assets/v4.1', member.path),
+      ),
+    );
+    assert.equal(
+      createHash('sha256').update(installed).digest('hex'),
+      member.artifactSha256,
+    );
+    assert(manifest.files.some((file) => file.path === path));
+    if (process.platform !== 'win32')
+      assert.equal(
+        Boolean((await stat(join(artifact, path))).mode & 0o111),
+        member.executable,
+      );
+  }
+  assert.deepEqual((await readdir(join(artifact, 'skills'))).sort(), [
+    'closeout',
+    'poteto-mode',
+    'qa-review-verification',
+    'qa-triage',
+    'temari',
+    'temari-knowledge',
+  ]);
+  assert.deepEqual(
+    await readFile(join(artifact, 'policy.json')),
+    await readFile(
+      join(repository, 'packages/workflow-runtime/public/policy.json'),
+    ),
+  );
+  assert.deepEqual(
+    await checkPublicEntryArtifact(artifact, manifestSha256(manifest)),
+    manifest,
+  );
+  for (const entry of ['temari', 'poteto-mode', 'closeout']) {
+    const policy = await child([join(artifact, `bin/${entry}.mjs`), 'policy']);
+    assert.equal(policy.status, 'described');
+  }
+  const catalog = JSON.parse(
+    await readFile(join(artifact, 'method/pstack/catalog.json'), 'utf8'),
+  );
+  assert.equal(catalog.skills.length, 53);
+  assert.equal(catalog.principles.length, 23);
+  assert.equal(catalog.playbooks.length, 24);
+  assert.equal(catalog.agents.length, 3);
+  for (const path of [
+    'skills/how/SKILL.md',
+    'skills/architect/SKILL.md',
+    'skills/principle-prove-it-works/SKILL.md',
+    'skills/poteto-mode/playbooks/feature.md',
+    'skills/poteto-mode/scripts/check-plan.mjs',
+  ])
+    assert((await readFile(join(artifact, 'method/pstack', path))).length > 0);
+  assert(
+    !manifest.files.some((file) =>
+      /method\/pstack\/(?:.*\/)?node_modules\//.test(file.path),
+    ),
+  );
+  assert(
+    !manifest.files.some((file) =>
+      file.path.startsWith('method/pstack/integrations/archon/'),
+    ),
+  );
+});
+
+test('public bundle refuses missing, altered, added, symlinked and incorrectly executable method resources', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'temari method-refusals-'));
+  t.after(async () => rm(root, { recursive: true, force: true }));
+  const mutations = [
+    async (artifact) =>
+      unlink(join(artifact, 'method/pstack/skills/how/SKILL.md')),
+    async (artifact) =>
+      writeFile(
+        join(
+          artifact,
+          'method/pstack/skills/principle-prove-it-works/SKILL.md',
+        ),
+        'changed',
+      ),
+    async (artifact) =>
+      writeFile(join(artifact, 'method/pstack/skills/unlisted.md'), 'unlisted'),
+    async (artifact) =>
+      writeFile(join(artifact, 'method/pstack/catalog.json'), '{}'),
+    async (artifact) =>
+      writeFile(join(artifact, 'method/pstack/provenance.json'), '{}'),
+  ];
+  if (process.platform !== 'win32')
+    mutations.push(
+      async (artifact) =>
+        chmod(
+          join(artifact, 'method/pstack/scripts/check-skill-references.sh'),
+          0o644,
+        ),
+      async (artifact) => {
+        const path = join(artifact, 'method/pstack/skills/how/SKILL.md');
+        await unlink(path);
+        await symlink('../../architect/SKILL.md', path);
+      },
+    );
+  for (let index = 0; index < mutations.length; index++) {
+    const artifact = join(root, `case-${index}`);
+    await cp(output, artifact, { recursive: true });
+    await mutations[index](artifact);
+    await assert.rejects(
+      checkPublicEntryArtifact(artifact, manifestSha256(manifest)),
+    );
+    const result = await childResult(
+      [
+        join(artifact, 'bin/temari.mjs'),
+        'start',
+        '--request',
+        join(root, 'unused-request.json'),
+        '--expected-request-sha256',
+        'a'.repeat(64),
+        '--expected-manifest-sha256',
+        manifestSha256(manifest),
+      ],
+      1,
+    );
+    assert.match(
+      `${result.stderr}\n${result.stdout}`,
+      /[Aa]rtifact|[Mm]ethod|[Ee]xecutable/,
+      'artifact validation must refuse changed methods before trying to read a request',
+    );
+  }
+});
+
 test('relocated managed resources launch compiled operations, owned children and planner under stock Node', async (t) => {
   if (process.platform === 'win32')
     return t.skip('Owned process groups require POSIX.');
@@ -2518,10 +2661,17 @@ test('both engineering skills reach shared conversation guidance, evidence intak
         );
         const resource = relative(output, target).split('\\').join('/');
         assert(
-          resource.startsWith('skills/'),
-          `Link escapes bundled skills: ${link}`,
+          ['skills/', 'method/pstack/', 'adapters/'].some((prefix) => resource.startsWith(prefix)),
+          `Link escapes bundled guidance: ${link}`,
         );
-        await visit(resource);
+        if (resource.startsWith('skills/')) await visit(resource);
+        else {
+          const bytes = await readFile(join(output, resource));
+          const record = manifest.files.find((file) => file.path === resource);
+          assert(record, `Unmanifested method resource: ${resource}`);
+          assert.equal(record.sha256, createHash('sha256').update(bytes).digest('hex'));
+          visited.add(resource);
+        }
       }
     };
     await visit(`skills/${entry}/SKILL.md`);
@@ -2530,6 +2680,19 @@ test('both engineering skills reach shared conversation guidance, evidence intak
       visited.has(conversationPath),
       `${entry} cannot reach shared conversation guidance`,
     );
+    for (const path of [
+      'skills/temari/references/method-library.md',
+      'method/pstack/catalog.json',
+      'method/pstack/adapters/codex/HOST.md',
+      'method/pstack/skills/how/SKILL.md',
+      'method/pstack/skills/architect/SKILL.md',
+      'method/pstack/skills/principle-model-the-domain/SKILL.md',
+      'method/pstack/skills/principle-prove-it-works/SKILL.md',
+    ])
+      assert(
+        visited.has(path),
+        `${entry} cannot reach bundled method resource ${path}`,
+      );
     assert.deepEqual(
       await readFile(join(output, conversationPath)),
       await readFile(

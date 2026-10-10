@@ -79,6 +79,11 @@ tree — [docs/overlays.md](docs/overlays.md).
   [Temari](packages/workflow-runtime/assets/v4.1/skills/temari/SKILL.md) and
   [Poteto](packages/workflow-runtime/assets/v4.1/skills/poteto-mode/SKILL.md)
   entries.
+- **Build the public plugin:** [current public packaging](packages/workflow-runtime/README.md#current-public-plugin).
+  The existing public entries load a complete internal P-stack method library;
+  public policy still selects supported execution routes.
+  Use the [installation and upgrade guide](docs/migrations/install-temari.md)
+  for verified marketplace releases and native Codex installation.
 - **Use knowledge:** [archive admission and handoff](libs/knowledge/ARCHIVE.md),
   [intake-to-search journey](libs/knowledge/JOURNEY.md), and the
   [knowledge system design](docs/knowledge-system-design.md). Registrar owns

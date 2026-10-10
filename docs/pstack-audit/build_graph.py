@@ -116,11 +116,18 @@ if {path.parent.name for path in public_skill_files} != {
 }:
     raise ValueError("reviewed public skill inventory changed")
 node("public:policy", "admission", "Public admission policy", source=relative(public_root / "policy.json"))
+method_guide = public_root / "skills/temari/references/method-library.md"
+node("public:method-guide", "reference", "Installed P-stack method loading", source=relative(method_guide))
+node("public:method-library", "bundle", "Complete portable P-stack method library", source="tools/pstack-method-library.mjs")
+edge("public:method-guide", "public:method-library", "loads_internal_method", "documented", relative(method_guide))
+edge("public:method-library", "component:pstack-v4.1", "packages_portable_inventory", "documented", "tools/pstack-method-library.mjs")
+edge("public:policy", "public:method-library", "retains_execution_admission", "documented", relative(method_guide))
 for entry_name in ("temari", "poteto-mode", "closeout"):
     entry_path = public_root / "skills" / entry_name / "SKILL.md"
     node(f"public-entry:{entry_name}", "public-entry", entry_name, source=relative(entry_path))
     edge("public:policy", f"public-entry:{entry_name}", "declares_entry", "documented", relative(public_root / "policy.json"))
     edge(f"public-entry:{entry_name}", f"skill:{entry_name}", "adapts_source_skill", "documented", relative(entry_path))
+    edge(f"public-entry:{entry_name}", "public:method-guide", "references_method_library", "source_reference", relative(entry_path))
 qa_public = public_root / "skills/qa-review-verification/SKILL.md"
 node("public-skill:qa-review-verification", "public-skill", "QA verification", source=relative(qa_public))
 edge("public-entry:temari", "public-skill:qa-review-verification", "invokes_supporting_skill", "documented", relative(public_root / "skills/temari/SKILL.md"))
@@ -255,7 +262,7 @@ for target in re.findall(r"\[[^\]]*\]\(([^)]+)\)", index.read_text()):
 graph = {
     "schemaVersion": 1,
     "scope": "Temari public entries and v4.1 bundled P-stack skills and playbooks, with adjacent ownership boundaries",
-    "reviewedAt": "2026-10-09",
+    "reviewedAt": "2026-10-10",
     "evidenceRule": "documented and source_reference edges describe checked source; review_recommendation edges are proposals, not current behavior",
     "nodes": sorted(nodes.values(), key=lambda item: item["id"]),
     "edges": sorted(edges.values(), key=lambda item: (item["from"], item["relation"], item["to"], item["basis"])),

@@ -24,23 +24,35 @@ import {
   REGISTRAR_PAYLOAD_FILES,
   verifyRegistrarPayload,
 } from './registrar-payload.mjs';
+import {
+  PSTACK_ASSET_SOURCE,
+  PSTACK_METHOD_PREFIX,
+  PSTACK_PROVENANCE_SOURCE,
+  checkPstackMethodLibrary,
+  readPstackMethodLibrary,
+  writePstackMethodLibrary,
+} from './pstack-method-library.mjs';
 
 const toolPath = fileURLToPath(import.meta.url);
 const workspace = resolve(dirname(toolPath), '..');
 const manifestName = 'public-entry-manifest.json';
 const entries = ['temari', 'poteto-mode', 'closeout'];
-const generatedFiles = [
+const historicalGeneratedFiles = [
   'bin/codex-parallel.mjs',
   'bin/qa-evaluator.mjs',
   'bin/qa-evaluator-worker.mjs',
   'bin/qa-product-policy-control.mjs',
   'bin/qa-temari-policy-semantic.mjs',
+];
+const generatedFiles = [
+  ...historicalGeneratedFiles,
   'host/reviewed-local-candidate.mjs',
   'host/managed-candidate-operation.mjs',
   'host/dashboard-managed-candidate.mjs',
   'host/dashboard-planner.mjs',
 ];
 const publicFiles = [
+  ['tools/pstack-method-library.mjs', 'host/pstack-method-library.mjs'],
   [
     'packages/workflow-runtime/public/managed-resources.md',
     'managed-resources.md',
@@ -68,7 +80,10 @@ const publicFiles = [
   ],
   ['packages/workflow-runtime/host/entry.mjs', 'host/entry.mjs'],
   ['packages/workflow-runtime/host/qa.mjs', 'host/qa.mjs'],
-  ['packages/workflow-runtime/host/qa-capability.mjs', 'host/qa-capability.mjs'],
+  [
+    'packages/workflow-runtime/host/qa-capability.mjs',
+    'host/qa-capability.mjs',
+  ],
   [
     'packages/workflow-runtime/host/task-tracking.mjs',
     'host/task-tracking.mjs',
@@ -118,8 +133,14 @@ const publicFiles = [
     'bin/poteto-mode.mjs',
   ],
   ['packages/workflow-runtime/public/bin/closeout.mjs', 'bin/closeout.mjs'],
-  ['packages/workflow-runtime/public/qa/ticket-acceptance-v1.md', 'qa/ticket-acceptance-v1.md'],
-  ['packages/workflow-runtime/public/qa/verify-temari-public-v1.md', 'qa/verify-temari-public-v1.md'],
+  [
+    'packages/workflow-runtime/public/qa/ticket-acceptance-v1.md',
+    'qa/ticket-acceptance-v1.md',
+  ],
+  [
+    'packages/workflow-runtime/public/qa/verify-temari-public-v1.md',
+    'qa/verify-temari-public-v1.md',
+  ],
   [
     'packages/workflow-runtime/public/skills/temari/SKILL.md',
     'skills/temari/SKILL.md',
@@ -131,6 +152,10 @@ const publicFiles = [
   [
     'packages/workflow-runtime/public/skills/temari/references/conversation.md',
     'skills/temari/references/conversation.md',
+  ],
+  [
+    'packages/workflow-runtime/public/skills/temari/references/method-library.md',
+    'skills/temari/references/method-library.md',
   ],
   [
     'packages/workflow-runtime/public/skills/temari-knowledge/SKILL.md',
@@ -163,14 +188,12 @@ const publicFiles = [
     `packages/workflow-runtime/public/skills/qa-review-verification/${path}`,
     `skills/qa-review-verification/${path}`,
   ]),
-  ...[
-    'SKILL.md',
-    'references/issue-triage-v1.md',
-    'assets/triage-note.md',
-  ].map((path) => [
-    `packages/workflow-runtime/public/skills/qa-triage/${path}`,
-    `skills/qa-triage/${path}`,
-  ]),
+  ...['SKILL.md', 'references/issue-triage-v1.md', 'assets/triage-note.md'].map(
+    (path) => [
+      `packages/workflow-runtime/public/skills/qa-triage/${path}`,
+      `skills/qa-triage/${path}`,
+    ],
+  ),
   ...REGISTRAR_PAYLOAD_FILES.map((path) => [
     `packages/workflow-runtime/registrar/${path}`,
     `registrar/${path}`,
@@ -359,7 +382,11 @@ function assertPolicy(policy) {
 }
 
 /** Checks the complete outer bundle, including the nested canonical runtime. */
-export async function checkPublicEntryArtifact(root, expectedManifestSha256) {
+export async function checkPublicEntryArtifact(
+  root,
+  expectedManifestSha256,
+  { historicalVersion = false } = {},
+) {
   assert(isAbsolute(root), 'Artifact path must be absolute');
   assert.match(
     expectedManifestSha256 ?? '',
@@ -393,18 +420,115 @@ export async function checkPublicEntryArtifact(root, expectedManifestSha256) {
     sortedRecords(files),
     'Outer artifact inventory differs from its files.',
   );
+  const historicalWithoutMethod =
+    historicalVersion && !Object.hasOwn(manifest, 'methodLibrary');
+  if (historicalWithoutMethod)
+    assert(
+      ![...files.keys()].some((path) => path.startsWith('method/')),
+      'Historical artifact unexpectedly contains a method library.',
+    );
   const expectedPaths = [
-    ...publicFiles.map(([, destination]) => destination),
+    ...publicFiles
+      .map(([, destination]) => destination)
+      .filter(
+        (path) =>
+          !historicalWithoutMethod ||
+          ![
+            'host/pstack-method-library.mjs',
+            'skills/temari/references/method-library.md',
+          ].includes(path),
+      ),
     ...generatedFiles,
     ...[...files.keys()].filter((path) => path.startsWith('runtime/')),
+    ...[...files.keys()].filter((path) =>
+      path.startsWith(`${PSTACK_METHOD_PREFIX}/`),
+    ),
     manifestName,
   ].sort();
-  assert.deepEqual(expectedPublicPaths(files), expectedPaths);
+  // Historical membership belongs to the externally pinned manifest's vintage.
+  // New current resources must not be retroactively required in a predecessor.
+  if (!historicalVersion)
+    assert.deepEqual(expectedPublicPaths(files), expectedPaths);
+  assert.deepEqual(
+    [...files.keys()]
+      .filter((path) => /^skills\/[^/]+\/SKILL\.md$/.test(path))
+      .sort(),
+    [
+      'closeout',
+      'poteto-mode',
+      'qa-review-verification',
+      'qa-triage',
+      'temari',
+      'temari-knowledge',
+    ]
+      .map((name) => `skills/${name}/SKILL.md`)
+      .sort(),
+    'Public skill discovery must contain exactly the six supported entries.',
+  );
+  if (!historicalWithoutMethod) {
+    const method = await checkPstackMethodLibrary(
+      join(root, PSTACK_METHOD_PREFIX),
+    );
+    assert.deepEqual(
+      manifest.methodLibrary,
+      {
+        path: PSTACK_METHOD_PREFIX,
+        sourceRevision: method.catalog.sourceRevision,
+        provenanceSha256: method.provenanceSha256,
+        catalogSha256: method.catalogSha256,
+      },
+      'Method library metadata differs from the pinned manifest.',
+    );
+    const sourceProvenance = manifest.source.files.filter(
+      (file) => file.path === PSTACK_PROVENANCE_SOURCE,
+    );
+    assert.equal(
+      sourceProvenance.length,
+      1,
+      'Missing or duplicate method source provenance.',
+    );
+    assert.equal(
+      sourceProvenance[0].sha256,
+      method.provenanceSha256,
+      'Carried method provenance differs from source inventory.',
+    );
+    assert.equal(
+      sourceProvenance[0].bytes,
+      files.get(`${PSTACK_METHOD_PREFIX}/provenance.json`).length,
+      'Method provenance source byte count differs.',
+    );
+    const methodSourceFiles = manifest.source.files.filter((file) =>
+      file.path.startsWith(`${PSTACK_ASSET_SOURCE}/`),
+    );
+    const methodArtifactFiles = new Map(
+      [...files.entries()]
+        .filter(
+          ([path]) =>
+            path.startsWith(`${PSTACK_METHOD_PREFIX}/`) &&
+            !['catalog.json', 'provenance.json'].includes(
+              path.slice(PSTACK_METHOD_PREFIX.length + 1),
+            ),
+        )
+        .map(([path, bytes]) => [
+          `${PSTACK_ASSET_SOURCE}/${path.slice(PSTACK_METHOD_PREFIX.length + 1)}`,
+          bytes,
+        ]),
+    );
+    assert.deepEqual(
+      methodSourceFiles,
+      sortedRecords(methodArtifactFiles),
+      'Method source inventory differs from carried method files.',
+    );
+  }
   const policy = JSON.parse(files.get('policy.json').toString());
   assertPolicy(policy);
   const plugin = JSON.parse(files.get('.codex-plugin/plugin.json').toString());
   assert.equal(plugin.name, 'temari');
-  assert.equal(plugin.version, '0.15.4+codex.2');
+  assert.equal(
+    plugin.version,
+    historicalVersion ? '0.15.4+codex.2' : '0.15.5',
+    'Unexpected public plugin version.',
+  );
   assert.equal(plugin.skills, './skills/');
   assert(files.has('skills/temari-knowledge/SKILL.md'));
   assert(files.has('bin/temari-knowledge.mjs'));
@@ -416,7 +540,10 @@ export async function checkPublicEntryArtifact(root, expectedManifestSha256) {
     );
   assert.equal(manifest.build.parallelBundler.name, 'bun');
   assert.match(manifest.build.parallelBundler.version, /^\d+\.\d+\.\d+/);
-  for (const path of generatedFiles) assert(files.has(path));
+  for (const path of historicalVersion
+    ? historicalGeneratedFiles
+    : generatedFiles)
+    assert(files.has(path));
   for (const entry of entries) {
     const path = `bin/${entry}.mjs`;
     assert(files.has(path), `Missing public entry: ${entry}`);
@@ -437,7 +564,11 @@ export async function checkPublicEntryArtifact(root, expectedManifestSha256) {
     );
   }
 
-  const canonicalManifest = await checkCanonicalArtifact(join(root, 'runtime'));
+  const canonicalManifest = await checkCanonicalArtifact(
+    join(root, 'runtime'),
+    undefined,
+    { historical: historicalVersion },
+  );
   assert.equal(
     manifest.runtimeManifestSha256,
     digest(jsonBytes(canonicalManifest)),
@@ -472,6 +603,17 @@ export async function packagePublicEntries(
   for (const [source, destination] of publicFiles) {
     sourceFiles.set(source, await readFile(join(workspace, source)));
   }
+  const methodLibrary = await readPstackMethodLibrary(
+    join(workspace, PSTACK_ASSET_SOURCE),
+    join(workspace, PSTACK_PROVENANCE_SOURCE),
+  );
+  sourceFiles.set(
+    'tools/pstack-method-library.mjs',
+    await readFile(join(workspace, 'tools/pstack-method-library.mjs')),
+  );
+  sourceFiles.set(PSTACK_PROVENANCE_SOURCE, methodLibrary.provenance);
+  for (const [path, bytes] of methodLibrary.files)
+    sourceFiles.set(`${PSTACK_ASSET_SOURCE}/${path}`, bytes);
 
   await mkdir(dirname(output), { recursive: true });
   const reservationPath = `${output}.publish-lock`;
@@ -491,6 +633,10 @@ export async function packagePublicEntries(
     );
     const runtime = join(staging, 'runtime');
     await packageCanonical(runtime);
+    await writePstackMethodLibrary(
+      methodLibrary,
+      join(staging, PSTACK_METHOD_PREFIX),
+    );
     for (const [source, destination] of publicFiles) {
       await exclusiveCopy(
         source,
@@ -553,7 +699,8 @@ export async function packagePublicEntries(
       schemaVersion: 1,
       source: {
         revision: git('rev-parse', 'HEAD'),
-        dirty: git('status', '--porcelain=v1', '--untracked-files=normal') !== '',
+        dirty:
+          git('status', '--porcelain=v1', '--untracked-files=normal') !== '',
         files: sortedRecords(sourceFiles),
       },
       build: {
@@ -570,6 +717,12 @@ export async function packagePublicEntries(
         ),
       },
       entries,
+      methodLibrary: {
+        path: PSTACK_METHOD_PREFIX,
+        sourceRevision: methodLibrary.catalog.sourceRevision,
+        provenanceSha256: digest(methodLibrary.provenance),
+        catalogSha256: digest(jsonBytes(methodLibrary.catalog)),
+      },
       runtimeManifestSha256: digest(canonicalBytes),
       files: [],
     };

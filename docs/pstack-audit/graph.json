@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "scope": "Temari public entries and v4.1 bundled P-stack skills and playbooks, with adjacent ownership boundaries",
-  "reviewedAt": "2026-10-09",
+  "reviewedAt": "2026-10-10",
   "evidenceRule": "documented and source_reference edges describe checked source; review_recommendation edges are proposals, not current behavior",
   "nodes": [
     {
@@ -436,6 +436,18 @@
       "kind": "template",
       "label": "Compact triage handoff",
       "source": "packages/workflow-runtime/public/skills/qa-triage/assets/triage-note.md"
+    },
+    {
+      "id": "public:method-guide",
+      "kind": "reference",
+      "label": "Installed P-stack method loading",
+      "source": "packages/workflow-runtime/public/skills/temari/references/method-library.md"
+    },
+    {
+      "id": "public:method-library",
+      "kind": "bundle",
+      "label": "Complete portable P-stack method library",
+      "source": "tools/pstack-method-library.mjs"
     },
     {
       "id": "public:policy",
@@ -1468,6 +1480,13 @@
       "evidence": "packages/workflow-runtime/public/skills/closeout/SKILL.md"
     },
     {
+      "from": "public-entry:closeout",
+      "to": "public:method-guide",
+      "relation": "references_method_library",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/public/skills/closeout/SKILL.md"
+    },
+    {
       "from": "public-entry:poteto-mode",
       "to": "skill:poteto-mode",
       "relation": "adapts_source_skill",
@@ -1486,6 +1505,13 @@
       "to": "public-skill:temari-knowledge",
       "relation": "invokes_supporting_skill",
       "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "public-entry:poteto-mode",
+      "to": "public:method-guide",
+      "relation": "references_method_library",
+      "basis": "source_reference",
       "evidence": "packages/workflow-runtime/public/skills/poteto-mode/SKILL.md"
     },
     {
@@ -1521,6 +1547,13 @@
       "to": "public-skill:temari-knowledge",
       "relation": "invokes_supporting_skill",
       "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/skills/temari/SKILL.md"
+    },
+    {
+      "from": "public-entry:temari",
+      "to": "public:method-guide",
+      "relation": "references_method_library",
+      "basis": "source_reference",
       "evidence": "packages/workflow-runtime/public/skills/temari/SKILL.md"
     },
     {
@@ -1580,6 +1613,20 @@
       "evidence": "packages/workflow-runtime/public/skills/temari-knowledge/SKILL.md"
     },
     {
+      "from": "public:method-guide",
+      "to": "public:method-library",
+      "relation": "loads_internal_method",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/skills/temari/references/method-library.md"
+    },
+    {
+      "from": "public:method-library",
+      "to": "component:pstack-v4.1",
+      "relation": "packages_portable_inventory",
+      "basis": "documented",
+      "evidence": "tools/pstack-method-library.mjs"
+    },
+    {
       "from": "public:policy",
       "to": "public-entry:closeout",
       "relation": "declares_entry",
@@ -1599,6 +1646,13 @@
       "relation": "declares_entry",
       "basis": "documented",
       "evidence": "packages/workflow-runtime/public/policy.json"
+    },
+    {
+      "from": "public:policy",
+      "to": "public:method-library",
+      "relation": "retains_execution_admission",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/skills/temari/references/method-library.md"
     },
     {
       "from": "skill:architect",

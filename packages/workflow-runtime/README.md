@@ -1,5 +1,53 @@
 # Build a Temari workflow distribution
 
+## Current public plugin
+
+Build the current public plugin after the workspace's dependency setup:
+
+```sh
+pnpm nx run workflow-runtime:public-package --args='--output /absolute/new/temari'
+pnpm nx run workflow-runtime:public-check --args='--artifact /absolute/new/temari --expected-manifest-sha256 HEX'
+```
+
+Use a new absolute destination. Record the SHA-256 of the generated
+`public-entry-manifest.json` outside the artifact, then supply it as `HEX` to
+the check command. Packaging preserves existing destinations and uses an
+exclusive staging/publication boundary. Neither command installs or activates
+the plugin.
+
+The public artifact has a small discovery directory at `skills/`, the existing
+`temari`, `poteto-mode` and `closeout` executable entries, and a complete portable
+method library under `method/pstack/`. The library preserves the vendored layout
+and includes skills, principles, playbooks, agents, host mappings and referenced
+verification material. Its `catalog.json` provides a relative-path index. Every
+member comes from the reviewed portable provenance allowlist; local dependency
+trees, private overlays, retained evidence and the optional native Archon payload
+are excluded. Source provenance, member bytes and executable modes are checked
+when building, checking and starting trusted public work.
+
+The public entries link the [method loading guide](public/skills/temari/references/method-library.md).
+It keeps one flow: public policy and source scope, host mapping, selected playbook,
+needed helper skills, relevant principle leaves, candidate verification and
+canonical closeout. Root skill discovery and `policy.json` admission stay the
+same. Method availability does not admit every playbook or activate historical
+installer, Orchestrate, receipt or verification commands.
+
+Distribute this artifact through the host's plugin discovery mechanism. For
+Codex, the manifest discovers only `./skills/`; use the skill picker or an
+explicit skill mention such as `$temari`. Internal `/how` references mean loading
+the method file through the host mapping. This build does not register arbitrary
+slash commands or alter the user's active installation. Keep dependencies and
+mutable task/evidence state outside the immutable artifact.
+
+The historical `qa-public-package` target is an alias for this same packager.
+
+For a digest-pinned marketplace release, recipient installation, explicit local
+upgrade and recovery, follow [Install or upgrade Temari](../../docs/migrations/install-temari.md).
+The carried verifier and installation inspector run without a source checkout;
+Codex retains ownership of installation state.
+
+## Inherited source distributions
+
 This package vendors Temari's conversational skills, Pstack playbooks, evidence
 commands, host adapters, and an optional Archon integration. Packaging uses only
 the files under this package. It never reads the original Temari checkout.
@@ -108,11 +156,15 @@ bash /absolute/scratch/skills/.temari-package/verification/verify-temari/scripts
 
 `codex` and `claude-code` are also supported host values. The installed
 `pstack-root` pointer is relative, so the complete skill root can move together.
-For a Codex plugin, use a fresh directory whose final component is `temari`:
+For an inherited compatibility plugin, use a fresh directory whose final component is `temari`:
 
 ```sh
 bash /absolute/new/portable/scripts/build-codex-plugin.sh --output=/absolute/scratch/temari
 ```
+
+That inherited helper builds the historical adapter surface. Use the current
+`public-package` target above for the current public runtime and complete method
+library; the two artifact formats are distinct.
 
 These inherited installation helpers can back up existing destinations. For
 evaluation, always use fresh scratch destinations. Do not point them at your
