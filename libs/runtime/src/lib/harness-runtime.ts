@@ -47,6 +47,47 @@ function requireMatchingHarness(
   }
 }
 
+/** Host-only source route. It is deliberately outside ExecutionHarness.start. */
+export interface ReviewedLocalCandidatePaths {
+  readonly specPath: string;
+  readonly bridgePath: string;
+  readonly expectedRequestSha256: string;
+  readonly expectedBridgeSha256: string;
+  readonly bridgeRuntimeExecutable: string;
+  readonly bridgeRuntimeSha256: string;
+}
+export interface ReviewedLocalCandidateHarness extends ExecutionHarness {
+  startReviewedLocalCandidate(
+    request: Omit<HarnessRunRequest, 'entrypoint' | 'inputs'>,
+    paths: ReviewedLocalCandidatePaths,
+  ): Promise<HarnessRunRef>;
+}
+export async function startReviewedLocalCandidateHarness(
+  selection: HarnessSelection,
+  request: Omit<HarnessRunRequest, 'entrypoint' | 'inputs'>,
+  paths: ReviewedLocalCandidatePaths,
+): Promise<HarnessRunRef> {
+  const harness = selectExecutionHarness(
+    selection,
+  ) as Partial<ReviewedLocalCandidateHarness> & ExecutionHarness;
+  if (!harness.verifyRunIdentity || !harness.startReviewedLocalCandidate)
+    throw new Error(
+      'Selected harness does not admit reviewed local candidates.',
+    );
+  const reference = await harness.startReviewedLocalCandidate(request, paths);
+  requireMatchingHarness(harness, reference);
+  if (
+    reference.runId !== request.runId ||
+    reference.revision !== request.revision ||
+    reference.workspaceRoot !== request.workspaceRoot ||
+    reference.entrypoint !== 'temari-reviewed-local-candidate' ||
+    reference.planSha256 !==
+      planSha256({ ...request, entrypoint: reference.entrypoint, inputs: {} })
+  )
+    throw new Error('Managed harness returned a different candidate binding.');
+  return reference;
+}
+
 /** Start a native run through the host/configured/default composition point. */
 export async function startExecutionHarness(
   selection: HarnessSelection,

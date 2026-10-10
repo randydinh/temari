@@ -54,3 +54,4 @@ export function createOllamaModelTransport(
 ) {
   return createProtectedModelTransport(createOllamaModelDriver(options), host);
 }
+export * from './lib/owned-execution.js';

@@ -203,7 +203,7 @@ async function classifyLightweight(request, policy) {
   );
 }
 
-async function admitEngineering(entry, request, policy, trusted = false) {
+export async function admitEngineering(entry, request, policy, trusted = false) {
   exactFields(
     request,
     ['schemaVersion', 'entry', 'route', 'profile', 'obligations'],
@@ -1004,6 +1004,62 @@ async function startQa(request, requestSha256, policy, execution = {}) {
 }
 
 export async function run(entry, argv = process.argv.slice(2)) {
+  if (argv[0] === 'repair') {
+    assert.equal(entry, 'temari', 'Same-task repair is owned by Temari.');
+    assert(
+      ['start', 'readmit', 'status', 'accept'].includes(argv[1]),
+      'Unknown repair operation.',
+    );
+    const flags = new Map();
+    const allowed = [
+      '--request',
+      '--expected-request-sha256',
+      '--expected-manifest-sha256',
+      '--task-selection',
+      '--expected-task-selection-sha256',
+    ];
+    for (let index = 2; index < argv.length; index += 2) {
+      assert(
+        allowed.includes(argv[index]) &&
+          !flags.has(argv[index]) &&
+          argv[index + 1],
+        'Repair requires complete unique flag pairs.',
+      );
+      flags.set(argv[index], argv[index + 1]);
+    }
+    assert(
+      allowed.every((name) => flags.has(name)),
+      'Repair request, artifact and independent current-task selection must be pinned.',
+    );
+    assert(
+      isAbsolute(flags.get('--request')) &&
+        isAbsolute(flags.get('--task-selection')),
+      'Repair request and selection paths must be absolute.',
+    );
+    await verifyBundle(flags.get('--expected-manifest-sha256'));
+    const request = trustedRequest(
+      await readBoundedFile(flags.get('--request'), REQUEST_BYTES),
+      flags.get('--expected-request-sha256'),
+    );
+    const selection = trustedRequest(
+      await readBoundedFile(flags.get('--task-selection'), REQUEST_BYTES),
+      flags.get('--expected-task-selection-sha256'),
+    );
+    const { runInstalledRepair } = await import(
+      pathToFileURL(join(root, 'host/task-repair.mjs')).href
+    );
+    finish(
+      await runInstalledRepair({
+        mode: argv[1],
+        request,
+        selection,
+        selectionPath: flags.get('--task-selection'),
+        selectionSha256: flags.get('--expected-task-selection-sha256'),
+        manifestSha256: flags.get('--expected-manifest-sha256'),
+      }),
+    );
+    return;
+  }
   const command = argv[0];
   const flag = argv[1];
   const argument = argv[2];

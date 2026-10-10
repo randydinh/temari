@@ -1,0 +1,15 @@
+{
+  "request": "For the Cobalt pilot, how should we handle a station that stops sending heartbeats when reporting uptime? Give the relevant project rule and any unresolved assumptions.",
+  "need": "required",
+  "reason": "Current fictional project reporting policy is needed.",
+  "scope": {"sourceId": "2bbc01bed06a4a979f75b37af5005da3", "question": "Heartbeat loss and uptime reporting", "budget": "5 search results; 16000 read characters", "currentness": "Current registered policy"},
+  "observations": [
+    {"operation": "knowledge_discover", "resultRef": null},
+    {"operation": "knowledge_read", "resultRef": null}
+  ],
+  "observationLimitation": "No retainable host tool-event identifier exposed; citations identify verified source bytes.",
+  "evidence": {"path": "cobalt-policy.md", "lines": "1-5", "revision": "2026-10-09", "generation": "279187854003445e9399d537c289ef5f", "sha256": "a877045c45dea76eaee4e9b3d9e284ab2463d3b6bfba53c17212ef4a225b5224"},
+  "result": "retrieved",
+  "conclusion": "Three missed heartbeats trigger unknown classification; report per port, separate communications from charging, retain unknown in eligible time without up credit.",
+  "unresolved": ["Heartbeat schedule and timing tolerance", "Evidence needed for reclassification and retrospective correction", "Mapping station silence to individual ports", "Exact formula clarification for policy wording about not-proven-up minutes in numerator"]
+}

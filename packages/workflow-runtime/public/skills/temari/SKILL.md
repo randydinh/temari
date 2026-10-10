@@ -1,6 +1,6 @@
 ---
 name: temari
-description: Use Temari as the current Nx conversational engineering entry point with lightweight, host-proven feature, and versioned QA routes.
+description: Use Temari to choose and continue source-dependent research, engineering, or QA work. Compose bounded evidence retrieval with Poteto engineering methods and the current Nx runtime's admitted routes.
 ---
 
 # Temari
@@ -10,6 +10,32 @@ Temari is the conversational entry point for the current Nx workflow runtime.
 For engineering work, use the bundled [method library](references/method-library.md)
 after checking public policy and source scope. It supplies P-stack's playbooks,
 supporting skills and principles behind this entry without adding execution routes.
+
+## Decide evidence need and work responsibility
+
+For each request handled through Temari, decide what outcome the user wants and
+what evidence it depends on. Source-dependent research does not require the user
+to name Knowledge: use the bundled [Knowledge skill](../temari-knowledge/SKILL.md)
+when material dependencies remain beyond relevant supplied or reusable evidence.
+This includes documents, current external facts, product requirements, existing
+code behavior, source comparisons, and factual verification. A self-contained
+rewrite or calculation can use its supplied context without external retrieval.
+
+Before substantial planning or dependent work, follow the shared
+[evidence intake](../temari-knowledge/references/evidence-intake.md) to bound the
+question, sources, freshness requirement and observations. Retain its small local
+decision in existing task artifacts/context references, or per-request context
+when untracked. Missing evidence limits dependent claims; independent work can
+continue. An announcement that retrieval will run does not establish that it ran.
+
+Choose the work responsibility separately. A research answer can use Knowledge
+alone; software investigation, design, repair and implementation use Poteto's
+engineering method alongside any needed retrieval. QA acceptance keeps its QA
+owner and evaluator obligations. Research need alone admits no engineering
+profile, and retrieved context grants no permission to implement or publish.
+Revisit the decision when the requested outcome or material dependencies change.
+These are skill instructions for the host path using them; the packaged CLI does
+not intercept every chat or mechanically enforce natural-language selection.
 
 Use the shared [conversation guidance](references/conversation.md) for progress,
 results, choices, and blocked work. Temari owns their practical meaning and the
@@ -132,7 +158,7 @@ Evidence-only drafting produces a local document; it does not admit a QA executi
 route or complete its review obligations. Test-case authoring alone and generic code
 review keep their existing routes.
 
-## Bounded codebase context intake
+## Apply evidence intake to a codebase
 
 After reading the installed policy and identifying the selected repository and
 candidate, use context providers only within the admitted task authority. When a
@@ -141,8 +167,8 @@ documents, then read relevant source-backed requirements and product decisions.
 When an existing knowledge graph covers the admitted repository and candidate,
 query affected components, callers, and boundaries before broad file exploration.
 Record the source scope, query, selection, budget, revisions or graph snapshot,
-useful citations, and coverage gaps. Treat graph relationships and indexed
-summaries as navigation; verify material claims against the current ticket,
+useful citations, and coverage gaps in the shared evidence decision. Treat graph
+relationships and indexed summaries as navigation; verify material claims against the current ticket,
 document, and source. A provider is optional and does not decide a QA disposition
 or expand the task's authority. If it is unavailable, stale, or lacks the needed
 corpus, state the gap and continue with scoped direct inspection. Do not silently
@@ -163,6 +189,40 @@ to retain the actual conversation, recovery point and outcome automatically.
 Select the task explicitly, preserve its current version, and keep tracking outside
 the execution request. Feature tracking uses the original project scope while
 the host verifies the integration checkout. A handoff never establishes completion.
+
+When a correction or observed counterexample confirms a systemic discrepancy,
+Temari owns the decision to repair it and the required route. Preserve the failing
+case and expected invariant, then promptly initiate one bounded repair under the
+same logical task when its independently selected existing authority admits it.
+Use `bin/temari.mjs repair start --request ABS_JSON --expected-request-sha256 HEX
+--expected-manifest-sha256 HEX --task-selection ABS_JSON
+--expected-task-selection-sha256 HEX`. The report names `repairId`, counterexample,
+affected surface, invariant, pinned evidence, requested scopes, regression contract
+and `requiredRoute`; it cannot nominate an executable or commands. Keep task/host
+selection and its externally supplied digest separate from the report. The selection
+pins the owning public invocation and existing bounded host profile. A handoff is
+only a continuity link. Reopen actual prior host proof for a feature owner; a
+lightweight owner cannot authorize a shared boundary, defect, migration or other
+full-route repair. Record the precise missing-authority blocker instead of
+self-authoring a wider profile or relabeling the work.
+
+After the actual repair worker is observed, continue compatible original work;
+the repair never replaces the parent run or requires a new chat. Use the same flag
+pairs with `repair status` to recover the exact retained launch. Repeat reports,
+restarts, missing heartbeat or expired lease never authorize another launch.
+Worker PASS means `NEEDS_REVIEW`. Select the exact candidate/artifact and reopened
+independent-review plus failing-baseline/fresh-install regression evidence before
+`repair accept` records coordinator resolution. Missing or changed evidence reopens
+the obligation. Repair acceptance grants no parent completion or publication.
+
+For a never-launched BLOCKED report, obtain the missing independently proven
+authority and use `repair readmit` with the same report, a fresh key and current
+task version. Preserve the original refusal in history. Ordinary repeat `start`
+cannot admit it, and readmission never retries a launched or uncertain process.
+The host freezes the admitted source before dispatch; compatible parent edits
+outside repair ownership do not disturb that isolated candidate. Reopen the
+pinned counterexample and helper/input byte identities alongside result evidence
+before maintaining resolution.
 
 For QA, pass a versioned full assignment, review draft, canonical evidence root, and canonical invocation to `bin/temari.mjs qa` with the same external request and artifact digest flags. The result retains a QA disposition and evaluator evidence. A caller-supplied evaluator ID, round, context claim, or capability list is rejected. The route never writes to external systems.
 

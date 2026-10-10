@@ -9,6 +9,7 @@ smoke.ts
 live.ts
 live-codex.ts
 privacy.ts
+worker-efficiency.ts
 model-transport.ts
 codex-model-driver.ts
 openai-responses-driver.ts

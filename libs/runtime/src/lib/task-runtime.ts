@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict';
 import { lstat } from 'node:fs/promises';
+import {
+  TaskRepairs,
+  type TaskRepairHost,
+  type TaskRepairReport,
+  type RepairVerificationSelection,
+  type TaskRepairSnapshot,
+} from './task-repair.js';
 import type {
   HarnessRunRef,
   HarnessRunSnapshot,
@@ -18,6 +25,8 @@ import {
   resumeExecutionHarness,
   startExecutionHarness,
   verifyExecutionHarnessRunIdentity,
+  startReviewedLocalCandidateHarness,
+  type ReviewedLocalCandidatePaths,
 } from './harness-runtime.js';
 import {
   selectExecutionHarness,
@@ -67,6 +76,7 @@ export interface TaskSnapshot extends TaskRecord {
   readonly evidence: TaskEvidenceSnapshot;
   readonly semanticAcceptance: boolean;
   readonly runSnapshots: readonly TaskRunSnapshot[];
+  readonly repairSnapshots: readonly TaskRepairSnapshot[];
 }
 export type TaskRunCommand = TaskCommand & { readonly runId: string };
 const missingEvidence: TaskEvidenceSnapshot = {
@@ -102,12 +112,15 @@ function closeoutEligibility(run: TaskRun): void {
 export class TaskRuntime {
   private readonly store: FileTaskStore;
   private readonly selection: HarnessSelection | undefined;
+  private readonly repairs: TaskRepairs;
   constructor(options: {
     readonly store: FileTaskStore;
     readonly selection?: HarnessSelection;
+    readonly repairHost?: TaskRepairHost;
   }) {
     this.store = options.store;
     this.selection = options.selection;
+    this.repairs = new TaskRepairs(options.store, options.repairHost);
   }
 
   async snapshot(taskId: string): Promise<TaskSnapshot> {
@@ -115,11 +128,45 @@ export class TaskRuntime {
     const runSnapshots = await Promise.all(
       task.runs.map((run) => this.inspectRun(run)),
     );
-    return this.projectSnapshot(task, runSnapshots);
+    return this.projectSnapshot(
+      task,
+      runSnapshots,
+      await this.repairs.snapshots(task),
+    );
+  }
+  async initiateRepair(
+    input: TaskCommand & { readonly report: TaskRepairReport },
+  ): Promise<TaskSnapshot> {
+    await this.repairs.initiate(input);
+    return this.snapshot(input.taskId);
+  }
+  async reconcileRepair(input: {
+    readonly taskId: string;
+    readonly repairId: string;
+  }): Promise<TaskSnapshot> {
+    await this.repairs.reconcile(input.taskId, input.repairId);
+    return this.snapshot(input.taskId);
+  }
+  async readmitRepair(
+    input: TaskCommand & { readonly report: TaskRepairReport },
+  ): Promise<TaskSnapshot> {
+    await this.repairs.initiate(input, true);
+    return this.snapshot(input.taskId);
+  }
+  async acceptRepair(
+    input: TaskCommand & {
+      readonly repairId: string;
+      readonly selection: RepairVerificationSelection;
+      readonly reason: string;
+    },
+  ): Promise<TaskSnapshot> {
+    await this.repairs.accept(input);
+    return this.snapshot(input.taskId);
   }
   private projectSnapshot(
     task: TaskRecord,
     runSnapshots: readonly TaskRunSnapshot[],
+    repairSnapshots: readonly TaskRepairSnapshot[],
   ): TaskSnapshot {
     const run = task.runs.find((r) => r.runId === task.currentRunId);
     const observed = runSnapshots.find((r) => r.runId === task.currentRunId);
@@ -134,7 +181,7 @@ export class TaskRuntime {
         /* Present verified evidence for review while stronger route proof is unavailable. */
       }
     }
-    const accepted = Boolean(
+    const parentAccepted = Boolean(
       task.acceptance &&
       task.acceptance.runId === run?.runId &&
       task.acceptance.receiptSha256 === evidence.receiptSha256 &&
@@ -153,7 +200,7 @@ export class TaskRuntime {
       (observed && run
         ? (run.plan.stages[observed.stages.length] ?? null)
         : null);
-    if (accepted && !task.blocker) status = 'DONE';
+    if (parentAccepted && !task.blocker) status = 'DONE';
     else if (pending) {
       status = 'BLOCKED';
       blocker ??=
@@ -225,6 +272,21 @@ export class TaskRuntime {
       nextAction ??= run
         ? 'Execute the bound plan and retain its canonical receipt and evidence.'
         : 'Bind the first execution plan to this task.';
+    const unresolved = repairSnapshots.find(
+      (repair) => repair.state !== 'RESOLVED',
+    );
+    if (
+      unresolved &&
+      (!run || status === 'DONE' || status === 'NEEDS_REVIEW')
+    ) {
+      status = ['RUNNING', 'STARTING'].includes(unresolved.state)
+        ? 'RUNNING'
+        : unresolved.state === 'NEEDS_REVIEW'
+          ? 'NEEDS_REVIEW'
+          : 'BLOCKED';
+      blocker ??= unresolved.issues[0] ?? null;
+      nextAction ??= `Review required repair ${unresolved.repairId} before closing this task.`;
+    }
     return {
       ...task,
       status,
@@ -232,8 +294,9 @@ export class TaskRuntime {
       blocker,
       currentStage,
       evidence,
-      semanticAcceptance: accepted,
+      semanticAcceptance: parentAccepted && !unresolved,
       runSnapshots,
+      repairSnapshots,
     };
   }
   async listSnapshots(): Promise<readonly TaskSnapshot[]> {
@@ -261,6 +324,7 @@ export class TaskRuntime {
     const refreshed = this.projectSnapshot(
       task,
       run ? [await this.inspectRun(run)] : [],
+      await this.repairs.snapshots(task),
     );
     return {
       schema: 1,
@@ -277,6 +341,79 @@ export class TaskRuntime {
       readonly inputs: Readonly<Record<string, string>>;
     },
   ): Promise<TaskSnapshot> {
+    assert.notEqual(
+      request.entrypoint,
+      'temari-reviewed-local-candidate',
+      'Managed candidate requires route-specific admission and dispatch.',
+    );
+    return (
+      await this.dispatchThrough(request, (run, task, intent) =>
+        startExecutionHarness(this.requireSelection(), {
+          runId: run.runId,
+          revision: run.revision,
+          plan: run.plan,
+          workspaceRoot: task.workspaceRoot,
+          entrypoint: intent.entrypoint!,
+          inputs: intent.inputs!,
+          recovery: 'required',
+        }),
+      )
+    ).task;
+  }
+
+  /** Persist the exact protected inputs before the managed admission/start port.
+   * Duplicate and uncertain dispatch never fall through to a second native launch. */
+  async dispatchReviewedLocalCandidate(
+    request: TaskRunCommand & {
+      readonly paths: ReviewedLocalCandidatePaths;
+    },
+  ): Promise<{ readonly task: TaskSnapshot; readonly dispatched: boolean }> {
+    const paths = structuredClone(request.paths);
+    for (const pin of [
+      paths.expectedRequestSha256,
+      paths.expectedBridgeSha256,
+      paths.bridgeRuntimeSha256,
+    ])
+      assert.match(pin, /^[a-f0-9]{64}$/);
+    return this.dispatchThrough(
+      {
+        ...request,
+        entrypoint: 'temari-reviewed-local-candidate',
+        inputs: {
+          spec: paths.specPath,
+          bridge: paths.bridgePath,
+          request_sha256: paths.expectedRequestSha256,
+          bridge_sha256: paths.expectedBridgeSha256,
+          bridge_runtime: paths.bridgeRuntimeExecutable,
+          bridge_runtime_sha256: paths.bridgeRuntimeSha256,
+        },
+      },
+      (run, task) =>
+        startReviewedLocalCandidateHarness(
+          this.requireSelection(),
+          {
+            runId: run.runId,
+            revision: run.revision,
+            plan: run.plan,
+            workspaceRoot: task.workspaceRoot,
+            recovery: 'required',
+          },
+          paths,
+        ),
+    );
+  }
+
+  private async dispatchThrough(
+    request: TaskRunCommand & {
+      readonly entrypoint: string;
+      readonly inputs: Readonly<Record<string, string>>;
+    },
+    launch: (
+      run: TaskRun,
+      task: TaskRecord,
+      intent: TaskRun['operations'][number],
+    ) => Promise<HarnessRunRef>,
+  ): Promise<{ readonly task: TaskSnapshot; readonly dispatched: boolean }> {
     const selection = this.requireSelection();
     const harness = selectExecutionHarness(selection);
     assert(
@@ -291,21 +428,14 @@ export class TaskRuntime {
       harnessId: harness.id,
       harnessVersion: harness.version,
     });
-    if (!started.applied) return this.snapshot(request.taskId);
+    if (!started.applied)
+      return { task: await this.snapshot(request.taskId), dispatched: false };
     const run = boundRun(started.task, request.runId);
     const intent = run.operations.find(
       (op) => op.commandId === request.idempotencyKey,
     )!;
     try {
-      const reference = await startExecutionHarness(selection, {
-        runId: run.runId,
-        revision: run.revision,
-        plan: run.plan,
-        workspaceRoot: started.task.workspaceRoot,
-        entrypoint: intent.entrypoint!,
-        inputs: intent.inputs!,
-        recovery: 'required',
-      });
+      const reference = await launch(run, started.task, intent);
       await this.finish(request, 'bound', {
         type: 'native-bound',
         runId: run.runId,
@@ -316,7 +446,7 @@ export class TaskRuntime {
       await this.uncertain(request, error);
       throw error;
     }
-    return this.snapshot(request.taskId);
+    return { task: await this.snapshot(request.taskId), dispatched: true };
   }
 
   /** Recover a retained dispatch only after the selected executor recognizes
@@ -637,6 +767,28 @@ export class TaskRuntime {
             'Child revision mismatch.',
           );
           children.push(child);
+        }
+      } catch (error) {
+        issues.push(errorMessage(error));
+      }
+    }
+    if (run.executionStoreRoot) {
+      try {
+        assert(
+          (await lstat(run.executionStoreRoot)).isDirectory(),
+          'Execution store is missing.',
+        );
+        const store = await FileChildTaskStore.create(run.executionStoreRoot);
+        for (const child of await store.executionRecords(run.runId)) {
+          assert.equal(
+            child.revision,
+            run.revision,
+            'Execution revision mismatch.',
+          );
+          if (!children.some((existing) => existing.taskId === child.taskId))
+            children.push(child);
+          if (child.execution && child.execution.state !== 'CLEANED')
+            issues.push(`Execution cleanup unresolved: ${child.taskId}`);
         }
       } catch (error) {
         issues.push(errorMessage(error));

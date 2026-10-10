@@ -1,3 +1,4 @@
+import { inOwnedProcessGroup } from './owned-execution.js';
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -67,7 +68,7 @@ export interface CapturedProcessOptions {
 function terminate(pid: number | undefined): void {
   if (!pid) return;
   try {
-    process.kill(process.platform === 'win32' ? pid : -pid, 'SIGKILL');
+    process.kill(process.platform === 'win32' || inOwnedProcessGroup() ? pid : -pid, 'SIGKILL');
   } catch {}
 }
 function safeErrorCode(error: unknown): string | null {
@@ -290,7 +291,7 @@ export async function runProcessToFiles(
       cwd: options.cwd,
       env: options.env ?? process.env,
       shell: false,
-      detached: process.platform !== 'win32',
+      detached: process.platform !== 'win32' && !inOwnedProcessGroup(),
       stdio: ['pipe', 'pipe', 'pipe'],
     });
   } catch (cause) {

@@ -36,6 +36,12 @@ is a public supporting skill, invoked through Temari for QA deliverables rather
 than a fourth `policy.entries` key.
 [Temari Knowledge](../../packages/workflow-runtime/public/skills/temari-knowledge/SKILL.md)
 is a supporting knowledge capability, not a fourth workflow admission entry.
+Temari and Poteto now link to its shared
+[evidence intake](../../packages/workflow-runtime/public/skills/temari-knowledge/references/evidence-intake.md).
+The guidance composes source-dependent research and engineering with bounded
+retrieval and retained request context. It does not add chat interception,
+authenticated tool proof, or execution admission. Neutral-prompt observations
+remain separate from these source-linked graph relationships.
 [QA Triage](../../packages/workflow-runtime/public/skills/qa-triage/SKILL.md)
 provides analytical guidance through an ordered
 [issue triage playbook](../../packages/workflow-runtime/public/skills/qa-triage/references/issue-triage-v1.md)

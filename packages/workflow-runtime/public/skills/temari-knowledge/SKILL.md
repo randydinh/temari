@@ -1,6 +1,6 @@
 ---
 name: temari-knowledge
-description: Use the bundled Temari knowledge and Content Registrar capability for explicitly scoped source intake, search, queries, and archive jobs. Use when the user asks to set up or inspect this installed capability, or when an admitted task needs source-backed knowledge retrieval.
+description: Retrieve source-backed evidence for research, explanations, comparisons, factual verification, and engineering or QA context when material dependencies remain beyond supplied evidence. Use for scoped source intake, search, queries, archive jobs, and setup or inspection of the bundled Content Registrar capability.
 ---
 
 # Temari Knowledge
@@ -10,6 +10,25 @@ entries. It does not admit an engineering or QA route, decide a disposition, or
 expand the current task's authority. Use `bin/temari-knowledge.mjs` from the
 installed plugin root. The launcher uses the compiled `@temari/knowledge` CLI
 inside the verified artifact and the pinned, bundled Python Content Registrar.
+
+## Select bounded evidence retrieval
+
+Use this skill for source-dependent requests without requiring the user to name
+Knowledge. Decide whether relevant supplied or previously retrieved evidence
+satisfies the question; check its scope, applicability and currentness. When
+material dependencies remain, perform bounded lookup and source reading before
+dependent conclusions. Read [evidence intake](references/evidence-intake.md) for
+the decision, retained observations, source limits and result states. Pure
+rewrites and calculations need no external lookup unless a material factual
+premise needs checking.
+
+Use existing sources for ordinary retrieval. Archive intake is conditional on
+needing capture, verified refresh, retained versions or a durable worker handoff;
+do not recapture a corpus for each question. Authoritative web lookup can supply
+current citations without importing the site. A dedicated worker is warranted
+by an actual context, independence, duration or recovery need, rather than every
+knowledge question. This guidance creates no automatic chat interception or new
+runtime admission.
 
 ## Set up the local provider
 
@@ -105,3 +124,6 @@ against current source and candidate state. Report missing or stale coverage.
 Local Registrar read/search needs no TypeSafe key. Any hosted Jev call remains
 conditional on its configured credential and source-sharing policy. Do not
 silently substitute another provider or widen source access.
+Honor a disabled provider selection; automatic retrieval does not authorize
+enabling or reconnecting it. Keep local-only sources local, report the dependency
+gap, and use only fallbacks permitted by the current request and source policy.

@@ -42,6 +42,11 @@ const sourcePluginPath =
   'packages/workflow-runtime/knowledge-plugin/.codex-plugin/plugin.json';
 const sourceSkillPath =
   'packages/workflow-runtime/public/skills/temari-knowledge/SKILL.md';
+const knowledgeReferences = ['references/evidence-intake.md'];
+const referencePaths = knowledgeReferences.map((path) => ({
+  source: `packages/workflow-runtime/public/skills/temari-knowledge/${path}`,
+  artifact: `skills/content-registrar-knowledge/${path}`,
+}));
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const jsonBytes = (value) => Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
@@ -176,9 +181,21 @@ async function checkKnowledgePluginAtPin(
   assert.equal(typeof manifest.source.dirty, 'boolean');
   assert.match(manifest.source.publicManifestSha256, /^[a-f0-9]{64}$/);
   assert(Array.isArray(manifest.source.additionalFiles));
+  const selectedReferences =
+    historicalRegistrarProvenance &&
+    !manifest.source.additionalFiles.some((file) =>
+      referencePaths.some((path) => path.source === file.path),
+    )
+      ? []
+      : referencePaths;
   assert.deepEqual(
     manifest.source.additionalFiles.map((file) => file.path),
-    [sourcePluginPath, sourceSkillPath, 'tools/knowledge-plugin.mjs'].sort(),
+    [
+      sourcePluginPath,
+      sourceSkillPath,
+      'tools/knowledge-plugin.mjs',
+      ...selectedReferences.map((path) => path.source),
+    ].sort(),
   );
   for (const file of manifest.source.additionalFiles) {
     safePath(file.path);
@@ -196,7 +213,12 @@ async function checkKnowledgePluginAtPin(
           !path.startsWith('registrar/') && !path.startsWith('runtime/'),
       )
       .sort(),
-    [pluginPath, launcherPath, skillPath].sort(),
+    [
+      pluginPath,
+      launcherPath,
+      skillPath,
+      ...selectedReferences.map((path) => path.artifact),
+    ].sort(),
   );
   const plugin = JSON.parse(files.get(pluginPath).toString());
   assert.equal(
@@ -212,6 +234,14 @@ async function checkKnowledgePluginAtPin(
     files.get(skillPath).toString(),
     /^---\nname: content-registrar-knowledge\n/,
   );
+  for (const path of selectedReferences) {
+    assert.equal(
+      sha256(files.get(path.artifact)),
+      manifest.source.additionalFiles.find((file) => file.path === path.source)
+        .sha256,
+      `Knowledge reference differs from its source: ${path.artifact}`,
+    );
+  }
   assert(
     files.get(launcherPath).includes('temari-knowledge-provider-selection'),
   );
@@ -302,6 +332,12 @@ export async function packageKnowledgePlugin(output) {
     const toolSource = await readRegularSource(toolPath);
     await writeExclusive(staging, pluginPath, pluginSource);
     await writeExclusive(staging, skillPath, standaloneSkill(skillSource));
+    const referenceSources = new Map();
+    for (const path of referencePaths) {
+      const bytes = await readRegularSource(join(workspace, path.source));
+      referenceSources.set(path.source, bytes);
+      await writeExclusive(staging, path.artifact, bytes);
+    }
     assert.equal(git('rev-parse', 'HEAD'), publicManifest.source.revision);
     const files = await filesAt(staging);
     const manifest = {
@@ -317,6 +353,7 @@ export async function packageKnowledgePlugin(output) {
             [sourcePluginPath, pluginSource],
             [sourceSkillPath, skillSource],
             ['tools/knowledge-plugin.mjs', toolSource],
+            ...referenceSources,
           ]),
         ),
       },

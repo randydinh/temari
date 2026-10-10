@@ -41,6 +41,9 @@
     },
     {
       "path": "./packages/testmo-mcp"
+    },
+    {
+      "path": "./apps/dashboard"
     }
   ],
   "compilerOptions": {}

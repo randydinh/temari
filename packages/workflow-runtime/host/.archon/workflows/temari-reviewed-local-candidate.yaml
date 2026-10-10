@@ -1,0 +1,88 @@
+name: temari-reviewed-local-candidate
+description: Temari-governed one-builder local candidate with independent review and protected checks.
+inputs:
+  temari_binding:
+    required: true
+  bridge:
+    required: true
+  spec:
+    required: true
+  request_sha256:
+    required: true
+  bridge_sha256:
+    required: true
+  bridge_runtime:
+    required: true
+  bridge_runtime_sha256:
+    required: true
+  native_executable:
+    required: true
+  native_executable_sha256:
+    required: true
+  native_home:
+    required: true
+evidence_policy:
+  required: true
+nodes:
+  - id: investigate
+    timeout: 1800000
+    mutates_checkout: false
+    bash: >-
+      test "$(shasum -a 256 "$INPUTS_BRIDGE" | cut -d " " -f 1)" = "$INPUTS_BRIDGE_SHA256" &&
+      test "$(shasum -a 256 "$INPUTS_BRIDGE_RUNTIME" | cut -d " " -f 1)" = "$INPUTS_BRIDGE_RUNTIME_SHA256" &&
+      "$INPUTS_BRIDGE_RUNTIME" "$INPUTS_BRIDGE" capture --spec "$INPUTS_SPEC" --sha256 "$INPUTS_REQUEST_SHA256"
+      --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --stage investigate
+  - id: plan
+    timeout: 180000
+    depends_on: [investigate]
+    mutates_checkout: false
+    bash: >-
+      test "$(shasum -a 256 "$INPUTS_BRIDGE" | cut -d " " -f 1)" = "$INPUTS_BRIDGE_SHA256" &&
+      test "$(shasum -a 256 "$INPUTS_BRIDGE_RUNTIME" | cut -d " " -f 1)" = "$INPUTS_BRIDGE_RUNTIME_SHA256" &&
+      "$INPUTS_BRIDGE_RUNTIME" "$INPUTS_BRIDGE" capture --spec "$INPUTS_SPEC" --sha256 "$INPUTS_REQUEST_SHA256"
+      --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --stage plan
+  - id: build
+    timeout: 1800000
+    depends_on: [plan]
+    mutates_checkout: false
+    bash: >-
+      test "$(shasum -a 256 "$INPUTS_BRIDGE" | cut -d " " -f 1)" = "$INPUTS_BRIDGE_SHA256" &&
+      test "$(shasum -a 256 "$INPUTS_BRIDGE_RUNTIME" | cut -d " " -f 1)" = "$INPUTS_BRIDGE_RUNTIME_SHA256" &&
+      "$INPUTS_BRIDGE_RUNTIME" "$INPUTS_BRIDGE" capture --spec "$INPUTS_SPEC" --sha256 "$INPUTS_REQUEST_SHA256"
+      --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --stage build
+  - id: review
+    timeout: 1080000
+    depends_on: [build]
+    mutates_checkout: false
+    bash: >-
+      test "$(shasum -a 256 "$INPUTS_BRIDGE" | cut -d " " -f 1)" = "$INPUTS_BRIDGE_SHA256" &&
+      test "$(shasum -a 256 "$INPUTS_BRIDGE_RUNTIME" | cut -d " " -f 1)" = "$INPUTS_BRIDGE_RUNTIME_SHA256" &&
+      "$INPUTS_BRIDGE_RUNTIME" "$INPUTS_BRIDGE" capture --spec "$INPUTS_SPEC" --sha256 "$INPUTS_REQUEST_SHA256"
+      --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --stage review
+  - id: verify
+    timeout: 900000
+    depends_on: [review]
+    mutates_checkout: false
+    bash: >-
+      test "$(shasum -a 256 "$INPUTS_BRIDGE" | cut -d " " -f 1)" = "$INPUTS_BRIDGE_SHA256" &&
+      test "$(shasum -a 256 "$INPUTS_BRIDGE_RUNTIME" | cut -d " " -f 1)" = "$INPUTS_BRIDGE_RUNTIME_SHA256" &&
+      "$INPUTS_BRIDGE_RUNTIME" "$INPUTS_BRIDGE" capture --spec "$INPUTS_SPEC" --sha256 "$INPUTS_REQUEST_SHA256"
+      --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --stage verify
+  - id: deliver
+    timeout: 180000
+    depends_on: [verify]
+    mutates_checkout: false
+    bash: >-
+      test "$(shasum -a 256 "$INPUTS_BRIDGE" | cut -d " " -f 1)" = "$INPUTS_BRIDGE_SHA256" &&
+      test "$(shasum -a 256 "$INPUTS_BRIDGE_RUNTIME" | cut -d " " -f 1)" = "$INPUTS_BRIDGE_RUNTIME_SHA256" &&
+      "$INPUTS_BRIDGE_RUNTIME" "$INPUTS_BRIDGE" capture --spec "$INPUTS_SPEC" --sha256 "$INPUTS_REQUEST_SHA256"
+      --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID" --stage deliver
+  - id: finalize
+    timeout: 300000
+    depends_on: [deliver]
+    mutates_checkout: false
+    bash: >-
+      test "$(shasum -a 256 "$INPUTS_BRIDGE" | cut -d " " -f 1)" = "$INPUTS_BRIDGE_SHA256" &&
+      test "$(shasum -a 256 "$INPUTS_BRIDGE_RUNTIME" | cut -d " " -f 1)" = "$INPUTS_BRIDGE_RUNTIME_SHA256" &&
+      "$INPUTS_BRIDGE_RUNTIME" "$INPUTS_BRIDGE" finalize --spec "$INPUTS_SPEC" --sha256 "$INPUTS_REQUEST_SHA256"
+      --artifacts "$ARTIFACTS_DIR" --workflow-id "$WORKFLOW_ID"

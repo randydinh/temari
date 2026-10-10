@@ -1,7 +1,9 @@
 packages:
   - 'packages/*'
   - 'libs/*'
+  - 'apps/*'
 allowBuilds:
   '@swc/core': false
   nx: false
   protobufjs: false
+  esbuild: false

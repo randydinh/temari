@@ -150,6 +150,12 @@ edge("public-skill:qa-triage", "owner:poteto", "hands_off_authorized_repair", "d
 
 knowledge_public = public_root / "skills/temari-knowledge/SKILL.md"
 node("public-skill:temari-knowledge", "public-skill", "Temari Knowledge", source=relative(knowledge_public))
+evidence_intake = public_root / "skills/temari-knowledge/references/evidence-intake.md"
+node("public-reference:evidence-intake", "public-reference", "Bounded evidence intake", source=relative(evidence_intake))
+edge("public-skill:temari-knowledge", "public-reference:evidence-intake", "uses_evidence_decision", "source_reference", relative(knowledge_public))
+for entry_name in ("temari", "poteto-mode"):
+    edge(f"public-entry:{entry_name}", "public-skill:temari-knowledge", "invokes_supporting_skill", "documented", relative(public_root / "skills" / entry_name / "SKILL.md"))
+    edge(f"public-entry:{entry_name}", "public-reference:evidence-intake", "uses_evidence_decision", "source_reference", relative(public_root / "skills" / entry_name / "SKILL.md"))
 
 skill_files = sorted(SKILLS.glob("*/SKILL.md"))
 playbook_files = sorted(PLAYBOOKS.glob("*.md"))

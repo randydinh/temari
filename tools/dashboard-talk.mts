@@ -39,12 +39,30 @@ export interface DashboardTalkOptions {
   readonly taskStore:FileTaskStore;
   readonly runtime:TaskRuntime;
   readonly controller?:unknown;
+  /** Narrow host-owned schema-1 bridge. Browser/model input cannot select its policy or route. */
+  readonly taskBridge?:DashboardTalkTaskBridge;
   /** Trusted host injection for focused tests; never supplied by HTTP/config JSON. */
   readonly transport?:ModelTransport;
   readonly transportIdentity?:{ readonly adapter:string; readonly model:string };
   /** Internal host registry binding; never accepted from config or HTTP. */
   readonly proposalIdentityNamespace?:string;
   readonly validateHostSelection?:()=>Promise<void>;
+}
+export interface TalkTaskAction {
+  readonly action:'prepare-plan'|'implementation-start';
+  readonly label:string;
+  readonly proposalSha256?:string;
+}
+export interface TalkTaskControllerProjection {
+  readonly phase:'planning'|'implementation';
+  readonly state:string;
+  readonly message:string|null;
+  readonly action:TalkTaskAction|null;
+}
+export interface DashboardTalkTaskBridge {
+  readonly workspaceRoot:string;
+  intake(input:{readonly requestId:string;readonly title:string;readonly goal:string}):Promise<{readonly taskId:string}>;
+  project(input:{readonly taskId:string;readonly expectedVersion:number}):Promise<TalkTaskControllerProjection|null>;
 }
 export interface TalkMutationInput { readonly requestId:string; readonly expectedVersion:number }
 export interface TalkTurnInput extends TalkMutationInput { readonly text:string }
@@ -58,6 +76,7 @@ export interface TalkTaskCard {
   readonly currentRunId:string|null; readonly nextAction:string|null; readonly blocker:string|null;
   readonly semanticAcceptance:boolean; readonly evidence:TaskSnapshot['evidence']|null;
   readonly observedAt:string; readonly reason:string|null; readonly omittedFields:readonly string[];
+  readonly controller?:TalkTaskControllerProjection|null;
 }
 export type TalkTurnDto = ConversationTurn & { readonly requestId:string };
 export interface TalkTopicDetail {
@@ -266,9 +285,14 @@ export class DashboardTalkService {
         check(snapshot.version===actual.version&&await this.matchesWorkspace(snapshot.workspaceRoot),'Linked task changed during observation.',409);
         const omittedFields:string[]=[];
         const bounded=(field:string,value:string|null)=>{const chosen=short(value);if(chosen!==value)omittedFields.push(field);return chosen;};
-        cards.push({taskId:link.taskId,available:true,version:snapshot.version,title:bounded('title',snapshot.title)!,goal:bounded('goal',snapshot.goal)!,status:snapshot.status,currentRunId:snapshot.currentRunId,nextAction:bounded('nextAction',snapshot.nextAction),blocker:bounded('blocker',snapshot.blocker),semanticAcceptance:snapshot.semanticAcceptance,evidence:{...snapshot.evidence,issues:snapshot.evidence.issues.slice(0,8).map((issue)=>short(issue,1024)!)},observedAt,reason:null,omittedFields});
+        let controller:TalkTaskControllerProjection|null=null;
+        if(this.options.taskBridge)try {
+          controller=await this.options.taskBridge.project({taskId:link.taskId,expectedVersion:snapshot.version});
+          if(controller)controller={...controller,message:short(controller.message,1024)};
+        } catch { controller=null; }
+        cards.push({taskId:link.taskId,available:true,version:snapshot.version,title:bounded('title',snapshot.title)!,goal:bounded('goal',snapshot.goal)!,status:snapshot.status,currentRunId:snapshot.currentRunId,nextAction:bounded('nextAction',snapshot.nextAction),blocker:bounded('blocker',snapshot.blocker),semanticAcceptance:snapshot.semanticAcceptance,evidence:{...snapshot.evidence,issues:snapshot.evidence.issues.slice(0,8).map((issue)=>short(issue,1024)!)},observedAt,reason:null,omittedFields,controller});
       } catch {
-        cards.push({taskId:link.taskId,available:false,version:actual?.version??null,title:'Unavailable linked task',goal:'',status:'UNKNOWN',currentRunId:actual?.currentRunId??null,nextAction:null,blocker:null,semanticAcceptance:false,evidence:null,observedAt,reason:'The linked task status or selected workspace could not be verified.',omittedFields:[]});
+        cards.push({taskId:link.taskId,available:false,version:actual?.version??null,title:'Unavailable linked task',goal:'',status:'UNKNOWN',currentRunId:actual?.currentRunId??null,nextAction:null,blocker:null,semanticAcceptance:false,evidence:null,observedAt,reason:'The linked task status or selected workspace could not be verified.',omittedFields:[],controller:null});
       }
     }
     return cards;
@@ -292,7 +316,7 @@ export class DashboardTalkService {
     const selected=await this.allTopics(),attention=await this.store.listAttention({unreadOnly:true,limit:50});
     const topics=selected.map((topic)=>({...topic,unread:topic.unreadAttentionCount,attentionCount:topic.actionableAttentionCount,turnState:topic.lastTurnState}));
     const setupReason=this.transport?null:'Configure a host-selected model transport to send messages. Topics and task links are available.';
-    return {configured:true,capabilities:{canSendTurn:Boolean(this.transport),canCreateTopic:true,canLinkTask:true,canAcknowledge:true,canAcceptProposal:true,canStartTask:false},reason:setupReason,setupReason,topics,page:{total:topics.length,offset:0,limit:CONVERSATION_LIMITS.topics,omittedBefore:0,omittedAfter:0,hasMore:false},attention:attention.items,attentionPage:pageMeta(attention)};
+    return {configured:true,capabilities:{canSendTurn:Boolean(this.transport),canCreateTopic:true,canLinkTask:true,canAcknowledge:true,canAcceptProposal:true,canStartTask:Boolean(this.options.taskBridge)},reason:setupReason,setupReason,topics,page:{total:topics.length,offset:0,limit:CONVERSATION_LIMITS.topics,omittedBefore:0,omittedAfter:0,hasMore:false},attention:attention.items,attentionPage:pageMeta(attention)};
   }
   async topic(topicId:string,options:{offset?:number;limit?:number}={}):Promise<TalkTopicDetail> {
     options=structuredClone(options);await this.requireTopic(topicId);await this.refresh(topicId);
@@ -437,7 +461,10 @@ export class DashboardTalkService {
         if(!claim.applied)return claim.topic;
         topic=claim.topic;
         if(this.options.validateHostSelection)await this.options.validateHostSelection();
-        await this.options.taskStore.createTask({taskId,actor,idempotencyKey:'talk-create-'+identity,title:proposal.title,goal:proposal.goal,workspaceRoot:this.options.config.workspaceRoot});
+        if(this.options.taskBridge) {
+          const intake=await this.options.taskBridge.intake({requestId:'talk-'+identity,title:proposal.title,goal:proposal.goal});
+          check(intake.taskId===taskId,'The configured task intake returned another task identity.',409);
+        } else await this.options.taskStore.createTask({taskId,actor,idempotencyKey:'talk-create-'+identity,title:proposal.title,goal:proposal.goal,workspaceRoot:this.options.config.workspaceRoot});
         const actual=await this.options.taskStore.load(taskId);check(actual&&await this.matchesWorkspace(actual.workspaceRoot),'Created task could not be verified in the selected workspace.',409);
         if(this.options.validateHostSelection)await this.options.validateHostSelection();
         const current=await this.requireTopic(topicId);
@@ -469,6 +496,7 @@ export async function createDashboardTalk(options:DashboardTalkOptions):Promise<
   if(options.proposalIdentityNamespace!==undefined)check(typeof options.proposalIdentityNamespace==='string'&&/^[a-f0-9]{64}$/.test(options.proposalIdentityNamespace),'Invalid internal Talk proposal namespace.');
   if(options.validateHostSelection!==undefined)check(typeof options.validateHostSelection==='function','Invalid internal Talk host-selection validator.');
   const {workspaceRoot,conversationRoot,taskStoreRoot}=await validateDashboardTalkRoots(config,options.taskStore.root);
+  if(options.taskBridge)check(isAbsolute(options.taskBridge.workspaceRoot)&&await realpath(options.taskBridge.workspaceRoot)===workspaceRoot,'Talk task controls are bound to another workspace.',409);
   assert((await lstat(taskStoreRoot)).isDirectory(),'Selected Talk task store is not a directory.');
   const scope={hostId:config.hostId,workspaceId:config.workspaceId,taskStoreId:config.taskStoreId};
   const selection:HostSelectionPayload={schema:1,kind:'temari-talk-host-selection',scope,workspaceRoot,taskStoreRoot};

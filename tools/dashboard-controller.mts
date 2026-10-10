@@ -29,6 +29,8 @@ import {
   verifyPersistedStageEvidence,
   TaskRuntime,
   taskDigest,
+  getExecutionHarnessStatus,
+  verifyExecutionHarnessRunIdentity,
   type TaskSnapshot,
 } from '../libs/runtime/src/index.js';
 import type { TaskViewController } from './task-view.mjs';
@@ -53,7 +55,7 @@ import {
 } from './run-codex-write-workers.mjs';
 import { parseCodexWorkersRequest } from './run-codex-workers.mjs';
 import {
-  parsePlannerPolicy,
+  parseGoalPlannerPolicy,
   prepareGoalPlan,
   startGoalPlan,
   inspectGoalPlan,
@@ -62,6 +64,17 @@ import {
   type GoalPlanHandle,
   type GoalPlanSnapshot,
 } from './dashboard-planner.mjs';
+import {
+  validateManagedCandidateProfile,
+  prepareManagedCandidate,
+  readManagedCandidatePreparation,
+  readManagedCandidateResult,
+  inspectManagedCandidateCompletion,
+  retainManagedDiagnostic,
+  type DashboardManagedCandidateProfile,
+  type ManagedCandidateHost,
+  type ManagedCandidatePreparation,
+} from './dashboard-managed-candidate.mjs';
 import {
   parseDashboardKnowledgeOptions,
   type DashboardKnowledgeOptions,
@@ -128,6 +141,7 @@ export interface DashboardConfig {
     timeoutMs: number;
     policies: PlannerPolicy[];
   };
+  managedCandidate?: DashboardManagedCandidateProfile;
   scheduling?: { tickMs: number };
   knowledge?: DashboardKnowledgeOptions;
   /** Explicit host-owned inputs required to enable reconciliation controls. */
@@ -198,6 +212,7 @@ export interface DashboardControllerOptions {
   finalizerPath: string;
   archonHome: string;
   readNative(reference: HarnessRunRef): Promise<Record<string, any>>;
+  managedCandidateHost?: ManagedCandidateHost;
   /** Optional intent-only reconciliation facade; it has no task-closeout authority. */
   reconciliation?: MergeReconciliationDashboard;
 }
@@ -639,7 +654,15 @@ export async function validateDashboardConfig(
   fields(
     config,
     ['schema', 'workspaceRoot', 'preparationRoot', 'recipes'],
-    ['swarm', 'implementation', 'planning', 'scheduling', 'knowledge', 'reconciliation'],
+    [
+      'swarm',
+      'implementation',
+      'planning',
+      'scheduling',
+      'knowledge',
+      'reconciliation',
+      'managedCandidate',
+    ],
   );
   assert.equal(config.schema, 1);
   for (const key of ['workspaceRoot', 'preparationRoot']) {
@@ -667,7 +690,7 @@ export async function validateDashboardConfig(
     );
   if (config.planning !== undefined) {
     assert(
-      config.implementation,
+      config.implementation || config.managedCandidate,
       'Goal planning requires configured implementation limits.',
     );
     const planning = object(config.planning);
@@ -689,13 +712,49 @@ export async function validateDashboardConfig(
         planning.policies.length <= 20,
       'Configure one to twenty planning policies.',
     );
-    planning.policies = planning.policies.map(parsePlannerPolicy);
+    planning.policies = planning.policies.map(parseGoalPlannerPolicy);
     assert.equal(
       new Set(planning.policies.map((item: PlannerPolicy) => item.id)).size,
       planning.policies.length,
       'Duplicate planning policy.',
     );
   }
+  if (config.managedCandidate !== undefined) {
+    config.managedCandidate = await validateManagedCandidateProfile(
+      config.managedCandidate,
+      workspaceRoot,
+      preparationRoot,
+    );
+    const selected = config.planning?.policies.find(
+      (p: PlannerPolicy) => p.id === config.managedCandidate.policyId,
+    );
+    assert(
+      selected?.profile === 'reviewed-local-candidate-v1',
+      'Managed route needs its separate one-builder planning policy.',
+    );
+    assert.deepEqual(
+      selected.prepare,
+      config.managedCandidate.baselineChecks,
+      'Managed planner must show the protected baseline checks.',
+    );
+    assert.deepEqual(
+      selected.verify,
+      config.managedCandidate.acceptanceChecks,
+      'Managed planner must show the protected acceptance checks.',
+    );
+    assert.equal(
+      config.planning.executable,
+      config.managedCandidate.executable,
+      'Managed planner must use the pinned executable.',
+    );
+  }
+  for (const p of config.planning?.policies ?? [])
+    if (p.profile)
+      assert.equal(
+        config.managedCandidate?.policyId,
+        p.id,
+        'Managed planning policy requires host route configuration.',
+      );
   if (config.scheduling !== undefined) {
     fields(object(config.scheduling), ['tickMs']);
     assert(
@@ -709,28 +768,59 @@ export async function validateDashboardConfig(
     config.knowledge = parseDashboardKnowledgeOptions(config.knowledge);
   if (config.reconciliation !== undefined) {
     const reconciliation = object(config.reconciliation);
-    fields(reconciliation, [
-      'storeRoot', 'sourceRoot', 'candidate', 'resolutionIntent',
-      'requiredChecks', 'expectedComparison',
-    ], ['browserReview']);
+    fields(
+      reconciliation,
+      [
+        'storeRoot',
+        'sourceRoot',
+        'candidate',
+        'resolutionIntent',
+        'requiredChecks',
+        'expectedComparison',
+      ],
+      ['browserReview'],
+    );
     for (const key of ['storeRoot', 'sourceRoot']) {
       text(reconciliation[key]);
-      assert(isAbsolute(reconciliation[key]), `reconciliation.${key} must be absolute.`);
+      assert(
+        isAbsolute(reconciliation[key]),
+        `reconciliation.${key} must be absolute.`,
+      );
     }
-    assert((await lstat(reconciliation.sourceRoot)).isDirectory(), 'Reconciliation sourceRoot must be a directory.');
+    assert(
+      (await lstat(reconciliation.sourceRoot)).isDirectory(),
+      'Reconciliation sourceRoot must be a directory.',
+    );
     reconciliation.sourceRoot = await realpath(reconciliation.sourceRoot);
-    reconciliation.storeRoot = (await validateDashboardReconciliationRoots({ ...config, workspaceRoot, preparationRoot } as DashboardConfig)).storeRoot;
+    reconciliation.storeRoot = (
+      await validateDashboardReconciliationRoots({
+        ...config,
+        workspaceRoot,
+        preparationRoot,
+      } as DashboardConfig)
+    ).storeRoot;
     if (reconciliation.browserReview !== undefined) {
       const browserReview = object(reconciliation.browserReview);
       fields(browserReview, ['selectedAttempts']);
-      assert(Array.isArray(browserReview.selectedAttempts) && browserReview.selectedAttempts.length <= 128, 'Select at most128 reconciliation reviews.');
+      assert(
+        Array.isArray(browserReview.selectedAttempts) &&
+          browserReview.selectedAttempts.length <= 128,
+        'Select at most128 reconciliation reviews.',
+      );
       const selected = new Set<string>();
       for (const raw of browserReview.selectedAttempts) {
         const item = object(raw);
         fields(item, ['attemptId', 'reviewSha256']);
         reconciliationAttemptId(item.attemptId);
-        assert(typeof item.reviewSha256 === 'string' && /^[a-f0-9]{64}$/.test(item.reviewSha256), 'Select an exact reconciliation review digest.');
-        assert(!selected.has(item.attemptId), 'Duplicate reconciliation review selection.');
+        assert(
+          typeof item.reviewSha256 === 'string' &&
+            /^[a-f0-9]{64}$/.test(item.reviewSha256),
+          'Select an exact reconciliation review digest.',
+        );
+        assert(
+          !selected.has(item.attemptId),
+          'Duplicate reconciliation review selection.',
+        );
         selected.add(item.attemptId);
       }
     }
@@ -753,19 +843,37 @@ export async function validateDashboardConfig(
         sourceRoot: { id: 'configured-source-root', sha256: '0'.repeat(64) },
         candidateRoot: reconciliation.candidate.root,
         baseHead: { id: 'configured-base-head', sha256: '1'.repeat(64) },
-        operationHead: { id: 'configured-operation-head', sha256: '2'.repeat(64) },
-        affectedPaths: [{
-          path: 'configured-path', classification: 'tracked',
-          pathSha256: '4'.repeat(64), indexBlobs: [], unmergedStages: [],
-          worktreeKind: 'missing', worktreeSha256: null, diffSha256: '5'.repeat(64),
-        }],
+        operationHead: {
+          id: 'configured-operation-head',
+          sha256: '2'.repeat(64),
+        },
+        affectedPaths: [
+          {
+            path: 'configured-path',
+            classification: 'tracked',
+            pathSha256: '4'.repeat(64),
+            indexBlobs: [],
+            unmergedStages: [],
+            worktreeKind: 'missing',
+            worktreeSha256: null,
+            diffSha256: '5'.repeat(64),
+          },
+        ],
         resolutionIntent: reconciliation.resolutionIntent,
         requiredChecks: reconciliation.requiredChecks,
         expectedComparison: reconciliation.expectedComparison,
       },
       observedAt: '2026-01-01T00:00:00.000Z',
       kind: 'clean',
-      evidence: [{ schema: 1, id: 'config-evidence', sha256: '3'.repeat(64), bytes: 0, mediaType: 'application/json' }],
+      evidence: [
+        {
+          schema: 1,
+          id: 'config-evidence',
+          sha256: '3'.repeat(64),
+          bytes: 0,
+          mediaType: 'application/json',
+        },
+      ],
     });
   }
   if (config.swarm !== undefined) {
@@ -1443,6 +1551,12 @@ export class DashboardController implements TaskViewController {
       (entry) => entry.id === request.policyId,
     );
     assert(policy, 'Unknown planning policy.');
+    if(policy.profile) {
+      const home=await realpath(this.options.archonHome);
+      assert.equal(home,this.options.archonHome,'Managed Archon home alias refused.');
+      for(const root of [this.options.config.workspaceRoot,this.options.config.preparationRoot,this.options.store.root,this.options.config.managedCandidate!.evidenceRoot])
+        assert(!within(root,home)&&!within(home,root),'Managed native home must be disjoint from source and durable stores.');
+    }
     const taskId = `task-${request.requestId}`;
     await this.options.store.createTask({
       taskId,
@@ -1483,6 +1597,20 @@ export class DashboardController implements TaskViewController {
       policy,
       executable: config.executable,
       timeoutMs: config.timeoutMs,
+      ...(policy.profile && this.options.config.managedCandidate
+        ? {
+            selection: {
+              executableSha256:
+                this.options.config.managedCandidate.providerSelection
+                  .executableSha256,
+              model:
+                this.options.config.managedCandidate.providerSelection.model,
+              reasoning:
+                this.options.config.managedCandidate.providerSelection
+                  .reasoning,
+            },
+          }
+        : {}),
     });
     const path = join(directory, 'planning.json');
     await publish(
@@ -1893,7 +2021,9 @@ export class DashboardController implements TaskViewController {
       const prior = task.events.find(
         (event) =>
           event.idempotencyKey === command.idempotencyKey ||
-          (admissionId && event.idempotencyKey === `prepare-${admissionId}`),
+          (admissionId &&
+            (event.idempotencyKey === `prepare-${admissionId}` ||
+              event.idempotencyKey === `managed-prepare-run-${admissionId}`)),
       );
       if (!prior)
         assert.equal(
@@ -1991,6 +2121,24 @@ export class DashboardController implements TaskViewController {
           snapshot,
           await cleanCandidate(task.workspaceRoot),
         );
+        if (policy.profile === 'reviewed-local-candidate-v1') {
+          assert(
+            this.options.config.managedCandidate &&
+              this.options.managedCandidateHost,
+            'Managed candidate host admission is not configured.',
+          );
+          return prepareManagedCandidate({
+            profile: this.options.config.managedCandidate,
+            preparationRoot: this.options.config.preparationRoot,
+            store: this.options.store,
+            runtime: this.options.runtime,
+            task,
+            policy,
+            snapshot,
+            runId: `run-${stableId}`,
+            host: this.options.managedCandidateHost,
+          });
+        }
         return this.prepareImplementation(
           { requestId: stableId, title: task.title, goal: task.goal },
           {
@@ -2009,6 +2157,112 @@ export class DashboardController implements TaskViewController {
             proposalSha256: material.proposalSha256,
           },
         );
+      }
+      const managed = this.options.config.managedCandidate
+        ? await readManagedCandidatePreparation({
+            task,
+            profile: this.options.config.managedCandidate,
+            preparationRoot: this.options.config.preparationRoot,
+          })
+        : null;
+      if (managed) {
+        const host = this.options.managedCandidateHost;
+        assert(host, 'Managed candidate host is unavailable.');
+        const run = task.runs.find((r) => r.runId === managed.runId)!;
+        const runCommand = { ...command, runId: managed.runId };
+        if (request.action === 'implementation-start') {
+          if (
+            run.operations.some((op) => op.commandId === command.idempotencyKey)
+          )
+            return task;
+          assert(
+            !run.nativeRef && run.operations.length === 0,
+            'Managed launch is already retained; reconcile its exact reference.',
+          );
+          assert.deepEqual(
+            await cleanCandidate(task.workspaceRoot),
+            managed.candidate,
+            'Workspace changed since managed preparation.',
+          );
+          await host.admit(managed.paths);
+          const readinessAbort = new AbortController();
+          let timer: ReturnType<typeof setTimeout> | undefined;
+          const abort = () => readinessAbort.abort();
+          process.once('SIGINT', abort);
+          process.once('SIGTERM', abort);
+          try {
+            const dispatch = await this.options.runtime.dispatchReviewedLocalCandidate({
+              ...runCommand,
+              paths: managed.paths,
+            });
+            task = dispatch.task;
+            if (!dispatch.dispatched) return task;
+            const reference = task.runs.find(
+              (r) => r.runId === managed.runId,
+            )!.nativeRef;
+            assert(
+              reference,
+              'Managed dispatch needs exact-reference reconciliation.',
+            );
+            const directory = dirname(managed.paths.specPath);
+            await retainManagedDiagnostic(
+              join(directory, 'native-reference.json'),
+              reference,
+            );
+            const deadlineAtMs = Date.now() + 10_000;
+            timer = setTimeout(() => readinessAbort.abort(), 10_000);
+            await host.readiness(reference, {
+              timeoutMs: Math.max(1, deadlineAtMs - Date.now()),
+              deadlineAtMs,
+              signal: readinessAbort.signal,
+              onObservation: async (event) => {
+                const attempt = (event as { attempt?: unknown }).attempt;
+                assert(Number.isSafeInteger(attempt) && Number(attempt) > 0);
+                await retainManagedDiagnostic(
+                  join(directory, `native-readiness-${attempt}.json`),
+                  event,
+                );
+              },
+            });
+            return this.options.runtime.observeNative({
+              ...runCommand,
+              expectedVersion: task.version,
+              idempotencyKey: `ready-${request.requestId}`,
+            });
+          } catch (error) {
+            // Keep the exact bound reference and readiness diagnostics. There is
+            // no implicit cancellation or replacement after failed identity reads.
+            await retainManagedDiagnostic(
+              join(dirname(managed.paths.specPath), 'readiness-refusal.json'),
+              { reason: (error as Error).message },
+            );
+            const current = await this.options.runtime.snapshot(taskId);
+            if(current.currentRunId===managed.runId && current.runs.find(r=>r.runId===managed.runId)?.operations.some(op=>op.commandId===command.idempotencyKey)) await this.options.store.updateTask({
+              taskId,
+              actor,
+              expectedVersion: current.version,
+              idempotencyKey: `managed-readiness-refused-${managed.runId}`,
+              blocker:
+                'Managed launch/readiness was refused; reconcile the retained intent and exact native reference.',
+              nextAction:
+                'Use host recovery to verify and clean up the exact retained run.',
+            });
+            throw error;
+          } finally {
+            clearTimeout(timer);
+            process.removeListener('SIGINT', abort);
+            process.removeListener('SIGTERM', abort);
+          }
+        }
+        assert(
+          request.action === 'observe',
+          'Managed candidate requires coordinator review; generic acceptance is unavailable.',
+        );
+        assert(
+          run.nativeRef,
+          'Managed launch requires exact host recovery before control.',
+        );
+        return this.observeManagedCandidate(task, managed, command.idempotencyKey);
       }
       const implementation = await this.implementationPreparation(task);
       if (implementation) {
@@ -2228,6 +2482,231 @@ export class DashboardController implements TaskViewController {
     });
   }
 
+  private managedObservationCursor = 0;
+  private readonly managedObservationIssues = new Map<string, string>();
+  private managedObserverHealthProvider?: () => { issues: readonly unknown[] };
+
+  /** Trusted host wiring only; this is not a dashboard action. */
+  setManagedObserverHealthProvider(
+    provider: () => { issues: readonly unknown[] },
+  ): void {
+    this.managedObserverHealthProvider = provider;
+  }
+
+  private managedObserverHealth() {
+    let issueCount = 0;
+    try {
+      issueCount = Math.min(
+        8,
+        this.managedObserverHealthProvider?.().issues.length ?? 0,
+      );
+    } catch {
+      issueCount = 1;
+    }
+    return {
+      configured: Boolean(this.managedObserverHealthProvider),
+      issueCount,
+      message: issueCount
+        ? 'Managed observation needs host recovery. Inspect the retained exact run and its result.'
+        : null,
+    };
+  }
+
+  private managedReadiness(task: TaskSnapshot, runId: string) {
+    const passed = task.events.some(
+      (event) =>
+        event.change.type === 'native-observed' &&
+        event.change.runId === runId &&
+        event.idempotencyKey.startsWith('ready-'),
+    );
+    const refused = task.events.some(
+      (event) => event.idempotencyKey === `managed-readiness-refused-${runId}`,
+    );
+    return { passed, refused, allowFinalization: passed && !refused };
+  }
+
+  /** Host-only observation. It cannot dispatch, resume, cancel or reconcile. */
+  async observeManagedCandidates(): Promise<{
+    scanned: number;
+    issues: string[];
+  }> {
+    if (
+      !this.options.config.managedCandidate ||
+      !this.options.managedCandidateHost
+    )
+      return { scanned: 0, issues: [] };
+    const tasks = (await this.options.store.list())
+      .filter(
+        (task) =>
+          task.workspaceRoot === this.options.config.workspaceRoot &&
+          task.runs.some(
+            (run) =>
+              run.runId === task.currentRunId &&
+              run.sourceRefs?.some(
+                (ref) => ref.sourceId === 'dashboard-managed-candidate',
+              ),
+          ),
+      )
+      .sort((a, b) => a.taskId.localeCompare(b.taskId));
+    const issues: string[] = [];
+    const count = Math.min(2, tasks.length);
+    for (let offset = 0; offset < count; offset++) {
+      const retained =
+        tasks[(this.managedObservationCursor + offset) % tasks.length]!;
+      try {
+        const task = await this.task(retained.taskId);
+        const prepared = await readManagedCandidatePreparation({
+          task,
+          profile: this.options.config.managedCandidate,
+          preparationRoot: this.options.config.preparationRoot,
+        });
+        const run = task.runs.find((run) => run.runId === prepared?.runId);
+        // Lost dispatch without a reference remains an explicit host recovery.
+        const readiness =
+          prepared && this.managedReadiness(task, prepared.runId);
+        if (
+          prepared &&
+          run?.nativeRef &&
+          (readiness?.passed || readiness?.refused)
+        ) {
+          await this.observeManagedCandidate(task, prepared);
+          this.managedObservationIssues.delete(task.taskId);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        // Optimistic version conflicts converge on the next tick.
+        if (
+          !/Task version conflict|Task changed during candidate closeout/.test(
+            message,
+          )
+        ) {
+          issues.push(`${retained.taskId}: ${message}`.slice(0, 256));
+          this.managedObservationIssues.set(
+            retained.taskId,
+            'Managed observation could not verify this run or its result. Use host recovery to inspect the retained exact run.',
+          );
+          if (this.managedObservationIssues.size > 32)
+            this.managedObservationIssues.delete(
+              this.managedObservationIssues.keys().next().value!,
+            );
+        }
+      }
+    }
+    if (tasks.length)
+      this.managedObservationCursor =
+        (this.managedObservationCursor + count) % tasks.length;
+    return { scanned: count, issues };
+  }
+
+  private async observeManagedCandidate(
+    task: TaskSnapshot,
+    managed: ManagedCandidatePreparation,
+    manualIdempotencyKey?: string,
+  ): Promise<TaskSnapshot> {
+    const host = this.options.managedCandidateHost;
+    assert(host, 'Managed candidate host is unavailable.');
+    const run = task.runs.find((run) => run.runId === managed.runId)!;
+    assert(
+      run.nativeRef,
+      'Managed launch requires exact host recovery before control.',
+    );
+    const record = await this.nativeIdentity(task);
+    await verifyExecutionHarnessRunIdentity(host.selection, run.nativeRef);
+    const duplicate = manualIdempotencyKey
+      ? task.events.find(
+          (event) => event.idempotencyKey === manualIdempotencyKey,
+        )
+      : undefined;
+    if (duplicate) {
+      assert.equal(duplicate.actor, actor, 'Idempotency actor conflict.');
+      assert.equal(
+        duplicate.change.type,
+        'native-observed',
+        'Idempotency command conflict.',
+      );
+      assert(duplicate.change.type === 'native-observed');
+      assert.equal(
+        duplicate.change.runId,
+        managed.runId,
+        'Idempotency run binding conflict.',
+      );
+    }
+    const observation = duplicate
+      ? run.nativeSnapshot!
+      : await getExecutionHarnessStatus(host.selection, run.nativeRef);
+    const semantic = (snapshot: typeof observation | null) =>
+      snapshot && {
+        status: snapshot.status,
+        summary: snapshot.summary,
+        rawLogPath: snapshot.rawLogPath,
+        ...(snapshot.nativeProjectId
+          ? { nativeProjectId: snapshot.nativeProjectId }
+          : {}),
+      };
+    const pending = run.operations.find((op) => op.state !== 'CONFIRMED');
+    if (
+      !duplicate &&
+      (pending ||
+        taskDigest(semantic(run.nativeSnapshot)) !==
+          taskDigest(semantic(observation)))
+    ) {
+      await this.options.store.append(
+        {
+          taskId: task.taskId,
+          actor,
+          expectedVersion: task.version,
+          idempotencyKey:
+            manualIdempotencyKey ??
+            `managed-observe-${managed.runId}-${task.version}-${taskDigest(semantic(observation))}`,
+        },
+        {
+          type: 'native-observed',
+          runId: managed.runId,
+          snapshot: observation,
+          ...(pending ? { operationId: pending.commandId } : {}),
+        },
+      );
+      task = await this.options.runtime.snapshot(task.taskId);
+    }
+    if (
+      !this.managedReadiness(task, managed.runId).allowFinalization ||
+      observation.status !== 'SUCCEEDED' ||
+      task.blocker ||
+      task.events.some(
+        (event) => event.idempotencyKey === `managed-result-${managed.runId}`,
+      )
+    )
+      return task;
+    assert(
+      typeof record.output_root === 'string',
+      'Managed native artifacts are unavailable.',
+    );
+    const outputRoot = await realpath(record.output_root);
+    assert(
+      within(await realpath(this.options.archonHome), outputRoot),
+      'Managed output lies outside selected Archon home.',
+    );
+    const artifacts = join(
+      outputRoot,
+      'artifacts',
+      'runs',
+      run.nativeRef.externalRunId,
+    );
+    assert.equal(
+      await realpath(artifacts),
+      artifacts,
+      'Managed artifacts alias refused.',
+    );
+    return readManagedCandidateResult({
+      store: this.options.store,
+      runtime: this.options.runtime,
+      host,
+      task,
+      prepared: managed,
+      artifacts,
+    });
+  }
+
   /** Refresh only the exact scheduled execution; leave evidence acceptance to review. */
   async inspectScheduledTask(
     taskId: string,
@@ -2337,6 +2816,133 @@ export class DashboardController implements TaskViewController {
             planningPolicy &&
             taskDigest(planningPolicy) === planning.policySha256,
           );
+        const managed = this.options.config.managedCandidate
+          ? await readManagedCandidatePreparation({
+              task,
+              profile: this.options.config.managedCandidate,
+              preparationRoot: this.options.config.preparationRoot,
+            })
+          : null;
+        if (managed) {
+          const run = task.runs.find((r) => r.runId === managed.runId)!;
+          let candidateCurrent = false;
+          try {
+            candidateCurrent =
+              taskDigest(await currentCandidate()) ===
+              taskDigest(managed.candidate);
+          } catch {}
+          const pending = run.operations.some((op) => op.state !== 'CONFIRMED');
+          let state = pending
+            ? 'RECOVERY_REQUIRED'
+            : !run.nativeRef
+              ? 'PREPARED'
+              : run.nativeSnapshot?.status === 'SUCCEEDED'
+                ? 'RUNNING'
+                : run.nativeSnapshot?.status === 'RUNNING' ||
+                    run.nativeSnapshot?.status === 'QUEUED'
+                  ? 'RUNNING'
+                  : run.nativeSnapshot?.status === 'FAILED'
+                    ? 'FAILED'
+                    : run.nativeSnapshot?.status === 'CANCELLED'
+                      ? 'CANCELLED'
+                      : 'RECOVERY_REQUIRED';
+          const actions = ['update'];
+          if (
+            state === 'PREPARED' &&
+            candidateCurrent &&
+            policyCurrent &&
+            this.options.managedCandidateHost
+          )
+            actions.push('implementation-start');
+          if (run.nativeRef) actions.push('observe');
+          let result = null;
+          let observationIssue = this.managedObservationIssues.get(task.taskId) ?? null;
+          const readiness = this.managedReadiness(task, managed.runId);
+          const completionRetained = task.events.some(
+            (event) => event.idempotencyKey === `managed-result-${managed.runId}`,
+          );
+          if (run.nativeSnapshot?.status === 'SUCCEEDED') {
+            if (!readiness.allowFinalization) {
+              state = 'RECOVERY_REQUIRED';
+              observationIssue =
+                'Managed launch readiness is unresolved. Use host recovery to verify the retained exact run before result verification.';
+            } else if (task.blocker) {
+              state = 'RECOVERY_REQUIRED';
+              observationIssue ??=
+                'Managed execution or evidence needs attention. Use host recovery to inspect the retained exact run and result.';
+            } else if (completionRetained && this.options.managedCandidateHost) {
+              try {
+                const record = await this.nativeIdentity(task);
+                assert(typeof record.output_root === 'string');
+                const outputRoot = await realpath(record.output_root);
+                assert(within(await realpath(this.options.archonHome), outputRoot));
+                const artifacts = join(
+                  outputRoot,
+                  'artifacts',
+                  'runs',
+                  run.nativeRef!.externalRunId,
+                );
+                assert.equal(await realpath(artifacts), artifacts);
+                result = await inspectManagedCandidateCompletion({
+                  store: this.options.store,
+                  host: this.options.managedCandidateHost,
+                  task,
+                  prepared: managed,
+                  artifacts,
+                });
+                assert(result, 'Managed result context is missing.');
+                state = 'COMPLETE';
+                observationIssue = null;
+              } catch {
+                state = 'RECOVERY_REQUIRED';
+                observationIssue =
+                  'The retained managed result could not be verified. Use host recovery to inspect the exact completion and evidence.';
+              }
+            } else if (observationIssue) state = 'RECOVERY_REQUIRED';
+          } else if (observationIssue) state = 'RECOVERY_REQUIRED';
+          const children =
+            task.runSnapshots.find((snapshot) => snapshot.runId === managed.runId)
+              ?.children ?? [];
+          const counts = new Map<string, number>();
+          for (const child of children)
+            counts.set(child.status, (counts.get(child.status) ?? 0) + 1);
+          const childProgress = [...counts]
+            .sort(([a], [b]) => a.localeCompare(b))
+            .slice(0, 8)
+            .map(([status, count]) => ({ status, count }));
+          const childSummary = children.length
+            ? ` Children: ${childProgress.map((entry) => `${entry.count} ${entry.status.toLowerCase()}`).join(', ')}.`
+            : '';
+          if (state !== 'PREPARED') {
+            const start = actions.indexOf('implementation-start');
+            if (start >= 0) actions.splice(start, 1);
+          }
+          controls[task.taskId] = {
+            actions,
+            implementation: { state },
+            managedCandidate: {
+              profile: 'reviewed-local-candidate-v1',
+              runId: managed.runId,
+              result,
+              progress: childProgress,
+              observationIssue,
+            },
+            ...(planning ? { planning, policyCurrent } : {}),
+            candidateCurrent,
+            progress: [],
+            verifiedRevision: managed.candidate.head,
+            message:
+              observationIssue ??
+              (result
+                ? `Reviewed local candidate ${result.commit} at ${result.root}; coordinator review remains required.`
+                : run.nativeSnapshot?.status === 'SUCCEEDED'
+                  ? 'Native work succeeded. Exact result verification is still in progress; coordinator review follows verified completion.'
+                  : state === 'RECOVERY_REQUIRED'
+                    ? 'Reconcile the retained exact native reference before proceeding.'
+                    : `Managed local candidate ${state.toLowerCase()}.${childSummary}`),
+          };
+          return;
+        }
         const implementation = await this.implementationPreparation(task);
         if (implementation) {
           const snapshot = await inspectDashboardImplementation(
@@ -2563,6 +3169,12 @@ export class DashboardController implements TaskViewController {
         };
       } catch (error) {
         const run = task.runs.find((item) => item.runId === task.currentRunId);
+        if (run?.sourceRefs?.some(ref => ref.sourceId === 'dashboard-managed-candidate')) {
+          controls[task.taskId] = {actions: run.nativeRef ? ['update','observe'] : ['update'],
+            implementation:{state:'RECOVERY_REQUIRED'},progress:[],
+            message:'Managed preparation or result could not be verified. Use host recovery to inspect the retained exact run.'};
+          return;
+        }
         const actions = run?.nativeRef ? ['observe'] : [];
         if (
           run?.nativeRef &&
@@ -2590,6 +3202,7 @@ export class DashboardController implements TaskViewController {
     );
     return {
       workspaceRoot: this.options.config.workspaceRoot,
+      managedObserver: this.managedObserverHealth(),
       recipes: this.options.config.recipes.map(({ id, title, goal }) => ({
         id,
         title,

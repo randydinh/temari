@@ -1,6 +1,6 @@
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, realpath, stat } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
-import { isAbsolute, resolve, join } from 'node:path';
+import { basename, isAbsolute, resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs, promisify } from 'node:util';
 import {
@@ -16,9 +16,12 @@ import {
 } from '../libs/runtime/src/index.js';
 import { platformInfo } from '../packages/initializer/src/lib/platform.js';
 import { createOpenWorkReader } from './dashboard-open-work.mjs';
+import { createManagedCandidateHost } from './dashboard-managed-candidate.mjs';
+import { createDashboardManagedObserver } from './dashboard-managed-observer.mjs';
 import { startTaskViewServer } from './task-view.mjs';
 import {
   DashboardController,
+  type DashboardConfig,
   loadDashboardConfig,
   createDashboardReconciliationInteractionWriter,
   validateDashboardReconciliationRoots,
@@ -37,7 +40,7 @@ import {
   selectKnowledgeMapNode,
   expandKnowledgeMap,
 } from './dashboard-knowledge.mjs';
-import { createDashboardTalk, validateDashboardTalkRoots } from './dashboard-talk.mjs';
+import { createDashboardTalk, validateDashboardTalkRoots, type DashboardTalkConfig, type DashboardTalkTaskBridge, type TalkTaskAction } from './dashboard-talk.mjs';
 import { createDashboardTalkRegistry, loadDashboardTalkConfiguration, validateDashboardTalkRegistryRoots } from './dashboard-talk-registry.mjs';
 
 export const taskHelp = `Temari tasks — keep a goal and its evidence across runs
@@ -103,6 +106,65 @@ for a pinned read-only capture, without Archon or control configuration. Refresh
 rereads only that saved capture; source references are provenance only.
 See docs/task-continuity.md for full examples and recovery rules.
 `;
+
+export interface TaskCommandResources {
+  readonly managedWorkflowSource?: string;
+  readonly canonicalWorkflowSource?: string;
+  readonly canonicalBridgePath?: string;
+  readonly canonicalFinalizerPath?: string;
+}
+
+/**
+ * Admit the one safe conversational execution bridge. The host must select one
+ * planning policy and bind both surfaces to the same canonical workspace.
+ */
+export async function createDashboardTalkTaskBridge(options:{
+  readonly talkConfig:DashboardTalkConfig;
+  readonly dashboardConfig:DashboardConfig;
+  readonly controller:Pick<DashboardController,'create'|'describe'>;
+  readonly runtime:TaskRuntime;
+}):Promise<DashboardTalkTaskBridge|undefined> {
+  const [talkRoot,dashboardRoot]=await Promise.all([
+    realpath(options.talkConfig.workspaceRoot),
+    realpath(options.dashboardConfig.workspaceRoot),
+  ]);
+  if(talkRoot!==dashboardRoot)return undefined;
+  const policies=options.dashboardConfig.planning?.policies;
+  if(!policies||policies.length!==1)return undefined;
+  const policyId=policies[0]!.id;
+  return {
+    workspaceRoot:talkRoot,
+    async intake(input) {
+      const task=await options.controller.create({
+        requestId:input.requestId,
+        mode:'planning',
+        policyId,
+        title:input.title,
+        goal:input.goal,
+      });
+      if(task.workspaceRoot!==talkRoot)
+        throw new Error('Configured planning intake returned another workspace.');
+      return {taskId:task.taskId};
+    },
+    async project({taskId,expectedVersion}) {
+      const before=await options.runtime.snapshot(taskId);
+      if(before.version!==expectedVersion||await realpath(before.workspaceRoot)!==talkRoot)return null;
+      const described=await options.controller.describe() as {controls?:Record<string,{actions?:unknown;message?:unknown;planning?:{state?:unknown;proposalSha256?:unknown};implementation?:{state?:unknown}}>};
+      const control=described.controls?.[taskId];
+      if(!control||!Array.isArray(control.actions))return null;
+      let action:TalkTaskAction|null=null;
+      if(control.actions.includes('implementation-start'))
+        action={action:'implementation-start',label:'Start implementation'};
+      else if(control.actions.includes('prepare-plan')&&typeof control.planning?.proposalSha256==='string'&&/^[a-f0-9]{64}$/.test(control.planning.proposalSha256))
+        action={action:'prepare-plan',label:'Prepare implementation plan',proposalSha256:control.planning.proposalSha256};
+      const phase=control.implementation?'implementation':control.planning?'planning':null;
+      const state=phase==='implementation'?control.implementation?.state:phase==='planning'?control.planning?.state:null;
+      const after=await options.runtime.snapshot(taskId);
+      if(after.version!==expectedVersion||after.workspaceRoot!==before.workspaceRoot||!phase||typeof state!=='string'||state.length>64)return null;
+      return {phase,state,message:typeof control.message==='string'?control.message:null,action};
+    },
+  };
+}
 
 function absolute(value: string | undefined, flag: string): string {
   if (!value || !isAbsolute(value))
@@ -185,6 +247,7 @@ export async function createTaskContinuityReconciliationDashboard(
 /** CLI and optional local dashboard share the same runtime mutation boundary. */
 export async function runTaskCommand(
   args: readonly string[],
+  resources: TaskCommandResources = {},
 ): Promise<unknown> {
   const { positionals, values } = parseArgs({
     args: [...args],
@@ -306,7 +369,7 @@ export async function runTaskCommand(
         ? {
             workflowSource: values['workflow-source']
               ? absolute(values['workflow-source'], '--workflow-source')
-              : resolve(
+              : dashboardConfig?.managedCandidate ? resources.managedWorkflowSource ?? resolve('packages/workflow-runtime/host') : resources.canonicalWorkflowSource ?? resolve(
                   'packages/workflow-runtime/assets/v4.1/integrations/archon',
                 ),
           }
@@ -354,13 +417,14 @@ export async function runTaskCommand(
           config: dashboardConfig,
           store,
           runtime,
+          ...(dashboardConfig.managedCandidate && selection ? { managedCandidateHost: createManagedCandidateHost(dashboardConfig.managedCandidate, selection) } : {}),
           archonHome: absolute(values['archon-home'], '--archon-home'),
-          bridgePath: resolve(
-            'packages/workflow-runtime/assets/v4.1/integrations/archon/canonical-bridge.ts',
-          ),
-          finalizerPath: resolve(
-            'libs/archon-harness/src/lib/canonical-finalize.ts',
-          ),
+          bridgePath: resources.canonicalBridgePath ?? resolve(
+              'packages/workflow-runtime/assets/v4.1/integrations/archon/canonical-bridge.ts',
+            ),
+          finalizerPath: resources.canonicalFinalizerPath ?? resolve(
+              'libs/archon-harness/src/lib/canonical-finalize.ts',
+            ),
           ...(reconciliation ? { reconciliation } : {}),
           readNative: async (reference) => {
             const result = await promisify(execFile)(
@@ -380,7 +444,14 @@ export async function runTaskCommand(
     const talk = talkConfig
       ? talkConfig.schema === 2
         ? await createDashboardTalkRegistry({ config: talkConfig, taskStore: store, runtime, ...(controller ? { controller } : {}) })
-        : await createDashboardTalk({ config: talkConfig, taskStore: store, runtime, ...(controller ? { controller } : {}) })
+        : await createDashboardTalk({
+            config: talkConfig,
+            taskStore: store,
+            runtime,
+            ...(controller&&dashboardConfig
+              ? {taskBridge:await createDashboardTalkTaskBridge({talkConfig,dashboardConfig,controller,runtime})}
+              : {}),
+          })
       : undefined;
     if (talk) await talk.recover();
     const scheduler =
@@ -454,6 +525,10 @@ export async function runTaskCommand(
       archonBaseUrl: values['archon-url'] ?? 'http://127.0.0.1:3091',
       port: values.port ? Number(values.port) : 3092,
     });
+    const managedObserver = controller && dashboardConfig?.managedCandidate && selection
+      ? createDashboardManagedObserver(controller) : undefined;
+    if (managedObserver) controller!.setManagedObserverHealthProvider(managedObserver.health);
+    managedObserver?.start();
     if (scheduler)
       clock = setInterval(() => {
         void tick();
@@ -461,11 +536,15 @@ export async function runTaskCommand(
     for (const signal of ['SIGINT', 'SIGTERM'] as const)
       process.once(signal, () => {
         if (clock) clearInterval(clock);
-        server.closeAllConnections();
-        server.close();
+        void (async () => {
+          await managedObserver?.stop();
+          server.closeAllConnections();
+          server.close();
+        })();
       });
     server.once('close', () => {
       if (clock) clearInterval(clock);
+      void managedObserver?.stop();
     });
     const port = (server.address() as { port: number }).port;
     return {
@@ -537,6 +616,7 @@ export async function runTaskCommand(
 
 if (
   process.argv[1] &&
+  basename(process.argv[1]) === 'task-continuity.mts' &&
   import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 ) {
   try {

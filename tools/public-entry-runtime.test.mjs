@@ -418,6 +418,165 @@ test('public bundle refuses missing, altered, added, symlinked and incorrectly e
   }
 });
 
+test('relocated managed resources launch compiled operations, owned children and planner under stock Node', async (t) => {
+  if (process.platform === 'win32')
+    return t.skip('Owned process groups require POSIX.');
+  const root = await realpath(
+    await mkdtemp(join(tmpdir(), 'temari managed relocated-')),
+  );
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const artifact = join(root, 'artifact');
+  await cp(output, artifact, { recursive: true });
+  const fixture = join(root, 'fixture');
+  const repo = join(fixture, 'repo');
+  await mkdir(repo, { recursive: true });
+  execFileSync('git', ['init', '-q', repo]);
+  await writeFile(join(repo, 'README'), 'synthetic fixture\n');
+  execFileSync('git', ['add', '.'], { cwd: repo });
+  execFileSync(
+    'git',
+    [
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@localhost',
+      'commit',
+      '-qm',
+      'base',
+    ],
+    { cwd: repo },
+  );
+  const head = execFileSync('git', ['rev-parse', 'HEAD'], {
+    cwd: repo,
+    encoding: 'utf8',
+  }).trim();
+  const executable = join(fixture, 'fake-codex');
+  const promptPath = join(fixture, 'prompt.txt');
+  await writeFile(
+    executable,
+    `#!${process.execPath}
+import fs from 'node:fs';
+const args=process.argv.slice(2), final=args[args.indexOf('--output-last-message')+1];
+const schema=JSON.parse(fs.readFileSync(args[args.indexOf('--output-schema')+1],'utf8'));
+let prompt='';process.stdin.on('data', chunk=>prompt+=chunk);process.stdin.on('end',()=>{
+ fs.writeFileSync(${JSON.stringify(promptPath)},prompt);
+ const result=schema.properties?.schema
+  ? {schema:1,title:'Synthetic plan',summary:'Bounded fixture',assignments:[{slotId:'alpha',goal:'Read fixture',acceptanceCriteria:['Report fixture'],dependsOn:[]}],blockers:[]}
+  : {status:'PASS',summary:'Synthetic review'};
+ fs.writeFileSync(final,JSON.stringify(result));
+});
+`,
+    { mode: 0o700 },
+  );
+  const script = join(fixture, 'verify.mjs');
+  await writeFile(
+    script,
+    `
+import assert from 'node:assert/strict';
+import {readFile,writeFile} from 'node:fs/promises';
+import {execFile,fork} from 'node:child_process';
+import {promisify} from 'node:util';
+import {createHash} from 'node:crypto';
+import {pathToFileURL} from 'node:url';
+const artifact=${JSON.stringify(artifact)}, fixture=${JSON.stringify(fixture)}, repo=${JSON.stringify(repo)}, executable=${JSON.stringify(executable)};
+const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
+const bridge=await import(pathToFileURL(artifact+'/host/reviewed-local-candidate.mjs'));
+const dashboard=await import(pathToFileURL(artifact+'/host/dashboard-managed-candidate.mjs'));
+const planner=await import(pathToFileURL(artifact+'/host/dashboard-planner.mjs'));
+assert.equal(typeof dashboard.prepareManagedCandidate,'function');
+const resources=bridge.managedCandidateResources();
+assert.equal(resources.operation,artifact+'/host/managed-candidate-operation.mjs');
+assert.equal(resources.cwd,artifact+'/host/');
+assert((await readFile(resources.workflow,'utf8')).includes('"$INPUTS_BRIDGE_RUNTIME" "$INPUTS_BRIDGE"'));
+const protectedPaths=[resources.bridge,resources.operation,resources.workflow,artifact+'/host/owned-process/guardian.mjs',artifact+'/host/owned-process/anchor.mjs'];
+const spec={repositoryRoot:repo,protectedInputs:await Promise.all(protectedPaths.map(async path=>({path,sha256:hash(await readFile(path))})))};
+await bridge.assertManagedResourceBindings(spec);
+await assert.rejects(bridge.assertManagedResourceBindings({...spec,protectedInputs:spec.protectedInputs.slice(0,1)}),/protected input missing/);
+await assert.rejects(bridge.assertManagedResourceBindings({...spec,protectedInputs:spec.protectedInputs.map((ref,i)=>i===1?{...ref,sha256:'0'.repeat(64)}:ref)}),/digest changed/);
+if(process.permission){
+ await assert.rejects(readFile(${JSON.stringify(join(repository, 'package.json'))}),error=>error.code==='ERR_ACCESS_DENIED');
+ console.log(JSON.stringify({imports:'portable',bindings:'verified',source:'denied'}));
+ process.exit(0);
+}
+const brief={goal:'Inspect fixture',context:'Synthetic only',scope:'README',acceptanceCriteria:['Report fixture'],verificationCommand:null,reportFormat:'json',forbiddenActions:['No edits']};
+const requestPath=fixture+'/operation.json', resultPath=fixture+'/operation-result.json';
+await writeFile(requestPath,JSON.stringify({stage:'investigate',request:{runId:'relocated-operation',revision:'fixture',workspaceRoot:repo,evidenceRoot:fixture+'/evidence',maxConcurrency:1,executable,timeoutMs:5000,assignments:[{id:'reader',role:'investigator',required:true,brief}]}}));
+const command=bridge.managedOperationCommand(resources.operation,requestPath,resultPath,false);
+assert.equal(command.program,process.execPath);
+assert.deepEqual(command.args,[resources.operation,requestPath,resultPath]);
+// Node permission mode disables fsync and propagates to descendants. The separate
+// restricted probe above validates imports/bindings; persistent children use the
+// production stock-Node launch path in this second process.
+await promisify(execFile)(command.program,command.args,{cwd:resources.cwd,env:{...process.env,NODE_OPTIONS:'',NODE_PATH:''},timeout:15000});
+const operationResult=JSON.parse(await readFile(resultPath,'utf8'));
+assert.equal(operationResult.status,'PASS',await readFile(operationResult.receiptPath,'utf8'));
+assert((await readFile(${JSON.stringify(promptPath)},'utf8')).includes('temari-worker-efficiency/v1'));
+const {createOwnedExecutionAdapter}=await import(pathToFileURL(artifact+'/runtime/node_modules/@temari/host-adapters/src/lib/owned-execution.js'));
+const adapter=createOwnedExecutionAdapter();
+const identity={nonce:'relocation-fixture',binding:'synthetic',receiptPath:fixture+'/owned-receipt.json'};
+let registered=false;
+const owned=await adapter.launch({program:process.execPath,args:['-e','console.log("owned-fixture")'],cwd:fixture,timeoutMs:5000},identity,new AbortController().signal,async witness=>{assert(witness.guardianPid>1&&witness.anchorPid>1);registered=true;});
+assert(registered);assert.equal(owned.code,0);assert.equal(owned.cleanup,'CONFIRMED');assert(owned.stdout.includes('owned-fixture'));
+const outerIdentity={nonce:'outer-resource-fixture',binding:'synthetic',receiptPath:fixture+'/outer-owned-receipt.json'};
+const outerOwned=await new Promise((resolve,reject)=>{
+ const guardian=fork(artifact+'/host/owned-process/guardian.mjs',[],{execArgv:[],stdio:['ignore','pipe','pipe','ipc']});
+ const bound=setTimeout(()=>{guardian.send({type:'cancel'});reject(new Error('Outer guardian fixture timeout'));},15000);
+ guardian.once('error',reject);
+ guardian.on('message',message=>{
+  if(message.type==='prepared')guardian.send({type:'go'});
+  if(message.type==='finished'){clearTimeout(bound);guardian.disconnect();resolve(message.receipt);}
+ });
+ guardian.send({type:'prepare',identity:outerIdentity,command:{program:process.execPath,args:['-e','process.exit(0)'],cwd:fixture,timeoutMs:5000}});
+});
+assert.deepEqual(outerOwned.identity,outerIdentity);assert.equal(outerOwned.code,0);assert.equal(outerOwned.cleanup,'CONFIRMED');
+const plannerInput={root:fixture+'/preparations/task-1/planning',taskId:'task-1',requestId:'request-1',goal:'Read fixture',workspaceRoot:repo,candidate:{head:${JSON.stringify(head)},fingerprint:hash('')},policy:{profile:'reviewed-local-candidate-v1',id:'fixture-policy',title:'Fixture',description:'One bounded slot',slots:[{id:'alpha',title:'Alpha',description:'Read fixture',owns:[{kind:'file',path:'alpha.txt'}],mandatoryCriteria:['Report fixture']}],prepare:[],verify:[{program:process.execPath,args:['-e','process.exit(0)'],timeoutMs:1000}],reviewer:{id:'reviewer',role:'reviewer',required:true,brief}},executable,timeoutMs:5000,selection:{executableSha256:hash(await readFile(executable)),model:'fixture-model',reasoning:'high'}};
+const planned=await promisify(execFile)(process.execPath,['--input-type=module','-e',
+  'import assert from "node:assert/strict";import * as planner from '+JSON.stringify(pathToFileURL(artifact+'/host/dashboard-planner.mjs').href)+';'+
+  'const handle=await planner.prepareGoalPlan('+JSON.stringify(plannerInput)+');await planner.startGoalPlan(handle);'+
+  'let snapshot;const deadline=Date.now()+15000;do{snapshot=await planner.inspectGoalPlan(handle);if(!["STARTING","RUNNING","PREPARED"].includes(snapshot.state))break;await new Promise(resolve=>setTimeout(resolve,40));}while(Date.now()<deadline);'+
+  'assert.equal(snapshot.state,"READY",JSON.stringify(snapshot));assert.equal(snapshot.proposal.title,"Synthetic plan");console.log(JSON.stringify({state:snapshot.state}));'
+],{cwd:fixture,env:{...process.env,NODE_OPTIONS:'',NODE_PATH:''},timeout:20000});
+const snapshot=JSON.parse(planned.stdout);
+const supervisorLog=await readFile(fixture+'/preparations/task-1/planning/supervisor.log','utf8');
+assert(!supervisorLog.includes('@swc-node'));
+console.log(JSON.stringify({operation:'PASS',policy:'temari-worker-efficiency/v1',cleanup:owned.cleanup,planner:snapshot.state}));
+`,
+  );
+  const restricted = await childResult([
+    '--permission',
+    `--allow-fs-read=${artifact}`,
+    `--allow-fs-read=${fixture}`,
+    script,
+  ]);
+  assert.deepEqual(JSON.parse(restricted.stdout), {
+    imports: 'portable',
+    bindings: 'verified',
+    source: 'denied',
+  });
+  const result = await childResult([script]);
+  assert.deepEqual(JSON.parse(result.stdout), {
+    operation: 'PASS',
+    policy: 'temari-worker-efficiency/v1',
+    cleanup: 'CONFIRMED',
+    planner: 'READY',
+  });
+  for (const source of [
+    'tools/managed-candidate-operation.mts',
+    'tools/dashboard-managed-candidate.mts',
+    'tools/dashboard-planner.mts',
+    'packages/workflow-runtime/host/reviewed-local-candidate.mjs',
+    'libs/host-adapters/src/lib/owned-process/guardian.mjs',
+    'libs/host-adapters/src/lib/owned-process/anchor.mjs',
+  ]) {
+    assert.equal(
+      manifest.source.files.find((record) => record.path === source)?.sha256,
+      createHash('sha256')
+        .update(await readFile(join(repository, source)))
+        .digest('hex'),
+    );
+  }
+});
+
 test('relocated Knowledge cold install keeps state outside the artifact and connects Codex only on request', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'temari knowledge-relocated-'));
   t.after(async () => rm(root, { recursive: true, force: true }));
@@ -1217,6 +1376,7 @@ const sandbox = args[args.indexOf('--sandbox') + 1];
 let prompt = '';
 process.stdin.on('data', chunk => prompt += chunk);
 process.stdin.on('end', () => {
+  if (!prompt.includes('temari-worker-efficiency/v1') || !prompt.includes('task constraints take priority')) throw new Error('Shared managed worker policy missing.');
   const id = prompt.match(/Goal: ([A-Za-z]+)/)?.[1] ?? 'unknown';
   setTimeout(() => {
     if (sandbox === 'workspace-write') fs.writeFileSync(id + '.txt', id + '\\n');
@@ -2481,7 +2641,7 @@ process.stdin.on('end', () => {
   });
 }
 
-test('both engineering skills reach shared conversation guidance, QA triage and the complete QA writer inside the artifact', async () => {
+test('both engineering skills reach shared conversation guidance, evidence intake, QA triage and the complete QA writer inside the artifact', async () => {
   for (const entry of ['temari', 'poteto-mode']) {
     const visited = new Set();
     const visit = async (path) => {
@@ -2539,6 +2699,13 @@ test('both engineering skills reach shared conversation guidance, QA triage and 
         join(repository, 'packages/workflow-runtime/public', conversationPath),
       ),
       'relocated guidance must preserve the owning source bytes',
+    );
+    const intakePath = 'skills/temari-knowledge/references/evidence-intake.md';
+    assert(visited.has(intakePath), `${entry} cannot reach shared evidence intake`);
+    assert.deepEqual(
+      await readFile(join(output, intakePath)),
+      await readFile(join(repository, 'packages/workflow-runtime/public', intakePath)),
+      'relocated intake guidance must preserve the owning source bytes',
     );
     for (const resource of [
       'SKILL.md',
