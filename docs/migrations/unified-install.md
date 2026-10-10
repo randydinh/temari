@@ -6,7 +6,7 @@ Temari is the main conversation. The runtime coordinates admitted work and retai
 
 ## Before setup
 
-Use the distribution for your OS and CPU. Native recipient verification covers macOS arm64 (macOS 14) and Linux x64/arm64 (Ubuntu 24.04). Intel macOS uses an outer, hash-pinned compatibility lock with cryptography 48.0.1. Full Intel setup and knowledge access pass locally under Rosetta; native Intel CI is required before advertising support. Original Registrar and marketplace dependency metadata remain unchanged. Native Windows binaries pass version diagnostics, but knowledge setup is unsupported. WSL2 and other OS/libc/CPU baselines still need their own recipient verification.
+Use the distribution for your OS and CPU. Native recipient verification covers macOS arm64 (macOS 14), Intel macOS (macOS 15), and Linux x64/arm64 (Ubuntu 24.04). Intel macOS uses an outer, hash-pinned compatibility lock with cryptography 48.0.1. Full Intel setup and knowledge access pass in native Intel CI and locally under Rosetta. Original Registrar and marketplace dependency metadata remain unchanged. Native Windows binaries pass version diagnostics, but knowledge setup is unsupported. WSL2 and other OS/libc/CPU baselines still need their own recipient verification.
 
 Extract the distribution and obtain its `UNIFIED.json` SHA-256 from the release publisher through a trusted channel. Verify the archive before executing the included launcher. The manifest digest is required independently; computing a new digest from an untrusted download does not establish trust.
 

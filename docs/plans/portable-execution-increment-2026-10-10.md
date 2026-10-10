@@ -122,3 +122,15 @@ remote library authentication remain separate increments. Claude is admitted as
 a scoped filesystem MCP worker; its shell tools and Anthropic cloud backend have
 not been enabled or verified. Provider CLI acquisition/authentication remains
 explicit, while Node, Python, Archon and knowledge dependencies are managed.
+
+
+The first complete native verification for this increment is
+[run 38068483999](https://github.com/randydinh/temari/actions/runs/38068483999)
+at head `47e6df06`: macOS ARM/Intel, Linux x64/ARM recipient journeys and shared
+execution checks all passed. Windows passed runtime diagnostics only. The final
+file-search correction follows that proof and is checked in the subsequent PR
+workflow. The final focused local review used a clean frozen checkout at
+`78cc47ca`, passed both groups through the required router, and was reviewed by
+the coordinator. Earlier broad local review timed out; file-scoped search
+refusals were reproduced and fixed before this successful review. Native review
+text is advisory; its line-number claims do not substitute for current source.
