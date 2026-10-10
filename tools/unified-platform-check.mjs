@@ -13,7 +13,7 @@ const { values } = parseArgs({ options: { output: { type: 'string' }, marketplac
 assert(values.output);
 const output = resolve(values.output);
 await mkdir(output, { recursive: true });
-const evidence = { schema: 1, platform: `${process.platform}-${process.arch}`, sourceRevision: (await exec('git', ['rev-parse', 'HEAD'], { cwd: workspace })).stdout.trim(), status: 'preparing', installationSupported: process.platform !== 'win32' };
+const evidence = { schema: 1, platform: `${process.platform}-${process.arch}`, sourceRevision: (await exec('git', ['rev-parse', 'HEAD'], { cwd: workspace })).stdout.trim(), sourceDirty: Boolean((await exec('git', ['status', '--porcelain'], { cwd: workspace })).stdout.trim()), status: 'preparing', installationSupported: process.platform !== 'win32' };
 const save = () => writeFile(join(output, 'result.json'), JSON.stringify(evidence, null, 2) + '\n');
 const run = async (command, args, env = process.env) => (await exec(command, args, { cwd: workspace, env, timeout: 180000, maxBuffer: 4 * 1024 * 1024 })).stdout.trim();
 try {

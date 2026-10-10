@@ -42,12 +42,14 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: pnpm install --frozen-lockfile
-      - name: Reproduce the pinned 0.15.5 marketplace
+      - name: Reproduce the pinned 0.15.5 marketplace payload
         shell: bash
         run: |
           pnpm exec nx run workflow-runtime:public-package -- --output "$RUNNER_TEMP/baseline-public"
           pnpm exec nx run workflow-runtime:release-package -- --artifact "$RUNNER_TEMP/baseline-public" --expected-manifest-sha256 963dce7adf2e4a23eaa022b600d4841067df6d1d830a0e9d84d0fbbf3f103195 --output "$RUNNER_TEMP/marketplace.tar.gz"
-          echo '8b5dc1c4b68cd9a08af1f89494730fbb409f06ddbe25413864955eff35d68442  '"$RUNNER_TEMP/marketplace.tar.gz" | sha256sum --check
+          # gzip encodings can differ across build runtimes; require the exact
+          # original uncompressed canonical tar as well as the public manifest.
+          node --input-type=module -e 'import assert from "node:assert/strict"; import {readFileSync} from "node:fs"; import {gunzipSync} from "node:zlib"; import {createHash} from "node:crypto"; assert.equal(createHash("sha256").update(gunzipSync(readFileSync(process.argv[1]))).digest("hex"), "8dedcec42ad3125f521b5132ce02748ce3ddd55f3e39be8ecd82d2d21ba97d9e")' "$RUNNER_TEMP/marketplace.tar.gz"
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: verified-marketplace-0.15.5
