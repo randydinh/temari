@@ -15,7 +15,14 @@ const output = resolve(values.output);
 await mkdir(output, { recursive: true });
 const evidence = { schema: 1, platform: `${process.platform}-${process.arch}`, sourceRevision: (await exec('git', ['rev-parse', 'HEAD'], { cwd: workspace })).stdout.trim(), sourceDirty: Boolean((await exec('git', ['status', '--porcelain'], { cwd: workspace })).stdout.trim()), status: 'preparing', installationSupported: process.platform !== 'win32' };
 const save = () => writeFile(join(output, 'result.json'), JSON.stringify(evidence, null, 2) + '\n');
-const run = async (command, args, env = process.env) => (await exec(command, args, { cwd: workspace, env, timeout: 180000, maxBuffer: 4 * 1024 * 1024 })).stdout.trim();
+const run = async (command, args, env = process.env, timeoutMs = 180000) => {
+  const started = Date.now();
+  try { return (await exec(command, args, { cwd: workspace, env, timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024 })).stdout.trim(); }
+  catch (error) {
+    evidence.commandFailure = { phase: evidence.phase ?? 'runtime-probe', elapsedMs: Date.now() - started, timeoutMs, killed: error.killed ?? false, signal: error.signal ?? null, code: error.code ?? null, stderr: String(error.stderr ?? '').slice(-8192) };
+    throw error;
+  }
+};
 try {
   const distribution = join(output, 'distribution'), cache = join(output, 'cache');
   let probedAssets;
@@ -43,7 +50,12 @@ try {
     const selected = await packageUnified({ marketplaceRoot: resolve(values.marketplace), releaseSha256: '64ac20821793c5c386b97b1468ccff9eef175419a44d4bea23b090257e47a894', publicManifestSha256: '963dce7adf2e4a23eaa022b600d4841067df6d1d830a0e9d84d0fbbf3f103195', dashboardRoot: join(workspace, 'apps/dashboard/dist'), outputRoot: distribution, cacheRoot: cache });
     evidence.distribution = selected;
     const manifest = JSON.parse(await readFile(join(distribution, 'UNIFIED.json'))), node = join(distribution, manifest.assets.node.executable);
-    evidence.recipientSmoke = await run(node, [join(workspace, 'tools/unified-recipient-smoke.mjs'), '--distribution', distribution, '--expected-manifest-sha256', selected.sha256]);
+    // This journey runs several individually bounded installs and negative retries.
+    // Its aggregate budget must exceed a single command's three-minute limit.
+    evidence.phase = 'recipient-setup-retry-integrity';
+    await save();
+    evidence.recipientSmoke = await run(node, [join(workspace, 'tools/unified-recipient-smoke.mjs'), '--distribution', distribution, '--expected-manifest-sha256', selected.sha256], process.env, 600000);
+    evidence.phase = 'installed-knowledge-talk';
     const home = join(output, 'home'), project = join(output, 'project'), profile = join(output, 'profile.json');
     await mkdir(project);
     await writeFile(profile, JSON.stringify({ schema: 1, id: 'native-platform-check', workspaceRoot: project, port: 0, transport: { kind: 'ollama', model: 'fixture-model-not-invoked' } }));
