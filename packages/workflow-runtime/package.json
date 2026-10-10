@@ -247,6 +247,10 @@
       "unified-recipient-smoke": {
         "command": "node tools/unified-recipient-smoke.mjs",
         "cache": false
+      },
+      "unified-platform-check": {
+        "command": "node tools/unified-platform-check.mjs",
+        "cache": false
       }
     }
   },

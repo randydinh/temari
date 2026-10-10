@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, lstat, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, lstat, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { gunzipSync, gzipSync } from 'node:zlib';
-import { extractManagedTarGz, prepareManagedAssets, readRuntimePins } from './unified-assets.mjs';
+import { extractManagedTarGz, prepareManagedAssets, probeFilesystemSemantics, readRuntimePins } from './unified-assets.mjs';
 function tar(entries) {
   const chunks = [];
   for (const { name, type = '0', link = '', content = '', mode = 0o755 } of entries) {
@@ -86,20 +86,47 @@ test('resolves intermediate directory links before .. and rejects hidden subtree
   await extractManagedTarGz(tar([{ name: 'python/safe/file', content: 'safe internal target' }, { name: 'python/deep/alias', type: '2', link: '../safe' }, { name: 'python/deep/link', type: '2', link: 'alias/file' }]), safeOutput, 'python');
   assert.equal(await readFile(join(safeOutput, 'deep/link'), 'utf8'), 'safe internal target');
 });
-test('rejects case and Unicode-equivalent paths including inferred parent directories', async t => {
-  const root = await fixture(t);
+test('uses actual filesystem equivalence for case and Unicode names including inferred parents', async t => {
+  const root = await fixture(t), semantics = await probeFilesystemSemantics(root);
   const cases = [
-    [{ name: 'python/tool', content: 'original' }, { name: 'python/other', content: 'replacement' }, { name: 'python/TOOL', type: '1', link: 'python/other' }],
-    [{ name: 'python/tool', content: 'original' }, { name: 'python/TOOL', content: 'replacement' }],
-    [{ name: 'python/Tools/one', content: 'one' }, { name: 'python/tools/two', content: 'two' }],
-    [{ name: 'python/caf\u00e9', content: 'NFC' }, { name: 'python/cafe\u0301', content: 'NFD' }],
-    [{ name: 'python/caf\u00e9/one', content: 'one' }, { name: 'python/cafe\u0301/two', content: 'two' }],
+    ['case', [{ name: 'python/tool', content: 'original' }, { name: 'python/other', content: 'replacement' }, { name: 'python/TOOL', type: '1', link: 'python/other' }]],
+    ['case', [{ name: 'python/tool', content: 'original' }, { name: 'python/TOOL', content: 'replacement' }]],
+    ['case', [{ name: 'python/Tools/one', content: 'one' }, { name: 'python/tools/two', content: 'two' }]],
+    ['unicode', [{ name: 'python/caf\u00e9', content: 'NFC' }, { name: 'python/cafe\u0301', content: 'NFD' }]],
+    ['unicode', [{ name: 'python/caf\u00e9/one', content: 'one' }, { name: 'python/cafe\u0301/two', content: 'two' }]],
   ];
   for (let index = 0; index < cases.length; index++) {
-    const output = join(root, String(index));
-    await assert.rejects(extractManagedTarGz(tar(cases[index]), output, 'python'), /Filesystem-equivalent archive path collision/);
-    await assert.rejects(lstat(output), { code: 'ENOENT' });
+    const output = join(root, String(index)), [kind, entries] = cases[index];
+    const aliases = kind === 'case' ? !semantics.caseSensitive : !semantics.unicodeNormalizationSensitive;
+    if (aliases) {
+      await assert.rejects(extractManagedTarGz(tar(entries), output, 'python'), /Filesystem-equivalent archive path collision/);
+      await assert.rejects(lstat(output), { code: 'ENOENT' });
+    } else {
+      await extractManagedTarGz(tar(entries), output, 'python');
+      for (const entry of entries.filter(entry => entry.content !== undefined)) assert.equal(await readFile(join(output, entry.name.slice('python/'.length)), 'utf8'), entry.content);
+      if (index === 0) assert.equal(await readFile(join(output, 'TOOL'), 'utf8'), 'replacement');
+    }
   }
+  assert.deepEqual((await readdir(root)).filter(name => name.startsWith('.temari-fs-probe-')), []);
+});
+test('filesystem probe detects alias behavior, cleans up, and preserves missing destination parents', async t => {
+  const root = await fixture(t), before = await readdir(root), semantics = await probeFilesystemSemantics(root);
+  assert.deepEqual(await readdir(root), before);
+  assert.deepEqual(await probeFilesystemSemantics(join(root, 'missing', 'parent')), semantics);
+  await assert.rejects(lstat(join(root, 'missing')), { code: 'ENOENT' });
+  // Independently observe exclusive-create behavior instead of assuming semantics
+  // from the OS name: Linux and macOS both support multiple filesystem variants.
+  for (const [first, second, sensitive] of [['Alpha', 'alpha', semantics.caseSensitive], ['caf\u00e9', 'cafe\u0301', semantics.unicodeNormalizationSensitive]]) {
+    await writeFile(join(root, first), 'first', { flag: 'wx' });
+    if (sensitive) { await writeFile(join(root, second), 'second', { flag: 'wx' }); assert.equal(await readFile(join(root, first), 'utf8'), 'first'); }
+    else await assert.rejects(writeFile(join(root, second), 'second', { flag: 'wx' }), { code: 'EEXIST' });
+  }
+  const output = join(root, 'existing');
+  await writeFile(output, 'preserve', { flag: 'wx' });
+  const beforeExisting = await readdir(root);
+  await assert.rejects(extractManagedTarGz(tar([{ name: 'python/file', content: 'archive' }]), output, 'python'), /must be fresh/);
+  assert.deepEqual(await readdir(root), beforeExisting);
+  assert.equal(await readFile(output, 'utf8'), 'preserve');
 });
 test('rejects incomplete headers and padded entry blocks and requires complete EOF termination', async t => {
   const root = await fixture(t), valid = gunzipSync(tar([{ name: 'python/bin/python3.12', content: 'x' }]));

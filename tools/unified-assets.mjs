@@ -1,7 +1,7 @@
 /** Release-builder only: acquire immutable upstream runtimes into a private distribution. */
 import { createHash, randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
-import { chmod, copyFile, lstat, mkdir, readFile, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, lstat, mkdir, mkdtemp, readFile, realpath, rename, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { dirname, join, posix, resolve, sep } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 
@@ -41,9 +41,29 @@ function paxRecords(bytes) {
   }
   return result;
 }
+/** Probe the actual destination filesystem; a portable archive may have case-distinct files. */
+export async function probeFilesystemSemantics(directory) {
+  // Missing parents inherit the filesystem of their nearest existing ancestor.
+  // Probe there without creating any part of the archive's destination tree.
+  let parent = resolve(directory);
+  for (;;) {
+    try { if (!(await stat(parent)).isDirectory()) throw new Error('Filesystem probe parent is not a directory'); break; }
+    catch (error) { if (error.code !== 'ENOENT' || dirname(parent) === parent) throw error; parent = dirname(parent); }
+  }
+  const probe = await mkdtemp(join(parent, '.temari-fs-probe-'));
+  try {
+    await writeFile(join(probe, 'CaseProbe'), 'case', { flag: 'wx' });
+    await writeFile(join(probe, 'caf\u00e9'), 'unicode', { flag: 'wx' });
+    async function exists(name) {
+      try { await lstat(join(probe, name)); return true; } catch (error) { if (error.code !== 'ENOENT') throw error; return false; }
+    }
+    return { caseSensitive: !await exists('caseprobe'), unicodeNormalizationSensitive: !await exists('cafe\u0301') };
+  } finally { await rm(probe, { recursive: true, force: true }); }
+}
 /** Validate the whole archive before any entry is written. No system extraction commands. */
 export async function extractManagedTarGz(bytes, destination, archiveRoot) {
   safePath(archiveRoot);
+  try { await lstat(destination); throw new Error('Extraction destination must be fresh'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
   const tar = gunzipSync(bytes, { maxOutputLength: 1024 * 1024 * 1024 }), entries = new Map();
   let local = {}, global = {}, longName, longLink, terminated = false;
   for (let offset = 0; offset < tar.length;) {
@@ -88,14 +108,15 @@ export async function extractManagedTarGz(bytes, destination, archiveRoot) {
   }
   if (!terminated) throw new Error('Missing tar EOF termination');
   if (longName !== undefined || longLink !== undefined || Object.keys(local).length) throw new Error('Incomplete tar extended entry');
-  // APFS/HFS+ and Windows may treat differently spelled paths as one file. Include
-  // inferred directories so a later file/link cannot alias an earlier subtree.
-  const filesystemNames = new Map();
+  // Include inferred directories so a later file/link cannot alias an earlier
+  // subtree. Apply equivalence only where the actual filesystem aliases names.
+  const semantics = await probeFilesystemSemantics(dirname(destination)), filesystemNames = new Map();
   for (const entry of entries.values()) {
     const components = entry.path.split('/');
     for (let length = 1; length <= components.length; length++) {
       const path = components.slice(0, length).join('/');
-      const key = path.normalize('NFC').toLowerCase();
+      let key = semantics.unicodeNormalizationSensitive ? path : path.normalize('NFC');
+      if (!semantics.caseSensitive) key = key.toLowerCase();
       if (filesystemNames.has(key) && filesystemNames.get(key) !== path) throw new Error(`Filesystem-equivalent archive path collision: ${path}`);
       filesystemNames.set(key, path);
     }
