@@ -16,6 +16,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { after, before, test } from 'node:test';
+import { checkCanonicalArtifact } from './canonical-runtime.mjs';
 import {
   checkPublicEntryArtifact,
   manifestSha256 as publicManifestSha256,
@@ -94,6 +95,10 @@ test(
         historicalVersion: true,
       }),
       /external expected digest/,
+    );
+    await assert.rejects(
+      checkCanonicalArtifact(join(artifact, 'runtime')),
+      /Missing package: privacy/,
     );
     const copy = join(root, 'historical-membership');
     await cp(artifact, copy, { recursive: true });

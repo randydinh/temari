@@ -564,7 +564,11 @@ export async function checkPublicEntryArtifact(
     );
   }
 
-  const canonicalManifest = await checkCanonicalArtifact(join(root, 'runtime'));
+  const canonicalManifest = await checkCanonicalArtifact(
+    join(root, 'runtime'),
+    undefined,
+    { historical: historicalVersion },
+  );
   assert.equal(
     manifest.runtimeManifestSha256,
     digest(jsonBytes(canonicalManifest)),
