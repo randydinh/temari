@@ -33,7 +33,7 @@ import {
   verifyExecutionHarnessRunIdentity,
   type TaskSnapshot,
 } from '../libs/runtime/src/index.js';
-import { assertWorkerProviderSelection, assertWorkerToolServerPin, type WorkerProviderSelection, type WorkerToolServerPin } from '../libs/host-adapters/src/index.js';
+import { assertWorkerProviderSelection, assertWorkerToolServerPin, resolveWorkerExecutable, type WorkerProviderSelection, type WorkerToolServerPin } from '../libs/host-adapters/src/index.js';
 import type { TaskViewController } from './task-view.mjs';
 import {
   prepareDashboardSwarm,
@@ -1400,7 +1400,7 @@ export class DashboardController implements TaskViewController {
       const prior = await this.swarmPreparation(task);
       assert(prior);
       const manifest = await json(prior.handle.requestPath);
-      assert.equal(taskDigest({ executable: manifest.request.executable, providerSelection: manifest.request.providerSelection, scopedToolServer: manifest.request.scopedToolServer }), taskDigest({ executable: config.executable, providerSelection: config.providerSelection, scopedToolServer: config.scopedToolServer }), 'Configured worker transport changed; prepare a new task.');
+      assert.equal(taskDigest({ executable: manifest.request.executable, providerSelection: manifest.request.providerSelection, scopedToolServer: manifest.request.scopedToolServer }), taskDigest({ executable: await resolveWorkerExecutable(config.executable), providerSelection: config.providerSelection, scopedToolServer: config.scopedToolServer }), 'Configured worker transport changed; prepare a new task.');
       assert.equal(
         manifest.request.assignments.length,
         request.workerCount,
@@ -1474,7 +1474,7 @@ export class DashboardController implements TaskViewController {
     }
     assert.equal(prepared.taskId, taskId);
     const manifest = await json(prepared.handle.requestPath);
-    assert.equal(taskDigest({ executable: manifest.request.executable, providerSelection: manifest.request.providerSelection, scopedToolServer: manifest.request.scopedToolServer }), taskDigest({ executable: config.executable, providerSelection: config.providerSelection, scopedToolServer: config.scopedToolServer }), 'Configured worker transport changed; prepare a new task.');
+    assert.equal(taskDigest({ executable: manifest.request.executable, providerSelection: manifest.request.providerSelection, scopedToolServer: manifest.request.scopedToolServer }), taskDigest({ executable: await resolveWorkerExecutable(config.executable), providerSelection: config.providerSelection, scopedToolServer: config.scopedToolServer }), 'Configured worker transport changed; prepare a new task.');
     assert.equal(manifest.request.runId, runId);
     assert.equal(
       manifest.request.assignments.length,

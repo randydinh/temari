@@ -94,7 +94,10 @@ Claude dashboard implementation. Both durable workers, integration and the
 separate reviewer completed successfully; the dashboard snapshot retained their
 progress. A live native Claude read-only test ignored poisoned project hooks and
 an inherited MCP configuration, read an admitted file, and refused external and
-Git-metadata reads. The audit records those actual successful/refused calls.
+Git-metadata reads. The audit records those actual successful/refused calls. Native cancellation
+returned BLOCKED with cancelled=true and left neither the observed worker nor
+its MCP child process alive. An initial sandboxed process-list check was
+unavailable; the successful check enumerated only this worker's descendant PIDs.
 
 Focused checks: 15 adapter/MCP tests; 68 dashboard tests; 64 implementation/write
 regressions; 123 process/Codex/router diagnostics tests; adapter and runtime task

@@ -13,7 +13,7 @@ import {
   rename,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname, basename } from 'node:path';
 import { promisify } from 'node:util';
 import test, { type TestContext } from 'node:test';
 import {
@@ -686,10 +686,12 @@ test('resume refuses a changed exact-native identity and is hidden from controls
 
 test('swarm intake binds prepared child records, preserves limits, and refuses serial acceptance', async (t) => {
   const f = await fixture(t);
+  const binaryAlias = join(f.root, 'bin-alias');
+  await symlink(dirname(process.execPath), binaryAlias, 'dir');
   const config = await validateDashboardConfig({
     ...f.config,
     swarm: {
-      executable: process.execPath,
+      executable: join(binaryAlias, basename(process.execPath)),
       maxWorkers: 4,
       maxConcurrency: 2,
       timeoutMs: 3000,
