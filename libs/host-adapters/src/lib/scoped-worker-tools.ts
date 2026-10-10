@@ -352,7 +352,18 @@ export class ScopedWorkerTools {
         query.length <= 256 &&
         !query.includes('\0'),
     );
-    await this.path(path, true);
+    const selected = await this.path(path, true);
+    if ((await lstat(selected)).isFile()) {
+      const text = (await this.read(path)).text;
+      const matches: { path: string; line: number; text: string }[] = [];
+      let truncated = false;
+      for (const [index, line] of text.split('\n').entries()) {
+        if (!line.includes(query)) continue;
+        if (matches.length === 40) { truncated = true; break; }
+        matches.push({ path, line: index + 1, text: line.slice(0, 512) });
+      }
+      return { matches, truncated };
+    }
     const pending = [path],
       matches = [];
     let inspected = 0,

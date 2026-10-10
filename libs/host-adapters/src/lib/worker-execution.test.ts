@@ -83,6 +83,7 @@ fs.writeFileSync(${JSON.stringify(join(root, 'mcp-pid.txt'))},String(transport.p
 const listed=await client.listTools();if(listed.tools.some(t=>!['read_file','list_files','search_text','write_file'].includes(t.name)))process.exit(22);
 const denied=await client.callTool({name:'read_file',arguments:{path:'../outside.txt'}});if(!denied.isError)process.exit(23);
 const read=await client.callTool({name:'read_file',arguments:{path:'owned.txt'}});const value=JSON.parse(read.content[0].text);
+const searched=await client.callTool({name:'search_text',arguments:{path:'owned.txt',query:'before'}});if(searched.isError||JSON.parse(searched.content[0].text).matches[0]?.path!=='owned.txt')process.exit(25);
 if(${JSON.stringify(mode)}==='hang'){await new Promise(()=>{});}
 if(listed.tools.some(t=>t.name==='write_file')){const deniedWrite=await client.callTool({name:'write_file',arguments:{path:'../outside.txt',text:'outside overwrite',expectedSha256:null}});if(!deniedWrite.isError)process.exit(24);await client.callTool({name:'write_file',arguments:{path:'owned.txt',text:'after',expectedSha256:value.sha256}});}
 await client.close();

@@ -99,11 +99,13 @@ returned BLOCKED with cancelled=true and left neither the observed worker nor
 its MCP child process alive. An initial sandboxed process-list check was
 unavailable; the successful check enumerated only this worker's descendant PIDs.
 
-Focused checks: 15 adapter/MCP tests; 68 dashboard tests; 64 implementation/write
+Focused checks: 16 adapter/MCP tests; 68 dashboard tests; 64 implementation/write
 regressions; 123 process/Codex/router diagnostics tests; adapter and runtime task
 typechecks; dashboard build; 9 unified compatibility/integrity tests. Independent
 source review found and corrected final-publication false PASS, FIFO read
-blocking and requested-model attribution defects.
+blocking and requested-model attribution defects. A local review exposed file-scoped
+search being refused despite readable files; search now accepts admitted files
+and directories, preserving link/metadata/byte limits and MCP line evidence.
 
 Temporary evidence is under `/private/tmp/temari-live-shared-hosts`,
 `/private/tmp/temari-native-boundary`, `/private/tmp/temari-intel-compat-journey-20261010`

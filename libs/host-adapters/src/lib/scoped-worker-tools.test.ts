@@ -204,3 +204,21 @@ test('cumulative output is bounded across individually valid file reads', async 
     /cumulative output bound/,
   );
 });
+
+
+test('file-scoped search retains line evidence and refuses linked, metadata and oversized files', async (t) => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'temari-search-file-')));
+  t.after(() => rm(root, {recursive:true, force:true}));
+  const workspace = join(root, 'workspace'); await mkdir(workspace);
+  await writeFile(join(workspace, 'allowed.txt'), 'before\nneedle one\nneedle two\n');
+  await writeFile(join(root, 'outside.txt'), 'needle secret');
+  await symlink(join(root, 'outside.txt'), join(workspace, 'linked.txt'));
+  await link(join(root, 'outside.txt'), join(workspace, 'hardlinked.txt'));
+  await mkdir(join(workspace, '.git')); await writeFile(join(workspace, '.git', 'config'), 'needle secret');
+  await writeFile(join(workspace, 'large.txt'), 'needle\n'.repeat(40000));
+  const tools = new ScopedWorkerTools(await createScopedWorkerToolConfig(workspace, 'read-only'));
+  assert.deepEqual(await tools.search('needle', 'allowed.txt'), {matches:[{path:'allowed.txt',line:2,text:'needle one'},{path:'allowed.txt',line:3,text:'needle two'}],truncated:false});
+  for(const path of ['../outside.txt','linked.txt','hardlinked.txt','.git/config','large.txt']) await assert.rejects(tools.search('needle', path));
+  await writeFile(join(workspace, 'many.txt'), 'needle\n'.repeat(41));
+  const bounded = await tools.search('needle','many.txt'); assert.equal(bounded.matches.length,40); assert.equal(bounded.truncated,true);
+});

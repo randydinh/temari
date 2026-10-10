@@ -80,7 +80,7 @@ export async function serveScopedWorkerTools(
     'search_text',
     {
       description:
-        'Search a literal substring in bounded workspace text files. Returns matching paths and lines with truncation evidence.',
+        'Search a literal substring in one admitted file or a bounded workspace directory. Returns matching paths and lines with truncation evidence.',
       inputSchema: {
         query: z.string().min(1).max(256),
         path: pathSchema.optional(),
