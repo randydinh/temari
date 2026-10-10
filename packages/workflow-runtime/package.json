@@ -183,6 +183,30 @@
         "options": {
           "command": "tsc --ignoreConfig --noEmit --module nodenext --moduleResolution nodenext --target es2022 --types node --strict --skipLibCheck tools/pinned-submodules.mts tools/pinned-submodules.test.mts tools/run-codex-write-workers.mts tools/run-codex-write-workers.test.mts"
         }
+      },
+      "release-package": {
+        "command": "node tools/temari-release.mjs package",
+        "cache": false
+      },
+      "release-check": {
+        "command": "node tools/temari-release.mjs check",
+        "cache": false
+      },
+      "release-test": {
+        "command": "node --test tools/temari-release.test.mjs",
+        "cache": false
+      },
+      "install-state": {
+        "command": "node tools/temari-install-state.mjs",
+        "cache": false
+      },
+      "install-state-test": {
+        "command": "node --test tools/temari-install-state.test.mjs",
+        "cache": false
+      },
+      "installed-journey": {
+        "command": "node tools/temari-installed-journey.mjs",
+        "cache": false
       }
     }
   },

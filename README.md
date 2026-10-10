@@ -82,6 +82,8 @@ tree — [docs/overlays.md](docs/overlays.md).
 - **Build the public plugin:** [current public packaging](packages/workflow-runtime/README.md#current-public-plugin).
   The existing public entries load a complete internal P-stack method library;
   public policy still selects supported execution routes.
+  Use the [installation and upgrade guide](docs/migrations/install-temari.md)
+  for verified marketplace releases and native Codex installation.
 - **Use knowledge:** [archive admission and handoff](libs/knowledge/ARCHIVE.md),
   [intake-to-search journey](libs/knowledge/JOURNEY.md), and the
   [knowledge system design](docs/knowledge-system-design.md). Registrar owns

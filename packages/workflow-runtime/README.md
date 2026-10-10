@@ -41,6 +41,11 @@ mutable task/evidence state outside the immutable artifact.
 
 The historical `qa-public-package` target is an alias for this same packager.
 
+For a digest-pinned marketplace release, recipient installation, explicit local
+upgrade and recovery, follow [Install or upgrade Temari](../../docs/migrations/install-temari.md).
+The carried verifier and installation inspector run without a source checkout;
+Codex retains ownership of installation state.
+
 ## Inherited source distributions
 
 This package vendors Temari's conversational skills, Pstack playbooks, evidence

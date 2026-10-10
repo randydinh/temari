@@ -1,6 +1,6 @@
 {
   "name": "temari",
-  "version": "0.15.4+codex.2",
+  "version": "0.15.5",
   "description": "Temari's Nx workflow entries and bundled source-backed knowledge capability.",
   "author": {
     "name": "Randy Dinh"

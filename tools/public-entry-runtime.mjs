@@ -344,7 +344,7 @@ function assertPolicy(policy) {
 }
 
 /** Checks the complete outer bundle, including the nested canonical runtime. */
-export async function checkPublicEntryArtifact(root, expectedManifestSha256) {
+export async function checkPublicEntryArtifact(root, expectedManifestSha256, { historicalVersion = false } = {}) {
   assert(isAbsolute(root), 'Artifact path must be absolute');
   assert.match(
     expectedManifestSha256 ?? '',
@@ -378,8 +378,11 @@ export async function checkPublicEntryArtifact(root, expectedManifestSha256) {
     sortedRecords(files),
     'Outer artifact inventory differs from its files.',
   );
+  const historicalWithoutMethod = historicalVersion && !Object.hasOwn(manifest, 'methodLibrary');
+  if (historicalWithoutMethod)
+    assert(![...files.keys()].some((path) => path.startsWith('method/')), 'Historical artifact unexpectedly contains a method library.');
   const expectedPaths = [
-    ...publicFiles.map(([, destination]) => destination),
+    ...publicFiles.map(([, destination]) => destination).filter((path) => !historicalWithoutMethod || !['host/pstack-method-library.mjs', 'skills/temari/references/method-library.md'].includes(path)),
     ...generatedFiles,
     ...[...files.keys()].filter((path) => path.startsWith('runtime/')),
     ...[...files.keys()].filter((path) =>
@@ -388,64 +391,66 @@ export async function checkPublicEntryArtifact(root, expectedManifestSha256) {
     manifestName,
   ].sort();
   assert.deepEqual(expectedPublicPaths(files), expectedPaths);
-  const method = await checkPstackMethodLibrary(
-    join(root, PSTACK_METHOD_PREFIX),
-  );
-  assert.deepEqual(
-    manifest.methodLibrary,
-    {
-      path: PSTACK_METHOD_PREFIX,
-      sourceRevision: method.catalog.sourceRevision,
-      provenanceSha256: method.provenanceSha256,
-      catalogSha256: method.catalogSha256,
-    },
-    'Method library metadata differs from the pinned manifest.',
-  );
-  const sourceProvenance = manifest.source.files.filter(
-    (file) => file.path === PSTACK_PROVENANCE_SOURCE,
-  );
-  assert.equal(
-    sourceProvenance.length,
-    1,
-    'Missing or duplicate method source provenance.',
-  );
-  assert.equal(
-    sourceProvenance[0].sha256,
-    method.provenanceSha256,
-    'Carried method provenance differs from source inventory.',
-  );
-  assert.equal(
-    sourceProvenance[0].bytes,
-    files.get(`${PSTACK_METHOD_PREFIX}/provenance.json`).length,
-    'Method provenance source byte count differs.',
-  );
-  const methodSourceFiles = manifest.source.files.filter((file) =>
-    file.path.startsWith(`${PSTACK_ASSET_SOURCE}/`),
-  );
-  const methodArtifactFiles = new Map(
-    [...files.entries()]
-      .filter(
-        ([path]) =>
-          path.startsWith(`${PSTACK_METHOD_PREFIX}/`) &&
-          !['catalog.json', 'provenance.json'].includes(
-            path.slice(PSTACK_METHOD_PREFIX.length + 1),
-          ),
-      )
-      .map(([path, bytes]) => [
-        `${PSTACK_ASSET_SOURCE}/${path.slice(PSTACK_METHOD_PREFIX.length + 1)}`,
-        bytes,
-      ]),
-  );
-  assert.deepEqual(
-    methodSourceFiles,
-    sortedRecords(methodArtifactFiles),
-    'Method source inventory differs from carried method files.',
-  );
+  if (!historicalWithoutMethod) {
+    const method = await checkPstackMethodLibrary(
+      join(root, PSTACK_METHOD_PREFIX),
+    );
+    assert.deepEqual(
+      manifest.methodLibrary,
+      {
+        path: PSTACK_METHOD_PREFIX,
+        sourceRevision: method.catalog.sourceRevision,
+        provenanceSha256: method.provenanceSha256,
+        catalogSha256: method.catalogSha256,
+      },
+      'Method library metadata differs from the pinned manifest.',
+    );
+    const sourceProvenance = manifest.source.files.filter(
+      (file) => file.path === PSTACK_PROVENANCE_SOURCE,
+    );
+    assert.equal(
+      sourceProvenance.length,
+      1,
+      'Missing or duplicate method source provenance.',
+    );
+    assert.equal(
+      sourceProvenance[0].sha256,
+      method.provenanceSha256,
+      'Carried method provenance differs from source inventory.',
+    );
+    assert.equal(
+      sourceProvenance[0].bytes,
+      files.get(`${PSTACK_METHOD_PREFIX}/provenance.json`).length,
+      'Method provenance source byte count differs.',
+    );
+    const methodSourceFiles = manifest.source.files.filter((file) =>
+      file.path.startsWith(`${PSTACK_ASSET_SOURCE}/`),
+    );
+    const methodArtifactFiles = new Map(
+      [...files.entries()]
+        .filter(
+          ([path]) =>
+            path.startsWith(`${PSTACK_METHOD_PREFIX}/`) &&
+            !['catalog.json', 'provenance.json'].includes(
+              path.slice(PSTACK_METHOD_PREFIX.length + 1),
+            ),
+        )
+        .map(([path, bytes]) => [
+          `${PSTACK_ASSET_SOURCE}/${path.slice(PSTACK_METHOD_PREFIX.length + 1)}`,
+          bytes,
+        ]),
+    );
+    assert.deepEqual(
+      methodSourceFiles,
+      sortedRecords(methodArtifactFiles),
+      'Method source inventory differs from carried method files.',
+    );
+  }
   const policy = JSON.parse(files.get('policy.json').toString());
   assertPolicy(policy);
   const plugin = JSON.parse(files.get('.codex-plugin/plugin.json').toString());
   assert.equal(plugin.name, 'temari');
-  assert.equal(plugin.version, '0.15.4+codex.2');
+  assert.equal(plugin.version, historicalVersion ? '0.15.4+codex.2' : '0.15.5', 'Unexpected public plugin version.');
   assert.equal(plugin.skills, './skills/');
   assert(files.has('skills/temari-knowledge/SKILL.md'));
   assert(files.has('bin/temari-knowledge.mjs'));
