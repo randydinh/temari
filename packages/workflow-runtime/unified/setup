@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+TEMARI_UNIFIED_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec "$TEMARI_UNIFIED_ROOT/runtime/node/bin/node" "$TEMARI_UNIFIED_ROOT/installer/setup.mjs" "$@"

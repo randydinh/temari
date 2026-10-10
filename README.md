@@ -16,6 +16,9 @@ and [component guide](docs/platform-components.md) for the full design. Use the
 [verification matrix](docs/verification-matrix.md) to trace claims to
 implementation and retained evidence.
 
+For the self-contained distribution with managed Node, Python, Archon, and
+knowledge access, follow the [unified installation guide](docs/migrations/unified-install.md).
+
 **Start with the [local dashboard guide](docs/task-dashboard.md)** to save goals,
 plan bounded parallel implementation from a natural goal, launch investigation
 agents, run coding agents in isolated clones, or execute verification checks. It covers setup, the UI flow,

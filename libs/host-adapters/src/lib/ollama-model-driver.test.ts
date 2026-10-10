@@ -98,6 +98,40 @@ test('Ollama driver sends a JSON schema through its native API', async () => {
   }
 });
 
+test('Ollama separates tool calls from constrained final packet rendering', async () => {
+  const requests: any[] = [];
+  const replies = [
+    reply({ role: 'assistant', content: '', tool_calls: [{ function: { name: 'temari_host_1', arguments: { query: 'Temari' } } }] }),
+    reply({ role: 'assistant', content: '{"answer":"Verified document."}' }),
+    reply({ role: 'assistant', content: '{"answer":"Verified document."}' }),
+  ];
+  let called = false;
+  const transport = createProtectedModelTransport(createOllamaModelDriver({
+    model: 'tool-fixture',
+    fetchImpl: (async (_url, init) => { requests.push(JSON.parse(String(init?.body))); return replies.shift()!; }) as typeof fetch,
+  }), { tools: [{ description: 'Search the selected library.', inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'], additionalProperties: false }, execute: async (args) => { assert.deepEqual(args, { query: 'Temari' }); called = true; return [{ kind: 'text', text: 'Verified source evidence.' }]; } }] });
+  const result = await transport.complete({ prompt: 'Retrieve evidence, then answer.', outputSchema: { type: 'object', properties: { answer: { type: 'string' } }, required: ['answer'], additionalProperties: false } });
+  try {
+    assert(called);
+    assert.equal(requests.length, 3);
+    assert(requests.slice(0, 2).every((request) => request.format === undefined));
+    assert.equal(requests[2].format.type, 'object');
+    assert.deepEqual(requests[2].tools, []);
+    assert.match(requests[0].messages[0].content, /After all tool calls/);
+    assert.match(requests[0].messages[0].content, /final schema/);
+    assert.equal(requests[1].messages.at(-1).role, 'tool');
+    assert.equal(JSON.parse(result.displayText()).answer, 'Verified document.');
+  } finally { result.dispose(); }
+});
+
+test('Ollama refuses tool calls during final packet rendering', async () => {
+  const responses = [reply({ role: 'assistant', content: 'Draft answer.' }), reply({ role: 'assistant', content: '', tool_calls: [{ function: { name: 'selected_tool', arguments: {} } }] })];
+  const driver = createOllamaModelDriver({ model: 'tool-fixture', fetchImpl: (async () => responses.shift()!) as typeof fetch });
+  let calls = 0;
+  await assert.rejects(driver.complete({ prompt: 'Answer.', tools: [{ name: 'selected_tool', description: 'Selected library.', inputSchema: { type: 'object' } }], outputSchema: { type: 'object' } }, async () => { calls++; return '{}'; }), /Tools are unavailable during final packet rendering/);
+  assert.equal(calls, 0);
+});
+
 test('Ollama endpoint rejects non-loopback and credentials in the URL', () => {
   assert.throws(
     () =>

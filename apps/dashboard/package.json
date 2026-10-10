@@ -6,6 +6,17 @@
   "nx": {
     "name": "dashboard",
     "targets": {
+      "talk-release-smoke": {
+        "command": "node apps/dashboard/scripts/talk-release-smoke.mjs",
+        "dependsOn": [
+          "build"
+        ],
+        "cache": false
+      },
+      "lifecycle-typecheck": {
+        "command": "tsc --ignoreConfig --noEmit --module nodenext --moduleResolution nodenext --target es2022 --types node --strict --skipLibCheck --allowImportingTsExtensions apps/dashboard/src/lifecycle.ts apps/dashboard/src/main.ts",
+        "cache": false
+      },
       "build": {
         "executor": "@nx/esbuild:esbuild",
         "inputs": [
@@ -145,6 +156,17 @@
           "command": "node apps/dashboard/scripts/release-smoke.mjs",
           "cwd": ""
         }
+      },
+      "talk-knowledge-test": {
+        "command": "node --import @swc-node/register/esm-register --test tools/dashboard-talk-knowledge.test.mts",
+        "cache": false
+      },
+      "knowledge-talk-release-smoke": {
+        "command": "node apps/dashboard/scripts/knowledge-talk-release-smoke.mjs",
+        "dependsOn": [
+          "build"
+        ],
+        "cache": false
       }
     }
   },

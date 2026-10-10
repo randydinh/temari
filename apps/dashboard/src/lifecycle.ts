@@ -14,8 +14,13 @@ import {
 } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
-import { parseArgs, promisify } from 'node:util';
+import { isDeepStrictEqual, parseArgs, promisify } from 'node:util';
 import { loadDashboardConfig } from '../../../tools/dashboard-controller.mjs';
+import {
+  loadDashboardTalkConfig,
+  validateDashboardTalkRoots,
+  type DashboardTalkConfig,
+} from '../../../tools/dashboard-talk.mjs';
 
 interface InstalledProfile {
   readonly schema: 1;
@@ -24,6 +29,7 @@ interface InstalledProfile {
   readonly port: number;
   readonly archonUrl?: string;
   readonly control: unknown;
+  readonly talk?: DashboardTalkConfig;
 }
 interface RuntimeState {
   readonly schema: 1;
@@ -75,6 +81,7 @@ const home = () =>
 const profilePath = (root: string) => join(root, 'active-profile.json');
 const runtimePath = (root: string) => join(root, 'runtime.json');
 const controlPath = (root: string) => join(root, 'control.json');
+const talkPath = (root: string) => join(root, 'talk.json');
 
 async function atomic(path: string, value: unknown): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
@@ -123,7 +130,7 @@ function validateProfile(value: unknown): asserts value is InstalledProfile {
   exact(
     value,
     ['schema', 'id', 'archonHome', 'port', 'control'],
-    ['archonUrl'],
+    ['archonUrl', 'talk'],
   );
   assert.equal(value.schema, 1);
   assert(typeof value.id === 'string' && safeId(value.id));
@@ -134,6 +141,13 @@ function validateProfile(value: unknown): asserts value is InstalledProfile {
       Number(value.port) <= 65535,
   );
   if ('archonUrl' in value) assert(typeof value.archonUrl === 'string');
+  if ('talk' in value)
+    assert(
+      value.talk &&
+        typeof value.talk === 'object' &&
+        !Array.isArray(value.talk),
+      'Talk must be a schema1 configuration.',
+    );
 }
 async function alive(pid: number): Promise<boolean> {
   if (!Number.isSafeInteger(pid) || pid < 1) return false;
@@ -143,6 +157,25 @@ async function alive(pid: number): Promise<boolean> {
   } catch {
     return false;
   }
+}
+async function readInstalledTalk(
+  root: string,
+  profile: InstalledProfile,
+): Promise<DashboardTalkConfig> {
+  const talk = await loadDashboardTalkConfig(talkPath(root));
+  assert.deepEqual(
+    talk,
+    profile.talk,
+    'Installed Talk configuration changed after configure.',
+  );
+  const selection = await validateDashboardTalkRoots(talk, join(root, 'tasks'));
+  const control = await loadDashboardConfig(controlPath(root));
+  assert.equal(
+    selection.workspaceRoot,
+    await realpath(control.workspaceRoot),
+    'Installed Talk and execution controls must select the same workspace.',
+  );
+  return talk;
 }
 async function readRuntime(root: string): Promise<RuntimeState | null> {
   try {
@@ -209,15 +242,37 @@ async function configure(
   host: LifecycleHost,
 ): Promise<unknown> {
   assert(isAbsolute(path), '--profile requires an absolute path.');
+  const running = await readRuntime(root);
   const source = JSON.parse(await readFile(path, 'utf8')) as unknown;
   exact(
     source,
     ['schema', 'id', 'archonHome', 'port', 'control'],
-    ['archonUrl'],
+    ['archonUrl', 'talk'],
   );
   const control = await materializeControl(source, host);
   const installedSource = { ...source, control };
   validateProfile(installedSource);
+  if (running && (await alive(running.pid))) {
+    const retained = await readProfile(root);
+    assert(
+      isDeepStrictEqual(installedSource, retained.profile),
+      'Stop the dashboard before changing its profile.',
+    );
+    assert(
+      isDeepStrictEqual(
+        JSON.parse(await readFile(controlPath(root), 'utf8')),
+        control,
+      ),
+      'Installed control configuration changed after configure.',
+    );
+    if (retained.profile.talk) await readInstalledTalk(root, retained.profile);
+    return {
+      status: 'configured',
+      profileId: retained.profile.id,
+      home: root,
+      reused: true,
+    };
+  }
   await mkdir(root, { recursive: true });
   await mkdir(join(root, 'tasks'), { recursive: true });
   await mkdir(join(root, 'logs'), { recursive: true });
@@ -228,12 +283,39 @@ async function configure(
       mode: 0o600,
       flag: 'wx',
     });
-    await loadDashboardConfig(validationPath);
+    const selectedControl = await loadDashboardConfig(validationPath);
+    if (installedSource.talk) {
+      const talkValidationPath = `${talkPath(root)}.${process.pid}.validate`;
+      try {
+        await writeFile(
+          talkValidationPath,
+          JSON.stringify(installedSource.talk),
+          {
+            mode: 0o600,
+            flag: 'wx',
+          },
+        );
+        const talk = await loadDashboardTalkConfig(talkValidationPath);
+        const selection = await validateDashboardTalkRoots(
+          talk,
+          join(root, 'tasks'),
+        );
+        assert.equal(
+          selection.workspaceRoot,
+          await realpath(selectedControl.workspaceRoot),
+          'Installed Talk and execution controls must select the same workspace.',
+        );
+      } finally {
+        await rm(talkValidationPath, { force: true });
+      }
+    }
   } finally {
     await rm(validationPath, { force: true });
   }
   await realpath(installedSource.archonHome);
   await atomic(controlPath(root), control);
+  if (installedSource.talk) await atomic(talkPath(root), installedSource.talk);
+  else await rm(talkPath(root), { force: true });
   await atomic(profilePath(root), installedSource);
   return { status: 'configured', profileId: installedSource.id, home: root };
 }
@@ -313,6 +395,23 @@ async function doctor(root: string, host: LifecycleHost): Promise<unknown> {
     await loadDashboardConfig(controlPath(root));
     return 'valid';
   });
+  const selected = await readProfile(root).catch(() => null);
+  if (selected?.profile.talk) {
+    await check('talk', async () => {
+      const talk = await readInstalledTalk(root, selected.profile);
+      return `${talk.transport?.kind ?? 'unconfigured'}: configuration valid; live model access requires a successful turn`;
+    });
+    const transport = selected.profile.talk.transport;
+    if (transport && 'credentialEnv' in transport) {
+      await check('talk-model-credential', async () => {
+        assert(
+          process.env[transport.credentialEnv]?.trim(),
+          'Selected Talk credential environment variable is not set.',
+        );
+        return 'selected credential environment variable is set';
+      });
+    }
+  }
   await check('managed-workflow', async () => {
     const paths = [
       join(host.managedWorkflowSource, 'reviewed-local-candidate.mjs'),
@@ -620,6 +719,10 @@ async function serve(root: string, host: LifecycleHost): Promise<unknown> {
     String(profile.port),
   ];
   if (profile.archonUrl) args.push('--archon-url', profile.archonUrl);
+  if (profile.talk) {
+    await readInstalledTalk(root, profile);
+    args.push('--talk-config', talkPath(root));
+  }
   const result = (await host.runTaskCommand(args)) as { url: string };
   await atomic(runtimePath(root), {
     schema: 1,
