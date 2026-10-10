@@ -6,7 +6,7 @@ Temari is the main conversation. The runtime coordinates admitted work and retai
 
 ## Before setup
 
-Use the distribution for your OS and CPU. Actual recipient verification currently covers macOS arm64. Linux x64/arm64 and macOS x64 have pinned upstream assets but still require their own recipient verification. Native Windows knowledge is not supported; use a Linux distribution inside WSL2 after Linux verification.
+Use the distribution for your OS and CPU. Native recipient verification covers macOS arm64 (macOS 14) and Linux x64/arm64 (Ubuntu 24.04). Intel macOS packaging is blocked by a locked Python dependency without a compatible binary wheel. Native Windows binaries pass version diagnostics, but knowledge setup is unsupported. WSL2 and other OS/libc/CPU baselines still need their own recipient verification.
 
 Extract the distribution and obtain its `UNIFIED.json` SHA-256 from the release publisher through a trusted channel. Verify the archive before executing the included launcher. The manifest digest is required independently; computing a new digest from an untrusted download does not establish trust.
 

@@ -12,6 +12,14 @@ integration, Registrar owns source evidence, and Paperclip supplies selected UX
 patterns. The implementation sequence and acceptance cases below are approved
 design intent; their execution and verification remain pending.
 
+**Unified-install direction approved on 2026-10-10:** Temari is the user's main
+chat. The workflow runtime orchestrates behind the scenes and exposes worker
+progress in the dashboard; Archon remains the execution harness. The additive
+[unified installer](migrations/unified-install.md) connects managed runtimes,
+knowledge and Talk. Engineering recipes and host capabilities still require
+explicit configuration and admission; see the
+[portability assessment](plans/portable-install-gap-assessment-2026-10-10.md).
+
 Read the [platform overview](platform-overview.md) for the intended architecture,
 the [component guide](platform-components.md) for detailed boundaries, and the
 [verification matrix](verification-matrix.md) before promoting a capability.

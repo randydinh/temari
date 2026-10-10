@@ -28,7 +28,7 @@ Use focused runtime/setup tests, existing public release and dashboard regressio
 
 ## Delivered candidate
 
-Task selected: `temari-unified-install-20261010`. Implementation branch: `codex/unified-install-20261010`, based on merged `afa479979dac0e4d8a8bddd4277d803c881e8d17`. Changes remain available for source review; no canonical feature acceptance or publication is inferred.
+Task selected: `temari-unified-install-20261010`. Implementation branch: `codex/unified-install-20261010`, based on merged `afa479979dac0e4d8a8bddd4277d803c881e8d17`. Committed and pushed in `254550da` with platform verification follow-ups `ecb2ba26` and `8aaf245e`; [PR #231](https://github.com/randydinh/temari/pull/231) is open. No canonical feature acceptance, merge or distribution publication is inferred.
 
 The additive unified distribution is version 0.1.0 and preserves the original verified 0.15.5 marketplace unchanged. Recipient setup supplies Node 22.23.3, Python 3.12.15 and Archon 0.10.1; installs hash-locked binary dependencies and verified Registrar source; seeds a scoped public library; verifies a real read-only MCP connection; and configures Talk and the existing task controller. The installed launcher provides start/stop/status/doctor without global PATH changes.
 
@@ -43,10 +43,12 @@ The final macOS arm64 candidate (`rc4`) has manifest SHA-256 `a7778801137c509fcd
 - Archive extraction to a fresh location and exact full inventory verification: PASS.
 - Installed Talk using the actual local `qwen3-coder:30b` model retrieves an unpredictable value from a newly registered document and returns the exact path and SHA-256: PASS.
 - Installed model fixture performs search, pinned read and cited final rendering, excludes a denied source, and retains the response after restart without replay: PASS.
-- Focused checks: 11 asset tests, 6 distribution/dependency tests, 9 knowledge tests and 5 Ollama tests passed; runtime/task and dashboard lifecycle typechecks passed.
+- Focused checks: 12 asset tests, 6 distribution/dependency tests, 9 knowledge tests and 5 Ollama tests passed; runtime/task and dashboard lifecycle typechecks passed.
 - Existing Talk regression: 74 tests passed. Host adapter regression: 269 tests passed before the final rendering refinement; the final refinement has the focused Ollama and installed knowledge fixture checks above. Dashboard smoke, release smoke and installed Talk smoke passed.
 - Independent architecture and source reviews identified retry startup injection, unpinned build backend, archive-link/collision/truncation/Windows-path cases and a broken packaged configuration link. Each reported issue was addressed and exercised by focused regression or recipient checks. The final two-phase Ollama change passed independent review. Native homogeneous read-only review receipts remain in the local evidence directory; they do not prove host feature admission or canonical completion.
 
 ## Remaining scope
 
-macOS arm64 is the only platform with executed recipient evidence. Other native platforms require verification; native Windows knowledge remains unsupported. The starter library is a curated subset rather than a complete offline documentation mirror. Host MCP/plugin registration is explicit per client. Engineering workers, execution recipes, repository authentication and forge capabilities continue to require the existing admission/configuration; this increment does not silently enable them. In-place upgrade/migration and distribution publication are separate follow-up work.
+Native CI passed recipient checks on macOS arm64 and Ubuntu 24.04 x64/arm64. Intel macOS passed runtime version checks but failed binary-only knowledge packaging on `cryptography==50.0.1`. Windows passed native runtime diagnostics; its knowledge installer remains unsupported. The [portability assessment](portable-install-gap-assessment-2026-10-10.md) records the executed matrix, retained evidence and changes needed for host-neutral engineering, Windows, release acquisition and lifecycle support.
+
+The starter library is a curated subset rather than a complete offline documentation mirror. Host MCP/plugin registration is explicit per client. Engineering workers, execution recipes, repository authentication and forge capabilities continue to require the existing admission/configuration; this increment does not silently enable them. In-place upgrade/migration and distribution publication are separate follow-up work.
