@@ -37,12 +37,15 @@ const toolPath = fileURLToPath(import.meta.url);
 const workspace = resolve(dirname(toolPath), '..');
 const manifestName = 'public-entry-manifest.json';
 const entries = ['temari', 'poteto-mode', 'closeout'];
-const generatedFiles = [
+const historicalGeneratedFiles = [
   'bin/codex-parallel.mjs',
   'bin/qa-evaluator.mjs',
   'bin/qa-evaluator-worker.mjs',
   'bin/qa-product-policy-control.mjs',
   'bin/qa-temari-policy-semantic.mjs',
+];
+const generatedFiles = [
+  ...historicalGeneratedFiles,
   'host/reviewed-local-candidate.mjs',
   'host/managed-candidate-operation.mjs',
   'host/dashboard-managed-candidate.mjs',
@@ -77,7 +80,10 @@ const publicFiles = [
   ],
   ['packages/workflow-runtime/host/entry.mjs', 'host/entry.mjs'],
   ['packages/workflow-runtime/host/qa.mjs', 'host/qa.mjs'],
-  ['packages/workflow-runtime/host/qa-capability.mjs', 'host/qa-capability.mjs'],
+  [
+    'packages/workflow-runtime/host/qa-capability.mjs',
+    'host/qa-capability.mjs',
+  ],
   [
     'packages/workflow-runtime/host/task-tracking.mjs',
     'host/task-tracking.mjs',
@@ -127,8 +133,14 @@ const publicFiles = [
     'bin/poteto-mode.mjs',
   ],
   ['packages/workflow-runtime/public/bin/closeout.mjs', 'bin/closeout.mjs'],
-  ['packages/workflow-runtime/public/qa/ticket-acceptance-v1.md', 'qa/ticket-acceptance-v1.md'],
-  ['packages/workflow-runtime/public/qa/verify-temari-public-v1.md', 'qa/verify-temari-public-v1.md'],
+  [
+    'packages/workflow-runtime/public/qa/ticket-acceptance-v1.md',
+    'qa/ticket-acceptance-v1.md',
+  ],
+  [
+    'packages/workflow-runtime/public/qa/verify-temari-public-v1.md',
+    'qa/verify-temari-public-v1.md',
+  ],
   [
     'packages/workflow-runtime/public/skills/temari/SKILL.md',
     'skills/temari/SKILL.md',
@@ -176,14 +188,12 @@ const publicFiles = [
     `packages/workflow-runtime/public/skills/qa-review-verification/${path}`,
     `skills/qa-review-verification/${path}`,
   ]),
-  ...[
-    'SKILL.md',
-    'references/issue-triage-v1.md',
-    'assets/triage-note.md',
-  ].map((path) => [
-    `packages/workflow-runtime/public/skills/qa-triage/${path}`,
-    `skills/qa-triage/${path}`,
-  ]),
+  ...['SKILL.md', 'references/issue-triage-v1.md', 'assets/triage-note.md'].map(
+    (path) => [
+      `packages/workflow-runtime/public/skills/qa-triage/${path}`,
+      `skills/qa-triage/${path}`,
+    ],
+  ),
   ...REGISTRAR_PAYLOAD_FILES.map((path) => [
     `packages/workflow-runtime/registrar/${path}`,
     `registrar/${path}`,
@@ -372,7 +382,11 @@ function assertPolicy(policy) {
 }
 
 /** Checks the complete outer bundle, including the nested canonical runtime. */
-export async function checkPublicEntryArtifact(root, expectedManifestSha256, { historicalVersion = false } = {}) {
+export async function checkPublicEntryArtifact(
+  root,
+  expectedManifestSha256,
+  { historicalVersion = false } = {},
+) {
   assert(isAbsolute(root), 'Artifact path must be absolute');
   assert.match(
     expectedManifestSha256 ?? '',
@@ -406,11 +420,24 @@ export async function checkPublicEntryArtifact(root, expectedManifestSha256, { h
     sortedRecords(files),
     'Outer artifact inventory differs from its files.',
   );
-  const historicalWithoutMethod = historicalVersion && !Object.hasOwn(manifest, 'methodLibrary');
+  const historicalWithoutMethod =
+    historicalVersion && !Object.hasOwn(manifest, 'methodLibrary');
   if (historicalWithoutMethod)
-    assert(![...files.keys()].some((path) => path.startsWith('method/')), 'Historical artifact unexpectedly contains a method library.');
+    assert(
+      ![...files.keys()].some((path) => path.startsWith('method/')),
+      'Historical artifact unexpectedly contains a method library.',
+    );
   const expectedPaths = [
-    ...publicFiles.map(([, destination]) => destination).filter((path) => !historicalWithoutMethod || !['host/pstack-method-library.mjs', 'skills/temari/references/method-library.md'].includes(path)),
+    ...publicFiles
+      .map(([, destination]) => destination)
+      .filter(
+        (path) =>
+          !historicalWithoutMethod ||
+          ![
+            'host/pstack-method-library.mjs',
+            'skills/temari/references/method-library.md',
+          ].includes(path),
+      ),
     ...generatedFiles,
     ...[...files.keys()].filter((path) => path.startsWith('runtime/')),
     ...[...files.keys()].filter((path) =>
@@ -418,7 +445,26 @@ export async function checkPublicEntryArtifact(root, expectedManifestSha256, { h
     ),
     manifestName,
   ].sort();
-  assert.deepEqual(expectedPublicPaths(files), expectedPaths);
+  // Historical membership belongs to the externally pinned manifest's vintage.
+  // New current resources must not be retroactively required in a predecessor.
+  if (!historicalVersion)
+    assert.deepEqual(expectedPublicPaths(files), expectedPaths);
+  assert.deepEqual(
+    [...files.keys()]
+      .filter((path) => /^skills\/[^/]+\/SKILL\.md$/.test(path))
+      .sort(),
+    [
+      'closeout',
+      'poteto-mode',
+      'qa-review-verification',
+      'qa-triage',
+      'temari',
+      'temari-knowledge',
+    ]
+      .map((name) => `skills/${name}/SKILL.md`)
+      .sort(),
+    'Public skill discovery must contain exactly the six supported entries.',
+  );
   if (!historicalWithoutMethod) {
     const method = await checkPstackMethodLibrary(
       join(root, PSTACK_METHOD_PREFIX),
@@ -478,7 +524,11 @@ export async function checkPublicEntryArtifact(root, expectedManifestSha256, { h
   assertPolicy(policy);
   const plugin = JSON.parse(files.get('.codex-plugin/plugin.json').toString());
   assert.equal(plugin.name, 'temari');
-  assert.equal(plugin.version, historicalVersion ? '0.15.4+codex.2' : '0.15.5', 'Unexpected public plugin version.');
+  assert.equal(
+    plugin.version,
+    historicalVersion ? '0.15.4+codex.2' : '0.15.5',
+    'Unexpected public plugin version.',
+  );
   assert.equal(plugin.skills, './skills/');
   assert(files.has('skills/temari-knowledge/SKILL.md'));
   assert(files.has('bin/temari-knowledge.mjs'));
@@ -490,7 +540,10 @@ export async function checkPublicEntryArtifact(root, expectedManifestSha256, { h
     );
   assert.equal(manifest.build.parallelBundler.name, 'bun');
   assert.match(manifest.build.parallelBundler.version, /^\d+\.\d+\.\d+/);
-  for (const path of generatedFiles) assert(files.has(path));
+  for (const path of historicalVersion
+    ? historicalGeneratedFiles
+    : generatedFiles)
+    assert(files.has(path));
   for (const entry of entries) {
     const path = `bin/${entry}.mjs`;
     assert(files.has(path), `Missing public entry: ${entry}`);
@@ -642,7 +695,8 @@ export async function packagePublicEntries(
       schemaVersion: 1,
       source: {
         revision: git('rev-parse', 'HEAD'),
-        dirty: git('status', '--porcelain=v1', '--untracked-files=normal') !== '',
+        dirty:
+          git('status', '--porcelain=v1', '--untracked-files=normal') !== '',
         files: sortedRecords(sourceFiles),
       },
       build: {

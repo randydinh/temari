@@ -16,6 +16,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { after, before, test } from 'node:test';
+import {
+  checkPublicEntryArtifact,
+  manifestSha256 as publicManifestSha256,
+} from './public-entry-runtime.mjs';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import {
   assertTemariVersionSuccessor,
@@ -77,6 +81,76 @@ function modifyHeader(bytes, change) {
   Buffer.from(`${checksum.toString(8).padStart(6, '0')}\0 `).copy(tar, 148);
   return gzipSync(tar, { level: 9, mtime: 0 });
 }
+
+test(
+  'historical public membership uses its external pin while current validation and six-skill discovery stay strict',
+  fixtureOptions,
+  async () => {
+    await checkPublicEntryArtifact(artifact, manifestSha256, {
+      historicalVersion: true,
+    });
+    await assert.rejects(
+      checkPublicEntryArtifact(artifact, 'a'.repeat(64), {
+        historicalVersion: true,
+      }),
+      /external expected digest/,
+    );
+    const copy = join(root, 'historical-membership');
+    await cp(artifact, copy, { recursive: true });
+    const extra = join(copy, 'unlisted.txt');
+    await writeFile(extra, 'unlisted');
+    await assert.rejects(
+      checkPublicEntryArtifact(copy, manifestSha256, {
+        historicalVersion: true,
+      }),
+      /inventory differs/,
+    );
+    await rm(extra);
+    const manifestPath = join(copy, 'public-entry-manifest.json');
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+    const skillPath = 'skills/qa-triage/SKILL.md';
+    await rm(join(copy, skillPath));
+    manifest.files = manifest.files.filter(
+      (record) => record.path !== skillPath,
+    );
+    await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+    await assert.rejects(
+      checkPublicEntryArtifact(copy, publicManifestSha256(manifest), {
+        historicalVersion: true,
+      }),
+      /exactly the six/,
+    );
+    // A current version cannot use historical compatibility to omit current resources.
+    const currentCopy = join(root, 'stripped-current-membership');
+    await cp(artifact, currentCopy, { recursive: true });
+    const pluginPath = '.codex-plugin/plugin.json';
+    const plugin = JSON.parse(
+      await readFile(join(currentCopy, pluginPath), 'utf8'),
+    );
+    plugin.version = '0.15.5';
+    const pluginBytes = Buffer.from(`${JSON.stringify(plugin, null, 2)}\n`);
+    await writeFile(join(currentCopy, pluginPath), pluginBytes);
+    const currentManifest = JSON.parse(
+      await readFile(join(currentCopy, 'public-entry-manifest.json'), 'utf8'),
+    );
+    Object.assign(
+      currentManifest.files.find((record) => record.path === pluginPath),
+      { sha256: sha256(pluginBytes), bytes: pluginBytes.length },
+    );
+    await writeFile(
+      join(currentCopy, 'public-entry-manifest.json'),
+      `${JSON.stringify(currentManifest, null, 2)}\n`,
+    );
+    const currentPin = publicManifestSha256(currentManifest);
+    await assert.rejects(checkPublicEntryArtifact(currentCopy, currentPin));
+    await assert.rejects(
+      checkPublicEntryArtifact(currentCopy, currentPin, {
+        historicalVersion: true,
+      }),
+      /Unexpected public plugin version/,
+    );
+  },
+);
 
 test('canonical archive bytes are deterministic and preserve every executable flag', () => {
   const files = sampleFiles(),
