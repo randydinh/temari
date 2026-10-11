@@ -197,8 +197,9 @@ export async function main(argv = process.argv.slice(2)) {
     home: { type: 'string' }, profile: { type: 'string' }, 'expected-manifest-sha256': { type: 'string' }, start: { type: 'boolean' }, 'no-start': { type: 'boolean' }, help: { type: 'boolean' },
     workspace: { type: 'string' }, id: { type: 'string' }, port: { type: 'string' }, chat: { type: 'string' }, model: { type: 'string' }, 'ollama-url': { type: 'string' }, worker: { type: 'string' },
     'worker-executable': { type: 'string' }, 'worker-model': { type: 'string' }, 'worker-reasoning': { type: 'string' }, clients: { type: 'string' }, 'codex-executable': { type: 'string' }, 'claude-executable': { type: 'string' }, 'claude-auth': { type: 'string' }, 'device-auth': { type: 'boolean' },
+    'provider-install': { type: 'string' }, engineering: { type: 'string' }, 'write-scope': { type: 'string', multiple: true }, check: { type: 'string', multiple: true }, prepare: { type: 'string', multiple: true },
   } });
-  if (values.help) return { usage: './setup guide --expected-manifest-sha256 HEX [--home ABS] [--workspace ABS]', scripted: './setup setup --home ABS --profile ABS --expected-manifest-sha256 HEX [--start]', choices: { chat: ['ollama', 'openai-responses'], worker: ['codex', 'claude-code', 'none'], clients: 'codex,claude-code or none', options: ['--model MODEL', '--worker-executable ABS', '--worker-model MODEL', '--worker-reasoning LEVEL', '--ollama-url LOOPBACK_ORIGIN', '--claude-auth api-key|ollama', '--device-auth', '--no-start'] }, credentials: 'Existing environment or hidden interactive prompt; never command-line values.' };
+  if (values.help) return { usage: './setup guide --expected-manifest-sha256 HEX [--home ABS] [--workspace ABS]', scripted: './setup setup --home ABS --profile ABS --expected-manifest-sha256 HEX [--start]', choices: { chat: ['ollama', 'openai-responses'], worker: ['codex', 'claude-code', 'none'], clients: 'codex,claude-code or none', options: ['--model MODEL', '--worker-executable ABS', '--worker-model MODEL', '--worker-reasoning LEVEL', '--ollama-url LOOPBACK_ORIGIN', '--claude-auth api-key|ollama', '--device-auth', '--provider-install managed|existing', '--engineering configure|skip', '--write-scope PATH (repeatable)', '--check ID (repeatable)', '--prepare ID (repeatable)', '--no-start'] }, credentials: 'Existing environment or hidden interactive prompt; never command-line values.' };
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   assert.equal(positionals.length, 1, 'Select setup or guide. Run ./setup --help for options.');
   if (positionals[0] === 'guide') {
@@ -206,6 +207,7 @@ export async function main(argv = process.argv.slice(2)) {
     const { guidedSetup } = await import('./guide.mjs');
     return guidedSetup({ root, expectedSha256: values['expected-manifest-sha256'], home: values.home, workspace: values.workspace, id: values.id, port: values.port === undefined ? undefined : Number(values.port), chat: values.chat, model: values.model,
       ollamaUrl: values['ollama-url'], worker: values.worker, workerExecutable: values['worker-executable'], workerModel: values['worker-model'], workerReasoning: values['worker-reasoning'], clients: values.clients === undefined ? undefined : values.clients === 'none' ? [] : values.clients.split(','),
+      providerInstall: values['provider-install'], engineering: values.engineering, writeScopes: values['write-scope'], checks: values.check, prepare: values.prepare,
       codexExecutable: values['codex-executable'], claudeExecutable: values['claude-executable'], claudeAuth: values['claude-auth'], deviceAuth: values['device-auth'], start: !values['no-start'],
     });
   }

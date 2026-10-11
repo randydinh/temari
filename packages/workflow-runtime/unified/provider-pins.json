@@ -1,0 +1,130 @@
+{
+  "schema": 1,
+  "kind": "temari-managed-provider-pins",
+  "sources": [
+    "https://developers.openai.com/codex/cli/",
+    "https://code.claude.com/docs/en/setup"
+  ],
+  "platforms": {
+    "darwin-arm64": {
+      "codex": {
+        "version": "0.154.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.154.0-darwin-arm64.tgz",
+        "integrity": "sha512-HP/vJCH/t2hB9Kg6hotN9UglClJ6/z584fal5lEP14C9gNAgAQS4/kTQC7l5V+BA3TqwDPwINSjul28cX8AYXg==",
+        "size": 116501639,
+        "sha256": "2a98662d79316a59993c7233e3e25a1aa1d42da4b45904585d33a5a7da1cade1",
+        "packageVersion": "0.154.0-darwin-arm64",
+        "format": "tar.gz",
+        "archiveRoot": "package",
+        "executable": "vendor/aarch64-apple-darwin/bin/codex",
+        "executableSha256": "4f85982624b3898c8991cb80c0981b2aa71070e3537046c9a95950318a95afcc",
+        "executableSize": 222655232,
+        "package": "@openai/codex"
+      },
+      "claude-code": {
+        "version": "2.1.296",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-arm64/-/claude-code-darwin-arm64-2.1.296.tgz",
+        "integrity": "sha512-vqtx3kS3r1hNLMk+N8JMG5J4kcLHIbI3t/NSIdcFQZrRVCFA6NtcxJyn/B+Sf3GxJaFJOCEfoBQXsFo10+Oj9A==",
+        "size": 105100333,
+        "sha256": "50fbf594d6526c9aae7d66b8b45a08d89ae6b863e2bc9777bfb277d6521a7458",
+        "packageVersion": "2.1.296",
+        "format": "tar.gz",
+        "archiveRoot": "package",
+        "executable": "claude",
+        "executableSha256": "c9b5341637becbd423ddffc5b254afb645682a3868cb708bbc6cc0e7bb419937",
+        "executableSize": 240664432,
+        "package": "@anthropic-ai/claude-code-darwin-arm64"
+      }
+    },
+    "darwin-x64": {
+      "codex": {
+        "version": "0.154.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.154.0-darwin-x64.tgz",
+        "integrity": "sha512-2aqz+72Hop8PF2RYglQ4JnGjm3OlRIrTykJIT0hyLeUgM6NCFy09RgTmqRCoWliKQZjEn9jjZqUEp7QujAj77g==",
+        "size": 124308807,
+        "sha256": "92c493533c53c433c4d94252251daba4f379ccba06a9964d260abb47a535dce1",
+        "packageVersion": "0.154.0-darwin-x64",
+        "format": "tar.gz",
+        "archiveRoot": "package",
+        "executable": "vendor/x86_64-apple-darwin/bin/codex",
+        "executableSha256": "b0e26f09819c4b27f621853800c29f95ac5d526ad9b88ab641de4db86835718d",
+        "executableSize": 239700064,
+        "package": "@openai/codex"
+      },
+      "claude-code": {
+        "version": "2.1.296",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-x64/-/claude-code-darwin-x64-2.1.296.tgz",
+        "integrity": "sha512-yCJe1vp7juHg3xVyk0Ts8b+mcEylCo6aINg7yC7r1eI8BKfm1DT15htxl1riz3y+B1FV25emIK90d7rH+zFjLA==",
+        "size": 109248203,
+        "sha256": "ec29d962f0f7c70cf8c44606ee7fbb3cd7936a33f4dc13d3c2e3664c5f0b3fc4",
+        "packageVersion": "2.1.296",
+        "format": "tar.gz",
+        "archiveRoot": "package",
+        "executable": "claude",
+        "executableSha256": "a6bf4f30be241053a923f3820ad23c5991d2f5ac2935b3a8dd64da218d9cc603",
+        "executableSize": 249194752,
+        "package": "@anthropic-ai/claude-code-darwin-x64"
+      }
+    },
+    "linux-arm64": {
+      "codex": {
+        "version": "0.154.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.154.0-linux-arm64.tgz",
+        "integrity": "sha512-KmTCB6ST484zeYlPpKP/K5P/gRaYmt6TihVD+zotoe6O9q0JSBP+FYvCz4A/zZXR7xDOHURTSjHp0sD8wWS0YQ==",
+        "size": 122610794,
+        "sha256": "a2315b5f64bfeaff79b71e0d35505ba8c22cc1e96cab9dc950b614c804105b24",
+        "packageVersion": "0.154.0-linux-arm64",
+        "format": "tar.gz",
+        "archiveRoot": "package",
+        "executable": "vendor/aarch64-unknown-linux-musl/bin/codex",
+        "executableSha256": "9b7c1c7abdc26fc3c4f47c77656a8e9121def5483dbae830ef1ee561758448a9",
+        "executableSize": 227482840,
+        "package": "@openai/codex"
+      },
+      "claude-code": {
+        "version": "2.1.296",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-2.1.296.tgz",
+        "integrity": "sha512-Q6Qh6qFmwuBG9rQFiDR6bY3XkFnwTN9AAPrnnDgBvr9sbg1Ql5wrf0lfoCDiV369EUHOzxI4i5OdHW9Vf2/oeA==",
+        "size": 115122331,
+        "sha256": "56abbe1cfc85e5b37afeef5ae8b4856ddc32bbe443b82689a3b5f99992045cd1",
+        "packageVersion": "2.1.296",
+        "format": "tar.gz",
+        "archiveRoot": "package",
+        "executable": "claude",
+        "executableSha256": "f1f6e96e0d8342b9dbf41d7e88255397a6a52ce3d8736ad6a4c6b59c9b62fefa",
+        "executableSize": 256434168,
+        "package": "@anthropic-ai/claude-code-linux-arm64"
+      }
+    },
+    "linux-x64": {
+      "codex": {
+        "version": "0.154.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.154.0-linux-x64.tgz",
+        "integrity": "sha512-a4FI3A8sGtwGrOqltrPbrS2hajrHQG591EwmRfiRoLMb10VxdBtUGW4gu6IJVYENiYGA7k3P4jlRHEoCZU/s9Q==",
+        "size": 129654638,
+        "sha256": "e27c83a49e6031685ee7f956c12aad5f16484d3a80181dd3fea930fb96b3832b",
+        "packageVersion": "0.154.0-linux-x64",
+        "format": "tar.gz",
+        "archiveRoot": "package",
+        "executable": "vendor/x86_64-unknown-linux-musl/bin/codex",
+        "executableSha256": "3188814c35471432d4123203e0eb38e5bddc60226e3d7ddf0e59e649ea140022",
+        "executableSize": 262858016,
+        "package": "@openai/codex"
+      },
+      "claude-code": {
+        "version": "2.1.296",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-x64/-/claude-code-linux-x64-2.1.296.tgz",
+        "integrity": "sha512-+m01urgelnI+VJxPaKPEK0wixgq42uZ8PeCaUk5tX/8YoDBvSmC/REVQG2jQfJAr8dxunpjJ600FvLrcj1WWTw==",
+        "size": 114864541,
+        "sha256": "eef5a2e2b09a5e7d2ce784d1b3ba335ae7fc6c7f6256c802a0ebf2c21e4fd0e1",
+        "packageVersion": "2.1.296",
+        "format": "tar.gz",
+        "archiveRoot": "package",
+        "executable": "claude",
+        "executableSha256": "24972e3bc859fab2b46ed4c1e51f7d6130f06d3bd550811a114640de3370d0de",
+        "executableSize": 257068216,
+        "package": "@anthropic-ai/claude-code-linux-x64"
+      }
+    }
+  }
+}

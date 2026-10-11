@@ -8,6 +8,8 @@ import { promisify, isDeepStrictEqual } from 'node:util';
 import { digest, verifyDistribution } from './inventory.mjs';
 import { detectHosts, inspectHost, authenticateHost, listLocalModels, saveCredentials, readCredentials } from './hosts.mjs';
 import { registerClients } from './clients.mjs';
+import { installManagedProvider } from './providers.mjs';
+import { discoverProject, createProjectOnboarding } from './project.mjs';
 
 const execute = promisify(execFile);
 const json = value => `${JSON.stringify(value, null, 2)}\n`;
@@ -70,6 +72,7 @@ export function generatedProfile(selection, worker, git) {
     control.recipes.push({ id: 'check-clean-checkout', title: 'Verify the selected checkout', goal: 'Retain the selected Git revision and confirm its clean checkout remains unchanged during these checks.', stages: Object.fromEntries(Object.entries(stages).map(([stage, args]) => [stage, { executable: git, args, timeoutMs: 10000, summary: `Recorded the ${stage} checkout check.` }])) });
   }
   if (worker) control.swarm = { executable: worker.executable, providerSelection: worker.providerSelection, maxConcurrency: 2, maxWorkers: 4, timeoutMs: 180000 };
+  if (selection.project?.implementation) control.implementation = selection.project.implementation;
   return { schema: 1, id: selection.id, workspaceRoot: selection.workspaceRoot, port: selection.port, transport: selection.transport, control };
 }
 
@@ -96,9 +99,10 @@ export async function probeChat(transport, credentials, send = fetch) {
 
 /** Native login remains with the host; installation receipts contain selections only. */
 export async function guidedSetup(options, dependencies = {}) {
-  const { root, expectedSha256, start = true } = options;
+  const { root: requestedRoot, expectedSha256, start = true } = options;
+  const root = await realpath(requestedRoot);
   const prompts = dependencies.prompts ?? terminalQuestions();
-  const services = { verifyDistribution, detectHosts, inspectHost, authenticateHost, listLocalModels, saveCredentials, readCredentials, registerClients, probeChat, ...dependencies };
+  const services = { verifyDistribution, detectHosts, inspectHost, authenticateHost, listLocalModels, saveCredentials, readCredentials, registerClients, probeChat, installManagedProvider, discoverProject, createProjectOnboarding, ...dependencies };
   const manifest = await services.verifyDistribution(root, expectedSha256);
   assert(process.platform !== 'win32', 'Native Windows knowledge is pending verification; use the Linux distribution inside WSL2.');
   assert.equal(manifest.assets.platform, `${process.platform}-${process.arch}`, 'Select the distribution for this native platform.');
@@ -109,6 +113,12 @@ export async function guidedSetup(options, dependencies = {}) {
   if (priorSetup) assert.equal(priorSetup.releaseSha256, expectedSha256, 'This installation belongs to another release. Select a new home.');
   if (priorSetup && !prior) throw new Error('Existing scripted installation has no guided selection. Select a new home for the guided journey.');
   const detected = await services.detectHosts();
+  const installation = join(home, 'installations', expectedSha256);
+  const managed = new Map();
+  async function provider(kind) {
+    if (!managed.has(kind)) managed.set(kind, await services.installManagedProvider({ root, manifest, kind }));
+    return managed.get(kind);
+  }
   let selection = prior?.selection, worker, credentials = {};
   if (selection) {
     for (const [option, selected] of [['workspace', selection.workspaceRoot], ['id', selection.id], ['chat', selection.transport.kind], ['model', selection.transport.model], ['worker', selection.worker?.kind ?? 'none'], ['workerModel', selection.worker?.model], ['workerExecutable', selection.worker?.executable], ['workerReasoning', selection.worker?.reasoning], ['port', selection.port], ['ollamaUrl', selection.transport.baseUrl]]) {
@@ -119,6 +129,11 @@ export async function guidedSetup(options, dependencies = {}) {
     }
     if (options.clients !== undefined) assert.deepEqual(options.clients, selection.clients.map(client => client.kind), 'Guided retry changes selected clients.');
     if (options.claudeAuth !== undefined) assert.equal(options.claudeAuth, selection.worker?.authMode, 'Guided retry changes worker authentication. Select a new home.');
+    if (options.providerInstall !== undefined) assert.equal(options.providerInstall, selection.providerInstall, 'Guided retry changes provider installation.');
+    if (options.engineering !== undefined) assert.equal(options.engineering, selection.project ? 'configure' : 'skip', 'Guided retry changes project onboarding.');
+    if (options.writeScopes !== undefined) assert.deepEqual(options.writeScopes, selection.project?.inputs.scopes, 'Guided retry changes write scopes.');
+    if (options.checks !== undefined) assert.deepEqual(options.checks, selection.project?.inputs.checks, 'Guided retry changes checks.');
+    if (options.prepare !== undefined) assert.deepEqual(options.prepare, selection.project?.inputs.prepare, 'Guided retry changes preparation.');
     for (const client of selection.clients) {
       const override = options[`${client.kind === 'codex' ? 'codex' : 'claude'}Executable`];
       if (override !== undefined) assert.equal(await realpath(override), client.executable, 'Guided retry changes the selected client.');
@@ -151,10 +166,14 @@ export async function guidedSetup(options, dependencies = {}) {
       assert(model, 'Select an OpenAI API model.');
       transport = { kind: chat, model, credentialEnv: 'OPENAI_API_KEY' };
     }
-    const kind = options.worker ?? await prompts.ask('Engineering worker host', ['codex', 'claude-code', 'none'], detected.find(host => host.kind === 'codex') ? 'codex' : 'none');
+    const kind = options.worker ?? await prompts.ask('Engineering worker host', ['codex', 'claude-code', 'none'], manifest.providers?.codex || detected.find(host => host.kind === 'codex') ? 'codex' : 'none');
     assert(['codex', 'claude-code', 'none'].includes(kind), 'Unknown engineering host.');
-    const executable = kind === 'none' ? null : options.workerExecutable ?? detected.find(host => host.kind === kind)?.executable ?? await prompts.ask(`${kind} executable (absolute path)`);
-    selection = { schema: 1, home, workspaceRoot, id, port: options.port ?? 3095, transport, worker: kind === 'none' ? null : { kind, executable }, clients: [] };
+    const providerInstall = options.providerInstall ?? (options.workerExecutable || !manifest.providers ? 'existing' : 'managed');
+    assert(['managed', 'existing'].includes(providerInstall), 'Select managed or existing provider installation.');
+    assert(!(providerInstall === 'managed' && options.workerExecutable), 'Select an existing executable or managed installation.');
+    const selectedProvider = kind !== 'none' && providerInstall === 'managed' ? await provider(kind) : null;
+    const executable = kind === 'none' ? null : selectedProvider ? join(installation, manifest.providers[kind].executable) : options.workerExecutable ?? detected.find(host => host.kind === kind)?.executable ?? await prompts.ask(`${kind} executable (absolute path)`);
+    selection = { schema: 1, home, workspaceRoot, id, port: options.port ?? 3095, transport, providerInstall, worker: kind === 'none' ? null : { kind, executable, ...(selectedProvider ? { managed: true } : {}) }, clients: [] };
     assert(Number.isInteger(selection.port) && selection.port >= 0 && selection.port <= 65535, 'Select a valid port.');
   }
   if (selection.transport.kind === 'openai-responses' && !credentials.OPENAI_API_KEY) {
@@ -163,6 +182,8 @@ export async function guidedSetup(options, dependencies = {}) {
   }
   if (selection.worker) {
     const selected = selection.worker;
+    const packaged = selected.managed ? await provider(selected.kind) : null;
+    const native = { ...selected, executable: packaged?.executable ?? selected.executable };
     if (selected.kind === 'claude-code') {
       selected.authMode ??= options.claudeAuth ?? await prompts.ask('Claude scoped workers use API credentials or local Ollama', ['api-key', 'ollama'], selection.transport.kind === 'ollama' ? 'ollama' : 'api-key');
         if (selected.authMode === 'ollama') {
@@ -175,12 +196,12 @@ export async function guidedSetup(options, dependencies = {}) {
           assert(credentials.ANTHROPIC_API_KEY, 'An Anthropic API key is required for scoped workers.');
         }
     }
-    let host = await services.inspectHost({ ...selected, env: { ...process.env, ...credentials } });
+    let host = await services.inspectHost({ ...native, env: { ...process.env, ...packaged?.environment, ...credentials } });
     assert(host.compatible, `Selected ${selected.kind} version is unsupported. Install a supported CLI and rerun guide.`);
     if (selected.kind === 'codex' && !host.authenticated) {
       prompts.report('Complete Codex sign-in in the native login flow. Temari does not copy its credentials.');
-      await services.authenticateHost({ ...selected, method: options.deviceAuth ? 'device' : 'browser' });
-      host = await services.inspectHost({ ...selected, env: { ...process.env, ...credentials } });
+      await services.authenticateHost({ ...native, method: options.deviceAuth ? 'device' : 'browser' });
+      host = await services.inspectHost({ ...native, env: { ...process.env, ...packaged?.environment, ...credentials } });
     }
     assert(host.workerReady, `Selected ${selected.kind} authentication is unavailable. Complete authentication and rerun guide.`);
     const modelIds = host.models.map(model => model.id);
@@ -193,22 +214,27 @@ export async function guidedSetup(options, dependencies = {}) {
       if (model.reasoningLevels.length) assert(model.reasoningLevels.includes(selected.reasoning), 'Selected reasoning is unavailable for this worker model.');
     }
     if (prior) { assert.equal(host.sha256, selected.sha256, 'Worker executable changed. Select a new installation home.'); assert.equal(host.version, selected.version, 'Worker version changed. Select a new installation home.'); }
-    selected.executable = host.executable; selected.sha256 = host.sha256; selected.version = host.version;
+    if (!selected.managed) selected.executable = host.executable;
+    selected.sha256 = host.sha256; selected.version = host.version;
     const providerSelection = { provider: selected.kind, executableSha256: host.sha256, executableVersion: host.version, model: selected.model, ...(selected.kind === 'codex' ? { reasoning: selected.reasoning } : { policy: 'temari-scoped-tools-v1', maxTurns: 32, maxBudgetUsd: 5 }) };
-    worker = { executable: host.executable, providerSelection };
+    worker = { executable: selected.executable, providerSelection };
   }
   if (!prior) {
     const choices = options.clients ?? (selection.worker ? [selection.worker.kind] : []);
     for (const kind of choices) {
       assert(['codex', 'claude-code'].includes(kind), 'Unknown client registration.');
-      const executable = options[`${kind === 'codex' ? 'codex' : 'claude'}Executable`] ?? (selection.worker?.kind === kind ? selection.worker.executable : detected.find(host => host.kind === kind)?.executable);
+      const override = options[`${kind === 'codex' ? 'codex' : 'claude'}Executable`];
+      const useManaged = !override && selection.providerInstall === 'managed';
+      if (useManaged) await provider(kind);
+      const executable = override ?? (useManaged ? join(installation, manifest.providers[kind].executable) : selection.worker?.kind === kind ? selection.worker.executable : detected.find(host => host.kind === kind)?.executable);
       assert(executable && isAbsolute(executable), `Install ${kind} or select its absolute executable to register that client.`);
-      selection.clients.push({ kind, executable, ...(options.clientHomes?.[kind] ? { configHome: options.clientHomes[kind] } : {}) });
+      selection.clients.push({ kind, executable, ...(useManaged ? { managed: true } : {}), ...(options.clientHomes?.[kind] ? { configHome: options.clientHomes[kind] } : {}) });
     }
   }
   for (const client of selection.clients) {
-    client.executable = await realpath(client.executable);
-    const pin = digest(await readFile(client.executable));
+    const packaged = client.managed ? await provider(client.kind) : null;
+    if (!client.managed) client.executable = await realpath(client.executable);
+    const pin = digest(await readFile(packaged?.executable ?? client.executable));
     if (client.executableSha256) assert.equal(pin, client.executableSha256, 'Registered client executable changed. Select a new installation home.');
     client.executableSha256 = pin;
   }
@@ -219,6 +245,30 @@ export async function guidedSetup(options, dependencies = {}) {
     try { await execute(git, ['rev-parse', '--verify', 'HEAD'], { cwd: selection.workspaceRoot, timeout: 10000 }); }
     catch { git = undefined; }
   }
+  const engineering = options.engineering ?? (prior ? selection.project ? 'configure' : 'skip' : worker && process.stdin.isTTY ? await prompts.ask('Configure engineering for this project', ['configure', 'skip'], 'configure') : 'skip');
+  assert(['configure', 'skip'].includes(engineering), 'Select configure or skip for project onboarding.');
+  if (engineering === 'configure') {
+    assert(worker && git, 'Project engineering needs a selected worker and a committed Git project.');
+    const runtimeNode = join(installation, manifest.assets.node.executable);
+    const runtimeNpmCli = join(installation, 'runtime/node/lib/node_modules/npm/bin/npm-cli.js');
+    const packageManagers = Object.fromEntries(detected.filter(host => ['pnpm', 'yarn', 'bun'].includes(host.kind)).map(host => [host.kind, host.executable]));
+    const discovery = await services.discoverProject({ workspaceRoot: selection.workspaceRoot, git, node: join(root, manifest.assets.node.executable), npmCli: join(root, 'runtime/node/lib/node_modules/npm/bin/npm-cli.js'), packageManagers });
+    let inputs = selection.project?.inputs;
+    if (!inputs) {
+      prompts.report(`Project checks: ${discovery.checks.map(check => `${check.id}: ${check.label}${check.script ? ` (${JSON.stringify(check.script)})` : ''}${check.hooks?.length ? `; hooks: ${check.hooks.map(hook => `${hook.id}=${JSON.stringify(hook.script)}`).join(', ')}` : ''}`).join('; ') || 'none discovered'}`);
+      if (discovery.blockedReasons.length) prompts.report(discovery.blockedReasons.join('\n'));
+      if (discovery.prepare.length) prompts.report(`Project preparation: ${discovery.prepare.map(step => `${step.id}: ${step.label}`).join('; ')}`);
+      prompts.report(`Write scope suggestions: ${discovery.scopeCandidates.map(scope => scope.path).slice(0, 12).join(', ')}`);
+      const scopes = options.writeScopes ?? (await prompts.ask('Two to four disjoint write scopes, comma separated (directory paths end with /)')).split(',').map(value => value.trim()).filter(Boolean);
+      const checks = options.checks ?? (await prompts.ask('Verification check IDs, comma separated', [], discovery.checks.find(check => check.id === 'test')?.id ?? discovery.checks[0]?.id ?? '')).split(',').map(value => value.trim()).filter(Boolean);
+      const prepare = options.prepare ?? (discovery.prepare?.length ? (await prompts.ask('Preparation IDs, comma separated; empty skips dependency installation', [], discovery.requiresPreparation ? 'install-dependencies' : '')).split(',').map(value => value.trim()).filter(Boolean) : []);
+      inputs = { scopes, checks, prepare };
+    }
+    const project = await services.createProjectOnboarding({ discovery, ...inputs, worker, runtimeNode, runtimeNpmCli });
+    if (selection.project) assert(isDeepStrictEqual(project.selection, selection.project.selection) && isDeepStrictEqual(project.implementation, selection.project.implementation), 'Project metadata or onboarding selection changed. Select a new installation home.');
+    else selection.project = { inputs, selection: project.selection, implementation: project.implementation };
+    prompts.report('The configured plan uses isolated checkouts, selected checks and a separate reviewer. Review the scopes before starting a dashboard coding task.');
+  } else assert(!(options.writeScopes?.length || options.checks?.length || options.prepare?.length), 'Select --engineering configure to choose project scopes and checks.');
   let profile = generatedProfile(selection, worker, git);
   if (prior) {
     const saved = await optional(join(home, 'setup-profile.json'));
@@ -260,7 +310,7 @@ export async function guidedSetup(options, dependencies = {}) {
       state.dashboard = await launch(installed);
     }
     await atomic(join(home, 'guided-setup.json'), state);
-    prompts.report('Temari is configured. Read-only workers and checkout verification are available for a Git project. Coding plans still require explicit project scopes and checks.');
-    return { schema: 1, phase: state.phase, home, chat, worker: state.worker, knowledge: state.knowledge, registration, dashboard: state.dashboard ?? { command: installed.dashboard.command, started: false } };
+    prompts.report(selection.project ? 'Temari is configured. Open the dashboard, choose the project coding plan and enter your engineering goal.' : 'Temari is configured. Read-only workers and checkout verification are available; project coding was not selected.');
+    return { schema: 1, phase: state.phase, home, chat, worker: state.worker, engineering: { status: selection.project ? 'configured' : 'not-selected', liveExecutionVerified: false, ...(selection.project ? { planId: selection.project.implementation.plans[0].id } : {}) }, knowledge: state.knowledge, registration, dashboard: state.dashboard ?? { command: installed.dashboard.command, started: false } };
   } finally { await rm(temporary, { recursive: true, force: true }); }
 }

@@ -38,6 +38,36 @@ test('guided setup generates an immutable profile and replays without asking for
   assert.equal(f.calls.filter(call => call === 'install').length, 2);
   await assert.rejects(guidedSetup({ ...f.options, model: 'other' }, f.services), /retry changes/);
 });
+test('managed worker selection probes bundled bytes and retains its installed path', async t => {
+  const f = await fixture(t), packaged = join(f.root, 'codex-package');
+  await writeFile(packaged, 'managed fixture');
+  f.services.verifyDistribution = async () => ({ assets: { platform: `${process.platform}-${process.arch}` }, providers: { codex: { executable: 'runtime/providers/codex/codex' } } });
+  f.services.installManagedProvider = async ({ kind }) => { assert.equal(kind, 'codex'); return { executable: packaged, environment: {} }; };
+  f.services.inspectHost = async ({ executable }) => { assert.equal(executable, packaged); return { compatible: true, authenticated: true, workerReady: true, executable: packaged, sha256: 'b'.repeat(64), version: 'codex-cli 0.154.0', models: [{ id: 'account-model', reasoningLevels: ['high'], defaultReasoning: 'high' }] }; };
+  const options = { ...f.options, worker: 'codex', workerModel: 'account-model', providerInstall: 'managed' };
+  await guidedSetup(options, f.services);
+  const profile = JSON.parse(await readFile(join(f.home, 'setup-profile.json')));
+  assert.equal(profile.control.swarm.executable, join(f.home, 'installations', options.expectedSha256, 'runtime/providers/codex/codex'));
+  await guidedSetup(options, f.services);
+  await assert.rejects(guidedSetup({ ...options, providerInstall: 'existing' }, f.services), /changes provider installation/);
+});
+test('project onboarding generates the selected plan and refuses changed retry scopes', async t => {
+  const f = await fixture(t);
+  const executable = join(f.root, 'native-codex'); await writeFile(executable, 'fixture');
+  f.services.verifyDistribution = async () => ({ assets: { platform: `${process.platform}-${process.arch}`, node: { executable: 'runtime/node/bin/node' } } });
+  f.services.detectHosts = async () => [{ kind: 'git', executable: '/usr/bin/git' }];
+  const { execFile } = await import('node:child_process'); const { promisify } = await import('node:util'); const run = promisify(execFile);
+  await writeFile(join(f.options.workspace, 'README'), 'base');
+  for (const args of [['init', '-q'], ['add', '.'], ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'base']]) await run('/usr/bin/git', args, { cwd: f.options.workspace });
+  f.services.inspectHost = async () => ({ compatible: true, authenticated: true, workerReady: true, executable, sha256: 'b'.repeat(64), version: 'codex-cli 0.154.0', models: [{ id: 'account-model', reasoningLevels: ['high'], defaultReasoning: 'high' }] });
+  f.services.discoverProject = async () => ({ checks: [{ id: 'test', label: 'npm run test' }], prepare: [], scopeCandidates: [], blockedReasons: [] });
+  f.services.createProjectOnboarding = async ({ scopes, checks }) => ({ selection: { scopes, checks }, implementation: { plans: [{ id: 'guided-project', verify: checks, assignments: scopes }] } });
+  const options = { ...f.options, worker: 'codex', workerExecutable: executable, workerModel: 'account-model', engineering: 'configure', writeScopes: ['src/a.mjs', 'src/b.mjs'], checks: ['test'] };
+  assert.equal((await guidedSetup(options, f.services)).engineering.status, 'configured');
+  assert.equal(JSON.parse(await readFile(join(f.home, 'setup-profile.json'))).control.implementation.plans[0].id, 'guided-project');
+  await guidedSetup(options, f.services);
+  await assert.rejects(guidedSetup({ ...options, writeScopes: ['src/a.mjs', 'src/c.mjs'] }, f.services), /changes write scopes/);
+});
 test('distribution admission precedes authentication or client writes', async t => {
   const f = await fixture(t);
   f.services.verifyDistribution = async () => { throw new Error('manifest refused'); };

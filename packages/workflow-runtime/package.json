@@ -21,11 +21,11 @@
     ],
     "targets": {
       "guided-setup-test": {
-        "command": "node --test packages/workflow-runtime/unified/hosts.test.mjs packages/workflow-runtime/unified/clients.test.mjs packages/workflow-runtime/unified/guide.test.mjs",
+        "command": "node --test packages/workflow-runtime/unified/hosts.test.mjs packages/workflow-runtime/unified/clients.test.mjs packages/workflow-runtime/unified/guide.test.mjs packages/workflow-runtime/unified/providers.test.mjs packages/workflow-runtime/unified/project.test.mjs",
         "cache": false
       },
       "unified-assets-test": {
-        "command": "node --test tools/unified-assets.test.mjs",
+        "command": "node --test tools/unified-assets.test.mjs tools/unified-provider-assets.test.mjs",
         "cache": false
       },
       "unified-test": {

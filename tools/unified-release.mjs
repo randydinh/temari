@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs, promisify } from 'node:util';
 import { prepareManagedAssets } from './unified-assets.mjs';
+import { prepareProviderAssets } from './unified-provider-assets.mjs';
 import { checkTemariReleaseRoot } from './temari-release-verify.mjs';
 import { digest, inventory, verifyDistribution } from '../packages/workflow-runtime/unified/inventory.mjs';
 
@@ -54,10 +55,11 @@ export async function packageUnified({ marketplaceRoot, releaseSha256, publicMan
   const uvRun = (args) => run(uv, args, { UV_CACHE_DIR: join(cacheRoot, 'uv') });
   try {
     const assets = await prepareManagedAssets({ outputRoot, cacheRoot });
+    const providers = await prepareProviderAssets({ outputRoot, cacheRoot });
     await cp(marketplaceRoot, join(outputRoot, 'marketplace'), { recursive: true, errorOnExist: true, force: false });
     await cp(dashboardRoot, join(outputRoot, 'dashboard'), { recursive: true, errorOnExist: true, force: false });
     await mkdir(join(outputRoot, 'installer'));
-    for (const name of ['inventory.mjs', 'setup.mjs', 'knowledge.py', 'guide.mjs', 'hosts.mjs', 'clients.mjs', 'launch.mjs']) await copyFile(join(source, name), join(outputRoot, 'installer', name));
+    for (const name of ['inventory.mjs', 'setup.mjs', 'knowledge.py', 'guide.mjs', 'hosts.mjs', 'clients.mjs', 'launch.mjs', 'providers.mjs', 'project.mjs']) await copyFile(join(source, name), join(outputRoot, 'installer', name));
     await copyFile(join(source, 'setup'), join(outputRoot, 'setup'));
     await chmod(join(outputRoot, 'setup'), 0o755);
     await mkdir(join(outputRoot, 'knowledge'));
@@ -96,7 +98,7 @@ lines += ['Requires-Dist: '+requirement for requirement in p['dependencies']]
       await copyFile(join(workspace, path), join(outputRoot, 'library', name));
     }
     await writeFile(join(outputRoot, 'profile.example.json'), JSON.stringify({ schema: 1, id: 'my-project', workspaceRoot: '/absolute/path/to/my-project', port: 3095, transport: { kind: 'ollama', model: 'YOUR_INSTALLED_MODEL' } }, null, 2) + '\n');
-    const manifest = { schema: 1, kind: 'temari-unified-distribution', version: '0.1.0', assets, knowledge: { registrarPackaging: 'verified-release-source', ...dependencySelection.knowledge }, marketplace: { version: '0.15.5', releaseSha256, publicManifestSha256 }, files: await inventory(outputRoot) };
+    const manifest = { schema: 1, kind: 'temari-unified-distribution', version: '0.2.0', assets, providers, knowledge: { registrarPackaging: 'verified-release-source', ...dependencySelection.knowledge }, marketplace: { version: '0.15.5', releaseSha256, publicManifestSha256 }, files: await inventory(outputRoot) };
     const bytes = Buffer.from(JSON.stringify(manifest, null, 2) + '\n');
     await writeFile(join(outputRoot, 'UNIFIED.json'), bytes, { flag: 'wx' });
     const sha256 = digest(bytes);
