@@ -5,7 +5,10 @@ on:
     paths:
       - '.github/workflows/unified-platforms.yml'
       - 'tools/unified-*'
-      - 'tools/dashboard-talk*'
+      - 'tools/dashboard-*'
+      - 'tools/run-worker-*'
+      - 'tools/run-codex-*'
+      - 'pnpm-lock.yaml'
       - 'apps/dashboard/**'
       - 'libs/host-adapters/**'
       - 'packages/workflow-runtime/**'
@@ -73,7 +76,7 @@ jobs:
             diagnostic: false
           - runner: macos-15-intel
             platform: darwin-x64
-            diagnostic: true
+            diagnostic: false
     runs-on: ${{ matrix.runner }}
     continue-on-error: ${{ matrix.diagnostic }}
     timeout-minutes: 20
@@ -97,6 +100,8 @@ jobs:
         shell: bash
         run: |
           pnpm exec nx run workflow-runtime:unified-assets-test
+          pnpm exec nx run workflow-runtime:unified-test
+          pnpm exec nx run host-adapters:worker-execution-test
           pnpm exec nx run dashboard:build
           mkdir "$RUNNER_TEMP/marketplace"
           tar -xzf "$RUNNER_TEMP/baseline/marketplace.tar.gz" -C "$RUNNER_TEMP/marketplace"
@@ -110,6 +115,25 @@ jobs:
           path: ${{ runner.temp }}/platform-evidence/result.json
           if-no-files-found: warn
           retention-days: 14
+
+  shared-execution:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.9.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec nx run host-adapters:worker-execution-typecheck
+      - run: pnpm exec nx run runtime:task-typecheck
+      - run: pnpm exec nx run runtime:dashboard-test
+      - run: pnpm exec nx run runtime:dashboard-implementation-test
 
   windows-runtime-diagnostic:
     runs-on: windows-2025

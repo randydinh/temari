@@ -17,12 +17,14 @@ import { promisify } from 'node:util';
 import {
   reconcilePlan,
   type ExecutionPlan,
-  type HostCapabilityReport,
   type WorkerAssignment,
 } from '../libs/contracts/src/index.js';
 import {
-  resolveCodexExecutable,
-  runCodexExecWorker,
+  preflightWorkerExecution,
+  runWorkerExecution,
+  workerExecutionCapabilities,
+  type WorkerProviderSelection,
+  type WorkerToolServerPin,
 } from '../libs/host-adapters/src/index.js';
 import {
   executeRestartableParallelWorkers,
@@ -51,28 +53,6 @@ import {
 
 const runFile = promisify(execFile);
 const script = fileURLToPath(import.meta.url);
-const capabilities: HostCapabilityReport = {
-  host: 'codex-exec-local',
-  available: ['parallelism'],
-  missing: [
-    'subagents',
-    'model_diversity',
-    'worktree_isolation',
-    'durable_delivery',
-    'forge',
-  ],
-  notes: {
-    parallelism:
-      'Bounded local read-only Codex processes; worker findings require coordinator review.',
-  },
-  provenance: {
-    parallelism: {
-      status: 'unproven',
-      source: 'Use retained process evidence to verify actual overlap.',
-    },
-  },
-};
-
 export interface DashboardSwarmRequest {
   readonly root: string;
   readonly taskId: string;
@@ -83,6 +63,8 @@ export interface DashboardSwarmRequest {
   readonly maxConcurrency: number;
   readonly executable: string;
   readonly timeoutMs: number;
+  readonly providerSelection?: WorkerProviderSelection;
+  readonly scopedToolServer?: WorkerToolServerPin;
   readonly maxAttempts?: 1 | 2;
 }
 export interface DashboardSwarmHandle {
@@ -340,7 +322,7 @@ export async function prepareDashboardSwarm(
     ...input,
     workspaceRoot,
     evidenceRoot: join(root, input.runId, input.revision),
-    executable: await resolveCodexExecutable(input.executable),
+    executable: (await preflightWorkerExecution(input.executable, input.providerSelection, input.scopedToolServer)).executable,
   });
   const plan = reconcilePlan({
     workType: 'investigation',
@@ -352,7 +334,10 @@ export async function prepareDashboardSwarm(
   const prepared = await prepareRestartableParallelWorkers({
     ...request,
     plan,
-    capabilities,
+    capabilities: workerExecutionCapabilities(
+      request.providerSelection,
+      'read-only',
+    ),
     childStore,
     owner: `dashboard:${input.taskId}`,
   });
@@ -736,7 +721,10 @@ async function supervise(
       const result = await executeRestartableParallelWorkers({
         ...request,
         plan: manifest.plan,
-        capabilities,
+        capabilities: workerExecutionCapabilities(
+          request.providerSelection,
+          'read-only',
+        ),
         childStore,
         receiptStore,
         evidenceStore,
@@ -757,7 +745,10 @@ async function supervise(
               assignment.id,
               randomUUID(),
             );
-            const result = await runCodexExecWorker(assignment, {
+            const result = await runWorkerExecution(assignment, {
+              access: 'read-only',
+              providerSelection: request.providerSelection,
+              scopedToolServer: request.scopedToolServer,
               executable: request.executable,
               workspaceRoot: request.workspaceRoot,
               evidenceDirectory,

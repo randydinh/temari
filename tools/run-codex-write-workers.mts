@@ -31,18 +31,21 @@ import {
 import { fileURLToPath } from 'node:url';
 import {
   reconcilePlan,
-  type HostCapabilityReport,
   type WorkerAssignment,
   type WorkerResult,
 } from '../libs/contracts/src/index.js';
 import {
-  resolveCodexExecutable,
+  resolveWorkerExecutable,
+  preflightWorkerExecution,
   runProcessToFiles,
   retainProcessDiagnostic,
-  assertCodexProviderSelection,
-  type CodexProviderSelection,
-  runCodexExecWriteWorker,
-  type CodexWriteOwnedPath,
+  assertWorkerProviderSelection,
+  assertWorkerToolServerPin,
+  type WorkerProviderSelection,
+  type WorkerToolServerPin,
+  runWorkerExecution,
+  workerExecutionCapabilities,
+  type WorkerOwnedPath,
   type CapturedStream,
   type CapturedProcessDiagnostic,
 } from '../libs/host-adapters/src/index.js';
@@ -56,7 +59,7 @@ import {
   streamEvidenceFile,
 } from '../libs/runtime/src/index.js';
 
-export type OwnedPath = CodexWriteOwnedPath;
+export type OwnedPath = WorkerOwnedPath;
 export interface WriteAssignment {
   readonly worker: WorkerAssignment;
   readonly owns: readonly OwnedPath[];
@@ -76,7 +79,8 @@ export interface WriteRunRequest {
   readonly timeoutMs: number;
   readonly outputLimitBytes?: number;
   readonly finalResponseLimitBytes?: number;
-  readonly providerSelection?: CodexProviderSelection;
+  readonly providerSelection?: WorkerProviderSelection;
+  readonly scopedToolServer?: WorkerToolServerPin;
   readonly prepare?: readonly CommandSpec[];
   readonly verify: readonly CommandSpec[];
   readonly assignments: readonly WriteAssignment[];
@@ -265,7 +269,11 @@ function worker(value: unknown): WorkerAssignment {
 export function parseWriteRunRequest(value: unknown): WriteRunRequest {
   const item = object(value);
   if (item.providerSelection !== undefined)
-    assertCodexProviderSelection(item.providerSelection);
+    assertWorkerProviderSelection(item.providerSelection);
+  if (item.scopedToolServer !== undefined)
+    assertWorkerToolServerPin(item.scopedToolServer);
+  if (item.providerSelection?.provider === 'claude-code' && !item.scopedToolServer)
+    throw new Error('Claude workers require a pinned scoped tool server.');
   const runId = id(item.runId, 'runId');
   const sourceRepo = absolute(item.sourceRepo, 'sourceRepo');
   const evidenceRoot = absolute(item.evidenceRoot, 'evidenceRoot');
@@ -346,6 +354,7 @@ export function parseWriteRunRequest(value: unknown): WriteRunRequest {
     ...(item.providerSelection
       ? { providerSelection: item.providerSelection }
       : {}),
+    ...(item.scopedToolServer ? { scopedToolServer: item.scopedToolServer } : {}),
     prepare: (item.prepare ?? []).map(command),
     verify: item.verify.map(command),
     assignments,
@@ -575,7 +584,7 @@ async function preflight(request: WriteRunRequest): Promise<string> {
     throw new Error('evidenceRoot must be external to sourceRepo.');
   await mkdir(evidence, { recursive: true, mode: 0o700 });
   await access(evidence, constants.W_OK | constants.X_OK);
-  await resolveCodexExecutable(request.executable);
+  await preflightWorkerExecution(request.executable, request.providerSelection, request.scopedToolServer);
   return source;
 }
 async function clone(
@@ -1192,7 +1201,7 @@ export async function runCodexWriteWorkersRequest(
 }> {
   const request = parseWriteRunRequest(value);
   const source = await preflight(request);
-  const executable = await resolveCodexExecutable(request.executable);
+  const executable = await resolveWorkerExecutable(request.executable);
   const runPath = join(request.evidenceRoot, request.runId);
   await mkdir(runPath, { mode: 0o700 });
   const integrationPath = join(runPath, 'integration');
@@ -1229,24 +1238,7 @@ export async function runCodexWriteWorkersRequest(
       workType: 'feature',
       parallelism: { maxConcurrency: request.maxConcurrency },
     });
-    const capabilities: HostCapabilityReport = {
-      host: 'codex-exec-write-local',
-      available: ['parallelism'],
-      missing: [
-        'subagents',
-        'model_diversity',
-        'worktree_isolation',
-        'durable_delivery',
-        'forge',
-      ],
-      notes: { parallelism: 'Local isolated Codex processes.' },
-      provenance: {
-        parallelism: {
-          status: 'unproven',
-          source: 'real Codex overlap has not been verified',
-        },
-      },
-    };
+    const capabilities = workerExecutionCapabilities(request.providerSelection, 'workspace-write');
     workerReceipt = await runParallelWorkers({
       runId: request.runId,
       revision: request.baseCommit,
@@ -1258,7 +1250,8 @@ export async function runCodexWriteWorkersRequest(
           (item) => item.worker.id === worker.id,
         )!;
         const evidenceDir = join(runPath, `evidence-${worker.id}`);
-        const result = await runCodexExecWriteWorker(worker, {
+        const result = await runWorkerExecution(worker, {
+          access: 'workspace-write',
           executable,
           workspaceRoot: workerPaths.get(worker.id)!,
           evidenceDirectory: evidenceDir,
@@ -1266,6 +1259,7 @@ export async function runCodexWriteWorkersRequest(
           outputLimitBytes: request.outputLimitBytes,
           finalResponseLimitBytes: request.finalResponseLimitBytes,
           providerSelection: request.providerSelection,
+          scopedToolServer: request.scopedToolServer,
           signal,
           baseCommit: request.baseCommit,
           owns: entry.owns,

@@ -13,7 +13,7 @@ import {
   rename,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname, basename } from 'node:path';
 import { promisify } from 'node:util';
 import test, { type TestContext } from 'node:test';
 import {
@@ -686,10 +686,12 @@ test('resume refuses a changed exact-native identity and is hidden from controls
 
 test('swarm intake binds prepared child records, preserves limits, and refuses serial acceptance', async (t) => {
   const f = await fixture(t);
+  const binaryAlias = join(f.root, 'bin-alias');
+  await symlink(dirname(process.execPath), binaryAlias, 'dir');
   const config = await validateDashboardConfig({
     ...f.config,
     swarm: {
-      executable: process.execPath,
+      executable: join(binaryAlias, basename(process.execPath)),
       maxWorkers: 4,
       maxConcurrency: 2,
       timeoutMs: 3000,
@@ -1228,4 +1230,25 @@ test('new browser binding check excludes unselected legacy text while invalidate
   assert.equal(current.status, 200); assert.equal(JSON.stringify(await current.json()).includes('private-revision-do-not-project'), false);
   const refused = await fetch(`${f.base}/api/reconciliation/${encodeURIComponent(attempt.id)}/check-current-binding`, { method: 'POST', headers, body: JSON.stringify({ current: {}, revision: '/caller/path' }) });
   assert.equal(refused.status, 400);
+});
+
+
+test('worker configuration validates provider identity, requires Claude server pin, and refuses transport changes on retry', async (t) => {
+  const f = await fixture(t, true);
+  const selection = { provider: 'claude-code', executableSha256: '1'.repeat(64), executableVersion: '2.1.296 (Claude Code)', model: 'qwen3-coder:30b', policy: 'temari-scoped-tools-v1' };
+  const pin = { path: join(f.workspaceRoot, 'server.mjs'), sha256: '2'.repeat(64) };
+  const changed: any = structuredClone(f.config);
+  changed.implementation.providerSelection = { ...selection, provider: 'unknown' };
+  await assert.rejects(validateDashboardConfig(changed), /Unsupported worker provider/);
+  changed.implementation.providerSelection = selection;
+  await assert.rejects(validateDashboardConfig(changed), /pinned scoped worker tool server/);
+  changed.implementation.scopedToolServer = pin;
+  const validated = await validateDashboardConfig(changed);
+  assert.deepEqual(validated.implementation?.providerSelection, selection);
+  assert.deepEqual(validated.implementation?.scopedToolServer, pin);
+  const request = { requestId: 'transport-pins', mode: 'implementation', planId: 'two-parts', title: 'Pinned host', goal: 'Retain the admitted provider.' };
+  await f.controller.create(request);
+  f.config.implementation!.providerSelection = selection as any;
+  f.config.implementation!.scopedToolServer = pin;
+  await assert.rejects(f.controller.create(request), /plan changed/);
 });

@@ -22,15 +22,16 @@ import { promisify } from 'node:util';
 import {
   reconcilePlan,
   type ExecutionPlan,
-  type HostCapabilityReport,
   type WorkerAssignment,
   type WorkerResult,
   type WorkerEvidenceReference,
 } from '../libs/contracts/src/index.js';
 import {
-  resolveCodexExecutable,
-  runCodexExecWorker,
-  runCodexExecWriteWorker,
+  preflightWorkerExecution,
+  runWorkerExecution,
+  workerExecutionCapabilities,
+  type WorkerProviderSelection,
+  type WorkerToolServerPin,
 } from '../libs/host-adapters/src/index.js';
 import {
   executeRestartableParallelWorkers,
@@ -69,27 +70,6 @@ export type {
 } from './run-codex-write-workers.mjs';
 const script = fileURLToPath(import.meta.url);
 const exec = promisify(execFile);
-const capabilities: HostCapabilityReport = {
-  host: 'codex-exec-write-local',
-  available: ['parallelism'],
-  missing: [
-    'subagents',
-    'model_diversity',
-    'worktree_isolation',
-    'durable_delivery',
-    'forge',
-  ],
-  notes: {
-    parallelism:
-      'Isolated local implementers followed by an independent read-only reviewer.',
-  },
-  provenance: {
-    parallelism: {
-      status: 'unproven',
-      source: 'Use retained process records to establish actual overlap.',
-    },
-  },
-};
 export interface DashboardImplementationRequest {
   readonly root: string;
   readonly taskId: string;
@@ -101,6 +81,8 @@ export interface DashboardImplementationRequest {
   readonly maxConcurrency: number;
   readonly executable: string;
   readonly timeoutMs: number;
+  readonly providerSelection?: WorkerProviderSelection;
+  readonly scopedToolServer?: WorkerToolServerPin;
   readonly prepare: readonly CommandSpec[];
   readonly verify: readonly CommandSpec[];
 }
@@ -356,6 +338,16 @@ function validate(
     ),
     'Reviewer identity must differ from implementers.',
   );
+  assert.deepEqual(
+    request.providerSelection,
+    write.providerSelection,
+    'Worker provider selection differs from retained write request.',
+  );
+  assert.deepEqual(
+    request.scopedToolServer,
+    write.scopedToolServer,
+    'Worker tool server differs from retained write request.',
+  );
   parseCodexWorkersRequest({
     ...request,
     assignments: [request.reviewer],
@@ -437,7 +429,7 @@ export async function prepareDashboardImplementation(
     sourceRepo: workspaceRoot,
     baseCommit,
     evidenceRoot: join(root, input.runId, input.revision),
-    executable: await resolveCodexExecutable(input.executable),
+    executable: (await preflightWorkerExecution(input.executable, input.providerSelection, input.scopedToolServer)).executable,
   });
   const request: DashboardImplementationRequest = {
     ...input,
@@ -445,6 +437,8 @@ export async function prepareDashboardImplementation(
     workspaceRoot,
     executable: write.executable,
     assignments: write.assignments,
+    providerSelection: write.providerSelection,
+    scopedToolServer: write.scopedToolServer,
     prepare: write.prepare ?? [],
     verify: write.verify,
   };
@@ -463,17 +457,24 @@ export async function prepareDashboardImplementation(
   const common = {
     runId: request.runId,
     revision: request.revision,
-    capabilities,
     childStore,
     owner: `dashboard:${request.taskId}`,
   };
   const group = await prepareRestartableParallelWorkers({
     ...common,
+    capabilities: workerExecutionCapabilities(
+      request.providerSelection,
+      'workspace-write',
+    ),
     plan,
     assignments: request.assignments.map((entry) => entry.worker),
   });
   const review = await prepareRestartableParallelWorkers({
     ...common,
+    capabilities: workerExecutionCapabilities(
+      request.providerSelection,
+      'read-only',
+    ),
     plan: reviewPlan,
     assignments: [request.reviewer],
   });
@@ -751,6 +752,16 @@ export async function inspectDashboardImplementation(
           'Reviewer integration evidence changed.',
         );
         assert.equal(input.assignment.id, m.request.reviewer.id);
+        assert.deepEqual(
+          input.providerSelection,
+          m.write.providerSelection,
+          'Reviewer worker provider selection changed.',
+        );
+        assert.deepEqual(
+          input.scopedToolServer,
+          m.write.scopedToolServer,
+          'Reviewer worker tool server changed.',
+        );
         reviewBindingVerified = true;
       }
     }, undefined);
@@ -1070,7 +1081,10 @@ async function supervise(
           ? [m.request.reviewer]
           : m.request.assignments.map((entry) => entry.worker),
         plan: review ? m.reviewPlan : m.plan,
-        capabilities,
+        capabilities: workerExecutionCapabilities(
+          m.request.providerSelection,
+          review ? 'read-only' : 'workspace-write',
+        ),
         childStore,
         receiptStore,
         evidenceStore,
@@ -1138,7 +1152,10 @@ async function supervise(
         m.write.baseCommit,
         controller.signal,
       );
-      const result = await runCodexExecWriteWorker(worker, {
+      const result = await runWorkerExecution(worker, {
+        access: 'workspace-write',
+        providerSelection: m.write.providerSelection,
+        scopedToolServer: m.write.scopedToolServer,
         executable: m.write.executable,
         workspaceRoot: workspace,
         evidenceDirectory,
@@ -1234,11 +1251,16 @@ async function supervise(
       await publish(resolvedPath, {
         manifestSha256: handle.manifestSha256,
         assignment: resolvedReviewer,
+        providerSelection: m.write.providerSelection,
+        scopedToolServer: m.write.scopedToolServer,
         revision,
         workspaceRoot: integrationPath,
         integration: sealed,
       });
-      const result = await runCodexExecWorker(resolvedReviewer, {
+      const result = await runWorkerExecution(resolvedReviewer, {
+        access: 'read-only',
+        providerSelection: m.write.providerSelection,
+        scopedToolServer: m.write.scopedToolServer,
         executable: m.write.executable,
         workspaceRoot: integrationPath,
         evidenceDirectory,

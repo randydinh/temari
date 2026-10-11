@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "id": "darwin-x64-knowledge-v1",
+  "platforms": [
+    "darwin-x64"
+  ],
+  "registrar": {
+    "version": "0.1.0",
+    "projectSha256": "74146555bebcde136cf3b415cfbf349a765d48811e7c1ee89001364e7a29d7ec",
+    "dependencyLockSha256": "a51cb38fa813912bc950e8075c53b50b93ba09856d42ac9101a3f8f42765509a"
+  },
+  "compatibility": {
+    "projectSha256": "14801f097c7e87eace19734aa5ebdaca8f4007e18043264b51da1b3a7e89512e",
+    "dependencyLockSha256": "b678478cd42e32cbc039e2364b5fe14a6bd734f7b22f0c3501d8c27094c3f31e"
+  },
+  "changes": [
+    {
+      "name": "cryptography",
+      "originalVersion": "50.0.1",
+      "version": "48.0.1",
+      "reason": "Cryptography 49+ wheels omit Intel macOS. 48.0.1 is the latest published release with an Intel-compatible universal2 wheel and satisfies PyJWT crypto >=3.4.0.",
+      "wheel": "cryptography-48.0.1-cp311-abi3-macosx_10_9_universal2.whl",
+      "wheelSha256": "3e4a1a3232eef2e6c732827d5722db29a0cc8b27af2a4d865b094cf954be9ca1",
+      "wheelBytes": 8008324
+    }
+  ],
+  "resolution": {
+    "tool": "uv 0.11.27",
+    "strategy": "copy original lock and resolve one cryptography constraint; all other package records unchanged",
+    "directRequirements": [
+      "pypdf==6.17.0",
+      "pyyaml==6.0.3",
+      "mcp==2.1.1"
+    ],
+    "installation": "hash-locked wheels only; Registrar copied from verified source"
+  },
+  "sources": [
+    "https://pypi.org/pypi/cryptography/48.0.1/json",
+    "https://pypi.org/pypi/pyjwt/2.13.0/json",
+    "https://docs.astral.sh/uv/concepts/resolution/#dependency-constraints"
+  ]
+}
