@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, readFile, writeFile, realpath, rm } from 'node:fs/promi
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { digest } from './inventory.mjs';
-import { guidedSetup } from './guide.mjs';
+import { guidedSetup, probeChat } from './guide.mjs';
 
 async function fixture(t) {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'temari-guide-test-')));
@@ -115,4 +115,18 @@ test('local chat with cloud Claude workers asks for the cloud worker model', asy
   await guidedSetup({ ...f.options, worker: 'claude-code', workerExecutable: '/native/claude', claudeAuth: 'api-key' }, f.services);
   const profile = JSON.parse(await readFile(join(f.home, 'setup-profile.json')));
   assert.deepEqual(asked, ['Worker model']); assert.equal(profile.control.swarm.providerSelection.model, 'sonnet'); assert.equal(profile.transport.model, 'local-model');
+});
+test('chat probe allows reasoning and distinguishes exhausted budgets from authentication', async () => {
+  let packet;
+  await assert.rejects(probeChat({ kind: 'openai-responses', model: 'reasoning-model' }, { OPENAI_API_KEY: 'secret' }, async (_, request) => {
+    packet = JSON.parse(request.body); assert.equal(request.redirect, 'error');
+    return new Response(JSON.stringify({ status: 'incomplete', output: [], incomplete_details: { reason: 'max_output_tokens' } }));
+  }), /exhausted its token budget/);
+  assert.equal(packet.max_output_tokens, 4096);
+  await assert.rejects(probeChat({ kind: 'ollama', model: 'thinking-model' }, {}, async (_, request) => {
+    packet = JSON.parse(request.body); return new Response(JSON.stringify({ done: true, done_reason: 'length', message: { content: '' } }));
+  }), /not an authentication failure/);
+  assert.equal(packet.options.num_predict, 1024);
+  assert.equal((await probeChat({ kind: 'ollama', model: 'local' }, {}, async () => new Response(JSON.stringify({ message: { content: 'OK' } })))).status, 'PASS');
+  await assert.rejects(probeChat({ kind: 'ollama', model: 'local' }, {}, async () => new Response('x'.repeat(1024 * 1024 + 1))), /Chat connection failed/);
 });

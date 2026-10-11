@@ -73,10 +73,11 @@ export function generatedProfile(selection, worker, git) {
   return { schema: 1, id: selection.id, workspaceRoot: selection.workspaceRoot, port: selection.port, transport: selection.transport, control };
 }
 
-async function probeChat(transport, credentials, send = fetch) {
+class ProbeRefusal extends Error {}
+export async function probeChat(transport, credentials, send = fetch) {
   const request = transport.kind === 'ollama'
-    ? { url: `${transport.baseUrl ?? 'http://127.0.0.1:11434'}/api/chat`, body: { model: transport.model, stream: false, messages: [{ role: 'user', content: 'Reply with OK.' }], options: { num_predict: 16 } }, headers: {} }
-    : { url: 'https://api.openai.com/v1/responses', body: { model: transport.model, input: 'Reply with OK.', max_output_tokens: 64, store: false }, headers: { Authorization: `Bearer ${credentials.OPENAI_API_KEY}` } };
+    ? { url: `${transport.baseUrl ?? 'http://127.0.0.1:11434'}/api/chat`, body: { model: transport.model, stream: false, messages: [{ role: 'user', content: 'Reply with OK.' }], options: { num_predict: 1024 } }, headers: {} }
+    : { url: 'https://api.openai.com/v1/responses', body: { model: transport.model, input: 'Reply with OK.', max_output_tokens: 4096, store: false }, headers: { Authorization: `Bearer ${credentials.OPENAI_API_KEY}` } };
   try {
     const response = await send(request.url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...request.headers }, body: JSON.stringify(request.body), signal: AbortSignal.timeout(90000), redirect: 'error' });
     assert(response.ok, 'Selected chat model rejected the connection. Check the selected model and authentication, then rerun guide.');
@@ -86,10 +87,11 @@ async function probeChat(transport, credentials, send = fetch) {
     try { while (true) { const part = await reader.read(); if (part.done) break; bytes += part.value.length; assert(bytes <= 1024 * 1024, 'Chat probe exceeds its response bound.'); chunks.push(part.value); } }
     finally { await reader.cancel().catch(() => {}); }
     const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    if (body.incomplete_details?.reason === 'max_output_tokens' || body.done_reason === 'length') throw new ProbeRefusal('Chat service responded, but the test exhausted its token budget before completing. Select a faster model and retry; this is not an authentication failure.');
     const text = transport.kind === 'ollama' ? body.message?.content : body.output?.flatMap(item => item.content ?? []).filter(item => item.type === 'output_text').map(item => item.text).join('');
     assert(typeof text === 'string' && text.trim(), 'Selected chat model returned no answer. Select a working model and rerun guide.');
     return { status: 'PASS', model: transport.model, evidence: 'live harmless chat probe; no product sources transmitted' };
-  } catch { throw new Error('Chat connection failed. Check the selected model, service and authentication, then rerun guide.'); }
+  } catch (error) { if (error instanceof ProbeRefusal) throw error; throw new Error('Chat connection failed. Check the selected model, service and authentication, then rerun guide.'); }
 }
 
 /** Native login remains with the host; installation receipts contain selections only. */
