@@ -55,6 +55,9 @@ try {
     evidence.phase = 'recipient-setup-retry-integrity';
     await save();
     evidence.recipientSmoke = await run(node, [join(workspace, 'tools/unified-recipient-smoke.mjs'), '--distribution', distribution, '--expected-manifest-sha256', selected.sha256], process.env, 600000);
+    evidence.phase = 'guided-setup-and-knowledge';
+    await save();
+    evidence.guidedSmoke = await run(node, [join(workspace, 'tools/unified-guided-smoke.mjs'), '--distribution', distribution, '--expected-manifest-sha256', selected.sha256], process.env, 360000);
     evidence.phase = 'installed-knowledge-talk';
     const home = join(output, 'home'), project = join(output, 'project'), profile = join(output, 'profile.json');
     await mkdir(project);

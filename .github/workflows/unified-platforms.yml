@@ -101,6 +101,7 @@ jobs:
         run: |
           pnpm exec nx run workflow-runtime:unified-assets-test
           pnpm exec nx run workflow-runtime:unified-test
+          pnpm exec nx run workflow-runtime:guided-setup-test
           pnpm exec nx run host-adapters:worker-execution-test
           pnpm exec nx run dashboard:build
           mkdir "$RUNNER_TEMP/marketplace"

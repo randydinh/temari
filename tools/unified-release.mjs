@@ -57,7 +57,7 @@ export async function packageUnified({ marketplaceRoot, releaseSha256, publicMan
     await cp(marketplaceRoot, join(outputRoot, 'marketplace'), { recursive: true, errorOnExist: true, force: false });
     await cp(dashboardRoot, join(outputRoot, 'dashboard'), { recursive: true, errorOnExist: true, force: false });
     await mkdir(join(outputRoot, 'installer'));
-    for (const name of ['inventory.mjs', 'setup.mjs', 'knowledge.py']) await copyFile(join(source, name), join(outputRoot, 'installer', name));
+    for (const name of ['inventory.mjs', 'setup.mjs', 'knowledge.py', 'guide.mjs', 'hosts.mjs', 'clients.mjs', 'launch.mjs']) await copyFile(join(source, name), join(outputRoot, 'installer', name));
     await copyFile(join(source, 'setup'), join(outputRoot, 'setup'));
     await chmod(join(outputRoot, 'setup'), 0o755);
     await mkdir(join(outputRoot, 'knowledge'));
