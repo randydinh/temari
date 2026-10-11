@@ -63,7 +63,7 @@ function validateProfile(profile) {
   assert(profile.transport && ['ollama', 'openai-responses', 'codex'].includes(profile.transport.kind), 'Select a supported Talk model transport.');
 }
 
-export async function setup({ root, expectedSha256, home, profilePath, start = false }) {
+export async function setup({ root, expectedSha256, home, profilePath, start = false, onPrepared }) {
   assert(process.platform !== 'win32', 'Native Windows knowledge is pending verification; use the Linux distribution inside WSL2.');
   root = await realpath(root);
   const manifest = await verifyDistribution(root, expectedSha256);
@@ -87,6 +87,7 @@ export async function setup({ root, expectedSha256, home, profilePath, start = f
     const installation = join(home, 'installations', expectedSha256);
     await directory(join(home, 'installations'));
     await atomic(receiptPath, { ...selection, phase: 'preparing', installation });
+    if (onPrepared) await onPrepared();
     try { await lstat(installation); await verifyDistribution(installation, expectedSha256); }
     catch (error) {
       if (error.code !== 'ENOENT') throw error;
@@ -180,7 +181,7 @@ export async function setup({ root, expectedSha256, home, profilePath, start = f
     const mcpReadiness = JSON.parse(await run(venvPython, ['-I', '-B', helper, JSON.stringify({ action: 'mcp', workspace: selected.workspace, sourceIds: [seed.sourceId] })], env));
     assert(mcpReadiness.connected && mcpReadiness.status === 'complete', 'Knowledge MCP connection failed.');
     const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
-    const launcher = `#!/bin/sh\nset -eu\nexport PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1\nexec ${quote(node)} ${quote(dashboard)} "$@" --home ${quote(dashboardHome)}\n`;
+    const launcher = `#!/bin/sh\nset -eu\nexport PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1\nexec ${quote(node)} ${quote(join(installation, 'installer', 'launch.mjs'))} --home ${quote(home)} --node ${quote(node)} --dashboard ${quote(dashboard)} -- "$@"\n`;
     const launcherPath = join(home, 'temari');
     try { assert.equal(await readFile(launcherPath, 'utf8'), launcher, 'Installed launcher changed.'); }
     catch (error) { if (error.code !== 'ENOENT') throw error; await writeFile(launcherPath, launcher, { mode: 0o755, flag: 'wx' }); }
@@ -192,9 +193,23 @@ export async function setup({ root, expectedSha256, home, profilePath, start = f
 }
 
 export async function main(argv = process.argv.slice(2)) {
-  const { values, positionals } = parseArgs({ args: argv, allowPositionals: true, options: { home: { type: 'string' }, profile: { type: 'string' }, 'expected-manifest-sha256': { type: 'string' }, start: { type: 'boolean' } } });
-  assert.equal(positionals[0], 'setup', 'Usage: ./setup setup --home ABS --profile ABS --expected-manifest-sha256 HEX [--start]');
+  const { values, positionals } = parseArgs({ args: argv, allowPositionals: true, options: {
+    home: { type: 'string' }, profile: { type: 'string' }, 'expected-manifest-sha256': { type: 'string' }, start: { type: 'boolean' }, 'no-start': { type: 'boolean' }, help: { type: 'boolean' },
+    workspace: { type: 'string' }, id: { type: 'string' }, port: { type: 'string' }, chat: { type: 'string' }, model: { type: 'string' }, 'ollama-url': { type: 'string' }, worker: { type: 'string' },
+    'worker-executable': { type: 'string' }, 'worker-model': { type: 'string' }, 'worker-reasoning': { type: 'string' }, clients: { type: 'string' }, 'codex-executable': { type: 'string' }, 'claude-executable': { type: 'string' }, 'claude-auth': { type: 'string' }, 'device-auth': { type: 'boolean' },
+  } });
+  if (values.help) return { usage: './setup guide --expected-manifest-sha256 HEX [--home ABS] [--workspace ABS]', scripted: './setup setup --home ABS --profile ABS --expected-manifest-sha256 HEX [--start]', choices: { chat: ['ollama', 'openai-responses'], worker: ['codex', 'claude-code', 'none'], clients: 'codex,claude-code or none', options: ['--model MODEL', '--worker-executable ABS', '--worker-model MODEL', '--worker-reasoning LEVEL', '--ollama-url LOOPBACK_ORIGIN', '--claude-auth api-key|ollama', '--device-auth', '--no-start'] }, credentials: 'Existing environment or hidden interactive prompt; never command-line values.' };
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  assert.equal(positionals.length, 1, 'Select setup or guide. Run ./setup --help for options.');
+  if (positionals[0] === 'guide') {
+    assert(!values.profile, 'Guided setup generates its profile.');
+    const { guidedSetup } = await import('./guide.mjs');
+    return guidedSetup({ root, expectedSha256: values['expected-manifest-sha256'], home: values.home, workspace: values.workspace, id: values.id, port: values.port === undefined ? undefined : Number(values.port), chat: values.chat, model: values.model,
+      ollamaUrl: values['ollama-url'], worker: values.worker, workerExecutable: values['worker-executable'], workerModel: values['worker-model'], workerReasoning: values['worker-reasoning'], clients: values.clients === undefined ? undefined : values.clients === 'none' ? [] : values.clients.split(','),
+      codexExecutable: values['codex-executable'], claudeExecutable: values['claude-executable'], claudeAuth: values['claude-auth'], deviceAuth: values['device-auth'], start: !values['no-start'],
+    });
+  }
+  assert.equal(positionals[0], 'setup', 'Select setup or guide. Run ./setup --help for options.');
   return setup({ root, expectedSha256: values['expected-manifest-sha256'], home: values.home, profilePath: values.profile, start: values.start });
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().then((result) => console.log(json(result))).catch((error) => { console.error(error.message); process.exitCode = 1; });

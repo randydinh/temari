@@ -20,6 +20,10 @@
       "type:distribution"
     ],
     "targets": {
+      "guided-setup-test": {
+        "command": "node --test packages/workflow-runtime/unified/hosts.test.mjs packages/workflow-runtime/unified/clients.test.mjs packages/workflow-runtime/unified/guide.test.mjs",
+        "cache": false
+      },
       "unified-assets-test": {
         "command": "node --test tools/unified-assets.test.mjs",
         "cache": false

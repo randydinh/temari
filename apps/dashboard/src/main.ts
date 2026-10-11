@@ -2,6 +2,8 @@ import { fileURLToPath } from 'node:url';
 import { runDashboardLifecycleCommand } from './lifecycle.js';
 import { runTaskCommand } from '../../../tools/task-continuity.mjs';
 import { configureGoalPlannerSupervisor } from '../../../tools/dashboard-planner.mjs';
+import { configureSwarmSupervisor } from '../../../tools/dashboard-swarm.mjs';
+import { configureImplementationSupervisor } from '../../../tools/dashboard-implementation.mjs';
 
 const managedWorkflowSource = fileURLToPath(
   new URL('./workflow-host', import.meta.url),
@@ -9,6 +11,16 @@ const managedWorkflowSource = fileURLToPath(
 configureGoalPlannerSupervisor(
   fileURLToPath(
     new URL('./workflow-host/dashboard-planner.mjs', import.meta.url),
+  ),
+);
+configureSwarmSupervisor(
+  fileURLToPath(
+    new URL('./workflow-host/dashboard-swarm.mjs', import.meta.url),
+  ),
+);
+configureImplementationSupervisor(
+  fileURLToPath(
+    new URL('./workflow-host/dashboard-implementation.mjs', import.meta.url),
   ),
 );
 const task = (args: readonly string[]) =>

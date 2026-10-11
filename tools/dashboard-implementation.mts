@@ -68,7 +68,12 @@ export type {
   WriteAssignment,
   CommandSpec,
 } from './run-codex-write-workers.mjs';
-const script = fileURLToPath(import.meta.url);
+const sourceScript = fileURLToPath(import.meta.url);
+let supervisorScript = sourceScript;
+export function configureImplementationSupervisor(path: string): void {
+  assert(isAbsolute(path), 'Implementation supervisor path must be absolute.');
+  supervisorScript = path;
+}
 const exec = promisify(execFile);
 export interface DashboardImplementationRequest {
   readonly root: string;
@@ -904,19 +909,19 @@ export async function startDashboardImplementation(
     return inspectDashboardImplementation(handle);
   const log = await open(join(root, 'supervisor.log'), 'a', 0o600);
   try {
+    const direct = supervisorScript.endsWith('.mjs');
     const child = spawn(
       process.execPath,
       [
-        '--import',
-        '@swc-node/register/esm-register',
-        script,
+        ...(direct ? [] : ['--import', '@swc-node/register/esm-register']),
+        supervisorScript,
         '--supervise-implementation',
         handle.requestPath,
         handle.manifestSha256,
         nonce,
       ],
       {
-        cwd: resolve(dirname(script), '..'),
+        cwd: resolve(dirname(supervisorScript), direct ? '.' : '..'),
         detached: process.platform !== 'win32',
         stdio: ['ignore', log.fd, log.fd],
         shell: false,
@@ -1380,7 +1385,7 @@ async function supervise(
 }
 if (
   process.argv[1] &&
-  resolve(process.argv[1]) === script &&
+  resolve(process.argv[1]) === sourceScript &&
   process.argv[2] === '--supervise-implementation'
 ) {
   (async () => {
