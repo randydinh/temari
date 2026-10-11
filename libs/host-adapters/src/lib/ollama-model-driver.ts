@@ -107,16 +107,23 @@ export function createOllamaModelDriver(
         if (!record(request.outputSchema))
           throw new PrivacyError('Invalid local model output schema.');
       }
-      const messages: unknown[] = [{ role: 'user', content: request.prompt }];
+      // A final-answer grammar can suppress Ollama's native tool-call syntax.
+      // Finish retrieval first, then render the packet with tools disabled and
+      // the native schema enabled. The caller still validates the final packet.
+      const toolSchema = tools.length > 0 && request.outputSchema !== undefined;
+      const messages: unknown[] = [{ role: 'user', content: request.prompt + (toolSchema
+        ? '\nAfter all tool calls, return only JSON matching this final schema: ' + JSON.stringify(request.outputSchema)
+        : '') }];
       let calls = 0;
+      let rendering = false;
       for (let turn = 0; turn < maxTurns; turn++) {
         signal?.throwIfAborted();
         const body = JSON.stringify({
           model: options.model,
           messages,
           stream: false,
-          tools,
-          ...(request.outputSchema === undefined
+          tools: rendering ? [] : tools,
+          ...(request.outputSchema === undefined || (toolSchema && !rendering)
             ? {}
             : { format: request.outputSchema }),
         });
@@ -151,12 +158,21 @@ export function createOllamaModelDriver(
         const toolCalls = message.tool_calls ?? [];
         if (!Array.isArray(toolCalls) || toolCalls.length > 32)
           throw new PrivacyError('Invalid local model tool sequence.');
+        if (rendering && toolCalls.length > 0)
+          throw new PrivacyError('Tools are unavailable during final packet rendering.');
         if (toolCalls.length === 0) {
           if (
             !message.content ||
             Buffer.byteLength(message.content) > 1024 * 1024
           )
             throw new PrivacyError('Invalid local model text.');
+          if (toolSchema && !rendering) {
+            messages.push({ role: 'assistant', content: message.content }, {
+              role: 'user', content: 'The tool phase is complete. Use the retrieved source evidence and citations when relevant. Return only the required final JSON packet, not the schema. Do not request further tools.',
+            });
+            rendering = true;
+            continue;
+          }
           return message.content;
         }
         if (message.content || calls + toolCalls.length > maxCalls)

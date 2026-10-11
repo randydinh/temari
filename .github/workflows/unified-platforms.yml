@@ -1,0 +1,133 @@
+name: Unified Temari platform verification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/unified-platforms.yml'
+      - 'tools/unified-*'
+      - 'tools/dashboard-talk*'
+      - 'apps/dashboard/**'
+      - 'libs/host-adapters/**'
+      - 'packages/workflow-runtime/**'
+      - 'docs/migrations/unified-install.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unified-platform-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  NX_DAEMON: 'false'
+  NX_NO_CLOUD: 'true'
+
+jobs:
+  baseline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: 3b91e4b688d4479cff133d7c3212fde71031204e
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.9.0
+      - uses: oven-sh/setup-bun@v2.2.0
+        with:
+          bun-version: 1.4.2
+      - run: pnpm install --frozen-lockfile
+      - name: Reproduce the pinned 0.15.5 marketplace payload
+        shell: bash
+        run: |
+          pnpm exec nx run workflow-runtime:public-package -- --output "$RUNNER_TEMP/baseline-public"
+          pnpm exec nx run workflow-runtime:release-package -- --artifact "$RUNNER_TEMP/baseline-public" --expected-manifest-sha256 963dce7adf2e4a23eaa022b600d4841067df6d1d830a0e9d84d0fbbf3f103195 --output "$RUNNER_TEMP/marketplace.tar.gz"
+          # gzip encodings can differ across build runtimes; require the exact
+          # original uncompressed canonical tar as well as the public manifest.
+          node --input-type=module -e 'import assert from "node:assert/strict"; import {readFileSync} from "node:fs"; import {gunzipSync} from "node:zlib"; import {createHash} from "node:crypto"; assert.equal(createHash("sha256").update(gunzipSync(readFileSync(process.argv[1]))).digest("hex"), "8dedcec42ad3125f521b5132ce02748ce3ddd55f3e39be8ecd82d2d21ba97d9e")' "$RUNNER_TEMP/marketplace.tar.gz"
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: verified-marketplace-0.15.5
+          path: ${{ runner.temp }}/marketplace.tar.gz
+          retention-days: 7
+
+  recipient:
+    needs: baseline
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux-x64
+            diagnostic: false
+          - runner: ubuntu-24.04-arm
+            platform: linux-arm64
+            diagnostic: false
+          - runner: macos-14
+            platform: darwin-arm64
+            diagnostic: false
+          - runner: macos-15-intel
+            platform: darwin-x64
+            diagnostic: true
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.diagnostic }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.9.0
+      - uses: astral-sh/setup-uv@v10.3.0
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          name: verified-marketplace-0.15.5
+          path: ${{ runner.temp }}/baseline
+      - run: pnpm install --frozen-lockfile
+      - name: Verify inputs and build dashboard
+        shell: bash
+        run: |
+          pnpm exec nx run workflow-runtime:unified-assets-test
+          pnpm exec nx run dashboard:build
+          mkdir "$RUNNER_TEMP/marketplace"
+          tar -xzf "$RUNNER_TEMP/baseline/marketplace.tar.gz" -C "$RUNNER_TEMP/marketplace"
+      - name: Verify native recipient
+        shell: bash
+        run: pnpm exec nx run workflow-runtime:unified-platform-check -- --output "$RUNNER_TEMP/platform-evidence" --marketplace "$RUNNER_TEMP/marketplace"
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: platform-evidence-${{ matrix.platform }}
+          path: ${{ runner.temp }}/platform-evidence/result.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  windows-runtime-diagnostic:
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.9.0
+      - name: Verify native binaries and record unsupported installation boundary
+        shell: pwsh
+        run: node tools/unified-platform-check.mjs --output "$env:RUNNER_TEMP/platform-evidence"
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: platform-evidence-win32-x64
+          path: ${{ runner.temp }}/platform-evidence/result.json
+          if-no-files-found: warn
+          retention-days: 14

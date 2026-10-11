@@ -20,6 +20,18 @@
       "type:distribution"
     ],
     "targets": {
+      "unified-assets-test": {
+        "command": "node --test tools/unified-assets.test.mjs",
+        "cache": false
+      },
+      "unified-test": {
+        "command": "node --test tools/unified-release.test.mjs",
+        "cache": false
+      },
+      "unified-package": {
+        "command": "node tools/unified-release.mjs",
+        "cache": false
+      },
       "privacy-generate": {
         "command": "node tools/generate-privacy-runtime.mjs --write",
         "cache": false
@@ -230,6 +242,14 @@
       },
       "managed-shutdown-r1-test": {
         "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 tools/managed-shutdown-r1.test.mts libs/runtime/src/lib/child-task-store.test.ts libs/runtime/src/lib/task-store.test.ts libs/runtime/src/lib/task-runtime.test.ts",
+        "cache": false
+      },
+      "unified-recipient-smoke": {
+        "command": "node tools/unified-recipient-smoke.mjs",
+        "cache": false
+      },
+      "unified-platform-check": {
+        "command": "node tools/unified-platform-check.mjs",
         "cache": false
       }
     }

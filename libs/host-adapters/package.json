@@ -43,6 +43,10 @@
           "command": "node --import @swc-node/register/esm-register --test --test-concurrency=1 libs/host-adapters/src/lib/process-capture.test.ts libs/host-adapters/src/lib/codex-exec-worker.test.ts tools/run-codex-workers.test.mts tools/run-codex-write-workers.test.mts",
           "cwd": "{workspaceRoot}"
         }
+      },
+      "ollama-test": {
+        "command": "node --import @swc-node/register/esm-register --test libs/host-adapters/src/lib/ollama-model-driver.test.ts",
+        "cache": false
       }
     }
   },

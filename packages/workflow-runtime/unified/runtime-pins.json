@@ -1,0 +1,155 @@
+{
+  "schema": 1,
+  "platforms": {
+    "darwin-arm64": {
+      "node": {
+        "version": "22.23.3",
+        "url": "https://nodejs.org/dist/v22.23.3/node-v22.23.3-darwin-arm64.tar.gz",
+        "size": 49963763,
+        "sha256": "23b25245dcfb9af7262f8ff142e9e2e0af025368117329e7a7458a51e5922f53",
+        "format": "tar.gz",
+        "archiveRoot": "node-v22.23.3-darwin-arm64",
+        "executable": "bin/node"
+      },
+      "python": {
+        "version": "3.12.15",
+        "release": "20261009",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.12.15%2B20261009-aarch64-apple-darwin-install_only_stripped.tar.gz",
+        "size": 25030095,
+        "sha256": "233f8e15255b3e1d1fd47ea5dd5230dfed803f371138e896e54d98c60ae19f6f",
+        "format": "tar.gz",
+        "archiveRoot": "python",
+        "executable": "bin/python3.12"
+      },
+      "archon": {
+        "version": "0.10.1",
+        "commitPrefix": "9820785c",
+        "url": "https://github.com/coleam00/Archon/releases/download/v0.10.1/archon-darwin-arm64",
+        "size": 75401632,
+        "sha256": "61aa2430198c27b2b3fcc97890c8e4b73b0c7cc99e417930ddb4b1f8c59e6933",
+        "format": "binary",
+        "executable": "archon"
+      }
+    },
+    "darwin-x64": {
+      "node": {
+        "version": "22.23.3",
+        "url": "https://nodejs.org/dist/v22.23.3/node-v22.23.3-darwin-x64.tar.gz",
+        "size": 51142049,
+        "sha256": "8a677b0219178efd6eb0e475457c4afb452b521a92f6e67845a73bd85727f2a8",
+        "format": "tar.gz",
+        "archiveRoot": "node-v22.23.3-darwin-x64",
+        "executable": "bin/node"
+      },
+      "python": {
+        "version": "3.12.15",
+        "release": "20261009",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.12.15%2B20261009-x86_64-apple-darwin-install_only_stripped.tar.gz",
+        "size": 24751118,
+        "sha256": "fb3187d95334813b88940db0f1ca57b84cedfd552739c3a5771c3ea0e49988c9",
+        "format": "tar.gz",
+        "archiveRoot": "python",
+        "executable": "bin/python3.12"
+      },
+      "archon": {
+        "version": "0.10.1",
+        "commitPrefix": "9820785c",
+        "url": "https://github.com/coleam00/Archon/releases/download/v0.10.1/archon-darwin-x64",
+        "size": 80349760,
+        "sha256": "f4766a8bcb9ab6e688ad6d38b4019cdb84ccce5f6701bfa8e56dfbb9f8ca6cee",
+        "format": "binary",
+        "executable": "archon"
+      }
+    },
+    "linux-arm64": {
+      "node": {
+        "version": "22.23.3",
+        "url": "https://nodejs.org/dist/v22.23.3/node-v22.23.3-linux-arm64.tar.gz",
+        "size": 56655163,
+        "sha256": "5ced2d48d1d7198739b7f86804de0171aefb6823b684b12341d3321afc3cb0b2",
+        "format": "tar.gz",
+        "archiveRoot": "node-v22.23.3-linux-arm64",
+        "executable": "bin/node"
+      },
+      "python": {
+        "version": "3.12.15",
+        "release": "20261009",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.12.15%2B20261009-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz",
+        "size": 29220608,
+        "sha256": "2e1ba0e7f22e01c534caebf7f09e7820322bc0d055271d3434af671e8400f96f",
+        "format": "tar.gz",
+        "archiveRoot": "python",
+        "executable": "bin/python3.12"
+      },
+      "archon": {
+        "version": "0.10.1",
+        "commitPrefix": "9820785c",
+        "url": "https://github.com/coleam00/Archon/releases/download/v0.10.1/archon-linux-arm64",
+        "size": 112969153,
+        "sha256": "9b8acd643a224385dc511c8d77400e31166e7e5c5579eb0335ed56e3434d4bff",
+        "format": "binary",
+        "executable": "archon"
+      }
+    },
+    "linux-x64": {
+      "node": {
+        "version": "22.23.3",
+        "url": "https://nodejs.org/dist/v22.23.3/node-v22.23.3-linux-x64.tar.gz",
+        "size": 56792076,
+        "sha256": "1084aa36196bba4c3a5e69a1ee388a6e4ff729dad09445fbcd434b28fe3c24af",
+        "format": "tar.gz",
+        "archiveRoot": "node-v22.23.3-linux-x64",
+        "executable": "bin/node"
+      },
+      "python": {
+        "version": "3.12.15",
+        "release": "20261009",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.12.15%2B20261009-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+        "size": 34304557,
+        "sha256": "ffa8f85f1b56e88b687f08d743d817015524b86a9365fd921243132b80f1a36d",
+        "format": "tar.gz",
+        "archiveRoot": "python",
+        "executable": "bin/python3.12"
+      },
+      "archon": {
+        "version": "0.10.1",
+        "commitPrefix": "9820785c",
+        "url": "https://github.com/coleam00/Archon/releases/download/v0.10.1/archon-linux-x64",
+        "size": 113528087,
+        "sha256": "7aa8b25a4b0017dddb05aead518cbd453ca8db9c54ac4a7611f40164fecd3973",
+        "format": "binary",
+        "executable": "archon"
+      }
+    },
+    "win32-x64": {
+      "node": {
+        "version": "22.23.3",
+        "url": "https://nodejs.org/dist/v22.23.3/win-x64/node.exe",
+        "size": 86973768,
+        "sha256": "9c9245166b4a8e182e0b797da9c20136117ff24368eaff1fec8343a123c8db0e",
+        "format": "binary",
+        "archiveRoot": null,
+        "executable": "node.exe"
+      },
+      "python": {
+        "version": "3.12.15",
+        "release": "20261009",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.12.15%2B20261009-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+        "size": 22011208,
+        "sha256": "11ed9f8a6ac64fb1b5a55e40e305a6744a3f77a70863c8f8197a6e4349abc64a",
+        "format": "tar.gz",
+        "archiveRoot": "python",
+        "executable": "python.exe"
+      },
+      "archon": {
+        "version": "0.10.1",
+        "commitPrefix": "9820785c",
+        "url": "https://github.com/coleam00/Archon/releases/download/v0.10.1/archon-windows-x64.exe",
+        "size": 129650176,
+        "sha256": "335cee6aedf7ee5e67a23ee5748813d5f161f4f37e207e61ae9c9a52cd36f54b",
+        "format": "binary",
+        "executable": "archon.exe"
+      }
+    }
+  }
+}
