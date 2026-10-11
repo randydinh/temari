@@ -38,6 +38,16 @@ export async function packageManagedWorkflow(output) {
       target: 'node22',
       sourcemap: false,
     }),
+    ...['swarm', 'implementation'].map((name) => build({
+      entryPoints: [`tools/dashboard-${name}.mts`],
+      outfile: join(output, `dashboard-${name}.mjs`),
+      bundle: true,
+      platform: 'node',
+      format: 'esm',
+      target: 'node22',
+      sourcemap: false,
+      banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
+    })),
     build({
       entryPoints: ['libs/host-adapters/src/lib/scoped-worker-tools-stdio.ts'],
       outfile: join(output, 'scoped-worker-tools-stdio.mjs'),

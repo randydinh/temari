@@ -17,11 +17,13 @@ For a Git project with a commit, the generated controller includes the existing 
 ## Verification scope
 
 - Focused unit fixtures cover login/cancellation, CLI model discovery, credential permissions/redaction/restart, generated profiles, mixed chat/worker backends, partial recovery, registration collisions, disabled servers, marketplace reuse and binary drift.
-- A cold-PATH packaged journey generates its profile, retries, starts through the managed launcher, executes actual knowledge search/read with returned citations, and restarts. Its model is an explicit loopback fixture.
+- A cold-PATH packaged journey generates its profile, retries, starts through the managed launcher, executes actual knowledge search/read with returned citations, and restarts. It also launches two workers through the shipped supervisor with a provider CLI fixture, asserting saved authentication and retained progress. Its model is an explicit loopback fixture.
 - Native local trials use existing Codex login/model discovery and local Ollama with current Claude Code. Codex and Claude client configuration roots are isolated; global client settings and credentials are unchanged. Fresh browser login and cloud API billing are tested with fixtures, not claimed as live account evidence.
 - The native matrix runs the guided cold journey on macOS Intel/ARM and Linux x64/ARM. Windows remains a runtime diagnostic with native knowledge setup explicitly refused.
 
 Independent source review found inherited Claude authentication routing, disabled-client readiness and mixed-backend model-selection issues; each received a focused regression. Frozen local review and final CI are recorded in the PR and task handoff. Test and host receipts are context evidence, not canonical Temari feature completion receipts.
+
+A live installed investigation exposed the prior supervisor's repository-only TypeScript loader dependency. The outer dashboard now carries dedicated compiled investigation and implementation supervisors, configured like its existing planner. Source launches retain the TypeScript loader. Native recipient verification checks an actual shipped worker launch, preventing setup-only readiness from hiding this dependency.
 
 ## Remaining portability work
 

@@ -52,7 +52,12 @@ import {
 } from './dashboard-diagnostics.mjs';
 
 const runFile = promisify(execFile);
-const script = fileURLToPath(import.meta.url);
+const sourceScript = fileURLToPath(import.meta.url);
+let supervisorScript = sourceScript;
+export function configureSwarmSupervisor(path: string): void {
+  assert(isAbsolute(path), 'Swarm supervisor path must be absolute.');
+  supervisorScript = path;
+}
 export interface DashboardSwarmRequest {
   readonly root: string;
   readonly taskId: string;
@@ -596,19 +601,19 @@ export async function startDashboardSwarm(
     return inspectDashboardSwarm(handle);
   const log = await open(join(root, 'supervisor.log'), 'a', 0o600);
   try {
+    const direct = supervisorScript.endsWith('.mjs');
     const child = spawn(
       process.execPath,
       [
-        '--import',
-        '@swc-node/register/esm-register',
-        script,
+        ...(direct ? [] : ['--import', '@swc-node/register/esm-register']),
+        supervisorScript,
         '--supervise-swarm',
         handle.requestPath,
         handle.manifestSha256,
         nonce,
       ],
       {
-        cwd: resolve(dirname(script), '..'),
+        cwd: resolve(dirname(supervisorScript), direct ? '.' : '..'),
         detached: process.platform !== 'win32',
         stdio: ['ignore', log.fd, log.fd],
         shell: false,
@@ -867,7 +872,7 @@ async function supervise(
 
 if (
   process.argv[1] &&
-  resolve(process.argv[1]) === script &&
+  resolve(process.argv[1]) === sourceScript &&
   process.argv[2] === '--supervise-swarm'
 ) {
   (async () => {
