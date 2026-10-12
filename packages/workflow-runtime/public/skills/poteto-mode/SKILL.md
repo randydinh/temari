@@ -7,6 +7,12 @@ description: Use Poteto for software investigation, design, implementation, repa
 
 Poteto mode supplies the engineering workflow selected by Temari.
 
+Preserve Temari's selected `work` or `personal` area for task history, private
+evidence, decisions and outputs. Shared methods do not merge private data. A
+direct Poteto request must select the area from intent and project before
+private retrieval; ask if ambiguous. Follow the Knowledge area commands and
+never search the other area as a fallback without an explicit user request.
+
 Use the bundled [method library](../temari/references/method-library.md) to load
 the selected playbook, supporting skills and relevant principles. Check public
 policy first; the library's catalog is availability guidance, not route admission.

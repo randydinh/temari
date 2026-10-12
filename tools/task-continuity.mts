@@ -1,4 +1,4 @@
-import { readFile, realpath, stat } from 'node:fs/promises';
+import { lstat, readFile, readdir, realpath, stat } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { basename, isAbsolute, resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -46,6 +46,9 @@ import { createDashboardTalkRegistry, loadDashboardTalkConfiguration, validateDa
 export const taskHelp = `Temari tasks — keep a goal and its evidence across runs
 
 Usage: pnpm exec nx run runtime:tasks -- COMMAND [--root ABSOLUTE_DIRECTORY] [options]
+
+--area work|personal selects a separate store at ROOT/areas/AREA. ROOT is the
+existing --root, TEMARI_TASK_ROOT or default. Legacy tasks are never included.
 
 Storage defaults to TEMARI_TASK_ROOT or the platform's Temari data directory
 under tasks, so a fresh session can find the same work.
@@ -249,11 +252,13 @@ export async function runTaskCommand(
   args: readonly string[],
   resources: TaskCommandResources = {},
 ): Promise<unknown> {
-  const { positionals, values } = parseArgs({
+  const { positionals, values, tokens } = parseArgs({
     args: [...args],
+    tokens: true,
     allowPositionals: true,
     options: {
       root: { type: 'string' },
+      area: { type: 'string' },
       input: { type: 'string' },
       task: { type: 'string' },
       workspace: { type: 'string' },
@@ -334,17 +339,62 @@ export async function runTaskCommand(
       resolve(platformInfo().dataDirectory, 'tasks'),
     '--root',
   );
+  let baseRoot = root;
+  const area = values.area;
+  if (tokens.filter((token) => token.kind === 'option' && token.name === 'area').length > 1)
+    throw new Error('Select one --area.');
+  if (area !== undefined && area !== 'work' && area !== 'personal')
+    throw new Error('Select --area work or personal.');
+  let areaRoot = area === undefined ? null : join(root, 'areas', area);
+  if (areaRoot) {
+    for (const path of [join(root, 'areas'), areaRoot]) {
+      try {
+        const entry = await lstat(path);
+        if (!entry.isDirectory() || entry.isSymbolicLink())
+          throw new Error('Area state must use separate regular directories.');
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+    }
+    let ancestor = areaRoot;
+    const missing: string[] = [];
+    for (;;) {
+      try {
+        areaRoot = join(await realpath(ancestor), ...missing);
+        break;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        missing.unshift(basename(ancestor));
+        ancestor = resolve(ancestor, '..');
+      }
+    }
+    baseRoot = resolve(areaRoot, '..', '..');
+    root = areaRoot;
+  }
   if (talkConfig) root = (talkConfig.schema === 2
     ? await validateDashboardTalkRegistryRoots(talkConfig, root)
     : await validateDashboardTalkRoots(talkConfig, root)).taskStoreRoot;
   if (dashboardConfig?.reconciliation)
     root = (await validateDashboardReconciliationRoots(dashboardConfig, root)).taskStoreRoot!;
-  const store =
-    command === 'create' ||
-    command === 'enter' ||
-    (command === 'serve' && (dashboardConfig !== null || talkConfig !== null))
-      ? await FileTaskStore.create(root)
-      : await FileTaskStore.openExisting(root);
+  if (areaRoot && root !== areaRoot)
+    throw new Error('Dashboard configuration cannot override the selected area store.');
+  const createsStore = command === 'create' || command === 'enter' ||
+    (command === 'serve' && (dashboardConfig !== null || talkConfig !== null));
+  if (areaRoot && createsStore) {
+    let initializeBase = false;
+    try {
+      const entry = await lstat(baseRoot);
+      initializeBase = entry.isDirectory() && !entry.isSymbolicLink() &&
+        (await readdir(baseRoot)).length === 0;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      initializeBase = true;
+    }
+    if (initializeBase) await FileTaskStore.create(baseRoot);
+  }
+  const store = createsStore
+    ? await FileTaskStore.create(root)
+    : await FileTaskStore.openExisting(root);
   let selection: HarnessSelection | undefined;
   let nativeExecutable: string | undefined;
   if (

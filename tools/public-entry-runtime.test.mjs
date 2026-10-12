@@ -625,6 +625,40 @@ test('relocated Knowledge cold install keeps state outside the artifact and conn
   assert.equal(await readFile(providerStatePath, 'utf8'),
     providerSelectionBytes('registrar', 'ready'));
   assert.deepEqual(await readdir(join(home, 'workspace')), []);
+  const coldArea = await child([launcher, 'area', 'status', '--area', 'work', '--home', home]);
+  assert.equal(coldArea.initialized, false);
+  assert.equal(coldArea.legacyIncluded, false);
+  await assert.rejects(lstat(join(home, 'areas')), { code: 'ENOENT' });
+  for (const area of ['work', 'personal']) {
+    const docs = join(root, `${area}-docs`);
+    await mkdir(docs);
+    await writeFile(join(docs, 'notes.md'), `partitionmarker ${area}only\n`);
+    const source = await child([launcher, 'area', 'sources', '--area', area,
+      '--home', home, 'add', docs]);
+    await child([launcher, 'area', 'sources', '--area', area, '--home', home,
+      'refresh', source.id]);
+    const result = await child([launcher, 'area', 'sources', '--area', area,
+      '--home', home, 'search', 'partitionmarker']);
+    assert.match(JSON.stringify(result), new RegExp(`${area}only`));
+    assert.doesNotMatch(JSON.stringify(result), new RegExp(`${area === 'work' ? 'personal' : 'work'}only`));
+    const opposite = area === 'work' ? 'personal' : 'work';
+    const refused = await childResult([launcher, 'area', 'sources', '--area', opposite,
+      '--home', home, 'read', source.id, 'notes.md'], 2);
+    assert.equal(JSON.parse(refused.stdout).error, 'unknown source ID');
+  }
+  for (const args of [
+    ['sources', 'list'], ['status', '--area', 'both'],
+    ['status', '--area', 'work', '--workspace', join(home, 'workspace')],
+    ['status', '--area', 'work', '--workspace=' + join(home, 'workspace')],
+  ]) {
+    await childResult([launcher, 'area', ...args, '--home', home], 1);
+  }
+  const aliasHome = join(root, 'alias-home');
+  await mkdir(join(aliasHome, 'areas'), { recursive: true });
+  await symlink(join(home, 'areas', 'work'), join(aliasHome, 'areas', 'personal'));
+  const aliasResult = await childResult([launcher, 'area', 'status', '--area', 'personal', '--home', aliasHome], 1);
+  assert.match(aliasResult.stderr, /separate regular directories/);
+  assert.deepEqual(await readdir(join(home, 'workspace')), []);
   assert.deepEqual(
     await checkPublicEntryArtifact(artifact, manifestSha256(manifest)),
     manifest,

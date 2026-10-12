@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
-import { mkdtemp, writeFile, rm, mkdir, realpath, readdir, readFile, symlink } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm, mkdir, realpath, readdir, readFile, symlink, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -15,6 +15,110 @@ import {
 } from './task-continuity.mjs';
 
 const run = promisify(execFile);
+
+test('work and personal task areas keep the same goal identity and pickup separate', async (t) => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'temari-task-areas-')));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const store = join(root, 'tasks');
+  const input = join(root, 'create.json');
+  for (const area of ['work', 'personal']) {
+    await writeFile(input, JSON.stringify({ taskId: 'same-goal', title: `${area} goal`,
+      goal: `Keep ${area} context`, workspaceRoot: root, actor: 'temari',
+      idempotencyKey: 'create-1' }));
+    await runTaskCommand(['create', '--root', store, '--area', area, '--input', input]);
+  }
+  for (const area of ['work', 'personal']) {
+    const result = await runTaskCommand(['pickup', '--root', store, '--area', area,
+      '--workspace', root]) as any;
+    assert.equal(result.status, 'selected');
+    assert.equal(result.selected.title, `${area} goal`);
+    const fresh = await run(process.execPath, ['--import', '@swc-node/register/esm-register',
+      resolve('tools/task-continuity.mts'), 'pickup', '--root', store, '--area', area,
+      '--workspace', root]);
+    assert.equal(JSON.parse(fresh.stdout).selected.title, `${area} goal`);
+  }
+  const legacy = await runTaskCommand(['pickup', '--root', store, '--workspace', root]) as any;
+  assert.equal(legacy.status, 'empty');
+  assert.deepEqual(await runTaskCommand(['list', '--root', store]), []);
+  await writeFile(input, JSON.stringify({ taskId: 'same-goal', title: 'legacy goal',
+    goal: 'Keep legacy context', workspaceRoot: root, actor: 'temari', idempotencyKey: 'legacy-1' }));
+  await runTaskCommand(['create', '--root', store, '--input', input]);
+  assert.equal((await runTaskCommand(['pickup', '--root', store, '--workspace', root]) as any).selected.title, 'legacy goal');
+  for (const area of ['work', 'personal'])
+    assert.equal((await runTaskCommand(['pickup', '--root', store, '--area', area, '--workspace', root]) as any).selected.title, `${area} goal`);
+
+  await assert.rejects(runTaskCommand(['list', '--root', store, '--area', 'both']), /Select --area/);
+  await assert.rejects(runTaskCommand(['list', '--root', store, '--area', 'work', '--area', 'personal']),
+    /Select one --area/);
+  for (const layer of ['areas', 'personal']) {
+    const aliasRoot = join(root, `alias-${layer}`);
+    const linkPath = layer === 'areas' ? join(aliasRoot, 'areas') : join(aliasRoot, 'areas', 'personal');
+    await mkdir(join(linkPath, '..'), { recursive: true });
+    await symlink(layer === 'areas' ? join(store, 'areas') : join(store, 'areas', 'work'), linkPath);
+    await assert.rejects(runTaskCommand(['list', '--root', aliasRoot, '--area', 'personal']),
+      /separate regular directories/);
+  }
+  await unlink(join(store, 'tasks.json'));
+  await assert.rejects(runTaskCommand(['create', '--root', store, '--input', input]), /missing|ledger|recover/i);
+  await assert.rejects(runTaskCommand(['list', '--root', store]), /missing|ledger|recover/i);
+  assert.equal((await runTaskCommand(['pickup', '--root', store, '--area', 'work', '--workspace', root]) as any).selected.title, 'work goal');
+});
+
+test('configured dashboard preserves the selected area through a base-root alias', async (t) => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'temari-area-dashboard-')));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const workspace = join(root, 'workspace');
+  const tasks = join(root, 'tasks');
+  await mkdir(workspace);
+  await FileTaskStore.create(tasks);
+  const input = join(root, 'task.json');
+  for (const area of ['work', 'personal']) {
+    await writeFile(input, JSON.stringify({ taskId: 'same-goal', title: `${area} goal`,
+      goal: `Keep ${area} context`, workspaceRoot: workspace, actor: 'temari', idempotencyKey: 'create-1' }));
+    await runTaskCommand(['create', '--root', tasks, '--area', area, '--input', input]);
+  }
+  await writeFile(input, JSON.stringify({ taskId: 'legacy-goal', title: 'legacy goal',
+    goal: 'Retain legacy context', workspaceRoot: workspace, actor: 'temari', idempotencyKey: 'create-legacy' }));
+  await runTaskCommand(['create', '--root', tasks, '--input', input]);
+  const alias = join(root, 'dashboard-task-alias');
+  await symlink(tasks, alias);
+  const talkConfig = join(root, 'talk.json');
+  await writeFile(talkConfig, JSON.stringify({ schema: 1, root: join(root, 'conversations'),
+    workspaceRoot: workspace, hostId: 'fixture-host', workspaceId: 'fixture-workspace', taskStoreId: 'fixture-tasks' }));
+  const child = spawn(process.execPath, ['--import', '@swc-node/register/esm-register',
+    resolve('tools/task-continuity.mts'), 'serve', '--root', alias, '--area', 'personal',
+    '--talk-config', talkConfig, '--port', '0'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  t.after(async () => {
+    if (child.exitCode !== null || child.signalCode !== null) return;
+    const closed = new Promise<void>((done) => child.once('close', () => done()));
+    child.kill('SIGTERM');
+    const force = setTimeout(() => child.kill('SIGKILL'), 2_000);
+    force.unref();
+    await closed;
+    clearTimeout(force);
+  });
+  let stderr = '';
+  child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
+  const started = await new Promise<{ url: string; root: string }>((done, reject) => {
+    let stdout = '';
+    const timer = setTimeout(() => reject(new Error(`Area dashboard readiness timed out: ${stderr}`)), 10_000);
+    child.once('error', (error) => { clearTimeout(timer); reject(error); });
+    child.once('exit', (code) => { clearTimeout(timer); reject(new Error(`Area dashboard exited (${code}): ${stderr}`)); });
+    child.stdout.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString();
+      let value: { url: string; root: string };
+      try { value = JSON.parse(stdout); } catch { return; }
+      clearTimeout(timer);
+      done(value);
+    });
+  });
+  assert.equal(started.root, join(tasks, 'areas', 'personal'));
+  const dashboard = await (await fetch(`${started.url}/api/tasks`)).json();
+  assert.equal(dashboard.tasks.length, 1);
+  assert.equal(dashboard.tasks[0].title, 'personal goal');
+  assert.doesNotMatch(JSON.stringify(dashboard), /work goal|legacy goal/);
+  assert.equal((await runTaskCommand(['pickup', '--root', tasks, '--area', 'work', '--workspace', workspace]) as any).selected.title, 'work goal');
+});
 
 test('Talk planning bridge requires the same canonical workspace and one host-selected policy',async(t)=>{
   const root=await realpath(await mkdtemp(join(tmpdir(),'temari-talk-bridge-')));t.after(()=>rm(root,{recursive:true,force:true}));

@@ -107,6 +107,10 @@
         "command": "node --test tools/pstack-method-library.test.mjs tools/public-entry-runtime.test.mjs",
         "cache": false
       },
+      "knowledge-area-test": {
+        "command": "node --test tools/knowledge-areas.test.mjs",
+        "cache": false
+      },
       "public-package": {
         "command": "node tools/public-entry-runtime.mjs package",
         "cache": false
