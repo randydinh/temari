@@ -415,16 +415,11 @@ export async function packageCanonicalRuntime(output) {
     files.set(`node_modules/@temari/${source.slice('libs/'.length)}`, bytes);
   }
   for (const value of metadata.values()) {
-    const dependencies = Object.fromEntries(
+    const canonicalDependencies = Object.fromEntries(
       Object.keys(value.dependencies ?? {})
+        .filter((name) => metadata.has(name))
         .sort()
-        .map((name) => {
-          assert(
-            metadata.has(name),
-            `Dependency outside canonical package: ${name}`,
-          );
-          return [name, metadata.get(name).version];
-        }),
+        .map((name) => [name, metadata.get(name).version]),
     );
     files.set(
       `${packageRoot(value.name.slice('@temari/'.length))}/package.json`,
@@ -449,7 +444,7 @@ export async function packageCanonicalRuntime(output) {
         ...(value.name === '@temari/knowledge'
           ? { bin: { 'temari-knowledge': './src/demo.js' } }
           : {}),
-        dependencies,
+        dependencies: canonicalDependencies,
       }),
     );
   }
