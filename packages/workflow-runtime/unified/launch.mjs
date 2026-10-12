@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFile, realpath } from 'node:fs/promises';
-import { isAbsolute, join, relative } from 'node:path';
+import { dirname, isAbsolute, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { readCredentials } from './hosts.mjs';
@@ -24,7 +24,7 @@ export async function launch({ home, node, dashboard, args = [], env = process.e
     assert(record?.kind === 'file' && sha(await readFile(selected)) === record.sha256, 'Installed launcher executable identity changed.');
   }
   assert(dashboard === join(installation, 'dashboard', 'main.mjs'), 'Launcher must select the installed dashboard.');
-  const selectedEnv = { ...env, ...credentials, PYTHONDONTWRITEBYTECODE: '1', PYTHONNOUSERSITE: '1' };
+  const selectedEnv = { ...env, ...credentials, PATH: `${dirname(node)}:${env.PATH ?? '/usr/bin:/bin'}`, PYTHONDONTWRITEBYTECODE: '1', PYTHONNOUSERSITE: '1', ...(manifest.providers?.['claude-code'] ? { DISABLE_AUTOUPDATER: '1', DISABLE_UPDATES: '1' } : {}) };
   if (signal?.aborted) return { exitCode: 130, signal: 'SIGINT' };
   return await new Promise((done) => {
     const child = spawn(node, [dashboard, ...args, '--home', join(home, 'dashboard')], { env: selectedEnv, stdio, signal });

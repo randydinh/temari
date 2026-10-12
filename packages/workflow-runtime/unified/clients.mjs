@@ -185,7 +185,7 @@ export async function registerClients({ home, workspaceRoot, clients, connection
       receipt.executableSha256 = pinnedSha256;
       const call = async (args) => {
         requireValue(digest(await readFile(client.executable)) === pinnedSha256, 'client-drift', 'The selected client executable changed. Run guided host selection again before registering.');
-        const env = { ...process.env };
+        const env = { ...process.env, ...(client.managed && client.kind === 'claude-code' ? { DISABLE_AUTOUPDATER: '1', DISABLE_UPDATES: '1' } : {}) };
         if (client.configHome) env[client.kind === 'codex' ? 'CODEX_HOME' : 'CLAUDE_CONFIG_DIR'] = client.configHome;
         return execute({ executable: client.executable, args, cwd: canonicalWorkspace, env, timeoutMs: 30000, maxOutputBytes: LIMIT });
       };

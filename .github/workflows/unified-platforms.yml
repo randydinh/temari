@@ -79,7 +79,7 @@ jobs:
             diagnostic: false
     runs-on: ${{ matrix.runner }}
     continue-on-error: ${{ matrix.diagnostic }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7.0.1
         with:

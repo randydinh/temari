@@ -36,7 +36,7 @@ async function command(executable, args, env) {
 
 export async function detectHosts({ env = process.env } = {}) {
   const found = [];
-  for (const [kind, name] of [['codex', 'codex'], ['claude-code', 'claude'], ['git', 'git']]) {
+  for (const [kind, name] of [['codex', 'codex'], ['claude-code', 'claude'], ['git', 'git'], ['pnpm', 'pnpm'], ['yarn', 'yarn'], ['bun', 'bun']]) {
     for (const directory of (env.PATH ?? '').split(delimiter).filter(Boolean)) {
       try {
         const executable = await canonicalExecutable(resolve(directory, name));
