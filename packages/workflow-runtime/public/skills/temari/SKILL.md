@@ -5,6 +5,27 @@ description: Use Temari to choose and continue source-dependent research, engine
 
 # Temari
 
+## Work and personal areas
+
+Treat Temari as shared tooling with separate `work` and `personal` data. Select
+the area from the user's intent and project before loading task history or
+private evidence. Ask when classification is ambiguous. Use the Knowledge
+skill's area entry for retrieval and record the selection in evidence intake.
+Keep private project notes, decisions, documents, graphs and outputs in their
+selected area. Never widen retrieval to the other area without an explicit
+request. Reusable public method guidance can remain shared; private material
+must not be promoted into that guidance automatically.
+
+In the source task CLI, pass `--area work|personal` consistently for create,
+pickup, enter, handoff, list and serve. It selects `ROOT/areas/AREA`, where ROOT
+is the usual task root. For installed engineering tracking, explicitly use that
+area store as the tracking sidecar's `taskRoot`; the sidecar remains outside the
+invocation. The existing default store is legacy context and is never merged
+automatically. A handoff must retain the area and source references. Area
+selection scopes the opt-in area commands. Direct legacy tools and journey
+plans retain their explicit paths; this is not a global access-control boundary.
+Area selection does not authorize execution or publish work.
+
 Temari is the conversational entry point for the current Nx workflow runtime.
 
 For engineering work, use the bundled [method library](references/method-library.md)

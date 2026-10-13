@@ -7,6 +7,12 @@ lookup does not establish that a provider, worker or evaluator ran.
 
 ## Decide and gather
 
+Select and retain one private-data area, `work` or `personal`, before source
+lookup. Shared tooling does not make private sources shared. Scope provider,
+workspace, task history, output and graph selection to that area. Ask if the
+area cannot be inferred; use both only when the user explicitly requests the
+additional sources. Missing results never authorize cross-area fallback.
+
 Choose one evidence need with a reason:
 
 - `required`: material dependencies remain on documents, current external facts,
@@ -45,7 +51,7 @@ a conversation identifier.
 | --- | --- |
 | Request | Outcome and task/request reference; work owner and method when applicable |
 | Need | `required`, `supplied` or `not-needed`, with the dependency or skip reason |
-| Scope | Question, selected sources/domains, budgets and currentness requirement |
+| Scope | Work/personal area, question, selected sources/domains, budgets and currentness requirement |
 | Observations | Actual operation names and references to retained tool/worker results; an empty list means no observed calls |
 | Evidence | Citations and source revisions, hashes or snapshots where available; applicability to supported claims |
 | Result | `pending`, `retrieved`, `partial`, `blocked` or `not-needed`; material gaps and unresolved decisions |

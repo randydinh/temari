@@ -69,6 +69,37 @@ The task dashboard runs from the source workspace. Main now bundles the Registra
 
 ## Start or pick up a task
 
+Temari can share tooling while keeping work and personal history in separate
+stores. Pass `--area work` or `--area personal` on every task command. The
+selected store is `ROOT/areas/AREA`; ROOT is the existing default, environment
+override or `--root` value. An area never includes tasks from the legacy root
+or the other area. A dashboard configuration cannot redirect it to a different
+store. Installed tracking uses this same absolute path as its `taskRoot`.
+Creating the first area in a new or empty root also initializes an empty legacy
+base store so existing bare commands remain usable. Retained or damaged base
+stores are not repaired automatically.
+
+```sh
+pnpm exec nx run runtime:tasks -- pickup --area work --workspace /absolute/work-project
+pnpm exec nx run runtime:tasks -- pickup --area personal --workspace /absolute/personal-project
+```
+
+Use the [Knowledge area commands](../packages/workflow-runtime/public/skills/temari-knowledge/SKILL.md#keep-work-and-personal-knowledge-separate)
+for the corresponding source registry. Existing tasks and documents stay in
+place until explicitly classified. Enforcement applies to commands selecting
+`--area`; direct legacy tools and journey plans retain their explicit paths.
+Areas are local data separation, not a global or operating-system access-control
+boundary.
+
+`runtime:task-test` verifies area-scoped history and pickup across fresh CLI
+processes. To verify knowledge separation with an already installed Registrar,
+run the following check. It uses temporary registries and shares only the
+installed provider; it does not read or modify your registered sources.
+
+```sh
+TEMARI_KNOWLEDGE_TEST_HOME=/absolute/provider-home pnpm exec nx run workflow-runtime:knowledge-area-test
+```
+
 Run commands from a checkout with `pnpm install` completed. A fresh session should
 discover retained work before creating a task. Reuse a matching task; give a replan a
 new run ID under that task.

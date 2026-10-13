@@ -105,6 +105,50 @@ launcher checks that home's selection before forwarding the command.
 
 ## Use source-backed context
 
+### Keep work and personal knowledge separate
+
+Temari is shared tooling. Choose `work` or `personal` from the user's request and
+selected project before retrieval or source intake. Retain that area with the
+task's evidence-intake decision. If classification is ambiguous, ask before
+reading dependent private sources; continue independent work. Never infer the
+area from the last chat, or combine both areas to improve search results.
+Cross-area use requires an explicit request naming the additional sources; keep
+their citations and resulting artifacts in the requested destination area.
+
+Use the area entry for persistent local sources:
+
+```sh
+node bin/temari-knowledge.mjs area status --area work
+node bin/temari-knowledge.mjs area sources --area work add /absolute/work-docs --label "Work docs"
+node bin/temari-knowledge.mjs area sources --area work refresh SOURCE_ID_FROM_ADD
+node bin/temari-knowledge.mjs area sources --area work search "charging requirements"
+node bin/temari-knowledge.mjs area sources --area personal add /absolute/personal-docs --label "Personal docs"
+node bin/temari-knowledge.mjs area sources --area personal refresh SOURCE_ID_FROM_ADD
+node bin/temari-knowledge.mjs area sources --area personal search "project notes"
+```
+
+These commands share the installed provider but select separate registries,
+indexes, archives and provider configurations under
+`HOME/areas/work/workspace` or `HOME/areas/personal/workspace`. `--home ABS`
+selects the same provider home used by setup. `area status` is read-only and
+prints the selected path and stdio MCP launch arguments. Register the
+area's selected sources before using `area mcp --area work|personal --source SOURCE_ID`;
+repeat `--source` for each admitted ID. That server exposes the existing
+read-only source profile for only those sources in that registry.
+When connecting it, use distinct names such as `temari-work-knowledge` and
+`temari-personal-knowledge`, and choose only the appropriate server for the task.
+
+Area commands require a selection and refuse workspace overrides and area
+directory symlinks. Empty areas do not fall back to the legacy workspace.
+Existing sources are not moved, copied or reclassified. Classify them explicitly
+before registering selected roots in an area. These are local storage and
+retrieval boundaries, not authenticated access control against another process
+with filesystem access. Direct Registrar tools and existing journey plans still
+use their explicit workspace: select the area's path and keep plan, graph, job,
+output and resume state within that area. Do not use the legacy mixed MCP
+connection for an area-scoped request. Sharing policy remains independent of
+area selection; `set-sharing SOURCE_ID local-only` restricts hosted use.
+
 Select a source scope and a bounded question before invoking intake, search, or
 query. The compiled CLI accepts explicit JSON plans:
 

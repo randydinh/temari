@@ -129,6 +129,46 @@ test('canonical artifact contains only compiled production packages and verifies
   );
 });
 
+test('relocated host worker APIs import without unreachable SDK, zod or stdio shim', async (t) => {
+  const { artifact } = await relocated(t);
+  for (const path of [
+    'node_modules/@modelcontextprotocol/sdk', 'node_modules/zod',
+    'node_modules/@temari/host-adapters/src/lib/scoped-worker-tools-stdio.js',
+    'node_modules/@temari/host-adapters/src/lib/scoped-worker-tools-stdio.d.ts',
+  ]) await assert.rejects(access(join(artifact, path)), { code: 'ENOENT' });
+  const metadata = JSON.parse(await readFile(join(artifact,
+    'node_modules/@temari/host-adapters/package.json'), 'utf8'));
+  assert(!Object.hasOwn(metadata.dependencies, '@modelcontextprotocol/sdk'));
+  assert(!Object.hasOwn(metadata.dependencies, 'zod'));
+  const env = { ...process.env };
+  delete env.NODE_OPTIONS;
+  delete env.NODE_PATH;
+  const imported = await child(['--permission', `--allow-fs-read=${artifact}`,
+    '--input-type=module', '-e',
+    'import * as host from "@temari/host-adapters"; console.log(JSON.stringify([typeof host.runWorkerExecution, typeof host.preflightWorkerExecution, typeof host.ScopedWorkerTools]));'],
+  { cwd: artifact, env });
+  assert.deepEqual(JSON.parse(imported.stdout), ['function', 'function', 'function']);
+});
+
+test('rehashed inventory still rejects external JS and declaration imports', async (t) => {
+  for (const [extension, injection] of [
+    ['js', '\nimport "@modelcontextprotocol/sdk";\n'],
+    ['d.ts', '\nexport type External = import("zod").ZodType;\n'],
+  ]) {
+    const { artifact } = await relocated(t);
+    const rewritten = structuredClone(manifest);
+    const file = rewritten.files.find((entry) =>
+      entry.path.endsWith(`/host-adapters/src/index.${extension}`));
+    assert(file);
+    const bytes = Buffer.concat([await readFile(join(artifact, file.path)), Buffer.from(injection)]);
+    await writeFile(join(artifact, file.path), bytes);
+    file.bytes = bytes.length;
+    file.sha256 = createHash('sha256').update(bytes).digest('hex');
+    await writeFile(join(artifact, 'canonical-manifest.json'), JSON.stringify(rewritten));
+    await assert.rejects(checkCanonicalArtifact(artifact), /External import not included/);
+  }
+});
+
 test('relocated knowledge API and CLI run with stock Node and no workspace loader', async (t) => {
   const { artifact } = await relocated(t);
   const env = { ...process.env };

@@ -73,6 +73,8 @@ async function verifyRegistrarPayload() {
 
 function usage() {
   return `Usage: temari-knowledge status [--home ABS]
+       temari-knowledge area status|sources|mcp --area work|personal [--home ABS] [sources arguments]
+                              (mcp requires repeatable --source SOURCE_ID)
        temari-knowledge setup [--home ABS] [--python PYTHON_3_12] [--connect-codex]
                               [--workspace ABS] [--codex CODEX]
        temari-knowledge connect-codex [--home ABS] [--workspace ABS] [--codex CODEX]
@@ -85,6 +87,71 @@ Setup builds a wheel from the pinned bundled Registrar source and installs it in
 a user-local Python venv. The registry and archives live outside the plugin.
 Connecting Codex is a separate, explicit command. Source intake requires a
 separately selected input plan; setup and connection do not register sources.`;
+}
+
+async function areaCommand(args) {
+  const { home, forwarded } = delegatedArgs(args);
+  const areaArgs = [];
+  let area;
+  for (let index = 0; index < forwarded.length; index++) {
+    const argument = forwarded[index];
+    if (argument === '--area') {
+      assert(area === undefined, 'Select one --area.');
+      area = forwarded[++index];
+    } else {
+      assert(argument !== '--workspace' && !argument.startsWith('--workspace='),
+        'Area commands own the workspace; a workspace override is refused.');
+      areaArgs.push(argument);
+    }
+  }
+  assert(area === 'work' || area === 'personal', 'Select --area work or personal.');
+  const place = locations({ '--home': home });
+  const directory = join(place.home, 'areas', area);
+  const workspace = join(directory, 'workspace');
+  for (const path of [join(place.home, 'areas'), directory, workspace]) {
+    try {
+      const entry = await lstat(path);
+      assert(entry.isDirectory() && !entry.isSymbolicLink(),
+        'Area state must use separate regular directories.');
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+  }
+  const [operation, ...rest] = areaArgs;
+  if (operation === 'status') {
+    assert(rest.length === 0, usage());
+    console.log(JSON.stringify({ area, workspace, home: place.home,
+      initialized: existsSync(join(workspace, 'registry.sqlite3')),
+      legacyWorkspace: place.workspace, legacyIncluded: false,
+      mcp: { command: process.execPath, args: [fileURLToPath(import.meta.url),
+        'area', 'mcp', '--area', area, '--home', place.home],
+        requiredFlags: ['--source SOURCE_ID (repeat for each admitted source)'] },
+    }, null, 2));
+    return;
+  }
+  assert(operation === 'sources' || operation === 'mcp', usage());
+  if (operation === 'mcp') {
+    assert(rest.length > 0 && rest.length <= 200 && rest.length % 2 === 0 &&
+      rest.every((value, index) => index % 2 === 0 ? value === '--source' :
+        value.length > 0 && value.length <= 80 && !value.startsWith('--')),
+    'Area MCP requires --source SOURCE_ID for each admitted source.');
+  }
+  else assert(['add', 'list', 'refresh', 'inventory', 'disable', 'enable', 'relink',
+    'search', 'discover', 'read', 'outline', 'expand', 'validate-claims',
+    'set-sharing', 'evidence-policy', 'retrieval-provider', 'add-testmo', 'add-remote'].includes(rest[0]),
+  'Select a supported sources command.');
+  await assertRegistrarSelected(place);
+  await verifyRegistrarPayload();
+  assert(await currentInstallation(place), 'Run setup before using an area.');
+  if (operation === 'mcp') assert(existsSync(join(workspace, 'registry.sqlite3')),
+    'Register the selected area before starting its read-only MCP server.');
+  const argv = operation === 'mcp'
+    ? ['mcp', 'serve', '--workspace', workspace, '--profile', 'source-read-only',
+      ...rest.map((value, index) => index % 2 === 0 ? '--allow-source' : value)]
+    : ['sources', '--workspace', workspace, ...rest];
+  const result = await invoke(place.python, ['-m', 'knowledge_agent.cli', ...argv],
+    { allowFailure: true });
+  process.exitCode = result.code;
 }
 
 function options(args, permitted, booleans = []) {
@@ -641,6 +708,10 @@ function delegatedArgs(args) {
 
 async function main(argv) {
   const [command, ...rest] = argv;
+  if (command === 'area') {
+    await areaCommand(rest);
+    return;
+  }
   if (!command || command === '--help' || command === 'help') {
     console.log(usage());
     if (existsSync(knowledgeCli))
