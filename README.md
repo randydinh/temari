@@ -98,6 +98,12 @@ tree — [docs/overlays.md](docs/overlays.md).
   and the [verification matrix](docs/verification-matrix.md). Treat a
   procedural receipt, a source citation, and a product-behavior verdict as
   different claims.
+- **Choose an external integration:** [integration options and setup](docs/integration-options.md).
+  Compare available access and verify the selected connection against the task.
+- **Find preserved local work:** [source comparison and documentation inventory](docs/evidence/local-artifact-preservation-2026-10-12.md).
+  It identifies integrated work, retained candidates and recovered proposals.
+  Use the [source/evidence template](docs/templates/analysis-source-provenance.md)
+  when continuing an investigation; private artifacts remain outside shared source.
 
 ## Layout
 
