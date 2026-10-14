@@ -118,6 +118,8 @@ if {path.parent.name for path in public_skill_files} != {
 node("public:policy", "admission", "Public admission policy", source=relative(public_root / "policy.json"))
 method_guide = public_root / "skills/temari/references/method-library.md"
 node("public:method-guide", "reference", "Installed P-stack method loading", source=relative(method_guide))
+specialist_intake = public_root / "skills/temari/references/specialist-intake-v1.md"
+node("public:specialist-intake-v1", "reference", "Conversational specialist intake v1", source=relative(specialist_intake))
 node("public:method-library", "bundle", "Complete portable P-stack method library", source="tools/pstack-method-library.mjs")
 edge("public:method-guide", "public:method-library", "loads_internal_method", "documented", relative(method_guide))
 edge("public:method-library", "component:pstack-v4.1", "packages_portable_inventory", "documented", "tools/pstack-method-library.mjs")
@@ -128,6 +130,9 @@ for entry_name in ("temari", "poteto-mode", "closeout"):
     edge("public:policy", f"public-entry:{entry_name}", "declares_entry", "documented", relative(public_root / "policy.json"))
     edge(f"public-entry:{entry_name}", f"skill:{entry_name}", "adapts_source_skill", "documented", relative(entry_path))
     edge(f"public-entry:{entry_name}", "public:method-guide", "references_method_library", "source_reference", relative(entry_path))
+    if entry_name in {"temari", "poteto-mode"}:
+        edge(f"public-entry:{entry_name}", "public:specialist-intake-v1", "references_advisory_intake", "source_reference", relative(entry_path))
+edge("public:policy", "public:specialist-intake-v1", "retains_execution_admission", "documented", relative(specialist_intake))
 qa_public = public_root / "skills/qa-review-verification/SKILL.md"
 node("public-skill:qa-review-verification", "public-skill", "QA verification", source=relative(qa_public))
 edge("public-entry:temari", "public-skill:qa-review-verification", "invokes_supporting_skill", "documented", relative(public_root / "skills/temari/SKILL.md"))

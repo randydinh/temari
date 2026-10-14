@@ -15,6 +15,13 @@ Use Temari's [conversation guidance](../temari/references/conversation.md) when
 reporting engineering progress or results. Keep the selected route's evidence,
 completion requirements, and authorization boundaries intact.
 
+For a fresh conversational intake, including direct Poteto requests, apply the
+shared [specialist intake v1](../temari/references/specialist-intake-v1.md) once.
+Use compatible relevant host SMEs for bounded advice, including UI Design for UX,
+flows, design critique and UI planning. Fold accepted findings into the existing
+brief; Poteto retains implementation and verification, and the caller retains
+acceptance. This does not enable specialist discovery inside protected workers.
+
 A request to keep working while the user is away returns to Temari for an
 overnight contract. For one substantive overnight task, suggest Figure-It-Out
 to plan reviewable phases, then Autonomous Run; do not escalate it to

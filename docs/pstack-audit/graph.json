@@ -456,6 +456,12 @@
       "source": "packages/workflow-runtime/public/policy.json"
     },
     {
+      "id": "public:specialist-intake-v1",
+      "kind": "reference",
+      "label": "Conversational specialist intake v1",
+      "source": "packages/workflow-runtime/public/skills/temari/references/specialist-intake-v1.md"
+    },
+    {
       "id": "skill:architect",
       "kind": "skill",
       "label": "architect",
@@ -1509,6 +1515,13 @@
     },
     {
       "from": "public-entry:poteto-mode",
+      "to": "public:specialist-intake-v1",
+      "relation": "references_advisory_intake",
+      "basis": "source_reference",
+      "evidence": "packages/workflow-runtime/public/skills/poteto-mode/SKILL.md"
+    },
+    {
+      "from": "public-entry:poteto-mode",
       "to": "public:method-guide",
       "relation": "references_method_library",
       "basis": "source_reference",
@@ -1547,6 +1560,13 @@
       "to": "public-skill:temari-knowledge",
       "relation": "invokes_supporting_skill",
       "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/skills/temari/SKILL.md"
+    },
+    {
+      "from": "public-entry:temari",
+      "to": "public:specialist-intake-v1",
+      "relation": "references_advisory_intake",
+      "basis": "source_reference",
       "evidence": "packages/workflow-runtime/public/skills/temari/SKILL.md"
     },
     {
@@ -1653,6 +1673,13 @@
       "relation": "retains_execution_admission",
       "basis": "documented",
       "evidence": "packages/workflow-runtime/public/skills/temari/references/method-library.md"
+    },
+    {
+      "from": "public:policy",
+      "to": "public:specialist-intake-v1",
+      "relation": "retains_execution_admission",
+      "basis": "documented",
+      "evidence": "packages/workflow-runtime/public/skills/temari/references/specialist-intake-v1.md"
     },
     {
       "from": "skill:architect",
