@@ -287,7 +287,7 @@ test(
     await f.state(catalog(selections.candidate, { installed: true }));
     await assert.rejects(inspectTemariInstall(f.options), /cache is missing/);
     await mkdir(
-      join(f.home, 'plugins/cache', TEMARI_MARKETPLACE, 'temari', '0.15.6'),
+      join(f.home, 'plugins/cache', TEMARI_MARKETPLACE, 'temari', '99.0.0'),
       { recursive: true },
     );
     await assert.rejects(

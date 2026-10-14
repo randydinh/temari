@@ -37,6 +37,12 @@ Revisit the decision when the requested outcome or material dependencies change.
 These are skill instructions for the host path using them; the packaged CLI does
 not intercept every chat or mechanically enforce natural-language selection.
 
+At each fresh conversational intake, use the shared
+[specialist intake v1](references/specialist-intake-v1.md) to inspect available
+host SMEs once and select a compatible relevant advisor. UI Design can support
+UX discovery, flows, design critique and UI planning; its findings remain advisory.
+Retain the caller's Poteto implementation and QA acceptance responsibilities.
+
 Use the shared [conversation guidance](references/conversation.md) for progress,
 results, choices, and blocked work. Temari owns their practical meaning and the
 next action in relation to the user's original goal.

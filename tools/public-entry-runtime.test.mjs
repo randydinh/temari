@@ -259,6 +259,31 @@ test('packages an isolated relocated outer bundle with three current public entr
         createHash('sha256').update(bytes).digest('hex'),
       );
     }
+    const specialistPath = 'skills/temari/references/specialist-intake-v1.md';
+    for (const path of [
+      specialistPath,
+      'skills/temari/SKILL.md',
+      'skills/poteto-mode/SKILL.md',
+    ]) {
+      const bytes = await readFile(join(artifact, path));
+      assert.deepEqual(
+        bytes,
+        await readFile(join(repository, 'packages/workflow-runtime/public', path)),
+      );
+      assert.equal(
+        manifest.files.find((file) => file.path === path)?.sha256,
+        createHash('sha256').update(bytes).digest('hex'),
+      );
+      if (path !== specialistPath) {
+        const link = [...bytes.toString().matchAll(/\]\(([^)]+specialist-intake-v1\.md)\)/g)];
+        assert.equal(link.length, 1, `${path} must reach the shared SME intake`);
+        assert.equal(
+          fileURLToPath(new URL(link[0][1], pathToFileURL(join(artifact, path)))),
+          join(artifact, specialistPath),
+          'specialist intake link must resolve inside the relocated installation',
+        );
+      }
+    }
     assert.deepEqual(
       await readFile(join(artifact, 'policy.json')),
       await readFile(join(repository, 'packages/workflow-runtime/public/policy.json')),
@@ -2706,6 +2731,14 @@ test('both engineering skills reach shared conversation guidance, evidence intak
       await readFile(join(output, intakePath)),
       await readFile(join(repository, 'packages/workflow-runtime/public', intakePath)),
       'relocated intake guidance must preserve the owning source bytes',
+    );
+    const specialistPath = 'skills/temari/references/specialist-intake-v1.md';
+    assert(visited.has(specialistPath), `${entry} cannot reach shared SME intake`);
+    assert(
+      manifest.source.files.some(
+        (file) => file.path === `packages/workflow-runtime/public/${specialistPath}`,
+      ),
+      'specialist intake must retain owning source provenance',
     );
     for (const resource of [
       'SKILL.md',

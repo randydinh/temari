@@ -158,6 +158,10 @@ const publicFiles = [
     'skills/temari/references/method-library.md',
   ],
   [
+    'packages/workflow-runtime/public/skills/temari/references/specialist-intake-v1.md',
+    'skills/temari/references/specialist-intake-v1.md',
+  ],
+  [
     'packages/workflow-runtime/public/skills/temari-knowledge/SKILL.md',
     'skills/temari-knowledge/SKILL.md',
   ],
