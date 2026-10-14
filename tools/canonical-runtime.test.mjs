@@ -539,6 +539,50 @@ test('canonical inventory rejects missing and same-size tampered dependency byte
   assert.deepEqual(await checkCanonicalArtifact(artifact, manifest), manifest);
 });
 
+test('relocated metadata omits manifest-only external dependencies outside the emitted closure', async (t) => {
+  const { artifact } = await relocated(t);
+  const source = JSON.parse(
+    await readFile(join(repository, 'libs/host-adapters/package.json'), 'utf8'),
+  );
+  assert(source.dependencies['@modelcontextprotocol/sdk']);
+  assert(source.dependencies.zod);
+  const emitted = JSON.parse(
+    await readFile(join(artifact, 'node_modules/@temari/host-adapters/package.json'), 'utf8'),
+  );
+  assert(!Object.hasOwn(emitted.dependencies, '@modelcontextprotocol/sdk'));
+  assert(!Object.hasOwn(emitted.dependencies, 'zod'));
+  for (const name of ['@temari/contracts', '@temari/privacy', '@temari/temari-core'])
+    assert(Object.hasOwn(emitted.dependencies, name), name);
+  assert(
+    !manifest.files.some((entry) => entry.path.includes('scoped-worker-tools-stdio')),
+    'the separate stdio helper must remain outside the production closure',
+  );
+  assert.deepEqual(await checkCanonicalArtifact(artifact, manifest), manifest);
+});
+
+test('canonical import audit rejects an emitted external import even with a matching local inventory', async (t) => {
+  const { artifact } = await relocated(t);
+  const path = 'node_modules/@temari/host-adapters/src/index.js';
+  const bytes = Buffer.concat([
+    await readFile(join(artifact, path)),
+    Buffer.from('\nimport { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";\n'),
+  ]);
+  await writeFile(join(artifact, path), bytes);
+  const changedManifest = structuredClone(manifest);
+  const entry = changedManifest.files.find((file) => file.path === path);
+  assert(entry);
+  entry.sha256 = createHash('sha256').update(bytes).digest('hex');
+  entry.bytes = bytes.length;
+  await writeFile(
+    join(artifact, 'canonical-manifest.json'),
+    `${JSON.stringify(changedManifest, null, 2)}\n`,
+  );
+  await assert.rejects(
+    checkCanonicalArtifact(artifact),
+    /External import not included: .* -> @modelcontextprotocol\/sdk\/server\/mcp\.js/,
+  );
+});
+
 async function candidateFixture(t) {
   const { root, artifact } = await relocated(t);
   const state = join(root, 'candidate-state');

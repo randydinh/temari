@@ -417,6 +417,10 @@ export async function packageCanonicalRuntime(output) {
   for (const value of metadata.values()) {
     const dependencies = Object.fromEntries(
       Object.keys(value.dependencies ?? {})
+        // Source manifests can also describe helpers outside the emitted
+        // closure. Import auditing below still rejects external dependencies
+        // in emitted code; retain unknown @temari entries so omissions fail.
+        .filter((name) => metadata.has(name) || name.startsWith('@temari/'))
         .sort()
         .map((name) => {
           assert(
